@@ -1,0 +1,218 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Ngui_2_6_3</RootNamespace>
+    <AssemblyName>Ngui_2_6_3</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.XML" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="UnityEditor">
+      <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\AssemblyVersionInfo.cs">
+      <Link>Properties\AssemblyVersionInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
+      <Link>Properties\SharedAssemblyInfo.cs</Link>
+    </Compile>
+    <Compile Include="Editor\BMFontReader.cs" />
+    <Compile Include="Editor\ComponentSelector.cs" />
+    <Compile Include="Editor\NGUIEditorTools.cs" />
+    <Compile Include="Editor\NGUIJson.cs" />
+    <Compile Include="Editor\NGUIMenu.cs" />
+    <Compile Include="Editor\NGUISelectionTools.cs" />
+    <Compile Include="Editor\NGUISettings.cs" />
+    <Compile Include="Editor\NGUITransformInspector.cs" />
+    <Compile Include="Editor\SpriteSelector.cs" />
+    <Compile Include="Editor\UIAtlasInspector.cs" />
+    <Compile Include="Editor\UIAtlasMaker.cs" />
+    <Compile Include="Editor\UICameraTool.cs" />
+    <Compile Include="Editor\UICreateNewUIWizard.cs" />
+    <Compile Include="Editor\UICreateWidgetWizard.cs" />
+    <Compile Include="Editor\UIDrawCallInspector.cs" />
+    <Compile Include="Editor\UIFilledSpriteInspector.cs" />
+    <Compile Include="Editor\UIFontInspector.cs" />
+    <Compile Include="Editor\UIFontMaker.cs" />
+    <Compile Include="Editor\UIImageButtonInspector.cs" />
+    <Compile Include="Editor\UILabelInspector.cs" />
+    <Compile Include="Editor\UIPanelInspector.cs" />
+    <Compile Include="Editor\UIPanelTool.cs" />
+    <Compile Include="Editor\UIPopupListInspector.cs" />
+    <Compile Include="Editor\UIScrollBarInspector.cs" />
+    <Compile Include="Editor\UISlicedSpriteInspector.cs" />
+    <Compile Include="Editor\UISliderInspector.cs" />
+    <Compile Include="Editor\UISpriteAnimationInspector.cs" />
+    <Compile Include="Editor\UISpriteInspector.cs" />
+    <Compile Include="Editor\UITextureInspector.cs" />
+    <Compile Include="Editor\UITexturePacker.cs" />
+    <Compile Include="Editor\UITiledSpriteInspector.cs" />
+    <Compile Include="Editor\UIWidgetInspector.cs" />
+    <Compile Include="Examples\InventorySystem\Editor\InvDatabaseInspector.cs" />
+    <Compile Include="Examples\InventorySystem\Editor\InvFindItem.cs" />
+    <Compile Include="Examples\InventorySystem\Game\EquipItems.cs" />
+    <Compile Include="Examples\InventorySystem\Game\EquipRandomItem.cs" />
+    <Compile Include="Examples\InventorySystem\Game\UICursor.cs" />
+    <Compile Include="Examples\InventorySystem\Game\UIEquipmentSlot.cs" />
+    <Compile Include="Examples\InventorySystem\Game\UIItemSlot.cs" />
+    <Compile Include="Examples\InventorySystem\Game\UIItemStorage.cs" />
+    <Compile Include="Examples\InventorySystem\Game\UIStorageSlot.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvAttachmentPoint.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvBaseItem.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvDatabase.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvEquipment.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvGameItem.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvStat.cs" />
+    <Compile Include="Examples\Other\ChatInput.cs" />
+    <Compile Include="Examples\Other\DownloadTexture.cs" />
+    <Compile Include="Examples\Other\DragDropContainer.cs" />
+    <Compile Include="Examples\Other\DragDropItem.cs" />
+    <Compile Include="Examples\Other\DragDropRoot.cs" />
+    <Compile Include="Examples\Other\DragDropSurface.cs" />
+    <Compile Include="Examples\Other\LagPosition.cs" />
+    <Compile Include="Examples\Other\LagRotation.cs" />
+    <Compile Include="Examples\Other\LoadLevelOnClick.cs" />
+    <Compile Include="Examples\Other\LookAtTarget.cs" />
+    <Compile Include="Examples\Other\PanWithMouse.cs" />
+    <Compile Include="Examples\Other\PlayIdleAnimations.cs" />
+    <Compile Include="Examples\Other\SetColorOnSelection.cs" />
+    <Compile Include="Examples\Other\ShaderQuality.cs" />
+    <Compile Include="Examples\Other\Spin.cs" />
+    <Compile Include="Examples\Other\SpinWithMouse.cs" />
+    <Compile Include="Examples\Other\TypewriterEffect.cs" />
+    <Compile Include="Examples\Other\UpdateManager.cs" />
+    <Compile Include="Examples\Other\WindowAutoYaw.cs" />
+    <Compile Include="Examples\Other\WindowDragTilt.cs" />
+    <Compile Include="Interaction\LanguageSelection.cs" />
+    <Compile Include="Interaction\UIButton.cs" />
+    <Compile Include="Interaction\UIButtonActivate.cs" />
+    <Compile Include="Interaction\UIButtonColor.cs" />
+    <Compile Include="Interaction\UIButtonKeyBinding.cs" />
+    <Compile Include="Interaction\UIButtonKeys.cs" />
+    <Compile Include="Interaction\UIButtonMessage.cs" />
+    <Compile Include="Interaction\UIButtonOffset.cs" />
+    <Compile Include="Interaction\UIButtonPlayAnimation.cs" />
+    <Compile Include="Interaction\UIButtonRotation.cs" />
+    <Compile Include="Interaction\UIButtonScale.cs" />
+    <Compile Include="Interaction\UIButtonSound.cs" />
+    <Compile Include="Interaction\UIButtonTween.cs" />
+    <Compile Include="Interaction\UICenterOnChild.cs" />
+    <Compile Include="Interaction\UICheckbox.cs" />
+    <Compile Include="Interaction\UICheckboxControlledComponent.cs" />
+    <Compile Include="Interaction\UICheckboxControlledObject.cs" />
+    <Compile Include="Interaction\UIDragCamera.cs" />
+    <Compile Include="Interaction\UIDraggableCamera.cs" />
+    <Compile Include="Interaction\UIDraggablePanel.cs" />
+    <Compile Include="Interaction\UIDragObject.cs" />
+    <Compile Include="Interaction\UIDragPanelContents.cs" />
+    <Compile Include="Interaction\UIForwardEvents.cs" />
+    <Compile Include="Interaction\UIGrid.cs" />
+    <Compile Include="Interaction\UIImageButton.cs" />
+    <Compile Include="Interaction\UIInputValidator.cs" />
+    <Compile Include="Interaction\UIPopupList.cs" />
+    <Compile Include="Interaction\UISavedOption.cs" />
+    <Compile Include="Interaction\UIScrollBar.cs" />
+    <Compile Include="Interaction\UISlider.cs" />
+    <Compile Include="Interaction\UISliderColors.cs" />
+    <Compile Include="Interaction\UISoundVolume.cs" />
+    <Compile Include="Interaction\UITable.cs" />
+    <Compile Include="Internal\ActiveAnimation.cs" />
+    <Compile Include="Internal\AnimationOrTween.cs" />
+    <Compile Include="Internal\BetterList.cs" />
+    <Compile Include="Internal\BMFont.cs" />
+    <Compile Include="Internal\BMGlyph.cs" />
+    <Compile Include="Internal\BMSymbol.cs" />
+    <Compile Include="Internal\ByteReader.cs" />
+    <Compile Include="Internal\IgnoreTimeScale.cs" />
+    <Compile Include="Internal\Localization.cs" />
+    <Compile Include="Internal\NGUIDebug.cs" />
+    <Compile Include="Internal\NGUIMath.cs" />
+    <Compile Include="Internal\NGUITools.cs" />
+    <Compile Include="Internal\SpringPanel.cs" />
+    <Compile Include="Internal\UIDrawCall.cs" />
+    <Compile Include="Internal\UIEventListener.cs" />
+    <Compile Include="Internal\UIGeometry.cs" />
+    <Compile Include="Internal\UINode.cs" />
+    <Compile Include="Internal\UIWidget.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Tweening\AnimatedAlpha.cs" />
+    <Compile Include="Tweening\AnimatedColor.cs" />
+    <Compile Include="Tweening\SpringPosition.cs" />
+    <Compile Include="Tweening\TweenAlpha.cs" />
+    <Compile Include="Tweening\TweenColor.cs" />
+    <Compile Include="Tweening\TweenFOV.cs" />
+    <Compile Include="Tweening\TweenOrthoSize.cs" />
+    <Compile Include="Tweening\TweenPosition.cs" />
+    <Compile Include="Tweening\TweenRotation.cs" />
+    <Compile Include="Tweening\TweenScale.cs" />
+    <Compile Include="Tweening\TweenTransform.cs" />
+    <Compile Include="Tweening\TweenVolume.cs" />
+    <Compile Include="Tweening\UITweener.cs" />
+    <Compile Include="UI\UIAnchor.cs" />
+    <Compile Include="UI\UIAtlas.cs" />
+    <Compile Include="UI\UICamera.cs" />
+    <Compile Include="UI\UIFilledSprite.cs" />
+    <Compile Include="UI\UIFont.cs" />
+    <Compile Include="UI\UIInput.cs" />
+    <Compile Include="UI\UIInputSaved.cs" />
+    <Compile Include="UI\UILabel.cs" />
+    <Compile Include="UI\UILocalize.cs" />
+    <Compile Include="UI\UIOrthoCamera.cs" />
+    <Compile Include="UI\UIPanel.cs" />
+    <Compile Include="UI\UIRoot.cs" />
+    <Compile Include="UI\UISlicedSprite.cs" />
+    <Compile Include="UI\UISprite.cs" />
+    <Compile Include="UI\UISpriteAnimation.cs" />
+    <Compile Include="UI\UIStretch.cs" />
+    <Compile Include="UI\UITextList.cs" />
+    <Compile Include="UI\UITexture.cs" />
+    <Compile Include="UI\UITiledSprite.cs" />
+    <Compile Include="UI\UITooltip.cs" />
+    <Compile Include="UI\UIViewport.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
