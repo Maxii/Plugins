@@ -3,6 +3,8 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NGUI", "NGUI\NGUI.csproj", "{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Contextual", "Contextual\Contextual.csproj", "{4FA683FF-627F-49FE-9046-B1E9049CBE14}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -13,6 +15,10 @@ Global
 		{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4FA683FF-627F-49FE-9046-B1E9049CBE14}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4FA683FF-627F-49FE-9046-B1E9049CBE14}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4FA683FF-627F-49FE-9046-B1E9049CBE14}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4FA683FF-627F-49FE-9046-B1E9049CBE14}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
