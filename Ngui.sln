@@ -5,6 +5,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NGUI", "NGUI\NGUI.csproj", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Contextual", "Contextual\Contextual.csproj", "{4FA683FF-627F-49FE-9046-B1E9049CBE14}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vectrosity", "Vectrosity\Vectrosity.csproj", "{742472E2-310C-430C-A59B-1B527D852181}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -19,6 +21,10 @@ Global
 		{4FA683FF-627F-49FE-9046-B1E9049CBE14}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4FA683FF-627F-49FE-9046-B1E9049CBE14}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4FA683FF-627F-49FE-9046-B1E9049CBE14}.Release|Any CPU.Build.0 = Release|Any CPU
+		{742472E2-310C-430C-A59B-1B527D852181}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{742472E2-310C-430C-A59B-1B527D852181}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{742472E2-310C-430C-A59B-1B527D852181}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{742472E2-310C-430C-A59B-1B527D852181}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
