@@ -6,11 +6,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{742472E2-310C-430C-A59B-1B527D852181}</ProjectGuid>
+    <ProjectGuid>{4CA92DEB-90B8-4347-B1B7-58BE8CB8DE97}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Vectrosity</RootNamespace>
-    <AssemblyName>Vectrosity</AssemblyName>
+    <RootNamespace>ContextualEditor</RootNamespace>
+    <AssemblyName>ContextualEditor</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -35,6 +35,12 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.XML" />
+    <Reference Include="UnityEditor">
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEngine">
       <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
       <Private>False</Private>
@@ -47,16 +53,28 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="BrightnessControl.cs" />
-    <Compile Include="LineManager.cs" />
+    <Compile Include="Editor\CtxMenuButtonInspector.cs" />
+    <Compile Include="Editor\CtxMenuInspector.cs" />
+    <Compile Include="Editor\CtxMenuItemInspector.cs" />
+    <Compile Include="Editor\CtxMenus.cs" />
+    <Compile Include="Editor\CtxObjectInspector.cs" />
+    <Compile Include="Editor\CtxPickHandlerInspector.cs" />
+    <Compile Include="Editor\CtxPopupInspector.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="RefInt.cs" />
-    <Compile Include="VectorChar.cs" />
-    <Compile Include="VectorLine.cs" />
-    <Compile Include="VectorManager.cs" />
-    <Compile Include="VisibilityControl.cs" />
-    <Compile Include="VisibilityControlAlways.cs" />
-    <Compile Include="VisibilityControlStatic.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Contextual\Contextual.csproj">
+      <Project>{4fa683ff-627f-49fe-9046-b1e9049cbe14}</Project>
+      <Name>Contextual</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\NguiEditor\NguiEditor.csproj">
+      <Project>{99d34a21-2ff7-4fb8-89b6-2552ce630941}</Project>
+      <Name>NguiEditor</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Ngui\Ngui.csproj">
+      <Project>{AC0F8B23-DD41-4BAB-A967-AA2C33BB1D0B}</Project>
+      <Name>Ngui</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -6,11 +6,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}</ProjectGuid>
+    <ProjectGuid>{AC0F8B23-DD41-4BAB-A967-AA2C33BB1D0B}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Ngui_2_6_3</RootNamespace>
-    <AssemblyName>Ngui_2_6_3</AssemblyName>
+    <RootNamespace>Ngui</RootNamespace>
+    <AssemblyName>Ngui</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -38,10 +38,12 @@
     <Reference Include="System.Data" />
     <Reference Include="System.XML" />
     <Reference Include="UnityEditor">
-      <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine">
       <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -51,73 +53,6 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="Editor\BMFontReader.cs" />
-    <Compile Include="Editor\ComponentSelector.cs" />
-    <Compile Include="Editor\NGUIEditorTools.cs" />
-    <Compile Include="Editor\NGUIJson.cs" />
-    <Compile Include="Editor\NGUIMenu.cs" />
-    <Compile Include="Editor\NGUISelectionTools.cs" />
-    <Compile Include="Editor\NGUISettings.cs" />
-    <Compile Include="Editor\NGUITransformInspector.cs" />
-    <Compile Include="Editor\SpriteSelector.cs" />
-    <Compile Include="Editor\UIAtlasInspector.cs" />
-    <Compile Include="Editor\UIAtlasMaker.cs" />
-    <Compile Include="Editor\UICameraTool.cs" />
-    <Compile Include="Editor\UICreateNewUIWizard.cs" />
-    <Compile Include="Editor\UICreateWidgetWizard.cs" />
-    <Compile Include="Editor\UIDrawCallInspector.cs" />
-    <Compile Include="Editor\UIFilledSpriteInspector.cs" />
-    <Compile Include="Editor\UIFontInspector.cs" />
-    <Compile Include="Editor\UIFontMaker.cs" />
-    <Compile Include="Editor\UIImageButtonInspector.cs" />
-    <Compile Include="Editor\UILabelInspector.cs" />
-    <Compile Include="Editor\UIPanelInspector.cs" />
-    <Compile Include="Editor\UIPanelTool.cs" />
-    <Compile Include="Editor\UIPopupListInspector.cs" />
-    <Compile Include="Editor\UIScrollBarInspector.cs" />
-    <Compile Include="Editor\UISlicedSpriteInspector.cs" />
-    <Compile Include="Editor\UISliderInspector.cs" />
-    <Compile Include="Editor\UISpriteAnimationInspector.cs" />
-    <Compile Include="Editor\UISpriteInspector.cs" />
-    <Compile Include="Editor\UITextureInspector.cs" />
-    <Compile Include="Editor\UITexturePacker.cs" />
-    <Compile Include="Editor\UITiledSpriteInspector.cs" />
-    <Compile Include="Editor\UIWidgetInspector.cs" />
-    <Compile Include="Examples\InventorySystem\Editor\InvDatabaseInspector.cs" />
-    <Compile Include="Examples\InventorySystem\Editor\InvFindItem.cs" />
-    <Compile Include="Examples\InventorySystem\Game\EquipItems.cs" />
-    <Compile Include="Examples\InventorySystem\Game\EquipRandomItem.cs" />
-    <Compile Include="Examples\InventorySystem\Game\UICursor.cs" />
-    <Compile Include="Examples\InventorySystem\Game\UIEquipmentSlot.cs" />
-    <Compile Include="Examples\InventorySystem\Game\UIItemSlot.cs" />
-    <Compile Include="Examples\InventorySystem\Game\UIItemStorage.cs" />
-    <Compile Include="Examples\InventorySystem\Game\UIStorageSlot.cs" />
-    <Compile Include="Examples\InventorySystem\System\InvAttachmentPoint.cs" />
-    <Compile Include="Examples\InventorySystem\System\InvBaseItem.cs" />
-    <Compile Include="Examples\InventorySystem\System\InvDatabase.cs" />
-    <Compile Include="Examples\InventorySystem\System\InvEquipment.cs" />
-    <Compile Include="Examples\InventorySystem\System\InvGameItem.cs" />
-    <Compile Include="Examples\InventorySystem\System\InvStat.cs" />
-    <Compile Include="Examples\Other\ChatInput.cs" />
-    <Compile Include="Examples\Other\DownloadTexture.cs" />
-    <Compile Include="Examples\Other\DragDropContainer.cs" />
-    <Compile Include="Examples\Other\DragDropItem.cs" />
-    <Compile Include="Examples\Other\DragDropRoot.cs" />
-    <Compile Include="Examples\Other\DragDropSurface.cs" />
-    <Compile Include="Examples\Other\LagPosition.cs" />
-    <Compile Include="Examples\Other\LagRotation.cs" />
-    <Compile Include="Examples\Other\LoadLevelOnClick.cs" />
-    <Compile Include="Examples\Other\LookAtTarget.cs" />
-    <Compile Include="Examples\Other\PanWithMouse.cs" />
-    <Compile Include="Examples\Other\PlayIdleAnimations.cs" />
-    <Compile Include="Examples\Other\SetColorOnSelection.cs" />
-    <Compile Include="Examples\Other\ShaderQuality.cs" />
-    <Compile Include="Examples\Other\Spin.cs" />
-    <Compile Include="Examples\Other\SpinWithMouse.cs" />
-    <Compile Include="Examples\Other\TypewriterEffect.cs" />
-    <Compile Include="Examples\Other\UpdateManager.cs" />
-    <Compile Include="Examples\Other\WindowAutoYaw.cs" />
-    <Compile Include="Examples\Other\WindowDragTilt.cs" />
     <Compile Include="Interaction\LanguageSelection.cs" />
     <Compile Include="Interaction\UIButton.cs" />
     <Compile Include="Interaction\UIButtonActivate.cs" />

@@ -1,0 +1,111 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{B865439C-3030-458A-8E76-9398D05128C3}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>NguiExamples</RootNamespace>
+    <AssemblyName>NguiExamples</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.XML" />
+    <Reference Include="UnityEditor">
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\AssemblyVersionInfo.cs">
+      <Link>Properties\AssemblyVersionInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
+      <Link>Properties\SharedAssemblyInfo.cs</Link>
+    </Compile>
+    <Compile Include="Examples\InventorySystem\Editor\InvDatabaseInspector.cs" />
+    <Compile Include="Examples\InventorySystem\Editor\InvFindItem.cs" />
+    <Compile Include="Examples\InventorySystem\Game\EquipItems.cs" />
+    <Compile Include="Examples\InventorySystem\Game\EquipRandomItem.cs" />
+    <Compile Include="Examples\InventorySystem\Game\UICursor.cs" />
+    <Compile Include="Examples\InventorySystem\Game\UIEquipmentSlot.cs" />
+    <Compile Include="Examples\InventorySystem\Game\UIItemSlot.cs" />
+    <Compile Include="Examples\InventorySystem\Game\UIItemStorage.cs" />
+    <Compile Include="Examples\InventorySystem\Game\UIStorageSlot.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvAttachmentPoint.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvBaseItem.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvDatabase.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvEquipment.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvGameItem.cs" />
+    <Compile Include="Examples\InventorySystem\System\InvStat.cs" />
+    <Compile Include="Examples\Other\ChatInput.cs" />
+    <Compile Include="Examples\Other\DownloadTexture.cs" />
+    <Compile Include="Examples\Other\DragDropContainer.cs" />
+    <Compile Include="Examples\Other\DragDropItem.cs" />
+    <Compile Include="Examples\Other\DragDropRoot.cs" />
+    <Compile Include="Examples\Other\DragDropSurface.cs" />
+    <Compile Include="Examples\Other\LagPosition.cs" />
+    <Compile Include="Examples\Other\LagRotation.cs" />
+    <Compile Include="Examples\Other\LoadLevelOnClick.cs" />
+    <Compile Include="Examples\Other\LookAtTarget.cs" />
+    <Compile Include="Examples\Other\PanWithMouse.cs" />
+    <Compile Include="Examples\Other\PlayIdleAnimations.cs" />
+    <Compile Include="Examples\Other\SetColorOnSelection.cs" />
+    <Compile Include="Examples\Other\ShaderQuality.cs" />
+    <Compile Include="Examples\Other\Spin.cs" />
+    <Compile Include="Examples\Other\SpinWithMouse.cs" />
+    <Compile Include="Examples\Other\TypewriterEffect.cs" />
+    <Compile Include="Examples\Other\UpdateManager.cs" />
+    <Compile Include="Examples\Other\WindowAutoYaw.cs" />
+    <Compile Include="Examples\Other\WindowDragTilt.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NguiEditor\NguiEditor.csproj">
+      <Project>{99d34a21-2ff7-4fb8-89b6-2552ce630941}</Project>
+      <Name>NguiEditor</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Ngui\Ngui.csproj">
+      <Project>{84ab84fa-983b-4fb8-bfd9-34d3b93d8000}</Project>
+      <Name>Ngui</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
