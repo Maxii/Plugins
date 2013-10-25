@@ -31,31 +31,10 @@ public class CtxPopupInspector : CtxMenuItemInspector
 			RegisterUndo();
 			popup.contextMenu = contextMenu;
 		}
-		
-		GameObject obj = EditorGUILayout.ObjectField("Event Receiver", popup.eventReceiver, typeof(GameObject), true) as GameObject;
-		string func = EditorGUILayout.TextField("Function Name", popup.functionName);
 
-		if (popup.eventReceiver != obj || popup.functionName != func)
-		{
-			RegisterUndo();
-			
-			popup.eventReceiver = obj;
-			popup.functionName = func;
-		}
-				
-		func = EditorGUILayout.TextField("Show Function", popup.showFunction);
-		if (popup.showFunction != func)
-		{
-			RegisterUndo();
-			popup.showFunction = func;
-		}
-		
-		func = EditorGUILayout.TextField("Hide Function", popup.hideFunction);
-		if (popup.hideFunction != func)
-		{
-			RegisterUndo();
-			popup.hideFunction = func;
-		}
+		NGUIEditorTools.DrawEvents("On Selection", popup, popup.onSelection);
+		NGUIEditorTools.DrawEvents("On Show", popup, popup.onShow);
+		NGUIEditorTools.DrawEvents("On Hide", popup, popup.onHide);
 		
 		if (popup.contextMenu != null)
 		{

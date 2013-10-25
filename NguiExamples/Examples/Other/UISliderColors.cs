@@ -1,6 +1,6 @@
-//----------------------------------------------
+﻿//----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright � 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2013 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -9,7 +9,6 @@ using UnityEngine;
 /// This script automatically changes the color of the specified sprite based on the value of the slider.
 /// </summary>
 
-[ExecuteInEditMode]
 [RequireComponent(typeof(UISlider))]
 [AddComponentMenu("NGUI/Examples/Slider Colors")]
 public class UISliderColors : MonoBehaviour
@@ -26,7 +25,7 @@ public class UISliderColors : MonoBehaviour
 	{
 		if (sprite == null || colors.Length == 0) return;
 
-		float val = mSlider.sliderValue;
+		float val = mSlider.value;
 		val *= (colors.Length - 1);
 		int startIndex = Mathf.FloorToInt(val);
 

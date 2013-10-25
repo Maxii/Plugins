@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEditor;
 
 [CustomEditor(typeof(UISlider))]
-public class UISliderInspector : Editor
+public class UISliderInspector : UIWidgetContainerEditor
 {
 	void ValidatePivot (Transform fg, string name, UISlider.Direction dir)
 	{
@@ -42,17 +42,17 @@ public class UISliderInspector : Editor
 
 	public override void OnInspectorGUI ()
 	{
-		EditorGUIUtility.LookLikeControls(80f);
+		NGUIEditorTools.SetLabelWidth(80f);
 		UISlider slider = target as UISlider;
 
-		NGUIEditorTools.DrawSeparator();
+		GUILayout.Space(3f);
 
-		float sliderValue = EditorGUILayout.Slider("Value", slider.sliderValue, 0f, 1f);
+		float sliderValue = EditorGUILayout.Slider("Value", slider.value, 0f, 1f);
 
-		if (slider.sliderValue != sliderValue)
+		if (slider.value != sliderValue)
 		{
 			NGUIEditorTools.RegisterUndo("Slider Change", slider);
-			slider.sliderValue = sliderValue;
+			slider.value = sliderValue;
 			UnityEditor.EditorUtility.SetDirty(slider);
 		}
 
@@ -66,46 +66,49 @@ public class UISliderInspector : Editor
 			UnityEditor.EditorUtility.SetDirty(slider);
 		}
 
-		NGUIEditorTools.DrawSeparator();
+		//GUILayout.Space(6f);
+		Transform fg = slider.foreground;
+		Transform tb = slider.thumb;
+		UISlider.Direction dir = slider.direction;
 
-		Transform fg = EditorGUILayout.ObjectField("Foreground", slider.foreground, typeof(Transform), true) as Transform;
-		Transform tb = EditorGUILayout.ObjectField("Thumb", slider.thumb, typeof(Transform), true) as Transform;
-		UISlider.Direction dir = (UISlider.Direction)EditorGUILayout.EnumPopup("Direction", slider.direction);
+		if (NGUIEditorTools.DrawHeader("Appearance"))
+		{
+			NGUIEditorTools.BeginContents();
 
-		// If we're using a sprite for the foreground, ensure it's using a proper pivot.
-		ValidatePivot(fg, "Foreground sprite", dir);
+			GUILayout.BeginHorizontal();
+			dir = (UISlider.Direction)EditorGUILayout.EnumPopup("Direction", slider.direction);
+			GUILayout.Space(18f);
+			GUILayout.EndHorizontal();
 
-		NGUIEditorTools.DrawSeparator();
+			fg = EditorGUILayout.ObjectField("Foreground", slider.foreground, typeof(Transform), true) as Transform;
+			tb = EditorGUILayout.ObjectField("Thumb", slider.thumb, typeof(Transform), true) as Transform;
 
-		GameObject er = EditorGUILayout.ObjectField("Event Recv.", slider.eventReceiver, typeof(GameObject), true) as GameObject;
-
-		GUILayout.BeginHorizontal();
-		string fn = EditorGUILayout.TextField("Function", slider.functionName);
-		GUILayout.Space(18f);
-		GUILayout.EndHorizontal();
+			// If we're using a sprite for the foreground, ensure it's using a proper pivot.
+			ValidatePivot(fg, "Foreground sprite", dir);
+			NGUIEditorTools.EndContents();
+		}
+		//GUILayout.Space(3f);
 
 		if (slider.foreground != fg ||
 			slider.thumb != tb ||
-			slider.direction != dir ||
-			slider.eventReceiver != er ||
-			slider.functionName != fn)
+			slider.direction != dir)
 		{
 			NGUIEditorTools.RegisterUndo("Slider Change", slider);
 			slider.foreground = fg;
 			slider.thumb = tb;
 			slider.direction = dir;
-			slider.eventReceiver = er;
-			slider.functionName = fn;
 
 			if (slider.thumb != null)
 			{
 				slider.thumb.localPosition = Vector3.zero;
-				slider.sliderValue = -1f;
-				slider.sliderValue = sliderValue;
+				slider.value = -1f;
+				slider.value = sliderValue;
 			}
 			else slider.ForceUpdate();
 
 			UnityEditor.EditorUtility.SetDirty(slider);
 		}
+
+		NGUIEditorTools.DrawEvents("On Value Change", slider, slider.onChange);
 	}
 }

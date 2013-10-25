@@ -20,31 +20,6 @@ public class UIDragPanelContents : MonoBehaviour
 
 	public UIDraggablePanel draggablePanel;
 
-	// Version 1.92 and earlier referenced the panel instead of UIDraggablePanel script.
-	[HideInInspector][SerializeField] UIPanel panel;
-
-	/// <summary>
-	/// Backwards compatibility.
-	/// </summary>
-
-	void Awake ()
-	{
-		// Legacy functionality support for backwards compatibility
-		if (panel != null)
-		{
-			if (draggablePanel == null)
-			{
-				draggablePanel = panel.GetComponent<UIDraggablePanel>();
-
-				if (draggablePanel == null)
-				{
-					draggablePanel = panel.gameObject.AddComponent<UIDraggablePanel>();
-				}
-			}
-			panel = null;
-		}
-	}
-
 	/// <summary>
 	/// Automatically find the draggable panel if possible.
 	/// </summary>

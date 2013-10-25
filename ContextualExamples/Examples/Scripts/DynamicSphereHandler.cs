@@ -29,7 +29,7 @@ public class DynamicSphereHandler : MonoBehaviour
 	private bool stealthOn;
 	private bool shieldOn;
 	
-	void OnMenuShow(CtxObject obj)
+	public void OnShowMenu(CtxObject obj)
 	{
 		if (menuItems == null)
 		{
@@ -72,12 +72,12 @@ public class DynamicSphereHandler : MonoBehaviour
 		obj.menuItems = menuItems;
 	}
 	
-	void OnMenuHide(CtxObject obj)
+	public void OnHideMenu(CtxObject obj)
 	{
 		Debug.Log("Menu hidden for "+obj.name);
 	}
 	
-	void OnMenuSelection(int itemID)
+	public void OnMenuSelection(int itemID)
 	{
 		switch ((MenuItemID)itemID)
 		{

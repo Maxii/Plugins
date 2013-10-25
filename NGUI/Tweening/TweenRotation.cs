@@ -1,4 +1,4 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
 // Copyright © 2011-2013 Tasharen Entertainment
 //----------------------------------------------
@@ -9,7 +9,7 @@ using UnityEngine;
 /// Tween the object's rotation.
 /// </summary>
 
-[AddComponentMenu("NGUI/Tween/Rotation")]
+[AddComponentMenu("NGUI/Tween/Tween Rotation")]
 public class TweenRotation : UITweener
 {
 	public Vector3 from;

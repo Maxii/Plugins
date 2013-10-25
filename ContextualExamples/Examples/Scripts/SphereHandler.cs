@@ -21,7 +21,7 @@ public class SphereHandler : MonoBehaviour
 		CautiousAttack
 	}
 	
-	void OnMenuSelection(int itemID)
+	public void OnMenuSelection(int itemID)
 	{
 		switch ((MenuItemID)itemID)
 		{

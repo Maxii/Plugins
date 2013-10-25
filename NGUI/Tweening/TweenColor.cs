@@ -1,4 +1,4 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
 // Copyright © 2011-2013 Tasharen Entertainment
 //----------------------------------------------
@@ -9,7 +9,7 @@ using UnityEngine;
 /// Tween the object's color.
 /// </summary>
 
-[AddComponentMenu("NGUI/Tween/Color")]
+[AddComponentMenu("NGUI/Tween/Tween Color")]
 public class TweenColor : UITweener
 {
 	public Color from = Color.white;

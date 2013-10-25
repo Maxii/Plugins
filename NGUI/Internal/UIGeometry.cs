@@ -67,19 +67,10 @@ public class UIGeometry
 	}
 
 	/// <summary>
-	/// Step 2: After the buffers have been filled, apply the specified pivot offset to the generated geometry.
+	/// Step 2: Transform the vertices by the provided matrix.
 	/// </summary>
 
-	public void ApplyOffset (Vector3 pivotOffset)
-	{
-		for (int i = 0; i < verts.size; ++i) verts.buffer[i] += pivotOffset;
-	}
-
-	/// <summary>
-	/// Step 3: Transform the vertices by the provided matrix.
-	/// </summary>
-
-	public void ApplyTransform (Matrix4x4 widgetToPanel, bool normals)
+	public void ApplyTransform (Matrix4x4 widgetToPanel)
 	{
 		if (verts.size > 0)
 		{
@@ -95,7 +86,7 @@ public class UIGeometry
 	}
 
 	/// <summary>
-	/// Step 4: Fill the specified buffer using the transformed values.
+	/// Step 3: Fill the specified buffer using the transformed values.
 	/// </summary>
 
 	public void WriteToBuffers (BetterList<Vector3> v, BetterList<Vector2> u, BetterList<Color32> c, BetterList<Vector3> n, BetterList<Vector4> t)

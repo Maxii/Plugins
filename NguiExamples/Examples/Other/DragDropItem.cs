@@ -15,6 +15,8 @@ public class DragDropItem : MonoBehaviour
 	public GameObject prefab;
 
 	Transform mTrans;
+	bool mPressed = false;
+	int mTouchID = 0;
 	bool mIsDragging = false;
 	bool mSticky = false;
 	Transform mParent;
@@ -54,6 +56,10 @@ public class DragDropItem : MonoBehaviour
 			mTrans.parent = mParent;
 		}
 
+		// Restore the depth
+		UIWidget[] widgets = GetComponentsInChildren<UIWidget>();
+		for (int i = 0; i < widgets.Length; ++i) widgets[i].depth = widgets[i].depth - 100;
+
 		// Notify the table of this change
 		UpdateTable();
 
@@ -66,6 +72,8 @@ public class DragDropItem : MonoBehaviour
 	/// </summary>
 
 	void Awake () { mTrans = transform; }
+	
+	UIRoot mRoot;
 
 	/// <summary>
 	/// Start the drag event and perform the dragging.
@@ -73,23 +81,30 @@ public class DragDropItem : MonoBehaviour
 
 	void OnDrag (Vector2 delta)
 	{
-		if (enabled && UICamera.currentTouchID > -2)
+		if (mPressed && UICamera.currentTouchID == mTouchID && enabled)
 		{
 			if (!mIsDragging)
 			{
 				mIsDragging = true;
 				mParent = mTrans.parent;
-				mTrans.parent = DragDropRoot.root;
+				mRoot = NGUITools.FindInParents<UIRoot>(mTrans.gameObject);
 				
+				if (DragDropRoot.root != null)
+					mTrans.parent = DragDropRoot.root;
+
 				Vector3 pos = mTrans.localPosition;
 				pos.z = 0f;
 				mTrans.localPosition = pos;
+
+				// Inflate the depth so that the dragged item appears in front of everything else
+				UIWidget[] widgets = GetComponentsInChildren<UIWidget>();
+				for (int i = 0; i < widgets.Length; ++i) widgets[i].depth = widgets[i].depth + 100;
 
 				NGUITools.MarkParentAsChanged(gameObject);
 			}
 			else
 			{
-				mTrans.localPosition += (Vector3)delta;
+				mTrans.localPosition += (Vector3)delta * mRoot.pixelSizeAdjustment;
 			}
 		}
 	}
@@ -104,16 +119,26 @@ public class DragDropItem : MonoBehaviour
 		{
 			if (isPressed)
 			{
+				if (mPressed) return;
+
+				mPressed = true;
+				mTouchID = UICamera.currentTouchID;
+
 				if (!UICamera.current.stickyPress)
 				{
 					mSticky = true;
 					UICamera.current.stickyPress = true;
 				}
 			}
-			else if (mSticky)
+			else
 			{
-				mSticky = false;
-				UICamera.current.stickyPress = false;
+				mPressed = false;
+
+				if (mSticky)
+				{
+					mSticky = false;
+					UICamera.current.stickyPress = false;
+				}
 			}
 
 			mIsDragging = false;

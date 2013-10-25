@@ -4,6 +4,7 @@
 //=========================================================
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 /// <summary>
 /// Context Menu. Similar in functionality to NGUI UIPopupList, but better
@@ -16,11 +17,6 @@ using System.Collections;
 public class CtxMenu : MonoBehaviour
 {
 	#region Public Member Variables
-	
-	/// <summary>
-	/// Current context menu. Only available during the OnSelection event callback.
-	/// </summary>
-	static public CtxMenu current;
 	
 	/// <summary>
 	/// Menu style enumeration.
@@ -501,57 +497,32 @@ public class CtxMenu : MonoBehaviour
 	/// Set this to true if you want the menu items to be localized.
 	/// </summary>
 	public bool isLocalized = false;
+	
+	/// <summary>
+	/// Current context menu. Only available during the OnSelection event callback.
+	/// </summary>
+	static public CtxMenu current;
+	
+	/// <summary>
+	/// The current selection. Only valid during the onSelection event callback;
+	/// </summary>
+	[System.NonSerialized]
+	public int selectedItem;
 
 	/// <summary>
-	/// Target game object that will be notified when selection is made.
+	/// The onSelection event.
 	/// </summary>
-	public GameObject eventReceiver;
+	public List<EventDelegate> onSelection = new List<EventDelegate>();
 
 	/// <summary>
-	/// Function to call when the selection is made. [eg void OnSelectionChange(int item);]
+	/// The onShow event.
 	/// </summary>
-	public string functionName = "OnMenuSelection";
-		
-	/// <summary>
-	/// Delegate type used for selection notifications.
-	/// </summary>
-	public delegate void OnSelection(int item);
-
-	/// <summary>
-	/// Delegate to call when the selection is made. Faster than using the 'eventReceiver'.
-	/// </summary>
-	public OnSelection onSelection;
-		
-	/// <summary>
-	/// Delegate type used for notifications.
-	/// </summary>
-	public delegate void OnMenuEvent(CtxMenu menu);
+	public List<EventDelegate> onShow = new List<EventDelegate>();
 	
 	/// <summary>
-	/// Delegate to call just prior to the menu being shown. This is an opportunity to set
-	/// up the menu parameters in an event-driven way before the menu is actually shown.
+	/// The onHide event.
 	/// </summary>
-	public OnMenuEvent onShow;
-	
-	/// <summary>
-	/// Name of function which is called just prior to the menu being shown. The parameter to
-	/// this function is a reference to this CtxMenu instance. Equivalent to the onShow delegate
-	/// for non-C# applications.
-	/// </summary>
-	public string showFunction;
-	
-	/// <summary>
-	/// Delegate to call just after the menu is hidden. This is an opportunity to do
-	/// post-menu cleanup.
-	/// </summary>
-	public OnMenuEvent onHide;
-	
-	/// <summary>
-	/// Name of function which is called just after this menu is hidden. The parameter to
-	/// this function is a reference to this CtxMenu instance. Equivalent to the onHide delegate
-	/// for non-C# applications.
-	/// </summary>
-	public string hideFunction;
+	public List<EventDelegate> onHide = new List<EventDelegate>();
 
 	#endregion
 	
@@ -648,10 +619,7 @@ public class CtxMenu : MonoBehaviour
 			relativePosition = ComputeRelativePosition(screenPos);
 		
 		if (onShow != null)
-			onShow(this);
-		
-		if (eventReceiver != null && ! string.IsNullOrEmpty(showFunction))
-			eventReceiver.SendMessage(showFunction, this, SendMessageOptions.DontRequireReceiver);
+			EventDelegate.Execute(onShow);
 		
 		BuildMenu(relativePosition);
 		index = -1;
@@ -712,7 +680,7 @@ public class CtxMenu : MonoBehaviour
 				{
 					TweenScale ts = TweenScale.Begin(menuRoot.gameObject, animationDuration, CollapsedScale);
 					ts.method = UITweener.Method.EaseOut;
-					ts.onFinished = OnHideAnimationFinished;
+					ts.onFinished.Add(new EventDelegate(OnHideAnimationFinished));
 					
 					if (hideSound)
 						NGUITools.PlaySound(hideSound);
@@ -722,11 +690,7 @@ public class CtxMenu : MonoBehaviour
 			}
 		}
 		
-		if (onHide != null)
-			onHide(this);
-		
-		if (eventReceiver != null && ! string.IsNullOrEmpty(hideFunction))
-			eventReceiver.SendMessage(hideFunction, this, SendMessageOptions.DontRequireReceiver);
+		EventDelegate.Execute(onHide);
 	}
 	
 	/// <summary>
@@ -766,7 +730,7 @@ public class CtxMenu : MonoBehaviour
 					panel = NGUITools.FindInParents<UIPanel>(gameObject);
 				
 				if (panel != null)
-					panel.Refresh();
+					Refresh();
 			}
 			else
 			{
@@ -1241,21 +1205,15 @@ public class CtxMenu : MonoBehaviour
 		{
 			if (style == Style.Horizontal)
 			{
-				Vector3 ls = background.cachedTransform.localScale;
-				if (ls.x != Screen.width)
-				{
-					ls.x = Screen.width;
-					background.cachedTransform.localScale = ls;
-				}
+				int w = (int)Screen.width;
+				if (background.width != w)
+					background.width = w;
 			}
 			else
 			{
-				Vector3 ls = background.cachedTransform.localScale;
-				if (ls.y != Screen.height)
-				{
-					ls.y = Screen.height;
-					background.cachedTransform.localScale = ls;
-				}
+				int h = (int)Screen.height;
+				if (background.height != h)
+					background.height = h;
 			}
 		}
 	}
@@ -1509,7 +1467,7 @@ public class CtxMenu : MonoBehaviour
 		OnKey(key);
 	}
 		
-	void OnHideAnimationFinished(UITweener tweener)
+	void OnHideAnimationFinished()
 	{
 		DestroyMenu();
 	}
@@ -1553,7 +1511,7 @@ public class CtxMenu : MonoBehaviour
 			
 			UICamera uiCam = uiCamera;
 			
-			currentSubmenu.onSelection = OnSubmenuSelection;
+			EventDelegate.Add(currentSubmenu.onSelection, OnSubmenuSelection, true);
 			currentSubmenu.parentMenu = this;
 			
 			float dx = 0f, dy = 0f;
@@ -1692,9 +1650,9 @@ public class CtxMenu : MonoBehaviour
 			currentSubmenu = null;
 	}
 	
-	void OnSubmenuSelection(int item)
+	void OnSubmenuSelection()
 	{
-		SendEvent(item);
+		SendEvent(current.selectedItem);
 		Hide();
 	}
 	
@@ -1830,7 +1788,6 @@ public class CtxMenu : MonoBehaviour
 		float submenuIndWidth = 0f;
 		float submenuIndHeight = 0f;
 		float iconWidth = 0f;
-		float fontSize = (font != null) ? font.size : 15f;
 
 		Color highlightColorFaded = highlightColor;
 		highlightColorFaded.a = 0f;
@@ -1890,8 +1847,8 @@ public class CtxMenu : MonoBehaviour
 					icon.cachedTransform.localPosition = Vector3.zero;
 					icon.MakePixelPerfect();
 					
-					float w = icon.cachedTransform.localScale.x;
-					float h = icon.cachedTransform.localScale.y + padding.y;
+					float w = (float)icon.width;
+					float h = (float)icon.height + padding.y;
 					
 					if (! string.IsNullOrEmpty(item.text) || item.isCheckable)
 						width += padding.x;
@@ -1917,14 +1874,10 @@ public class CtxMenu : MonoBehaviour
 	
 					label.cachedTransform.localPosition = Vector3.zero;
 					label.MakePixelPerfect();
+					label.cachedTransform.localScale = new Vector3(labelScale, labelScale, 1f);
 					
-					if (labelScale != 1f)
-					{
-						Vector3 scale = label.cachedTransform.localScale;
-						label.cachedTransform.localScale = scale * labelScale;
-					}
-				
-					Vector2 labelSize = label.relativeSize * labelScale * fontSize;
+					Vector2 labelSize = label.printedSize * labelScale;
+					
 					width += labelSize.x;
 					
 					itemData[i].label = label;
@@ -1943,8 +1896,8 @@ public class CtxMenu : MonoBehaviour
 					
 					itemData[i].checkmark = check;
 					
-					checkWidth = check.cachedTransform.localScale.x + padding.x;
-					checkHeight = check.cachedTransform.localScale.y + padding.y;
+					checkWidth = (float)check.width + padding.x;
+					checkHeight = (float)check.height + padding.y;
 					
 					if (checkHeight > itemHeight)
 						itemHeight = checkHeight;
@@ -1962,8 +1915,8 @@ public class CtxMenu : MonoBehaviour
 					
 					itemData[i].submenuIndicator = submenuInd;
 					
-					submenuIndWidth = submenuInd.cachedTransform.localScale.x + padding.x;
-					submenuIndHeight = submenuInd.cachedTransform.localScale.y + padding.y;
+					submenuIndWidth = (float)submenuInd.width + padding.x;
+					submenuIndHeight = (float)submenuInd.height + padding.y;
 					
 					if (submenuIndHeight > itemHeight)
 						itemHeight = submenuIndHeight;
@@ -1987,13 +1940,14 @@ public class CtxMenu : MonoBehaviour
 					
 					if (itemData[i].icon != null)
 					{
-						w += itemData[i].icon.cachedTransform.localScale.x;
+						w += (float)itemData[i].icon.width;
 						if (itemData[i].label != null)
 							w += padding.x;
 					}
 					
 					itemData[i].size = new Vector2(w, h);
-					itemData[i].background.cachedTransform.localScale = new Vector3(w, h, 1f);
+					itemData[i].background.width = (int)w;
+					itemData[i].background.height = (int)h;
 					itemData[i].background.MakePixelPerfect();
 				}
 
@@ -2030,12 +1984,12 @@ public class CtxMenu : MonoBehaviour
 					sep.depth = NGUITools.CalculateNextDepth(panel.gameObject);
 					sep.color = separatorColor;
 					
-					UIAtlas.Sprite sepSp = sep.GetAtlasSprite();
-					float sepHeight = sepSp.outer.yMax - sepSp.outer.yMin;
-					float sepWidth = sepSp.outer.xMax - sepSp.outer.xMin;
+					UISpriteData sepSp = sep.GetAtlasSprite();
+					float sepWidth = (float)sepSp.width + sepSp.paddingLeft + sepSp.paddingRight;
+					float sepHeight = (float)sepSp.height + sepSp.paddingTop + sepSp.paddingBottom;
 					
 					sep.cachedTransform.localPosition = Vector3.zero;
-					sep.cachedTransform.localScale = new Vector3(sepWidth, sepHeight, 1f);
+					sep.height = (int)sepHeight;
 					
 					itemData[i].separator = sep;
 										
@@ -2102,16 +2056,17 @@ public class CtxMenu : MonoBehaviour
 			totalHeight += itemHeight;
 
 			Vector3 localPos = ComputeMenuPosition(menuTrx.transform, Vector3.zero, totalWidth, totalHeight);
-			Vector3 localScale = new Vector3(totalWidth, totalHeight, 1f);
 			
 			background.cachedTransform.localPosition = localPos;
-			background.cachedTransform.localScale = localScale;
+			background.width = (int)totalWidth;
+			background.height = (int)totalHeight;
 			background.MakePixelPerfect();
 						
 			if (shadow != null)
 			{
 				shadow.cachedTransform.localPosition = localPos + (Vector3)shadowOffset;
-				shadow.cachedTransform.localScale = new Vector3(localScale.x+shadowSizeDelta.x, localScale.y+shadowSizeDelta.y, 1f);
+				shadow.width = (int)(totalWidth + shadowSizeDelta.x);
+				shadow.height = (int)(totalHeight + shadowSizeDelta.y);
 			}
 
 			Vector3 itemPos = localPos;
@@ -2128,9 +2083,7 @@ public class CtxMenu : MonoBehaviour
 				if (itemData[i].separator != null)
 				{
 					itemPos.x += padding.x;
-					Vector3 ss = itemData[i].separator.cachedTransform.localScale;
-					ss.y = itemHeight;
-					itemData[i].separator.cachedTransform.localScale = ss;
+					itemData[i].separator.height = (int)itemHeight;
 					itemData[i].separator.cachedTransform.localPosition = itemPos;
 				}
 				else
@@ -2138,7 +2091,8 @@ public class CtxMenu : MonoBehaviour
 					if (itemData[i].highlight != null)
 					{
 						itemData[i].highlight.cachedTransform.localPosition = itemPos;
-						itemData[i].highlight.cachedTransform.localScale = new Vector3(itemData[i].size.x, itemData[i].size.y, 1f);
+						itemData[i].highlight.width = (int)itemData[i].size.x;
+						itemData[i].highlight.height = (int)itemData[i].size.y;
 						
 						// Add a collider to the highlight item. The size of the highlight
 						// conveniently agrees with the extent of the box we want to track.
@@ -2165,11 +2119,11 @@ public class CtxMenu : MonoBehaviour
 					if (itemData[i].icon != null)
 					{
 						Vector3 iconPos = itemPos;
-						Vector3 iconScale = itemData[i].icon.cachedTransform.localScale;
+						float w = (float)itemData[i].icon.width;
 						
-						iconPos.x += (iconWidth - iconScale.x) * 0.5f;	// <-- Center sprite horizontally.
-						
-						PositionSprite(iconPos, itemData[i].icon, itemHeight, iconScale.x, iconScale.y);
+						iconPos.x += (iconWidth - w) * 0.5f;	// <-- Center sprite horizontally.
+
+						PositionSprite(iconPos, itemData[i].icon, itemHeight, w, (float)itemData[i].icon.height);
 
 						itemPos.x += iconWidth + padding.x;
 					}
@@ -2219,17 +2173,17 @@ public class CtxMenu : MonoBehaviour
 			totalWidth += itemWidth;
 			
 			Vector3 localPos = ComputeMenuPosition(menuTrx.transform, Vector3.zero, totalWidth, totalHeight);
-			Vector3 localScale = new Vector3(totalWidth, totalHeight, 1f);
 			
 			background.cachedTransform.localPosition = localPos;
-			background.cachedTransform.localScale = localScale;
+			background.width = (int)totalWidth;
+			background.height = (int)totalHeight;
 			background.MakePixelPerfect();
-			localScale = background.cachedTransform.localScale;
 			
 			if (shadow != null)
 			{
 				shadow.cachedTransform.localPosition = localPos + (Vector3)shadowOffset;
-				shadow.cachedTransform.localScale = new Vector3(localScale.x+shadowSizeDelta.x, localScale.y+shadowSizeDelta.y, 1f);
+				shadow.width = (int)(totalWidth + shadowSizeDelta.x);
+				shadow.height = (int)(totalHeight + shadowSizeDelta.y);
 			}
 
 			Vector3 itemPos = localPos;
@@ -2245,9 +2199,7 @@ public class CtxMenu : MonoBehaviour
 				if (itemData[i].separator != null)
 				{
 					itemPos.y -= padding.y;
-					Vector3 ss = itemData[i].separator.cachedTransform.localScale;
-					ss.x = itemWidth;
-					itemData[i].separator.cachedTransform.localScale = ss;
+					itemData[i].separator.width = (int)itemWidth;
 					itemData[i].separator.cachedTransform.localPosition = itemPos;
 				}
 				else
@@ -2255,7 +2207,8 @@ public class CtxMenu : MonoBehaviour
 					if (itemData[i].highlight != null)
 					{
 						itemData[i].highlight.cachedTransform.localPosition = itemPos;
-						itemData[i].highlight.cachedTransform.localScale = new Vector3(itemData[i].size.x, itemData[i].size.y, 1f);
+						itemData[i].highlight.width = (int)itemData[i].size.x;
+						itemData[i].highlight.height = (int)itemData[i].size.y;
 						
 						// Add a collider to the highlight item. The size of the highlight
 						// conveniently agrees with the extent of the box we want to track.
@@ -2284,11 +2237,11 @@ public class CtxMenu : MonoBehaviour
 					if (itemData[i].icon != null)
 					{
 						Vector3 iconPos = itemPos;
-						Vector3 iconScale = itemData[i].icon.cachedTransform.localScale;
+						float w = (float)itemData[i].icon.width;
 						
-						iconPos.x += (iconWidth - iconScale.x) * 0.5f;	// <-- Center sprite horizontally.
+						iconPos.x += (iconWidth - w) * 0.5f;	// <-- Center sprite horizontally.
 
-						PositionSprite(iconPos, itemData[i].icon, itemHeight, iconScale.x, iconScale.y);
+						PositionSprite(iconPos, itemData[i].icon, itemHeight, w, (float)itemData[i].icon.height);
 					}
 
 					if (iconWidth > 0f)
@@ -2377,18 +2330,11 @@ public class CtxMenu : MonoBehaviour
 						// size is the desired size for this item and adjust accordingly. Note that this may
 						// result in some UI elements exceeding the background boundaries.
 						
-						if (! ( itemData[i].background is UISlicedSprite || 
-								itemData[i].background is UITiledSprite ||
-								itemData[i].background is UIFilledSprite))
+						if (itemData[i].background != null && itemData[i].background.type == UISprite.Type.Simple)
 						{
-							UIAtlas.Sprite bgSp = itemData[i].background.GetAtlasSprite();
-							localScale = new Vector3(bgSp.outer.width, bgSp.outer.height, 1f);
-							
-							bgOffset.x = -(bgSp.inner.xMin - bgSp.outer.xMin + bgSp.paddingLeft * localScale.x);
-							bgOffset.y =   bgSp.inner.yMin - bgSp.outer.yMin + bgSp.paddingTop * localScale.y;
-						
-							backgroundPadding.x = (bgSp.outer.width - itemData[i].size.x) * 0.5f;
-							height = bgSp.outer.height;
+							localScale = new Vector3((float)itemData[i].background.width, (float)itemData[i].background.height, 1f);
+							backgroundPadding.x = (localScale.x - itemData[i].size.x) * 0.5f;
+							height = localScale.y;
 						}
 
 						itemPos = new Vector3(-localScale.x * 0.5f, localScale.y * 0.5f, 0f);
@@ -2397,14 +2343,16 @@ public class CtxMenu : MonoBehaviour
 					itemPos += radialPos;
 					itemData[i].position = itemPos;
 					
-					itemData[i].background.cachedTransform.localScale = localScale;
+					itemData[i].background.width = (int)localScale.x;
+					itemData[i].background.height = (int)localScale.y;
 					itemData[i].background.cachedTransform.localPosition = itemPos + bgOffset;
 					itemData[i].background.MakePixelPerfect();
 			
 					if (itemData[i].shadow != null)
 					{
 						itemData[i].shadow.cachedTransform.localPosition = itemPos + bgOffset + (Vector3)shadowOffset;
-						itemData[i].shadow.cachedTransform.localScale = new Vector3(localScale.x+shadowSizeDelta.x, localScale.y+shadowSizeDelta.y, 1f);
+						itemData[i].shadow.width = (int)(localScale.x + shadowSizeDelta.x);
+						itemData[i].shadow.height = (int)(localScale.y + shadowSizeDelta.y);
 					}
 					
 					pieBounds.Encapsulate(new Bounds(itemPos + new Vector3(localScale.x, -localScale.y, 0f)*0.5f, localScale));
@@ -2435,11 +2383,8 @@ public class CtxMenu : MonoBehaviour
 					if (itemData[i].icon != null)
 					{
 						Vector3 iconPos = itemPos;
-						Vector3 iconScale = itemData[i].icon.cachedTransform.localScale;
 						
-						iconPos.x += (iconWidth - iconScale.x) * 0.5f;	// <-- Center sprite horizontally.
-						
-						PositionSprite(iconPos, itemData[i].icon, height, iconScale.x, iconScale.y);
+						PositionSprite(iconPos, itemData[i].icon, height, (float)itemData[i].icon.width, (float)itemData[i].icon.height);
 						
 						itemPos.x += iconWidth + padding.x;
 					}
@@ -2582,13 +2527,16 @@ public class CtxMenu : MonoBehaviour
 	Vector3 PositionSprite(Vector3 pos, UISprite sprite, float itemHeight, float scaleX, float scaleY)
 	{
 		pos.y -= (itemHeight - scaleY) * 0.5f;	// <-- Center sprite vertically.
-
+		
+		/* Seems this is no longer needed in NGUI 3.0...
+		 *
 		UIAtlas.Sprite sp = sprite.GetAtlasSprite();
 		float spX = sp.inner.xMin - sp.outer.xMin + sp.paddingLeft * scaleX;
 		float spY = sp.inner.yMin - sp.outer.yMin + sp.paddingTop * scaleY;
 		
 		pos.x -= spX;
 		pos.y += spY;
+		/**/
 
 		sprite.cachedTransform.localPosition = pos;
 		sprite.MakePixelPerfect();
@@ -2901,13 +2849,8 @@ public class CtxMenu : MonoBehaviour
 		if (onSelection != null)
 		{
 			current = this;
-			onSelection(id);
-		}
-		
-		if (eventReceiver != null && ! string.IsNullOrEmpty(functionName) && Application.isPlaying)
-		{
-			current = this;
-			eventReceiver.SendMessage(functionName, id, SendMessageOptions.DontRequireReceiver);
+			selectedItem = id;
+			EventDelegate.Execute(onSelection);
 		}
 		
 		current = null;

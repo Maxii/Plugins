@@ -4,6 +4,7 @@
 //=========================================================
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 /// <summary>
 /// A component class that can be used to attach a context menu to any object.
@@ -41,57 +42,31 @@ public class CtxObject : MonoBehaviour
 	/// and/or more efficient in some situations.
 	/// </summary>
 	public CtxMenu.Item[] menuItems;
-
-	/// <summary>
-	/// The menu selection event handler delegate. If the handlesMenu flag is set then
-	/// this delegate will be called when a menu selection is made.
-	/// </summary>
-	public CtxMenu.OnSelection onSelection;
-
-	/// <summary>
-	/// Target game object that will be notified when a selection is made. If this is
-	/// not set then events will be sent to the game object to which this component
-	/// is attached.
-	/// </summary>
-	public GameObject eventReceiver;
 	
 	/// <summary>
-	/// Message sent to the event receiver when a menu selection is made. If
-	/// no event receiver is set then the message is sent to the game object to which
-	/// this component is attached.
+	/// The current CtxObject instance. Valid only during event callbacks.
 	/// </summary>
-	public string functionName = "OnMenuSelection";
-			
-	/// <summary>
-	/// Delegate type used for notifications.
-	/// </summary>
-	public delegate void OnMenuEvent(CtxObject menu);
+	public static CtxObject current;
 	
 	/// <summary>
-	/// Delegate to call just prior to the menu being shown. This is an opportunity to set
-	/// up the menu parameters in an event-driven way before the menu is actually shown.
+	/// The last selected menu item.
 	/// </summary>
-	public OnMenuEvent onShow;
+	public int selectedItem;
 	
 	/// <summary>
-	/// Optional message sent to the event receiver just prior to the menu being shown. If
-	/// no event receiver is set then the message is sent to the game object to which this
-	/// component is attached.
+	/// The onSelection event.
 	/// </summary>
-	public string showFunction;
+	public List<EventDelegate> onSelection = new List<EventDelegate>();
 	
 	/// <summary>
-	/// Delegate to call just after the menu is hidden. This is an opportunity to do
-	/// post-menu cleanup.
+	/// The onShow event.
 	/// </summary>
-	public OnMenuEvent onHide;
+	public List<EventDelegate> onShow = new List<EventDelegate>();
 	
 	/// <summary>
-	/// Name of function which is called just after the menu is hidden. The parameter to
-	/// this function is a reference to this CtxObject instance. Equivalent to the onHide delegate
-	/// for non-C# applications.
+	/// The onHide event.
 	/// </summary>
-	public string hideFunction;
+	public List<EventDelegate> onHide = new List<EventDelegate>();
 
 	#endregion
 	
@@ -118,20 +93,18 @@ public class CtxObject : MonoBehaviour
 	{
 		if (contextMenu != null)
 		{
-			contextMenu.onSelection = _OnSelection;
-				
-			if (onShow != null)
-				onShow(this);
-						
-			if (! string.IsNullOrEmpty(showFunction))
-				EventReceiver.SendMessage(showFunction, this, SendMessageOptions.DontRequireReceiver);
+			EventDelegate.Add(contextMenu.onSelection, OnMenuSelect, true);
+			EventDelegate.Add(contextMenu.onHide, OnHide, true);
+			
+			current = this;
+			EventDelegate.Execute(onShow);
+		
+			gameObject.SendMessage("OnShowMenu", this, SendMessageOptions.DontRequireReceiver);
 			
 			if (menuItems != null && menuItems.Length > 0)
 				contextMenu.Show(MenuPosition, menuItems);
 			else
 				contextMenu.Show(MenuPosition);
-			
-			contextMenu.onHide = OnHide;
 		}
 	}
 
@@ -144,13 +117,12 @@ public class CtxObject : MonoBehaviour
 			contextMenu.Hide();
 	}
 	
-	void OnHide(CtxMenu menu)
+	void OnHide()
 	{
-		if (onHide != null)
-			onHide(this);
-		
-		if (! string.IsNullOrEmpty(hideFunction))
-			EventReceiver.SendMessage(hideFunction, this, SendMessageOptions.DontRequireReceiver);
+		current = this;
+		EventDelegate.Execute(onHide);
+
+		gameObject.SendMessage("OnHideMenu", this, SendMessageOptions.DontRequireReceiver);
 	}
 	
 	#endregion
@@ -312,23 +284,15 @@ public class CtxObject : MonoBehaviour
 	#endregion
 		
 	#region Private Member Functions
-	
-	private void _OnSelection(int selected)
+
+	private void OnMenuSelect()
 	{
-		if (onSelection != null)
-			onSelection(selected);
+		selectedItem = CtxMenu.current.selectedItem;
 		
-		if (! string.IsNullOrEmpty(functionName))
-		{
-			sender = gameObject;
-			EventReceiver.SendMessage(functionName, selected, SendMessageOptions.DontRequireReceiver);
-			sender = null;
-		}
-	}
-	
-	private GameObject EventReceiver
-	{
-		get { return (eventReceiver != null) ? eventReceiver : gameObject; }
+		current = this;
+		EventDelegate.Execute(onSelection);
+		
+		gameObject.SendMessage("OnMenuSelection", selectedItem, SendMessageOptions.DontRequireReceiver);
 	}
 	
 	private Vector3 MenuPosition
@@ -339,7 +303,7 @@ public class CtxObject : MonoBehaviour
 			{
 				// In the simplest case the menu pivot is just positioned on the
 				// object's origin position. This may be fine in some cases.
-				return Camera.mainCamera.WorldToScreenPoint(transform.position);
+				return Camera.main.WorldToScreenPoint(transform.position);
 			}
 			else
 			{
@@ -348,7 +312,7 @@ public class CtxObject : MonoBehaviour
 				// object bounds. Note that CtxMenu itself may adjust the
 				// position in order to keep the menu contents on screen.
 				return CtxHelper.ComputeMenuPosition(contextMenu, 
-					CtxHelper.ComputeScreenSpaceBounds(collider.bounds, Camera.mainCamera), false);
+					CtxHelper.ComputeScreenSpaceBounds(collider.bounds, Camera.main), false);
 			}
 		}
 	}

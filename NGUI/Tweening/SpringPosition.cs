@@ -10,7 +10,7 @@ using UnityEngine;
 /// </summary>
 
 [AddComponentMenu("NGUI/Tween/Spring Position")]
-public class SpringPosition : IgnoreTimeScale
+public class SpringPosition : MonoBehaviour
 {
 	public delegate void OnFinished (SpringPosition spring);
 
@@ -71,7 +71,7 @@ public class SpringPosition : IgnoreTimeScale
 
 	void Update ()
 	{
-		float delta = ignoreTimeScale ? UpdateRealTimeDelta() : Time.deltaTime;
+		float delta = ignoreTimeScale ? RealTime.deltaTime : Time.deltaTime;
 
 		if (worldSpace)
 		{

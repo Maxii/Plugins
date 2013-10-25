@@ -12,9 +12,9 @@ public class ButtonHandler : MonoBehaviour
 		AreYouKidding
 	}
 	
-	void OnDifficultySelection(int item)
+	public void OnDifficultySelection()
 	{
-		Difficulty d = (Difficulty)item;
+		Difficulty d = (Difficulty)CtxMenuButton.current.selectedItem;
 		Debug.Log("Difficulty: "+d.ToString());
 	}
 
@@ -28,8 +28,10 @@ public class ButtonHandler : MonoBehaviour
 		Count
 	}
 	
-	void OnInputDeviceSelection(int item)
+	public void OnInputDeviceSelection()
 	{
+		//int item = CtxMenuButton.current.selectedItem;
+		
 		string msg = "";
 		for (InputDevice d = InputDevice.Mouse; d<InputDevice.Count; d++)
 		{
@@ -53,25 +55,27 @@ public class ButtonHandler : MonoBehaviour
 		End
 	}
 	
-	void OnPlaybackWidgetSelection(int item)
+	public void OnPlaybackWidgetSelection()
 	{
+		int item = CtxMenuButton.current.selectedItem;
+		
 		PlaybackItem pbi = (PlaybackItem)item;
 		Debug.Log("PlaybackWidget: "+pbi.ToString());
 	}
 	
-	void OnShowDifficultyMenu(CtxMenuButton button)
+	public void OnShowDifficultyMenu()
 	{
-		Debug.Log("ButtonHandler.OnShowDifficultyMenu() "+button);
+		Debug.Log("ButtonHandler.OnShowDifficultyMenu() "+CtxMenuButton.current);
 	}
 		
-	void OnHideDifficultyMenu(CtxMenuButton button)
+	public void OnHideDifficultyMenu()
 	{
-		Debug.Log("ButtonHandler.OnHideDifficultyMenu() "+button);
+		Debug.Log("ButtonHandler.OnHideDifficultyMenu() "+CtxMenuButton.current);
 	}
 
-	void OnShowInputOptionsMenu(CtxMenuButton button)
+	public void OnShowInputOptionsMenu()
 	{
-		Debug.Log("ButtonHandler.OnShowInputOptionsMenu() "+button);
+		Debug.Log("ButtonHandler.OnShowInputOptionsMenu() "+CtxMenuButton.current);
 	}
 	
 	enum HelpItem
@@ -83,9 +87,9 @@ public class ButtonHandler : MonoBehaviour
 		UserInterface
 	}
 	
-	void OnHelpSelection(int item)
+	public void OnHelpSelection()
 	{
-		HelpItem hi = (HelpItem)item;
+		HelpItem hi = (HelpItem)CtxPopup.current.selectedItem;
 		Debug.Log("ButtonHandler.OnHelpSelection() "+hi.ToString());
 	}
 }

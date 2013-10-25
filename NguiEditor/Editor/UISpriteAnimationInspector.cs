@@ -20,7 +20,7 @@ public class UISpriteAnimationInspector : Editor
 	public override void OnInspectorGUI ()
 	{
 		NGUIEditorTools.DrawSeparator();
-		EditorGUIUtility.LookLikeControls(80f);
+		NGUIEditorTools.SetLabelWidth(80f);
 		UISpriteAnimation anim = target as UISpriteAnimation;
 
 		int fps = EditorGUILayout.IntField("Framerate", anim.framesPerSecond);

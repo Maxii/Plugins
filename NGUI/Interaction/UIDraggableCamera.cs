@@ -11,7 +11,7 @@ using UnityEngine;
 
 [RequireComponent(typeof(Camera))]
 [AddComponentMenu("NGUI/Interaction/Draggable Camera")]
-public class UIDraggableCamera : IgnoreTimeScale
+public class UIDraggableCamera : MonoBehaviour
 {
 	/// <summary>
 	/// Root object that will be used for drag-limiting bounds.
@@ -215,7 +215,7 @@ public class UIDraggableCamera : IgnoreTimeScale
 
 	void Update ()
 	{
-		float delta = UpdateRealTimeDelta();
+		float delta = RealTime.deltaTime;
 
 		if (mPressed)
 		{

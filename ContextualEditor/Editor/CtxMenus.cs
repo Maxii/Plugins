@@ -53,6 +53,8 @@ public class CtxMenus
 			ct.localScale = Vector3.one;
 
 			CtxMenu menu = ctxMenuObj.AddComponent<CtxMenu>();
+			menu.atlas = PickAtlas();
+			menu.font = PickFont();
 			
 			// Create button object.
 			GameObject ctxButtonObj = new GameObject("Menu Button");
@@ -67,20 +69,24 @@ public class CtxMenus
 			int depth = NGUITools.CalculateNextDepth(ctxButtonObj);
 			
 			// Create child objects.
-			UISlicedSprite bg = NGUITools.AddWidget<UISlicedSprite>(ctxButtonObj);
+			
+			UISprite bg = NGUITools.AddSprite(ctxButtonObj, PickAtlas(), "Button");
 			bg.name = "Background";
 			bg.depth = depth;
-			bg.atlas = NGUISettings.atlas;
-			bg.transform.localScale = new Vector3(150f, 40f, 1f);
+			bg.width = 150;
+			bg.height = 40;
 			bg.MakePixelPerfect();
 
 			UILabel lbl = NGUITools.AddWidget<UILabel>(ctxButtonObj);
-			lbl.font = NGUISettings.font;
+			lbl.font = PickFont();
 			lbl.text = ctxButtonObj.name;
+			lbl.color = Color.black;
 			lbl.MakePixelPerfect();
+			Vector2 size = lbl.printedSize;		// Force NGUI to process metrics before adding collider. Otherwise you get incorrect-sized collider.
+			size.x -= 1f;						// Supress compiler warning for unused 'size' variable. Sheesh...
 
 			// Attach button and menu components.
-			NGUITools.AddWidgetCollider(ctxButtonObj);
+			NGUITools.AddWidgetCollider(ctxButtonObj, true);
 
 			CtxMenuButton menuButton = ctxButtonObj.AddComponent<CtxMenuButton>();
 			menuButton.contextMenu = menu;
@@ -89,7 +95,7 @@ public class CtxMenus
 			ctxButtonObj.AddComponent<UIButton>().tweenTarget = bg.gameObject;
 			ctxButtonObj.AddComponent<UIButtonScale>();
 			ctxButtonObj.AddComponent<UIButtonOffset>();
-			ctxButtonObj.AddComponent<UIButtonSound>();
+			ctxButtonObj.AddComponent<UIPlaySound>();
 
 			Selection.activeGameObject = ctxButtonObj;
 		}
@@ -120,5 +126,57 @@ public class CtxMenus
 			
 			Selection.activeGameObject = ctxMenuObj;
 		}
+	}
+	
+	private static UIAtlas PickAtlas()
+	{
+		UIAtlas atlas = NGUISettings.atlas;
+		
+		if (atlas == null)
+		{
+			UIAtlas[] atlases = Resources.FindObjectsOfTypeAll(typeof(UIAtlas)) as UIAtlas[];
+			if (atlases != null)
+			{
+				foreach (UIAtlas a in atlases)
+				{
+					if (a.name == "ExampleAtlas")
+					{
+						atlas = a;
+						break;
+					}
+				}
+				
+				if (atlas == null && atlases.Length > 0)
+					atlas = atlases[0];
+			}
+		}
+		
+		return atlas;
+	}
+	
+	private static UIFont PickFont()
+	{
+		UIFont font = NGUISettings.font;
+		
+		if (font == null)
+		{
+			UIFont[] fonts = Resources.FindObjectsOfTypeAll(typeof(UIFont)) as UIFont[];
+			if (fonts != null)
+			{
+				foreach (UIFont f in fonts)
+				{
+					if (f.name == "MedSans")
+					{
+						font = f;
+						break;
+					}
+				}
+				
+				if (fonts == null && fonts.Length > 0)
+					font = fonts[0];
+			}
+		}
+		
+		return font;
 	}
 }

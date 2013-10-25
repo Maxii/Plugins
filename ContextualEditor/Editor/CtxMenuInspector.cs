@@ -167,31 +167,10 @@ public class CtxMenuInspector : CtxMenuItemInspector
 		}
 		
 		EditorGUIUtility.LookLikeControls(100f);
-		
-		GameObject obj = EditorGUILayout.ObjectField("Event Receiver", contextMenu.eventReceiver, typeof(GameObject), true) as GameObject;
-		string func = EditorGUILayout.TextField("Event Function", contextMenu.functionName);
 
-		if (contextMenu.eventReceiver != obj || contextMenu.functionName != func)
-		{
-			RegisterUndo();
-			
-			contextMenu.eventReceiver = obj;
-			contextMenu.functionName = func;
-		}
-		
-		func = EditorGUILayout.TextField("Show Function", contextMenu.showFunction);
-		if (contextMenu.showFunction != func)
-		{
-			RegisterUndo();
-			contextMenu.showFunction = func;
-		}
-		
-		func = EditorGUILayout.TextField("Hide Function", contextMenu.hideFunction);
-		if (contextMenu.hideFunction != func)
-		{
-			RegisterUndo();
-			contextMenu.hideFunction = func;
-		}
+		NGUIEditorTools.DrawEvents("On Selection", contextMenu, contextMenu.onSelection);
+		NGUIEditorTools.DrawEvents("On Show", contextMenu, contextMenu.onShow);
+		NGUIEditorTools.DrawEvents("On Hide", contextMenu, contextMenu.onHide);
 		
 		EditorGUILayout.Space();
 

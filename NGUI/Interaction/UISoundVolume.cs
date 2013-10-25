@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright Â© 2011-2013 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -19,12 +19,12 @@ public class UISoundVolume : MonoBehaviour
 	void Awake ()
 	{
 		mSlider = GetComponent<UISlider>();
-		mSlider.sliderValue = NGUITools.soundVolume;
-		mSlider.eventReceiver = gameObject;
+		mSlider.value = NGUITools.soundVolume;
+		EventDelegate.Add(mSlider.onChange, OnChange);
 	}
 
-	void OnSliderChange (float val)
+	void OnChange ()
 	{
-		NGUITools.soundVolume = val;
+		NGUITools.soundVolume = UISlider.current.value;
 	}
 }

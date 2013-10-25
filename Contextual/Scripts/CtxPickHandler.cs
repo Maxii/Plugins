@@ -110,7 +110,7 @@ public class CtxPickHandler : MonoBehaviour
 	{
 		Camera cam = camera;
 		if (cam == null)
-			cam = Camera.mainCamera;
+			cam = Camera.main;
 		
 		Ray ray = cam.ScreenPointToRay(mousePos);
 

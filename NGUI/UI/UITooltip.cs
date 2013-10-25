@@ -20,7 +20,7 @@ public class UITooltip : MonoBehaviour
 	float mTarget = 0f;
 	float mCurrent = 0f;
 	Vector3 mPos;
-	Vector3 mSize;
+	Vector3 mSize = Vector3.zero;
 
 	UIWidget[] mWidgets;
 
@@ -36,7 +36,6 @@ public class UITooltip : MonoBehaviour
 		mTrans = transform;
 		mWidgets = GetComponentsInChildren<UIWidget>();
 		mPos = mTrans.localPosition;
-		mSize = mTrans.localScale;
 		if (uiCamera == null) uiCamera = NGUITools.FindCameraForLayer(gameObject.layer);
 		SetAlpha(0f);
 	}
@@ -98,23 +97,23 @@ public class UITooltip : MonoBehaviour
 
 			if (background != null)
 			{
-				Transform backgroundTrans = background.transform;
-
 				Transform textTrans = text.transform;
 				Vector3 offset = textTrans.localPosition;
 				Vector3 textScale = textTrans.localScale;
 
 				// Calculate the dimensions of the printed text
-				mSize = text.relativeSize;
+				mSize = text.printedSize;
 
 				// Scale by the transform and adjust by the padding offset
 				mSize.x *= textScale.x;
 				mSize.y *= textScale.y;
-				mSize.x += background.border.x + background.border.z + ( offset.x - background.border.x) * 2f;
-				mSize.y += background.border.y + background.border.w + (-offset.y - background.border.y) * 2f;
-				mSize.z = 1f;
 
-				backgroundTrans.localScale = mSize;
+				Vector4 border = background.border;
+				mSize.x += border.x + border.z + ( offset.x - border.x) * 2f;
+				mSize.y += border.y + border.w + (-offset.y - border.y) * 2f;
+
+				background.width = Mathf.RoundToInt(mSize.x);
+				background.height = Mathf.RoundToInt(mSize.y);
 			}
 
 			if (uiCamera != null)

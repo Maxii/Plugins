@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR, UNITY_4_2</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -53,8 +53,10 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Editor\ActiveAnimationEditor.cs" />
     <Compile Include="Editor\BMFontReader.cs" />
     <Compile Include="Editor\ComponentSelector.cs" />
+    <Compile Include="Editor\EventDelegateEditor.cs" />
     <Compile Include="Editor\NGUIEditorTools.cs" />
     <Compile Include="Editor\NGUIJson.cs" />
     <Compile Include="Editor\NGUIMenu.cs" />
@@ -62,34 +64,57 @@
     <Compile Include="Editor\NGUISettings.cs" />
     <Compile Include="Editor\NGUITransformInspector.cs" />
     <Compile Include="Editor\SpriteSelector.cs" />
+    <Compile Include="Editor\TweenAlphaEditor.cs" />
+    <Compile Include="Editor\TweenColorEditor.cs" />
+    <Compile Include="Editor\TweenFOVEditor.cs" />
+    <Compile Include="Editor\TweenHeightEditor.cs" />
+    <Compile Include="Editor\TweenOrthoSizeEditor.cs" />
+    <Compile Include="Editor\TweenPositionEditor.cs" />
+    <Compile Include="Editor\TweenRotationEditor.cs" />
+    <Compile Include="Editor\TweenScaleEditor.cs" />
+    <Compile Include="Editor\TweenTransformEditor.cs" />
+    <Compile Include="Editor\TweenVolumeEditor.cs" />
+    <Compile Include="Editor\TweenWidthEditor.cs" />
+    <Compile Include="Editor\UIAnchorEditor.cs" />
     <Compile Include="Editor\UIAtlasInspector.cs" />
     <Compile Include="Editor\UIAtlasMaker.cs" />
+    <Compile Include="Editor\UIButtonColorEditor.cs" />
+    <Compile Include="Editor\UIButtonEditor.cs" />
+    <Compile Include="Editor\UICameraEditor.cs" />
     <Compile Include="Editor\UICameraTool.cs" />
     <Compile Include="Editor\UICreateNewUIWizard.cs" />
     <Compile Include="Editor\UICreateWidgetWizard.cs" />
+    <Compile Include="Editor\UIDraggablePanelEditor.cs" />
     <Compile Include="Editor\UIDrawCallInspector.cs" />
-    <Compile Include="Editor\UIFilledSpriteInspector.cs" />
     <Compile Include="Editor\UIFontInspector.cs" />
     <Compile Include="Editor\UIFontMaker.cs" />
+    <Compile Include="Editor\UIGridEditor.cs" />
     <Compile Include="Editor\UIImageButtonInspector.cs" />
+    <Compile Include="Editor\UIInputEditor.cs" />
     <Compile Include="Editor\UILabelInspector.cs" />
     <Compile Include="Editor\UIPanelInspector.cs" />
     <Compile Include="Editor\UIPanelTool.cs" />
+    <Compile Include="Editor\UIPlayAnimationEditor.cs" />
+    <Compile Include="Editor\UIPlayTweenEditor.cs" />
     <Compile Include="Editor\UIPopupListInspector.cs" />
+    <Compile Include="Editor\UIRootEditor.cs" />
     <Compile Include="Editor\UIScrollBarInspector.cs" />
-    <Compile Include="Editor\UISlicedSpriteInspector.cs" />
     <Compile Include="Editor\UISliderInspector.cs" />
     <Compile Include="Editor\UISpriteAnimationInspector.cs" />
     <Compile Include="Editor\UISpriteInspector.cs" />
+    <Compile Include="Editor\UIStretchEditor.cs" />
+    <Compile Include="Editor\UITableEditor.cs" />
     <Compile Include="Editor\UITextureInspector.cs" />
     <Compile Include="Editor\UITexturePacker.cs" />
-    <Compile Include="Editor\UITiledSpriteInspector.cs" />
+    <Compile Include="Editor\UIToggleInspector.cs" />
+    <Compile Include="Editor\UITweenerEditor.cs" />
+    <Compile Include="Editor\UIWidgetContainerEditor.cs" />
     <Compile Include="Editor\UIWidgetInspector.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ngui\Ngui.csproj">
-      <Project>{84ab84fa-983b-4fb8-bfd9-34d3b93d8000}</Project>
+      <Project>{ac0f8b23-dd41-4bab-a967-aa2c33bb1d0b}</Project>
       <Name>Ngui</Name>
     </ProjectReference>
   </ItemGroup>

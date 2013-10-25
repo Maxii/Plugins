@@ -40,31 +40,10 @@ public class CtxObjectInspector : CtxMenuItemInspector
 			RegisterUndo();
 			contextObject.offsetMenu = offsetMenu;
 		}
-		
-		GameObject obj = EditorGUILayout.ObjectField("Event Receiver", contextObject.eventReceiver, typeof(GameObject), true) as GameObject;
-		string func = EditorGUILayout.TextField("Function Name", contextObject.functionName);
 
-		if (contextObject.eventReceiver != obj || contextObject.functionName != func)
-		{
-			RegisterUndo();
-			
-			contextObject.eventReceiver = obj;
-			contextObject.functionName = func;
-		}
-					
-		func = EditorGUILayout.TextField("Show Function", contextObject.showFunction);
-		if (contextObject.showFunction != func)
-		{
-			RegisterUndo();
-			contextObject.showFunction = func;
-		}
-						
-		func = EditorGUILayout.TextField("Hide Function", contextObject.hideFunction);
-		if (contextObject.hideFunction != func)
-		{
-			RegisterUndo();
-			contextObject.hideFunction = func;
-		}
+		NGUIEditorTools.DrawEvents("On Selection", contextObject, contextObject.onSelection);
+		NGUIEditorTools.DrawEvents("On Show", contextObject, contextObject.onShow);
+		NGUIEditorTools.DrawEvents("On Hide", contextObject, contextObject.onHide);
 
 		if (contextObject.contextMenu != null)
 		{

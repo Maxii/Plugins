@@ -63,7 +63,7 @@ public class UISpriteInspector : UIWidgetInspector
 
 	protected override void DrawExtraProperties ()
 	{
-		NGUIEditorTools.DrawSeparator();
+		GUILayout.Space(6f);
 
 		if (GetType() == typeof(UISpriteInspector))
 		{
@@ -132,19 +132,7 @@ public class UISpriteInspector : UIWidgetInspector
 		Texture2D tex = mSprite.mainTexture as Texture2D;
 		if (tex == null) return;
 
-		Rect outer = new Rect(mSprite.GetAtlasSprite().outer);
-		Rect inner = new Rect(mSprite.GetAtlasSprite().inner);
-		Rect uv = outer;
-
-		if (mSprite.atlas.coordinates == UIAtlas.Coordinates.Pixels)
-		{
-			uv = NGUIMath.ConvertToTexCoords(outer, tex.width, tex.height);
-		}
-		else
-		{
-			outer = NGUIMath.ConvertToPixels(outer, tex.width, tex.height, true);
-			inner = NGUIMath.ConvertToPixels(inner, tex.width, tex.height, true);
-		}
-		NGUIEditorTools.DrawSprite(tex, rect, outer, inner, uv, mSprite.color);
+		UISpriteData sd = mSprite.atlas.GetSprite(mSprite.spriteName);
+		NGUIEditorTools.DrawSprite(tex, rect, sd, mSprite.color);
 	}
 }

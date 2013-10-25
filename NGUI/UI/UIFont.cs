@@ -57,7 +57,7 @@ public class UIFont : MonoBehaviour
 #endif
 
 	// Cached value
-	UIAtlas.Sprite mSprite = null;
+	UISpriteData mSprite = null;
 	int mPMA = -1;
 	bool mSpriteSet = false;
 
@@ -255,22 +255,13 @@ public class UIFont : MonoBehaviour
 
 				if (tex != null)
 				{
-					mUVRect = mSprite.outer;
+					mUVRect = new Rect(
+						mSprite.x - mSprite.paddingLeft,
+						mSprite.y - mSprite.paddingTop,
+						mSprite.width + mSprite.paddingLeft + mSprite.paddingRight,
+						mSprite.height + mSprite.paddingTop + mSprite.paddingBottom);
 
-					if (mAtlas.coordinates == UIAtlas.Coordinates.Pixels)
-					{
-						mUVRect = NGUIMath.ConvertToTexCoords(mUVRect, tex.width, tex.height);
-					}
-
-					// Account for trimmed sprites
-					if (mSprite.hasPadding)
-					{
-						Rect rect = mUVRect;
-						mUVRect.xMin = rect.xMin - mSprite.paddingLeft * rect.width;
-						mUVRect.yMin = rect.yMin - mSprite.paddingBottom * rect.height;
-						mUVRect.xMax = rect.xMax + mSprite.paddingRight * rect.width;
-						mUVRect.yMax = rect.yMax + mSprite.paddingTop * rect.height;
-					}
+					mUVRect = NGUIMath.ConvertToTexCoords(mUVRect, tex.width, tex.height);
 #if UNITY_EDITOR
 					// The font should always use the original texture size
 					if (mFont != null)
@@ -399,7 +390,7 @@ public class UIFont : MonoBehaviour
 	/// Retrieves the sprite used by the font, if any.
 	/// </summary>
 
-	public UIAtlas.Sprite sprite
+	public UISpriteData sprite
 	{
 		get
 		{
@@ -549,8 +540,7 @@ public class UIFont : MonoBehaviour
 		if (tex != null && mSprite != null)
 		{
 			Rect full = NGUIMath.ConvertToPixels(mUVRect, texture.width, texture.height, true);
-			Rect trimmed = (mAtlas.coordinates == UIAtlas.Coordinates.TexCoords) ?
-				NGUIMath.ConvertToPixels(mSprite.outer, tex.width, tex.height, true) : mSprite.outer;
+			Rect trimmed = new Rect(mSprite.x, mSprite.y, mSprite.width, mSprite.height);
 
 			int xMin = Mathf.RoundToInt(trimmed.xMin - full.xMin);
 			int yMin = Mathf.RoundToInt(trimmed.yMin - full.yMin);
@@ -605,7 +595,6 @@ public class UIFont : MonoBehaviour
 		UnityEditor.EditorUtility.SetDirty(gameObject);
 #endif
 		if (mReplacement != null) mReplacement.MarkAsDirty();
-		RecalculateDynamicOffset();
 
 		mSprite = null;
 		UILabel[] labels = NGUITools.FindActive<UILabel>();
@@ -627,35 +616,34 @@ public class UIFont : MonoBehaviour
 			symbols[i].MarkAsDirty();
 	}
 
+#if DYNAMIC_FONT
+	static CharacterInfo mTemp;
+
 	/// <summary>
-	/// BUG: Unity's CharacterInfo.vert.y makes no sense at all. It changes depending on the imported font's size,
-	/// even though it shouldn't, since I overwrite the requested character size here. In order to calculate the
-	/// actual proper offset that needs to be applied to this weird value, I get the coordinates of the 'j' glyph
-	/// and then determine the difference between the glyph's position and the font's size.
+	/// Requests the following text to be present in the font's texture. Returns whether the texture has changed.
 	/// </summary>
 
-	public bool RecalculateDynamicOffset()
+	public void Request (string text)
 	{
-#if DYNAMIC_FONT
-		if (mDynamicFont != null)
+		if (!string.IsNullOrEmpty(text))
 		{
-			CharacterInfo j;
-			mDynamicFont.RequestCharactersInTexture("j", mDynamicFontSize, mDynamicFontStyle);
-			mDynamicFont.GetCharacterInfo('j', out j, mDynamicFontSize, mDynamicFontStyle);
-			float offset = (mDynamicFontSize + j.vert.yMax);
-			
-			if (!float.Equals(mDynamicFontOffset, offset))
+			if (mReplacement != null)
 			{
-				mDynamicFontOffset = offset;
-				return true;
+				mReplacement.Request(text);
+			}
+			else if (mDynamicFont != null)
+			{
+				mDynamicFont.RequestCharactersInTexture("j", mDynamicFontSize, mDynamicFontStyle);
+				mDynamicFont.GetCharacterInfo('j', out mTemp, mDynamicFontSize, mDynamicFontStyle);
+				mDynamicFontOffset = (mDynamicFontSize + mTemp.vert.yMax);
+				mDynamicFont.RequestCharactersInTexture(text, mDynamicFontSize, mDynamicFontStyle);
 			}
 		}
-#endif
-		return false;
 	}
+#endif
 
 	/// <summary>
-	/// Get the printed size of the specified string. The returned value is in local coordinates. Multiply by transform's scale to get pixels.
+	/// Get the printed size of the specified string. The returned value is in pixels.
 	/// </summary>
 
 	public Vector2 CalculatePrintedSize (string text, bool encoding, SymbolStyle symbolStyle)
@@ -673,12 +661,7 @@ public class UIFont : MonoBehaviour
 		{
 			if (encoding) text = NGUITools.StripSymbols(text);
 #if DYNAMIC_FONT
-			if (dynamic)
-			{
-				mDynamicFont.textureRebuildCallback = OnFontChanged;
-				mDynamicFont.RequestCharactersInTexture(text, mDynamicFontSize, mDynamicFontStyle);
-				mDynamicFont.textureRebuildCallback = null;
-			}
+			if (mDynamicFont != null) mDynamicFont.RequestCharactersInTexture(text, mDynamicFontSize, mDynamicFontStyle);
 #endif
 			int length = text.Length;
 			int maxX = 0;
@@ -740,9 +723,8 @@ public class UIFont : MonoBehaviour
 			}
 
 			// Convert from pixel coordinates to local coordinates
-			float scale = (fs > 0) ? 1f / fs : 1f;
-			v.x = scale * ((x > maxX) ? x : maxX);
-			v.y = scale * (y + lineHeight);
+			v.x = ((x > maxX) ? x : maxX);
+			v.y = (y + lineHeight);
 		}
 		return v;
 	}
@@ -767,9 +749,12 @@ public class UIFont : MonoBehaviour
 	{
 		if (mReplacement != null) return mReplacement.GetEndOfLineThatFits(text, maxWidth, encoding, symbolStyle);
 
-		int lineWidth = Mathf.RoundToInt(maxWidth * size);
+		int lineWidth = Mathf.RoundToInt(maxWidth);
 		if (lineWidth < 1) return text;
 
+#if DYNAMIC_FONT
+		if (mDynamicFont != null) mDynamicFont.RequestCharactersInTexture(text, mDynamicFontSize, mDynamicFontStyle);
+#endif
 		int textLength = text.Length;
 		int remainingWidth = lineWidth;
 		BMGlyph followingGlyph = null;
@@ -777,14 +762,6 @@ public class UIFont : MonoBehaviour
 		bool useSymbols = encoding && symbolStyle != SymbolStyle.None && hasSymbols;
 		bool dynamic = isDynamic;
 
-#if DYNAMIC_FONT
-		if (dynamic)
-		{
-			mDynamicFont.textureRebuildCallback = OnFontChanged;
-			mDynamicFont.RequestCharactersInTexture(text, mDynamicFontSize, mDynamicFontStyle);
-			mDynamicFont.textureRebuildCallback = null;
-		}
-#endif
 		while (currentCharacterIndex > 0 && remainingWidth > 0)
 		{
 			char currentCharacter = text[--currentCharacterIndex];
@@ -838,38 +815,45 @@ public class UIFont : MonoBehaviour
 #endif
 
 	/// <summary>
-	/// Text wrapping functionality. The 'maxWidth' should be in local coordinates (take pixels and divide them by transform's scale).
+	/// Text wrapping functionality. The 'width' and 'height' should be in pixels.
 	/// </summary>
 
-	public string WrapText (string text, float maxWidth, int maxLineCount, bool encoding, SymbolStyle symbolStyle)
+	public bool WrapText (string text, out string finalText, int width, int height, int maxLines, bool encoding, SymbolStyle symbolStyle)
 	{
-		if (mReplacement != null) return mReplacement.WrapText(text, maxWidth, maxLineCount, encoding, symbolStyle);
+		if (mReplacement != null)
+		{
+			return mReplacement.WrapText(text, out finalText, width, height, maxLines, encoding, symbolStyle);
+		}
+		
+		if (width < 1 || height < 1)
+		{
+			finalText = "";
+			return false;
+		}
 
-		// Width of the line in pixels
-		int lineWidth = Mathf.RoundToInt(maxWidth * size);
-		if (lineWidth < 1) return text;
+		int maxLineCount = (maxLines > 0) ? maxLines : 999999;
+		maxLineCount = Mathf.Min(maxLineCount, height / size);
 
+		if (maxLineCount == 0)
+		{
+			finalText = "";
+			return false;
+		}
+
+#if DYNAMIC_FONT
+		if (mDynamicFont != null) mDynamicFont.RequestCharactersInTexture(text, mDynamicFontSize, mDynamicFontStyle);
+#endif
 		StringBuilder sb = new StringBuilder();
 		int textLength = text.Length;
-		int remainingWidth = lineWidth;
+		int remainingWidth = width;
 		int previousChar = 0;
 		int start = 0;
 		int offset = 0;
 		bool lineIsEmpty = true;
-		bool multiline = (maxLineCount != 1);
+		bool multiline = (maxLines != 1);
 		int lineCount = 1;
 		bool useSymbols = encoding && symbolStyle != SymbolStyle.None && hasSymbols;
 		bool dynamic = isDynamic;
-
-#if DYNAMIC_FONT
-		// Make sure the characters are present in the dynamic font before printing them
-		if (dynamic)
-		{
-			mDynamicFont.textureRebuildCallback = OnFontChanged;
-			mDynamicFont.RequestCharactersInTexture(text, mDynamicFontSize, mDynamicFontStyle);
-			mDynamicFont.textureRebuildCallback = null;
-		}
-#endif
 
 		// Run through all characters
 		for (; offset < textLength; ++offset)
@@ -880,7 +864,7 @@ public class UIFont : MonoBehaviour
 			if (ch == '\n')
 			{
 				if (!multiline || lineCount == maxLineCount) break;
-				remainingWidth = lineWidth;
+				remainingWidth = width;
 
 				// Add the previous word to the final string
 				if (start < offset) sb.Append(text.Substring(start, offset - start + 1));
@@ -980,12 +964,12 @@ public class UIFont : MonoBehaviour
 					if (ch == ' ')
 					{
 						start = offset + 1;
-						remainingWidth = lineWidth;
+						remainingWidth = width;
 					}
 					else
 					{
 						start = offset;
-						remainingWidth = lineWidth - glyphWidth;
+						remainingWidth = width - glyphWidth;
 					}
 					previousChar = 0;
 				}
@@ -996,9 +980,10 @@ public class UIFont : MonoBehaviour
 
 					// Revert the position to the beginning of the word and reset the line
 					lineIsEmpty = true;
-					remainingWidth = lineWidth;
+					remainingWidth = width;
 					offset = start - 1;
 					previousChar = 0;
+
 					if (!multiline || lineCount == maxLineCount) break;
 					++lineCount;
 					EndLine(ref sb);
@@ -1016,20 +1001,27 @@ public class UIFont : MonoBehaviour
 		}
 
 		if (start < offset) sb.Append(text.Substring(start, offset - start));
-		return sb.ToString();
+		finalText = sb.ToString();
+		return (!multiline || offset == textLength || (maxLines > 0 && lineCount <= maxLines));
 	}
 
 	/// <summary>
 	/// Text wrapping functionality. Legacy compatibility function.
 	/// </summary>
 
-	public string WrapText (string text, float maxWidth, int maxLineCount, bool encoding) { return WrapText(text, maxWidth, maxLineCount, encoding, SymbolStyle.None); }
+	public bool WrapText (string text, out string finalText, int width, int height, int maxLines, bool encoding)
+	{
+		return WrapText(text, out finalText, width, height, maxLines, encoding, SymbolStyle.None);
+	}
 
 	/// <summary>
 	/// Text wrapping functionality. Legacy compatibility function.
 	/// </summary>
 
-	public string WrapText (string text, float maxWidth, int maxLineCount) { return WrapText(text, maxWidth, maxLineCount, false, SymbolStyle.None); }
+	public bool WrapText (string text, out string finalText, int width, int height, int maxLineCount)
+	{
+		return WrapText(text, out finalText, width, height, maxLineCount, false, SymbolStyle.None);
+	}
 
 	/// <summary>
 	/// Align the vertices to be right or center-aligned given the specified line width.
@@ -1039,42 +1031,33 @@ public class UIFont : MonoBehaviour
 	{
 		if (alignment != Alignment.Left)
 		{
-			int fs = size;
+			float offset = 0f;
 
-			if (fs > 0)
+			if (alignment == Alignment.Right)
 			{
-				float offset = 0f;
+				offset = lineWidth - x;
+				if (offset < 0f) offset = 0f;
+			}
+			else
+			{
+				// Centered alignment
+				offset = Mathf.RoundToInt((lineWidth - x) * 0.5f);
+				if (offset < 0f) offset = 0f;
 
-				if (alignment == Alignment.Right)
-				{
-					offset = Mathf.RoundToInt(lineWidth - x);
-					if (offset < 0f) offset = 0f;
-					offset /= size;
-				}
-				else
-				{
-					// Centered alignment
-					offset = Mathf.RoundToInt((lineWidth - x) * 0.5f);
-					if (offset < 0f) offset = 0f;
-					offset /= size;
+				// Keep it pixel-perfect
+				if ((lineWidth & 1) == 1) offset += 0.5f;
+			}
 
-					// Keep it pixel-perfect
-					if ((lineWidth & 1) == 1) offset += 0.5f / fs;
-				}
+			Vector3 temp;
 
-				Vector3 temp;
-
-				for (int i = indexOffset; i < verts.size; ++i)
-				{
-					temp = verts.buffer[i];
-					temp.x += offset;
-					verts.buffer[i] = temp;
-				}
+			for (int i = indexOffset; i < verts.size; ++i)
+			{
+				temp = verts.buffer[i];
+				temp.x += offset;
+				verts.buffer[i] = temp;
 			}
 		}
 	}
-
-	void OnFontChanged () { MarkAsDirty(); }
 
 	/// <summary>
 	/// Print the specified text into the buffers.
@@ -1096,22 +1079,16 @@ public class UIFont : MonoBehaviour
 				return;
 			}
 
+#if DYNAMIC_FONT
+			if (mDynamicFont != null) mDynamicFont.RequestCharactersInTexture(text, mDynamicFontSize, mDynamicFontStyle);
+#endif
 			// Make sure the characters are present in the dynamic font before printing them
 			bool dynamic = isDynamic;
-#if DYNAMIC_FONT
-			if (dynamic)
-			{
-				mDynamicFont.textureRebuildCallback = OnFontChanged;
-				mDynamicFont.RequestCharactersInTexture(text, mDynamicFontSize, mDynamicFontStyle);
-				mDynamicFont.textureRebuildCallback = null;
-			}
-#endif
+
 			mColors.Clear();
 			mColors.Add(color);
 
 			int fs = size;
-			Vector2 invSize = fs > 0 ? new Vector2(1f / fs, 1f / fs) : Vector2.one;
-
 			int indexOffset = verts.size;
 			int maxX = 0;
 			int x = 0;
@@ -1120,8 +1097,10 @@ public class UIFont : MonoBehaviour
 			int lineHeight = (fs + mSpacingY);
 			Vector3 v0 = Vector3.zero, v1 = Vector3.zero;
 			Vector2 u0 = Vector2.zero, u1 = Vector2.zero;
+
 			float invX = uvRect.width / mFont.texWidth;
 			float invY = mUVRect.height / mFont.texHeight;
+
 			int textLength = text.Length;
 			bool useSymbols = encoding && symbolStyle != SymbolStyle.None && hasSymbols && sprite != null;
 
@@ -1182,11 +1161,11 @@ public class UIFont : MonoBehaviour
 							continue;
 						}
 
-						v0.x =  invSize.x * (x + glyph.offsetX);
-						v0.y = -invSize.y * (y + glyph.offsetY);
+						v0.x =  (x + glyph.offsetX);
+						v0.y = -(y + glyph.offsetY);
 
-						v1.x = v0.x + invSize.x * glyph.width;
-						v1.y = v0.y - invSize.y * glyph.height;
+						v1.x = v0.x + glyph.width;
+						v1.y = v0.y - glyph.height;
 
 						u0.x = mUVRect.xMin + invX * glyph.x;
 						u0.y = mUVRect.yMax - invY * glyph.y;
@@ -1228,11 +1207,11 @@ public class UIFont : MonoBehaviour
 					}
 					else
 					{
-						v0.x =  invSize.x * (x + symbol.offsetX);
-						v0.y = -invSize.y * (y + symbol.offsetY);
+						v0.x =  (x + symbol.offsetX);
+						v0.y = -(y + symbol.offsetY);
 
-						v1.x = v0.x + invSize.x * symbol.width;
-						v1.y = v0.y - invSize.y * symbol.height;
+						v1.x = v0.x + symbol.width;
+						v1.y = v0.y - symbol.height;
 
 						Rect uv = symbol.uvRect;
 
@@ -1273,11 +1252,11 @@ public class UIFont : MonoBehaviour
 					if (!mDynamicFont.GetCharacterInfo(c, out mChar, mDynamicFontSize, mDynamicFontStyle))
 						continue;
 
-					v0.x =  invSize.x * (x + mChar.vert.xMin);
-					v0.y = -invSize.y * (y - mChar.vert.yMax + mDynamicFontOffset);
-					
-					v1.x = v0.x + invSize.x * mChar.vert.width;
-					v1.y = v0.y - invSize.y * mChar.vert.height;
+					v0.x =  (x + mChar.vert.xMin);
+					v0.y = -(y - mChar.vert.yMax + mDynamicFontOffset);
+
+					v1.x = v0.x + mChar.vert.width;
+					v1.y = v0.y - mChar.vert.height;
 
 					u0.x = mChar.uv.xMin;
 					u0.y = mChar.uv.yMin;

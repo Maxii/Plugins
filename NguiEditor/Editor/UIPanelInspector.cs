@@ -16,20 +16,10 @@ public class UIPanelInspector : Editor
 
 	public void OnSceneGUI ()
 	{
-		//Tools.current = Tool.View;
-
 		Event e = Event.current;
 
 		switch (e.type)
 		{
-			case EventType.MouseUp:
-			{
-				UIPanel panel = target as UIPanel;
-				BetterList<UIWidget> widgets = UIWidgetInspector.SceneViewRaycast(panel, e.mousePosition);
-				if (widgets.size > 0) Selection.activeGameObject = widgets[0].gameObject;
-			}
-			break;
-
 			case EventType.KeyDown:
 			{
 				if (e.keyCode == KeyCode.Escape)
@@ -50,10 +40,7 @@ public class UIPanelInspector : Editor
 	public override void OnInspectorGUI ()
 	{
 		UIPanel panel = target as UIPanel;
-		BetterList<UIDrawCall> drawcalls = panel.drawCalls;
-		EditorGUIUtility.LookLikeControls(80f);
-
-		//NGUIEditorTools.DrawSeparator();
+		NGUIEditorTools.SetLabelWidth(80f);
 		EditorGUILayout.Space();
 
 		float alpha = EditorGUILayout.Slider("Alpha", panel.alpha, 0f, 1f);
@@ -64,11 +51,38 @@ public class UIPanelInspector : Editor
 			panel.alpha = alpha;
 		}
 
-		if (panel.showInPanelTool != EditorGUILayout.Toggle("Panel Tool", panel.showInPanelTool))
+		GUILayout.BeginHorizontal();
 		{
-			panel.showInPanelTool = !panel.showInPanelTool;
-			EditorUtility.SetDirty(panel);
-			EditorWindow.FocusWindowIfItsOpen<UIPanelTool>();
+			EditorGUILayout.PrefixLabel("Depth");
+
+			int depth = panel.depth;
+			if (GUILayout.Button("Back", GUILayout.Width(60f))) --depth;
+			depth = EditorGUILayout.IntField(depth, GUILayout.MinWidth(20f));
+			if (GUILayout.Button("Forward", GUILayout.Width(68f))) ++depth;
+
+			if (panel.depth != depth)
+			{
+				NGUIEditorTools.RegisterUndo("Panel Depth", panel);
+				panel.depth = depth;
+
+				if (UIPanelTool.instance != null)
+					UIPanelTool.instance.Repaint();
+			}
+		}
+		GUILayout.EndHorizontal();
+
+		int matchingDepths = 0;
+
+		for (int i = 0; i < UIPanel.list.size; ++i)
+		{
+			UIPanel p = UIPanel.list[i];
+			if (p != null && panel.depth == p.depth)
+				++matchingDepths;
+		}
+
+		if (matchingDepths > 1)
+		{
+			EditorGUILayout.HelpBox(matchingDepths + " panels are sharing the depth value of " + panel.depth, MessageType.Info);
 		}
 
 		GUILayout.BeginHorizontal();
@@ -79,41 +93,7 @@ public class UIPanelInspector : Editor
 		if (panel.generateNormals != norms)
 		{
 			panel.generateNormals = norms;
-			panel.UpdateDrawcalls();
-			EditorUtility.SetDirty(panel);
-		}
-
-		GUILayout.BeginHorizontal();
-		bool depth = EditorGUILayout.Toggle("Depth Pass", panel.depthPass, GUILayout.Width(100f));
-		GUILayout.Label("Doubles draw calls, saves fillrate");
-		GUILayout.EndHorizontal();
-
-		if (panel.depthPass != depth)
-		{
-			panel.depthPass = depth;
-			panel.UpdateDrawcalls();
-			EditorUtility.SetDirty(panel);
-		}
-
-		if (depth)
-		{
-			UICamera cam = UICamera.FindCameraForLayer(panel.gameObject.layer);
-
-			if (cam == null || cam.camera.isOrthoGraphic)
-			{
-				EditorGUILayout.HelpBox("Please note that depth pass will only save fillrate when used with 3D UIs, and only UIs drawn by the game camera. If you are using a separate camera for the UI, you will not see any benefit!", MessageType.Warning);
-			}
-		}
-
-		GUILayout.BeginHorizontal();
-		bool stat = EditorGUILayout.Toggle("Static", panel.widgetsAreStatic, GUILayout.Width(100f));
-		GUILayout.Label("Check if widgets won't move");
-		GUILayout.EndHorizontal();
-
-		if (panel.widgetsAreStatic != stat)
-		{
-			panel.widgetsAreStatic = stat;
-			panel.UpdateDrawcalls();
+			UIPanel.SetDirty();
 			EditorUtility.SetDirty(panel);
 		}
 
@@ -125,19 +105,38 @@ public class UIPanelInspector : Editor
 		if (panel.cullWhileDragging != cull)
 		{
 			panel.cullWhileDragging = cull;
-			panel.UpdateDrawcalls();
+			UIPanel.SetDirty();
 			EditorUtility.SetDirty(panel);
 		}
 
-		EditorGUILayout.LabelField("Widgets", panel.widgets.size.ToString());
-		EditorGUILayout.LabelField("Draw Calls", drawcalls.size.ToString());
+		GUILayout.BeginHorizontal();
+		bool stat = EditorGUILayout.Toggle("Static", panel.widgetsAreStatic, GUILayout.Width(100f));
+		GUILayout.Label("Check if widgets won't move");
+		GUILayout.EndHorizontal();
 
-		UIPanel.DebugInfo di = (UIPanel.DebugInfo)EditorGUILayout.EnumPopup("Debug Info", panel.debugInfo);
-
-		if (panel.debugInfo != di)
+		if (panel.widgetsAreStatic != stat)
 		{
-			panel.debugInfo = di;
+			panel.widgetsAreStatic = stat;
+			UIPanel.SetDirty();
 			EditorUtility.SetDirty(panel);
+		}
+
+		if (stat)
+		{
+			EditorGUILayout.HelpBox("Only mark the panel as 'static' if you know FOR CERTAIN that the widgets underneath will not move, rotate, or scale. Doing this improves performance, but moving widgets around will have no effect.", MessageType.Warning);
+		}
+
+		GUILayout.BeginHorizontal();
+		if (NGUISettings.showAllDCs != EditorGUILayout.Toggle("Show All", NGUISettings.showAllDCs, GUILayout.Width(100f)))
+			NGUISettings.showAllDCs = !NGUISettings.showAllDCs;
+		GUILayout.Label("Show all draw calls");
+		GUILayout.EndHorizontal();
+
+		if (panel.showInPanelTool != EditorGUILayout.Toggle("Panel Tool", panel.showInPanelTool))
+		{
+			panel.showInPanelTool = !panel.showInPanelTool;
+			EditorUtility.SetDirty(panel);
+			EditorWindow.FocusWindowIfItsOpen<UIPanelTool>();
 		}
 
 		UIDrawCall.Clipping clipping = (UIDrawCall.Clipping)EditorGUILayout.EnumPopup("Clipping", panel.clipping);
@@ -195,17 +194,12 @@ public class UIPanelInspector : Editor
 				}
 			}
 
-#if !UNITY_3_5 && !UNITY_4_0 && (UNITY_ANDROID || UNITY_IPHONE)
+#if !UNITY_3_5 && !UNITY_4_0 && (UNITY_ANDROID || UNITY_IPHONE || UNITY_WP8 || UNITY_BLACKBERRY)
 			if (PlayerSettings.targetGlesGraphics == TargetGlesGraphics.OpenGLES_1_x)
 			{
 				EditorGUILayout.HelpBox("Clipping requires shader support!\n\nOpen File -> Build Settings -> Player Settings -> Other Settings, then set:\n\n- Graphics Level: OpenGL ES 2.0.", MessageType.Error);
 			}
 #endif
-		}
-
-		if (clipping == UIDrawCall.Clipping.HardClip)
-		{
-			EditorGUILayout.HelpBox("Hard clipping has been removed due to major performance issues on certain Android devices. Alpha clipping will be used instead.", MessageType.Warning);
 		}
 
 		if (clipping != UIDrawCall.Clipping.None && !NGUIEditorTools.IsUniform(panel.transform.lossyScale))
@@ -218,16 +212,106 @@ public class UIPanelInspector : Editor
 			}
 		}
 
-		foreach (UIDrawCall dc in drawcalls)
+		for (int i = 0; i < UIDrawCall.list.size; ++i)
 		{
-			NGUIEditorTools.DrawSeparator();
-			EditorGUILayout.ObjectField("Material", dc.material, typeof(Material), false);
-			EditorGUILayout.LabelField("Triangles", dc.triangles.ToString());
+			UIDrawCall dc = UIDrawCall.list[i];
 
-			if (clipping != UIDrawCall.Clipping.None && !dc.isClipped)
+			if (dc.panel != panel)
 			{
-				EditorGUILayout.HelpBox("You must switch this material's shader to Unlit/Transparent Colored or Unlit/Premultiplied Colored in order for clipping to work.",
-					MessageType.Warning);
+				if (!NGUISettings.showAllDCs) continue;
+				if (dc.showDetails) GUI.color = new Color(0.85f, 0.85f, 0.85f);
+				else GUI.contentColor = new Color(0.85f, 0.85f, 0.85f);
+			}
+			else GUI.contentColor = Color.white;
+
+			string key = dc.keyName;
+			string name = key + " of " + UIDrawCall.list.size;
+			if (!dc.isActive) name = name + " (HIDDEN)";
+			else if (dc.panel != panel) name = name + " (" + dc.panel.name + ")";
+
+			if (NGUIEditorTools.DrawHeader(name, key))
+			{
+				GUI.color = (dc.panel == panel) ? Color.white : new Color(0.8f, 0.8f, 0.8f);
+
+				NGUIEditorTools.BeginContents();
+				EditorGUILayout.ObjectField("Material", dc.material, typeof(Material), false);
+
+				int count = 0;
+
+				for (int b = 0; b < UIWidget.list.size; ++b)
+				{
+					UIWidget w = UIWidget.list[b];
+					if (w.drawCall == dc)
+						++count;
+				}
+
+				string myPath = NGUITools.GetHierarchy(dc.panel.cachedGameObject);
+				string remove = myPath + "\\";
+				string[] list = new string[count + 1];
+				list[0] = count.ToString();
+				count = 0;
+
+				for (int b = 0; b < UIWidget.list.size; ++b)
+				{
+					UIWidget w = UIWidget.list[b];
+					
+					if (w.drawCall == dc)
+					{
+						string path = NGUITools.GetHierarchy(w.cachedGameObject);
+						list[++count] = count + ". " + (string.Equals(path, myPath) ? w.name : path.Replace(remove, ""));
+					}
+				}
+
+				GUILayout.BeginHorizontal();
+				int sel = EditorGUILayout.Popup("Widgets", 0, list);
+				GUILayout.Space(18f);
+				GUILayout.EndHorizontal();
+
+				if (sel != 0)
+				{
+					count = 0;
+
+					for (int b = 0; b < UIWidget.list.size; ++b)
+					{
+						UIWidget w = UIWidget.list[b];
+
+						if (w.drawCall == dc && ++count == sel)
+						{
+							Selection.activeGameObject = w.gameObject;
+							break;
+						}
+					}
+				}
+
+				GUILayout.BeginHorizontal();
+				EditorGUILayout.LabelField("Triangles", dc.triangles.ToString(), GUILayout.Width(120f));
+
+				if (dc.panel != panel)
+				{
+					if (GUILayout.Button("Select the Panel"))
+					{
+						Selection.activeGameObject = dc.panel.gameObject;
+					}
+					GUILayout.Space(18f);
+				}
+				GUILayout.EndHorizontal();
+
+				bool draw = !EditorGUILayout.Toggle("Hide", !dc.isActive);
+
+				if (dc.isActive != draw)
+				{
+					dc.isActive = draw;
+					UnityEditor.EditorUtility.SetDirty(dc.panel);
+				}
+
+				if (dc.panel.clipping != UIDrawCall.Clipping.None && !dc.isClipped)
+				{
+					EditorGUILayout.HelpBox("You must switch this material's shader to Unlit/Transparent Colored or Unlit/Premultiplied Colored in order for clipping to work.",
+						MessageType.Warning);
+				}
+
+				NGUIEditorTools.EndContents();
+				GUI.color = Color.white;
 			}
 		}
 	}

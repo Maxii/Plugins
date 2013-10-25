@@ -1,157 +1,16 @@
 //----------------------------------------------
 //			  NGUI: Next-Gen UI kit
 // Copyright © 2011-2013 Tasharen Entertainment
-// Multi-objects editing support added by 
-// Bardelot 'Cripple' Alexandre / Graphicstream.
 //----------------------------------------------
+
+#if UNITY_3_5
 
 using UnityEngine;
 using UnityEditor;
 
 [CustomEditor(typeof(Transform))]
-[CanEditMultipleObjects]
 public class NGUITransformInspector : Editor
 {
-	static public NGUITransformInspector instance;
-
-#region Helpers structs/enum
-	// Enumeration of axes.
-	public enum Axes
-	{
-		None = 0,
-		X = 1,
-		Y = 2,
-		Z = 4,
-		All = X | Y | Z
-	}
-
-	/// <summary>
-	/// Describes a Vector update. 
-	/// We track axes modification using Set#() methods and update a final vector on modified axes only.
-	/// We use this because of Multi-editing Objects. We want to update the axes one by one.
-	/// </summary>
-
-	public struct VectorWrapper
-	{
-		public Axes axes;
-		public Vector3 value;
-
-		/// <summary>
-		/// Force the update of the vector on all Axes using the given value.
-		/// </summary>
-
-		public Vector3 ForceSet (Vector3 newValue)
-		{
-			axes = Axes.All;
-			value = newValue;
-			return value;
-		}
-
-		/// <summary>
-		/// Sets the value of the Vector on modified axes.
-		/// </summary>
-
-		public Vector3 Set (Vector3 newValue)
-		{
-			SetX(newValue.x);
-			SetY(newValue.y);
-			SetZ(newValue.z);
-			return value;
-		}
-
-		/// <summary>
-		/// Sets the value of the X axe.
-		/// </summary>
-
-		public Vector3 SetX (float x)
-		{
-			if (x != value.x)
-			{
-				value.x = x;
-				axes |= Axes.X;
-			}
-			return value;
-		}
-
-		/// <summary>
-		/// Sets the value of the Y axe.
-		/// </summary>
-
-		public Vector3 SetY (float y)
-		{
-			if (y != value.y)
-			{
-				value.y = y;
-				axes |= Axes.Y;
-			}
-			return value;
-		}
-
-		/// <summary>
-		/// Sets the value of the Z axe.
-		/// </summary>
-
-		public Vector3 SetZ (float z)
-		{
-			if (z != value.z)
-			{
-				value.z = z;
-				axes |= Axes.Z;
-			}
-			return value;
-		}
-
-		/// <summary>
-		/// Checks if an axe has been modified.
-		/// </summary>
-
-		public bool IsAxeUpdated (Axes axe)
-		{
-			return (axes & axe) == axe;
-		}
-
-		/// <summary>
-		/// Validates the current Vector.
-		/// </summary>
-
-		public VectorWrapper Validate ()
-		{
-			Vector3 vector = NGUITransformInspector.Validate(value);
-			Set(vector);
-			return this;
-		}
-
-		/// <summary>
-		/// Gets the vector updated on modified axes only.
-		/// </summary>
-
-		public Vector3 GetUpdatedVector3 (Vector3 vector)
-		{
-			if (axes == Axes.All) return value;
-
-			if (IsAxeUpdated(Axes.X)) vector.x = value.x;
-			if (IsAxeUpdated(Axes.Y)) vector.y = value.y;
-			if (IsAxeUpdated(Axes.Z)) vector.z = value.z;
-
-			return vector;
-		}
-	}
-#endregion
-
-	SerializedProperty mPosition;
-	SerializedProperty mRotation;
-	SerializedProperty mScale;
-
-	void OnEnable ()
-	{
-		instance = this;
-		mPosition = serializedObject.FindProperty("m_LocalPosition");
-		mRotation = serializedObject.FindProperty("m_LocalRotation");
-		mScale = serializedObject.FindProperty("m_LocalScale");
-	}
-
-	void OnDestroy () { instance = null; }
-
 	/// <summary>
 	/// Draw the inspector widget.
 	/// </summary>
@@ -159,165 +18,55 @@ public class NGUITransformInspector : Editor
 	public override void OnInspectorGUI ()
 	{
 		Transform trans = target as Transform;
-		EditorGUIUtility.LookLikeControls(15f);
+		NGUIEditorTools.SetLabelWidth(15f);
 
-		serializedObject.Update();
-
-		// For clarity purposes, if there is a widget, we want to disable rotation around X and Y, and disable scaling on the Z.
-		bool isWidget = false;
-		bool isStatic = false;
-
-		foreach (Object obj in serializedObject.targetObjects)
-		{
-			Transform t = obj as Transform;
-
-			if (t != null)
-			{
-				UIWidget w = t.GetComponent<UIWidget>();
-
-				if (w != null)
-				{
-					isWidget = true;
-
-					if (Application.isPlaying)
-					{
-						PrefabType type = PrefabUtility.GetPrefabType(w.gameObject);
-						if (type != PrefabType.Prefab) isStatic = (w.panel != null) && w.panel.widgetsAreStatic;
-					}
-					break;
-				}
-			}
-		}
+		Vector3 pos;
+		Vector3 rot;
+		Vector3 scale;
 
 		// Position
 		EditorGUILayout.BeginHorizontal();
 		{
-			Axes axes = GetMultipleValuesAxes(mPosition);
-
-			if (DrawButton("P", "Reset Position", !isStatic && (axes != Axes.None || IsResetPositionValid(trans)), 20f))
+			if (DrawButton("P", "Reset Position", IsResetPositionValid(trans), 20f))
 			{
-				NGUIEditorTools.RegisterUndo("Reset Position", serializedObject.targetObjects);
-
-				foreach (Object obj in serializedObject.targetObjects)
-				{
-					Transform t = obj as Transform;
-					if (t != null) t.localPosition = Vector3.zero;
-				}
+				NGUIEditorTools.RegisterUndo("Reset Position", trans);
+				trans.localPosition = Vector3.zero;
 			}
-
-			GUI.changed = false;
-			VectorWrapper final = DrawVector3(trans.localPosition, axes, isStatic ? Axes.None : Axes.All);
-
-			if (GUI.changed)
-			{
-				NGUIEditorTools.RegisterUndo("Reset Position", serializedObject.targetObjects);
-
-				foreach (Object obj in serializedObject.targetObjects)
-				{
-					Transform t = obj as Transform;
-
-					if (t != null)
-					{
-						Vector3 v = t.localPosition;
-						if ((final.axes & Axes.X) != 0) v.x = final.value.x;
-						if ((final.axes & Axes.Y) != 0) v.y = final.value.y;
-						if ((final.axes & Axes.Z) != 0) v.z = final.value.z;
-						t.localPosition = v;
-					}
-				}
-			}
+			pos = DrawVector3(trans.localPosition);
 		}
 		EditorGUILayout.EndHorizontal();
 
 		// Rotation
 		EditorGUILayout.BeginHorizontal();
 		{
-			Axes axes = GetMultipleValuesAxes(mRotation);
-
-			if (DrawButton("R", "Reset Rotation", !isStatic && (axes != Axes.None || IsResetRotationValid(trans)), 20f))
+			if (DrawButton("R", "Reset Rotation", IsResetRotationValid(trans), 20f))
 			{
-				NGUIEditorTools.RegisterUndo("Reset Rotation", serializedObject.targetObjects);
-
-				foreach (Object obj in serializedObject.targetObjects)
-				{
-					Transform t = obj as Transform;
-					if (t != null) t.localRotation = Quaternion.identity;
-				}
+				NGUIEditorTools.RegisterUndo("Reset Rotation", trans);
+				trans.localEulerAngles = Vector3.zero;
 			}
-
-			GUI.changed = false;
-			VectorWrapper final = DrawVector3(trans.localEulerAngles, axes, isStatic ? Axes.None : (isWidget ? Axes.Z : Axes.All));
-
-			if (GUI.changed)
-			{
-				NGUIEditorTools.RegisterUndo("Reset Rotation", serializedObject.targetObjects);
-
-				foreach (Object obj in serializedObject.targetObjects)
-				{
-					Transform t = obj as Transform;
-
-					if (t != null)
-					{
-						Vector3 v = t.localEulerAngles;
-						if ((final.axes & Axes.X) != 0) v.x = final.value.x;
-						if ((final.axes & Axes.Y) != 0) v.y = final.value.y;
-						if ((final.axes & Axes.Z) != 0) v.z = final.value.z;
-						t.localEulerAngles = v;
-					}
-				}
-			}
+			rot = DrawVector3(trans.localEulerAngles);
 		}
 		EditorGUILayout.EndHorizontal();
 
 		// Scale
 		EditorGUILayout.BeginHorizontal();
 		{
-			Axes axes = GetMultipleValuesAxes(mScale);
-
-			if (DrawButton("S", "Reset Scale", !isStatic && (axes != Axes.None || IsResetScaleValid(trans)), 20f))
+			if (DrawButton("S", "Reset Scale", IsResetScaleValid(trans), 20f))
 			{
-				NGUIEditorTools.RegisterUndo("Reset Scale", serializedObject.targetObjects);
-
-				foreach (Object obj in serializedObject.targetObjects)
-				{
-					Transform t = obj as Transform;
-
-					if (t != null)
-					{
-						UIWidget w = t.GetComponent<UIWidget>();
-						if (w != null) w.MakePixelPerfect();
-						else t.localScale = Vector3.one;
-					}
-				}
+				NGUIEditorTools.RegisterUndo("Reset Scale", trans);
+				trans.localScale = Vector3.one;
 			}
-
-			GUI.changed = false;
-			VectorWrapper final = DrawVector3(trans.localScale, axes, isStatic ? Axes.None : (isWidget ? (Axes.X | Axes.Y) : Axes.All));
-
-			if (GUI.changed)
-			{
-				NGUIEditorTools.RegisterUndo("Reset Scale", serializedObject.targetObjects);
-
-				foreach (Object obj in serializedObject.targetObjects)
-				{
-					Transform t = obj as Transform;
-
-					if (t != null)
-					{
-						Vector3 v = t.localScale;
-						if ((final.axes & Axes.X) != 0) v.x = final.value.x;
-						if ((final.axes & Axes.Y) != 0) v.y = final.value.y;
-						if ((final.axes & Axes.Z) != 0) v.z = final.value.z;
-						t.localScale = v;
-					}
-				}
-			}
+			scale = DrawVector3(trans.localScale);
 		}
 		EditorGUILayout.EndHorizontal();
 
-		if (isStatic)
+		// If something changes, set the transform values
+		if (GUI.changed)
 		{
-			EditorGUILayout.HelpBox("The panel managing this widget has the \"widgets are static\" flag set, so all transform changes will be ignored.", MessageType.Warning);
+			NGUIEditorTools.RegisterUndo("Transform Change", trans);
+			trans.localPosition = Validate(pos);
+			trans.localEulerAngles = Validate(rot);
+			trans.localScale = Validate(scale);
 		}
 	}
 
@@ -347,51 +96,13 @@ public class NGUITransformInspector : Editor
 	/// Helper function that draws a field of 3 floats.
 	/// </summary>
 
-	static VectorWrapper DrawVector3 (Vector3 value, Axes shown, Axes editable)
+	static Vector3 DrawVector3 (Vector3 value)
 	{
 		GUILayoutOption opt = GUILayout.MinWidth(30f);
-		VectorWrapper update = new VectorWrapper() { value = value };
-
-		update.SetX(DrawFloatField("X", value.x, ((shown & Axes.X) != Axes.None), ((editable & Axes.X) != Axes.None), opt));
-		update.SetY(DrawFloatField("Y", value.y, ((shown & Axes.Y) != Axes.None), ((editable & Axes.Y) != Axes.None), opt));
-		update.SetZ(DrawFloatField("Z", value.z, ((shown & Axes.Z) != Axes.None), ((editable & Axes.Z) != Axes.None), opt));
-
-		return update;
-	}
-
-	/// <summary>
-	/// Draw a float field.
-	/// </summary>
-
-	static float DrawFloatField (string name, float value, bool hidden, bool editable, GUILayoutOption opt)
-	{
-		if (!hidden)
-		{
-			if (editable)
-			{
-				return EditorGUILayout.FloatField(name, value, opt);
-			}
-			else
-			{
-				GUI.color = new Color(0.7f, 0.7f, 0.7f);
-				value = EditorGUILayout.FloatField(name, value, opt);
-				GUI.color = Color.white;
-				return value;
-			}
-		}
-		float result = value;
-
-		if (editable)
-		{
-			float.TryParse(EditorGUILayout.TextField(name, "-", opt), out result);
-		}
-		else
-		{
-			GUI.color = new Color(0.7f, 0.7f, 0.7f);
-			float.TryParse(EditorGUILayout.TextField(name, "-", opt), out result);
-			GUI.color = Color.white;
-		}
-		return result;
+		value.x = EditorGUILayout.FloatField("X", value.x, opt);
+		value.y = EditorGUILayout.FloatField("Y", value.y, opt);
+		value.z = EditorGUILayout.FloatField("Z", value.z, opt);
+		return value;
 	}
 
 	/// <summary>
@@ -435,47 +146,222 @@ public class NGUITransformInspector : Editor
 		vector.z = float.IsNaN(vector.z) ? 0f : vector.z;
 		return vector;
 	}
+}
+#else
+using UnityEngine;
+using UnityEditor;
+
+[CanEditMultipleObjects]
+[CustomEditor(typeof(Transform))]
+public class NGUITransformInspector : Editor
+{
+	static public NGUITransformInspector instance;
+
+	SerializedProperty mPos;
+	SerializedProperty mRot;
+	SerializedProperty mScale;
+
+	void OnEnable ()
+	{
+		instance = this;
+
+		mPos = serializedObject.FindProperty("m_LocalPosition");
+		mRot = serializedObject.FindProperty("m_LocalRotation");
+		mScale = serializedObject.FindProperty("m_LocalScale");
+	}
+
+	void OnDestroy () { instance = null; }
 
 	/// <summary>
-	/// Gets the axes of a Vector3 which have multiple values.
+	/// Draw the inspector widget.
 	/// </summary>
 
-	Axes GetMultipleValuesAxes (SerializedProperty property)
+	public override void OnInspectorGUI ()
+	{
+		NGUIEditorTools.SetLabelWidth(15f);
+
+		serializedObject.Update();
+
+		bool widgets = false;
+
+		foreach (Object obj in serializedObject.targetObjects)
+		{
+			Transform t = obj as Transform;
+
+			if (t.GetComponent<UIWidget>() != null)
+			{
+				widgets = true;
+				break;
+			}
+		}
+
+		DrawPosition();
+		DrawRotation(widgets);
+		DrawScale(widgets);
+
+		serializedObject.ApplyModifiedProperties();
+	}
+
+	void DrawPosition ()
+	{
+		GUILayout.BeginHorizontal();
+		{
+			bool reset = GUILayout.Button("P", GUILayout.Width(20f));
+
+			EditorGUILayout.PropertyField(mPos.FindPropertyRelative("x"));
+			EditorGUILayout.PropertyField(mPos.FindPropertyRelative("y"));
+			EditorGUILayout.PropertyField(mPos.FindPropertyRelative("z"));
+
+			if (reset) mPos.vector3Value = Vector3.zero;
+		}
+		GUILayout.EndHorizontal();
+	}
+
+	void DrawScale (bool isWidget)
+	{
+		GUILayout.BeginHorizontal();
+		{
+			bool reset = GUILayout.Button("S", GUILayout.Width(20f));
+
+			if (isWidget) GUI.color = new Color(0.7f, 0.7f, 0.7f);
+			EditorGUILayout.PropertyField(mScale.FindPropertyRelative("x"));
+			EditorGUILayout.PropertyField(mScale.FindPropertyRelative("y"));
+			EditorGUILayout.PropertyField(mScale.FindPropertyRelative("z"));
+			if (isWidget) GUI.color = Color.white;
+
+			if (reset) mScale.vector3Value = Vector3.one;
+		}
+		GUILayout.EndHorizontal();
+	}
+
+#region Rotation is ugly as hell... since there is no native support for quaternion property drawing
+	enum Axes : int
+	{
+		None = 0,
+		X = 1,
+		Y = 2,
+		Z = 4,
+		All = 7,
+	}
+
+	Axes CheckDifference (Transform t, Vector3 original)
+	{
+		Vector3 next = t.localEulerAngles;
+
+		Axes axes = Axes.None;
+
+		if (Differs(next.x, original.x)) axes |= Axes.X;
+		if (Differs(next.y, original.y)) axes |= Axes.Y;
+		if (Differs(next.z, original.z)) axes |= Axes.Z;
+
+		return axes;
+	}
+
+	Axes CheckDifference (SerializedProperty property)
 	{
 		Axes axes = Axes.None;
 
-		if (!property.hasMultipleDifferentValues)
+		if (property.hasMultipleDifferentValues)
 		{
-			return Axes.None;
-		}
+			Vector3 original = property.quaternionValue.eulerAngles;
 
-		// We know that we have at least one serialized object when this is called.
-		Vector3 current = GetVector(property, serializedObject.targetObjects[0] as Transform);
-		Vector3 next;
-
-		// We check that the value of the axe are all the same.
-		foreach (Object obj in serializedObject.targetObjects)
-		{
-			next = GetVector(property, obj as Transform);
-
-			if (next.x != current.x) axes |= Axes.X;
-			if (next.y != current.y) axes |= Axes.Y;
-			if (next.z != current.z) axes |= Axes.Z;
-
-			if (axes == Axes.All) return axes;
+			foreach (Object obj in serializedObject.targetObjects)
+			{
+				axes |= CheckDifference(obj as Transform, original);
+				if (axes == Axes.All) break;
+			}
 		}
 		return axes;
 	}
 
 	/// <summary>
-	/// Gets the vector of a transform (scale, position or eulerAngles) corresponding to a given property.
+	/// Draw an editable float field.
+	/// </summary>
+	/// <param name="hidden">Whether to replace the value with a dash</param>
+	/// <param name="greyedOut">Whether the value should be greyed out or not</param>
+
+	static bool FloatField (string name, ref float value, bool hidden, bool greyedOut, GUILayoutOption opt)
+	{
+		float newValue = value;
+		GUI.changed = false;
+
+		if (!hidden)
+		{
+			if (greyedOut)
+			{
+				GUI.color = new Color(0.7f, 0.7f, 0.7f);
+				newValue = EditorGUILayout.FloatField(name, newValue, opt);
+				GUI.color = Color.white;
+			}
+			else
+			{
+				newValue = EditorGUILayout.FloatField(name, newValue, opt);
+			}
+		}
+		else if (greyedOut)
+		{
+			GUI.color = new Color(0.7f, 0.7f, 0.7f);
+			float.TryParse(EditorGUILayout.TextField(name, "--", opt), out newValue);
+			GUI.color = Color.white;
+		}
+		else
+		{
+			float.TryParse(EditorGUILayout.TextField(name, "--", opt), out newValue);
+		}
+
+		if (GUI.changed && Differs(newValue, value))
+		{
+			value = newValue;
+			return true;
+		}
+		return false;
+	}
+
+	/// <summary>
+	/// Because Mathf.Approximately is too sensitive.
 	/// </summary>
 
-	public Vector3 GetVector (SerializedProperty property, Transform trans)
+	static bool Differs (float a, float b) { return Mathf.Abs(a - b) > 0.0001f; }
+
+	void DrawRotation (bool isWidget)
 	{
-		if (property == mRotation) return trans.localEulerAngles;
-		if (property == mPosition) return trans.localPosition;
-		if (property == mScale) return trans.localScale;
-		return Vector3.zero;
+		GUILayout.BeginHorizontal();
+		{
+			bool reset = GUILayout.Button("R", GUILayout.Width(20f));
+
+			Vector3 visible = (serializedObject.targetObject as Transform).localEulerAngles;
+			Axes changed = CheckDifference(mRot);
+			Axes altered = Axes.None;
+
+			GUILayoutOption opt = GUILayout.MinWidth(30f);
+
+			if (FloatField("X", ref visible.x, (changed & Axes.X) != 0, isWidget, opt)) altered |= Axes.X;
+			if (FloatField("Y", ref visible.y, (changed & Axes.Y) != 0, isWidget, opt)) altered |= Axes.Y;
+			if (FloatField("Z", ref visible.z, (changed & Axes.Z) != 0, false, opt)) altered |= Axes.Z;
+
+			if (reset)
+			{
+				mRot.quaternionValue = Quaternion.identity;
+			}
+			else if (altered != Axes.None)
+			{
+				NGUIEditorTools.RegisterUndo("Change Rotation", serializedObject.targetObjects);
+
+				foreach (Object obj in serializedObject.targetObjects)
+				{
+					Transform t = obj as Transform;
+					Vector3 v = t.localEulerAngles;
+
+					if ((altered & Axes.X) != 0) v.x = visible.x;
+					if ((altered & Axes.Y) != 0) v.y = visible.y;
+					if ((altered & Axes.Z) != 0) v.z = visible.z;
+
+					t.localEulerAngles = v;
+				}
+			}
+		}
+		GUILayout.EndHorizontal();
 	}
+#endregion
 }
+#endif

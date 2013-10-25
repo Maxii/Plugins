@@ -52,31 +52,10 @@ public class CtxMenuButtonInspector : CtxMenuItemInspector
 			RegisterUndo();
 			menuButton.currentItemIcon = icon;
 		}
-		
-		GameObject obj = EditorGUILayout.ObjectField("Event Receiver", menuButton.eventReceiver, typeof(GameObject), true) as GameObject;
-		string func = EditorGUILayout.TextField("Function Name", menuButton.functionName);
 
-		if (menuButton.eventReceiver != obj || menuButton.functionName != func)
-		{
-			RegisterUndo();
-			
-			menuButton.eventReceiver = obj;
-			menuButton.functionName = func;
-		}
-				
-		func = EditorGUILayout.TextField("Show Function", menuButton.showFunction);
-		if (menuButton.showFunction != func)
-		{
-			RegisterUndo();
-			menuButton.showFunction = func;
-		}
-				
-		func = EditorGUILayout.TextField("Hide Function", menuButton.hideFunction);
-		if (menuButton.hideFunction != func)
-		{
-			RegisterUndo();
-			menuButton.hideFunction = func;
-		}
+		NGUIEditorTools.DrawEvents("On Selection", menuButton, menuButton.onSelection);
+		NGUIEditorTools.DrawEvents("On Show", menuButton, menuButton.onShow);
+		NGUIEditorTools.DrawEvents("On Hide", menuButton, menuButton.onHide);
 
 		if (menuButton.contextMenu != null)
 		{

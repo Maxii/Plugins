@@ -77,8 +77,10 @@ public class SaucerBaseHandler : MonoBehaviour
 		items[4].submenuItems[4].text = "Embers";
 	}
 	
-	protected void OnMenuSelection(int item)
+	protected void OnMenuSelection()
 	{
+		int item = CtxMenu.current.selectedItem;
+		
 		MenuCommands cmd = (MenuCommands)item;
 		
 		switch (cmd)

@@ -1,4 +1,4 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
 // Copyright © 2011-2013 Tasharen Entertainment
 //----------------------------------------------
@@ -12,7 +12,7 @@ using System.Collections.Generic;
 /// </summary>
 
 [CustomEditor(typeof(UIPopupList))]
-public class UIPopupListInspector : Editor
+public class UIPopupListInspector : UIWidgetContainerEditor
 {
 	UIPopupList mList;
 
@@ -49,7 +49,7 @@ public class UIPopupListInspector : Editor
 
 	public override void OnInspectorGUI ()
 	{
-		EditorGUIUtility.LookLikeControls(80f);
+		NGUIEditorTools.SetLabelWidth(80f);
 		mList = target as UIPopupList;
 
 		ComponentSelector.Draw<UIAtlas>(mList.atlas, OnSelectAtlas);
@@ -62,16 +62,18 @@ public class UIPopupListInspector : Editor
 		{
 			RegisterUndo();
 			mList.textLabel = lbl;
-			if (lbl != null) lbl.text = mList.selection;
+			if (lbl != null) lbl.text = mList.value;
 		}
 		GUILayout.Space(44f);
 		GUILayout.EndHorizontal();
 
+		if (mList.textLabel == null)
+		{
+			EditorGUILayout.HelpBox("This popup list has no label to update, so it will behave like a menu.", MessageType.Info);
+		}
+
 		if (mList.atlas != null)
 		{
-			NGUIEditorTools.SpriteField("Background", mList.atlas, mList.backgroundSprite, OnBackground);
-			NGUIEditorTools.SpriteField("Highlight", mList.atlas, mList.highlightSprite, OnHighlight);
-
 			GUILayout.BeginHorizontal();
 			GUILayout.Space(6f);
 			GUILayout.Label("Options");
@@ -93,18 +95,18 @@ public class UIPopupListInspector : Editor
 				mList.items.Clear();
 				foreach (string s in split) mList.items.Add(s);
 
-				if (string.IsNullOrEmpty(mList.selection) || !mList.items.Contains(mList.selection))
+				if (string.IsNullOrEmpty(mList.value) || !mList.items.Contains(mList.value))
 				{
-					mList.selection = mList.items.Count > 0 ? mList.items[0] : "";
+					mList.value = mList.items.Count > 0 ? mList.items[0] : "";
 				}
 			}
 
-			string sel = NGUIEditorTools.DrawList("Selection", mList.items.ToArray(), mList.selection);
+			string sel = NGUIEditorTools.DrawList("Default", mList.items.ToArray(), mList.value);
 
-			if (mList.selection != sel)
+			if (mList.value != sel)
 			{
 				RegisterUndo();
-				mList.selection = sel;
+				mList.value = sel;
 			}
 
 			UIPopupList.Position pos = (UIPopupList.Position)EditorGUILayout.EnumPopup("Position", mList.position);
@@ -115,62 +117,72 @@ public class UIPopupListInspector : Editor
 				mList.position = pos;
 			}
 
-			float ts = EditorGUILayout.FloatField("Text Scale", mList.textScale);
-			Color tc = EditorGUILayout.ColorField("Text Color", mList.textColor);
-			Color bc = EditorGUILayout.ColorField("Background", mList.backgroundColor);
-			Color hc = EditorGUILayout.ColorField("Highlight", mList.highlightColor);
+			bool isLocalized = EditorGUILayout.Toggle("Localized", mList.isLocalized);
 
-			GUILayout.BeginHorizontal();
-			bool isLocalized = EditorGUILayout.Toggle("Localized", mList.isLocalized, GUILayout.Width(100f));
-			bool isAnimated = EditorGUILayout.Toggle("Animated", mList.isAnimated);
-			GUILayout.EndHorizontal();
-
-			if (mList.textScale != ts ||
-				mList.textColor != tc ||
-				mList.highlightColor != hc ||
-				mList.backgroundColor != bc ||
-				mList.isLocalized != isLocalized ||
-				mList.isAnimated != isAnimated)
+			if (mList.isLocalized != isLocalized)
 			{
 				RegisterUndo();
-				mList.textScale = ts;
-				mList.textColor = tc;
-				mList.backgroundColor = bc;
-				mList.highlightColor = hc;
 				mList.isLocalized = isLocalized;
-				mList.isAnimated = isAnimated;
 			}
 
-			NGUIEditorTools.DrawSeparator();
-
-			GUILayout.BeginHorizontal();
-			GUILayout.Space(6f);
-			GUILayout.Label("Padding", GUILayout.Width(76f));
-			GUILayout.BeginVertical();
-			GUILayout.Space(-12f);
-			Vector2 padding = EditorGUILayout.Vector2Field("", mList.padding);
-			GUILayout.EndVertical();
-			GUILayout.EndHorizontal();
-			
-			if (mList.padding != padding)
+			if (NGUIEditorTools.DrawHeader("Appearance"))
 			{
-				RegisterUndo();
-				mList.padding = padding;
+				NGUIEditorTools.BeginContents();
+
+				NGUIEditorTools.SpriteField("Background", mList.atlas, mList.backgroundSprite, OnBackground);
+				NGUIEditorTools.SpriteField("Highlight", mList.atlas, mList.highlightSprite, OnHighlight);
+
+				EditorGUILayout.Space();
+
+				Color tc = EditorGUILayout.ColorField("Text Color", mList.textColor);
+				Color bc = EditorGUILayout.ColorField("Background", mList.backgroundColor);
+				Color hc = EditorGUILayout.ColorField("Highlight", mList.highlightColor);
+
+				if (mList.textColor != tc ||
+					mList.highlightColor != hc ||
+					mList.backgroundColor != bc)
+				{
+					RegisterUndo();
+					mList.textColor = tc;
+					mList.backgroundColor = bc;
+					mList.highlightColor = hc;;
+				}
+
+				EditorGUILayout.Space();
+
+				GUILayout.BeginHorizontal();
+				GUILayout.Label("Padding", GUILayout.Width(76f));
+				Vector2 padding = mList.padding;
+				padding.x = EditorGUILayout.FloatField(padding.x);
+				padding.y = EditorGUILayout.FloatField(padding.y);
+				GUILayout.Space(18f);
+				GUILayout.EndHorizontal();
+
+				if (mList.padding != padding)
+				{
+					RegisterUndo();
+					mList.padding = padding;
+				}
+
+				float ts = EditorGUILayout.FloatField("Text Scale", mList.textScale, GUILayout.Width(120f));
+
+				if (mList.textScale != ts)
+				{
+					RegisterUndo();
+					mList.textScale = ts;
+				}
+
+				bool isAnimated = EditorGUILayout.Toggle("Animated", mList.isAnimated);
+
+				if (mList.isAnimated != isAnimated)
+				{
+					RegisterUndo();
+					mList.isAnimated = isAnimated;
+				}
+				NGUIEditorTools.EndContents();
 			}
 
-			EditorGUIUtility.LookLikeControls(100f);
-
-			GameObject go = EditorGUILayout.ObjectField("Event Receiver", mList.eventReceiver,
-				typeof(GameObject), true) as GameObject;
-
-			string fn = EditorGUILayout.TextField("Function Name", mList.functionName);
-
-			if (mList.eventReceiver != go || mList.functionName != fn)
-			{
-				RegisterUndo();
-				mList.eventReceiver = go;
-				mList.functionName = fn;
-			}
+			NGUIEditorTools.DrawEvents("On Value Change", mList, mList.onChange);
 		}
 	}
 }

@@ -1,4 +1,4 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
 // Copyright © 2011-2013 Tasharen Entertainment
 //----------------------------------------------
@@ -11,7 +11,7 @@ using UnityEngine;
 
 [RequireComponent(typeof(UIPanel))]
 [AddComponentMenu("NGUI/Internal/Spring Panel")]
-public class SpringPanel : IgnoreTimeScale
+public class SpringPanel : MonoBehaviour
 {
 	public Vector3 target = Vector3.zero;
 	public float strength = 10f;
@@ -41,9 +41,13 @@ public class SpringPanel : IgnoreTimeScale
 
 	void Update ()
 	{
-		float delta = UpdateRealTimeDelta();
+		float delta = RealTime.deltaTime;
 
-		if (mThreshold == 0f) mThreshold = (target - mTrans.localPosition).magnitude * 0.005f;
+		if (mThreshold == 0f)
+		{
+			mThreshold = (target - mTrans.localPosition).magnitude * 0.005f;
+			mThreshold = Mathf.Max(mThreshold, 0.00001f);
+		}
 
 		bool trigger = false;
 		Vector3 before = mTrans.localPosition;
@@ -78,12 +82,8 @@ public class SpringPanel : IgnoreTimeScale
 		sp.target = pos;
 		sp.strength = strength;
 		sp.onFinished = null;
-
-		if (!sp.enabled)
-		{
-			sp.mThreshold = 0f;
-			sp.enabled = true;
-		}
+		sp.mThreshold = 0f;
+		sp.enabled = true;
 		return sp;
 	}
 }

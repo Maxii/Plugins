@@ -5,13 +5,15 @@
 
 using UnityEngine;
 using AnimationOrTween;
+using System.Collections.Generic;
 
 /// <summary>
-/// Attaching this to an object lets you activate tweener components on other objects.
+/// Play the specified tween on click.
 /// </summary>
 
-[AddComponentMenu("NGUI/Interaction/Button Tween")]
-public class UIButtonTween : MonoBehaviour
+[ExecuteInEditMode]
+[AddComponentMenu("NGUI/Interaction/Play Tween")]
+public class UIPlayTween : MonoBehaviour
 {
 	/// <summary>
 	/// Target on which there is one or more tween.
@@ -44,6 +46,12 @@ public class UIButtonTween : MonoBehaviour
 	public bool resetOnPlay = false;
 
 	/// <summary>
+	/// Whether the tween will be reset to the start if it's disabled when activated.
+	/// </summary>
+
+	public bool resetIfDisabled = false;
+
+	/// <summary>
 	/// What to do if the tweenTarget game object is currently disabled.
 	/// </summary>
 
@@ -62,30 +70,54 @@ public class UIButtonTween : MonoBehaviour
 	public bool includeChildren = false;
 
 	/// <summary>
-	/// Target used with 'callWhenFinished', or this game object if none was specified.
+	/// Event delegates called when the animation finishes.
 	/// </summary>
 
-	public GameObject eventReceiver;
+	public List<EventDelegate> onFinished = new List<EventDelegate>();
 
-	/// <summary>
-	/// Name of the function to call when the tween finishes.
-	/// </summary>
-
-	public string callWhenFinished;
-
-	/// <summary>
-	/// Delegate to call. Faster than using 'eventReceiver', and allows for multiple receivers.
-	/// </summary>
-
-	public UITweener.OnFinished onFinished;
+	// Deprecated functionality, kept for backwards compatibility
+	[HideInInspector][SerializeField] GameObject eventReceiver;
+	[HideInInspector][SerializeField] string callWhenFinished;
 
 	UITweener[] mTweens;
 	bool mStarted = false;
 	bool mHighlighted = false;
+	int mActive = 0;
 
-	void Start () { mStarted = true; if (tweenTarget == null) tweenTarget = gameObject; }
+	void Awake ()
+	{
+		// Remove deprecated functionality if new one is used
+		if (eventReceiver != null && EventDelegate.IsValid(onFinished))
+		{
+			eventReceiver = null;
+			callWhenFinished = null;
+#if UNITY_EDITOR
+			UnityEditor.EditorUtility.SetDirty(this);
+#endif
+		}
+	}
 
-	void OnEnable () { if (mStarted && mHighlighted) OnHover(UICamera.IsHighlighted(gameObject)); }
+	void Start()
+	{
+		mStarted = true;
+
+		if (tweenTarget == null)
+		{
+			tweenTarget = gameObject;
+#if UNITY_EDITOR
+			UnityEditor.EditorUtility.SetDirty(this);
+#endif
+		}
+	}
+
+	void OnEnable ()
+	{
+#if UNITY_EDITOR
+		if (!Application.isPlaying) return;
+#endif
+		if (mStarted && mHighlighted)
+			OnHover(UICamera.IsHighlighted(gameObject));
+	}
 
 	void OnHover (bool isOver)
 	{
@@ -158,6 +190,9 @@ public class UIButtonTween : MonoBehaviour
 
 	void Update ()
 	{
+#if UNITY_EDITOR
+		if (!Application.isPlaying) return;
+#endif
 		if (disableWhenFinished != DisableCondition.DoNotDisable && mTweens != null)
 		{
 			bool isFinished = true;
@@ -193,6 +228,7 @@ public class UIButtonTween : MonoBehaviour
 
 	public void Play (bool forward)
 	{
+		mActive = 0;
 		GameObject go = (tweenTarget == null) ? gameObject : tweenTarget;
 
 		if (!NGUITools.GetActive(go))
@@ -210,7 +246,8 @@ public class UIButtonTween : MonoBehaviour
 		if (mTweens.Length == 0)
 		{
 			// No tweeners found -- should we disable the object?
-			if (disableWhenFinished != DisableCondition.DoNotDisable) NGUITools.SetActive(tweenTarget, false);
+			if (disableWhenFinished != DisableCondition.DoNotDisable)
+				NGUITools.SetActive(tweenTarget, false);
 		}
 		else
 		{
@@ -232,22 +269,41 @@ public class UIButtonTween : MonoBehaviour
 						NGUITools.SetActive(go, true);
 					}
 
+					++mActive;
+
 					// Toggle or activate the tween component
-					if (playDirection == Direction.Toggle) tw.Toggle();
-					else tw.Play(forward);
-					if (resetOnPlay) tw.Reset();
-
-					// Set the delegate
-					tw.onFinished = onFinished;
-
-					// Copy the event receiver
-					if (eventReceiver != null && !string.IsNullOrEmpty(callWhenFinished))
+					if (playDirection == Direction.Toggle)
 					{
-						tw.eventReceiver = eventReceiver;
-						tw.callWhenFinished = callWhenFinished;
+						tw.Toggle();
 					}
+					else
+					{
+						if (resetOnPlay || (resetIfDisabled && !tw.enabled)) tw.Reset();
+						tw.Play(forward);
+					}
+
+					// Listen for tween finished messages
+					EventDelegate.Add(tw.onFinished, OnFinished, true);
 				}
 			}
+		}
+	}
+
+	/// <summary>
+	/// Callback triggered when each tween executed by this script finishes.
+	/// </summary>
+
+	void OnFinished ()
+	{
+		if (--mActive == 0)
+		{
+			EventDelegate.Execute(onFinished);
+			
+			// Legacy functionality
+			if (eventReceiver != null && !string.IsNullOrEmpty(callWhenFinished))
+				eventReceiver.SendMessage(callWhenFinished, SendMessageOptions.DontRequireReceiver);
+
+			eventReceiver = null;
 		}
 	}
 }

@@ -6,7 +6,7 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}</ProjectGuid>
+    <ProjectGuid>{2F5A6D85-040F-4EE6-A77F-D3E3B107A524}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>GridFramework</RootNamespace>

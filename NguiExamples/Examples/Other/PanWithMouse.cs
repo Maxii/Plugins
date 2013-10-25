@@ -5,7 +5,7 @@
 /// </summary>
 
 [AddComponentMenu("NGUI/Examples/Pan With Mouse")]
-public class PanWithMouse : IgnoreTimeScale
+public class PanWithMouse : MonoBehaviour
 {
 	public Vector2 degrees = new Vector2(5f, 3f);
 	public float range = 1f;
@@ -22,7 +22,7 @@ public class PanWithMouse : IgnoreTimeScale
 
 	void Update ()
 	{
-		float delta = UpdateRealTimeDelta();
+		float delta = RealTime.deltaTime;
 		Vector3 pos = Input.mousePosition;
 
 		float halfWidth = Screen.width * 0.5f;

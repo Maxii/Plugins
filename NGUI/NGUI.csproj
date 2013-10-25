@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR, UNITY_4_2</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -61,15 +61,9 @@
     <Compile Include="Interaction\UIButtonKeys.cs" />
     <Compile Include="Interaction\UIButtonMessage.cs" />
     <Compile Include="Interaction\UIButtonOffset.cs" />
-    <Compile Include="Interaction\UIButtonPlayAnimation.cs" />
     <Compile Include="Interaction\UIButtonRotation.cs" />
     <Compile Include="Interaction\UIButtonScale.cs" />
-    <Compile Include="Interaction\UIButtonSound.cs" />
-    <Compile Include="Interaction\UIButtonTween.cs" />
     <Compile Include="Interaction\UICenterOnChild.cs" />
-    <Compile Include="Interaction\UICheckbox.cs" />
-    <Compile Include="Interaction\UICheckboxControlledComponent.cs" />
-    <Compile Include="Interaction\UICheckboxControlledObject.cs" />
     <Compile Include="Interaction\UIDragCamera.cs" />
     <Compile Include="Interaction\UIDraggableCamera.cs" />
     <Compile Include="Interaction\UIDraggablePanel.cs" />
@@ -79,13 +73,19 @@
     <Compile Include="Interaction\UIGrid.cs" />
     <Compile Include="Interaction\UIImageButton.cs" />
     <Compile Include="Interaction\UIInputValidator.cs" />
+    <Compile Include="Interaction\UIPlayAnimation.cs" />
+    <Compile Include="Interaction\UIPlaySound.cs" />
+    <Compile Include="Interaction\UIPlayTween.cs" />
     <Compile Include="Interaction\UIPopupList.cs" />
     <Compile Include="Interaction\UISavedOption.cs" />
     <Compile Include="Interaction\UIScrollBar.cs" />
     <Compile Include="Interaction\UISlider.cs" />
-    <Compile Include="Interaction\UISliderColors.cs" />
     <Compile Include="Interaction\UISoundVolume.cs" />
     <Compile Include="Interaction\UITable.cs" />
+    <Compile Include="Interaction\UIToggle.cs" />
+    <Compile Include="Interaction\UIToggledComponents.cs" />
+    <Compile Include="Interaction\UIToggledObjects.cs" />
+    <Compile Include="Interaction\UIWidgetContainer.cs" />
     <Compile Include="Internal\ActiveAnimation.cs" />
     <Compile Include="Internal\AnimationOrTween.cs" />
     <Compile Include="Internal\BetterList.cs" />
@@ -93,16 +93,16 @@
     <Compile Include="Internal\BMGlyph.cs" />
     <Compile Include="Internal\BMSymbol.cs" />
     <Compile Include="Internal\ByteReader.cs" />
-    <Compile Include="Internal\IgnoreTimeScale.cs" />
+    <Compile Include="Internal\EventDelegate.cs" />
     <Compile Include="Internal\Localization.cs" />
     <Compile Include="Internal\NGUIDebug.cs" />
     <Compile Include="Internal\NGUIMath.cs" />
     <Compile Include="Internal\NGUITools.cs" />
+    <Compile Include="Internal\RealTime.cs" />
     <Compile Include="Internal\SpringPanel.cs" />
     <Compile Include="Internal\UIDrawCall.cs" />
     <Compile Include="Internal\UIEventListener.cs" />
     <Compile Include="Internal\UIGeometry.cs" />
-    <Compile Include="Internal\UINode.cs" />
     <Compile Include="Internal\UIWidget.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Tweening\AnimatedAlpha.cs" />
@@ -111,32 +111,31 @@
     <Compile Include="Tweening\TweenAlpha.cs" />
     <Compile Include="Tweening\TweenColor.cs" />
     <Compile Include="Tweening\TweenFOV.cs" />
+    <Compile Include="Tweening\TweenHeight.cs" />
     <Compile Include="Tweening\TweenOrthoSize.cs" />
     <Compile Include="Tweening\TweenPosition.cs" />
     <Compile Include="Tweening\TweenRotation.cs" />
     <Compile Include="Tweening\TweenScale.cs" />
     <Compile Include="Tweening\TweenTransform.cs" />
     <Compile Include="Tweening\TweenVolume.cs" />
+    <Compile Include="Tweening\TweenWidth.cs" />
     <Compile Include="Tweening\UITweener.cs" />
     <Compile Include="UI\UIAnchor.cs" />
     <Compile Include="UI\UIAtlas.cs" />
     <Compile Include="UI\UICamera.cs" />
-    <Compile Include="UI\UIFilledSprite.cs" />
     <Compile Include="UI\UIFont.cs" />
     <Compile Include="UI\UIInput.cs" />
-    <Compile Include="UI\UIInputSaved.cs" />
     <Compile Include="UI\UILabel.cs" />
     <Compile Include="UI\UILocalize.cs" />
     <Compile Include="UI\UIOrthoCamera.cs" />
     <Compile Include="UI\UIPanel.cs" />
     <Compile Include="UI\UIRoot.cs" />
-    <Compile Include="UI\UISlicedSprite.cs" />
     <Compile Include="UI\UISprite.cs" />
     <Compile Include="UI\UISpriteAnimation.cs" />
+    <Compile Include="UI\UISpriteData.cs" />
     <Compile Include="UI\UIStretch.cs" />
     <Compile Include="UI\UITextList.cs" />
     <Compile Include="UI\UITexture.cs" />
-    <Compile Include="UI\UITiledSprite.cs" />
     <Compile Include="UI\UITooltip.cs" />
     <Compile Include="UI\UIViewport.cs" />
   </ItemGroup>

@@ -25,11 +25,13 @@ public class DelegateSphereHandler : MonoBehaviour
 	{
 		CtxObject ctxObj = GetComponent<CtxObject>();
 		if (ctxObj != null)
-			ctxObj.onSelection = OnMenuSelection;
+			EventDelegate.Add(ctxObj.onSelection, OnMenuSelection);
 	}
 	
-	void OnMenuSelection(int itemID)
+	public void OnMenuSelection()
 	{
+		int itemID = CtxMenu.current.selectedItem;
+		
 		switch ((MenuItemID)itemID)
 		{
 		case MenuItemID.Small:

@@ -71,7 +71,7 @@ public class ComponentSelector : ScriptableWizard
 
 	void OnGUI ()
 	{
-		EditorGUIUtility.LookLikeControls(80f);
+		NGUIEditorTools.SetLabelWidth(80f);
 		GUILayout.Label("Recently used components", "LODLevelNotifyText");
 		NGUIEditorTools.DrawSeparator();
 

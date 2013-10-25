@@ -96,7 +96,7 @@
       <Name>NguiEditor</Name>
     </ProjectReference>
     <ProjectReference Include="..\Ngui\Ngui.csproj">
-      <Project>{84ab84fa-983b-4fb8-bfd9-34d3b93d8000}</Project>
+      <Project>{ac0f8b23-dd41-4bab-a967-aa2c33bb1d0b}</Project>
       <Name>Ngui</Name>
     </ProjectReference>
   </ItemGroup>

@@ -9,7 +9,7 @@ using UnityEngine;
 /// Tween the object's local scale.
 /// </summary>
 
-[AddComponentMenu("NGUI/Tween/Scale")]
+[AddComponentMenu("NGUI/Tween/Tween Scale")]
 public class TweenScale : UITweener
 {
 	public Vector3 from = Vector3.one;

@@ -24,7 +24,7 @@ public class InitializedSphereHandler : MonoBehaviour
 	bool stealthOn;
 	bool shieldOn;
 	
-	void OnMenuShow(CtxObject obj)
+	public void OnShowMenu(CtxObject obj)
 	{
 		if (transform.localScale.x == 1f)
 			obj.contextMenu.SetChecked((int)MenuItemID.Small, true);
@@ -61,7 +61,7 @@ public class InitializedSphereHandler : MonoBehaviour
 		}
 	}
 	
-	void OnMenuSelection(int itemID)
+	public void OnMenuSelection(int itemID)
 	{
 		switch ((MenuItemID)itemID)
 		{

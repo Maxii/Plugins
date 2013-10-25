@@ -1,4 +1,4 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
 // Copyright © 2011-2013 Tasharen Entertainment
 //----------------------------------------------
@@ -13,6 +13,8 @@ using System.Collections.Generic;
 
 public class UIPanelTool : EditorWindow
 {
+	static public UIPanelTool instance;
+
 	class Entry
 	{
 		public UIPanel panel;
@@ -20,8 +22,7 @@ public class UIPanelTool : EditorWindow
 		public bool widgetsEnabled = false;
 		public List<UIWidget> widgets = new List<UIWidget>();
 	}
-
-	static int Compare (Entry a, Entry b) { return string.Compare(a.panel.name, b.panel.name); }
+	static int Compare (Entry a, Entry b) { return UIPanel.CompareFunc(a.panel, b.panel); }
 
 	Vector2 mScroll = Vector2.zero;
 
@@ -31,13 +32,16 @@ public class UIPanelTool : EditorWindow
 
 	void OnSelectionChange () { Repaint(); }
 
+	void OnEnable () { instance = this; }
+	void OnDisable () { instance = null; }
+
 	/// <summary>
 	/// Collect a list of panels.
 	/// </summary>
 
 	static List<UIPanel> GetListOfPanels ()
 	{
-		List<UIPanel> panels = NGUIEditorTools.FindInScene<UIPanel>();
+		List<UIPanel> panels = NGUIEditorTools.FindAll<UIPanel>();
 
 		for (int i = panels.Count; i > 0; )
 		{
@@ -163,7 +167,7 @@ public class UIPanelTool : EditorWindow
 			// Sort the list alphabetically
 			entries.Sort(Compare);
 
-			EditorGUIUtility.LookLikeControls(80f);
+			NGUIEditorTools.SetLabelWidth(80f);
 			bool showAll = DrawRow(null, null, allEnabled);
 			NGUIEditorTools.DrawSeparator();
 
@@ -203,20 +207,22 @@ public class UIPanelTool : EditorWindow
 	bool DrawRow (Entry ent, UIPanel selected, bool isChecked)
 	{
 		bool retVal = false;
-		string panelName, layer, widgetCount, drawCalls, clipping;
+		string panelName, layer, depth, widgetCount, drawCalls, clipping;
 
 		if (ent != null)
 		{
 			panelName = ent.panel.name;
 			layer = LayerMask.LayerToName(ent.panel.gameObject.layer);
+			depth = ent.panel.depth.ToString();
 			widgetCount = ent.widgets.Count.ToString();
-			drawCalls = ent.panel.drawCalls.size.ToString();
+			drawCalls = ent.panel.drawCallCount.ToString();
 			clipping = (ent.panel.clipping != UIDrawCall.Clipping.None) ? "Yes" : "";
 		}
 		else
 		{
 			panelName = "Panel's Name";
 			layer = "Layer";
+			depth = "DP";
 			widgetCount = "WG";
 			drawCalls = "DC";
 			clipping = "Clip";
@@ -238,6 +244,8 @@ public class UIPanelTool : EditorWindow
 		GUI.contentColor = (ent == null || ent.isEnabled) ? Color.white : new Color(0.7f, 0.7f, 0.7f);
 		if (isChecked != EditorGUILayout.Toggle(isChecked, GUILayout.Width(20f))) retVal = true;
 
+		GUILayout.Label(depth, GUILayout.Width(30f));
+
 		if (GUILayout.Button(panelName, EditorStyles.label, GUILayout.MinWidth(100f)))
 		{
 			if (ent != null)
@@ -255,7 +263,6 @@ public class UIPanelTool : EditorWindow
 		if (ent == null)
 		{
 			GUILayout.Label("Stc", GUILayout.Width(24f));
-			GUILayout.Label("Giz", GUILayout.Width(24f));
 		}
 		else
 		{
@@ -265,17 +272,10 @@ public class UIPanelTool : EditorWindow
 			{
 				ent.panel.widgetsAreStatic = !val;
 				EditorUtility.SetDirty(ent.panel.gameObject);
-
+#if !UNITY_3_5
 				if (NGUITransformInspector.instance != null)
 					NGUITransformInspector.instance.Repaint();
-			}
-
-			val = (ent.panel.debugInfo == UIPanel.DebugInfo.Gizmos);
-
-			if (val != EditorGUILayout.Toggle(val, GUILayout.Width(20f)))
-			{
-				ent.panel.debugInfo = val ? UIPanel.DebugInfo.None : UIPanel.DebugInfo.Gizmos;
-				EditorUtility.SetDirty(ent.panel.gameObject);
+#endif
 			}
 		}
 		GUI.contentColor = Color.white;

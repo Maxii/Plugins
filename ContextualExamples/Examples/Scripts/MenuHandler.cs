@@ -32,6 +32,8 @@ public class MenuHandler : MonoBehaviour
 	
 	void OnMenuSelection(int cmd)
 	{
+		Debug.Log ("MenuHandler.OnMenuSelection("+cmd+")");
+		
 		switch ((Command)cmd)
 		{
 		case Command.Small:

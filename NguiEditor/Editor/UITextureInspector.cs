@@ -24,7 +24,7 @@ public class UITextureInspector : UIWidgetInspector
 
 	protected override bool DrawProperties ()
 	{
-		if (!mTex.hasDynamicMaterial && (mTex.material != null || mTex.mainTexture == null))
+		if (mTex.material != null || mTex.mainTexture == null)
 		{
 			Material mat = EditorGUILayout.ObjectField("Material", mTex.material, typeof(Material), false) as Material;
 
@@ -83,12 +83,6 @@ public class UITextureInspector : UIWidgetInspector
 	public override void OnPreviewGUI (Rect rect, GUIStyle background)
 	{
 		Texture2D tex = mTex.mainTexture as Texture2D;
-
-		if (tex != null)
-		{
-			Rect uv = mTex.uvRect;
-			Rect outer = NGUIMath.ConvertToPixels(uv, tex.width, tex.height, true);
-			NGUIEditorTools.DrawSprite(tex, rect, outer, outer, uv, mTex.color);
-		}
+		if (tex != null) NGUIEditorTools.DrawTexture(tex, rect, mTex.uvRect, mTex.color);
 	}
 }

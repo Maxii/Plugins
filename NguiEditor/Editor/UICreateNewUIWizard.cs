@@ -34,7 +34,7 @@ public class UICreateNewUIWizard : EditorWindow
 
 	void OnGUI ()
 	{
-		EditorGUIUtility.LookLikeControls(80f);
+		NGUIEditorTools.SetLabelWidth(80f);
 
 		GUILayout.Label("Create a new UI with the following parameters:");
 		NGUIEditorTools.DrawSeparator();
@@ -100,7 +100,7 @@ public class UICreateNewUIWizard : EditorWindow
 			bool clearColor = true;
 			bool audioListener = true;
 
-			List<Camera> cameras = NGUIEditorTools.FindInScene<Camera>();
+			List<Camera> cameras = NGUIEditorTools.FindAll<Camera>();
 
 			foreach (Camera c in cameras)
 			{

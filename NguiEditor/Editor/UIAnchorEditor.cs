@@ -6,9 +6,8 @@
 using UnityEngine;
 using UnityEditor;
 
-/// <summary>
-/// Tiled sprite is obsolete. It's only kept for backwards compatibility.
-/// </summary>
-
-[CustomEditor(typeof(UISlicedSprite))]
-public class UISlicedSpriteInspector : UISpriteInspector {}
+[CanEditMultipleObjects]
+[CustomEditor(typeof(UIAnchor))]
+public class UIAnchorEditor : Editor
+{
+}

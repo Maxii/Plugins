@@ -33,8 +33,9 @@ public class LocalizeDemo : MonoBehaviour
 		}
 	}
 	
-	void OnMenuSelection(int itemID)
+	public void OnMenuSelection()
 	{
+		int itemID = CtxMenu.current.selectedItem;
 		LanguageItem li = (LanguageItem)itemID;
 		string itemText = CtxMenu.current.GetText(itemID);
 		

@@ -1,4 +1,4 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
 // Copyright © 2011-2013 Tasharen Entertainment
 //----------------------------------------------
@@ -7,27 +7,45 @@ using UnityEngine;
 using UnityEditor;
 
 [CustomEditor(typeof(UIScrollBar))]
-public class UIScrollBarInspector : Editor
+public class UIScrollBarInspector : UIWidgetContainerEditor
 {
 	public override void OnInspectorGUI ()
 	{
-		EditorGUIUtility.LookLikeControls(80f);
+		NGUIEditorTools.SetLabelWidth(80f);
 		UIScrollBar sb = target as UIScrollBar;
 
-		NGUIEditorTools.DrawSeparator();
+		GUILayout.Space(3f);
 
-		float val = EditorGUILayout.Slider("Value", sb.scrollValue, 0f, 1f);
+		float val = EditorGUILayout.Slider("Value", sb.value, 0f, 1f);
 		float size = EditorGUILayout.Slider("Size", sb.barSize, 0f, 1f);
 		float alpha = EditorGUILayout.Slider("Alpha", sb.alpha, 0f, 1f);
 
-		NGUIEditorTools.DrawSeparator();
+		UISprite bg = sb.background;
+		UISprite fg = sb.foreground;
+		bool inv = sb.inverted;
+		UIScrollBar.Direction dir = sb.direction;
 
-		UISprite bg = (UISprite)EditorGUILayout.ObjectField("Background", sb.background, typeof(UISprite), true);
-		UISprite fg = (UISprite)EditorGUILayout.ObjectField("Foreground", sb.foreground, typeof(UISprite), true);
-		UIScrollBar.Direction dir = (UIScrollBar.Direction)EditorGUILayout.EnumPopup("Direction", sb.direction);
-		bool inv = EditorGUILayout.Toggle("Inverted", sb.inverted);
+		//GUILayout.Space(6f);
 
-		if (sb.scrollValue != val ||
+		if (NGUIEditorTools.DrawHeader("Appearance"))
+		{
+			NGUIEditorTools.BeginContents();
+			bg = (UISprite)EditorGUILayout.ObjectField("Background", sb.background, typeof(UISprite), true);
+			fg = (UISprite)EditorGUILayout.ObjectField("Foreground", sb.foreground, typeof(UISprite), true);
+
+			GUILayout.BeginHorizontal();
+			dir = (UIScrollBar.Direction)EditorGUILayout.EnumPopup("Direction", sb.direction);
+			GUILayout.Space(18f);
+			GUILayout.EndHorizontal();
+
+			inv = EditorGUILayout.Toggle("Inverted", sb.inverted);
+
+			NGUIEditorTools.EndContents();
+		}
+
+		//GUILayout.Space(3f);
+
+		if (sb.value != val ||
 			sb.barSize != size ||
 			sb.background != bg ||
 			sb.foreground != fg ||
@@ -36,7 +54,7 @@ public class UIScrollBarInspector : Editor
 			sb.alpha != alpha)
 		{
 			NGUIEditorTools.RegisterUndo("Scroll Bar Change", sb);
-			sb.scrollValue = val;
+			sb.value = val;
 			sb.barSize = size;
 			sb.inverted = inv;
 			sb.background = bg;
@@ -45,5 +63,7 @@ public class UIScrollBarInspector : Editor
 			sb.alpha = alpha;
 			UnityEditor.EditorUtility.SetDirty(sb);
 		}
+
+		NGUIEditorTools.DrawEvents("On Value Change", sb, sb.onChange);
 	}
 }

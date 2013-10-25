@@ -327,33 +327,6 @@ static public class NGUIMath
 	}
 
 	/// <summary>
-	/// Calculate the 4 corners of a widget taking padding into consideration.
-	/// </summary>
-
-	static public Vector3[] CalculateWidgetCorners (UIWidget w)
-	{
-		Vector2 size = w.relativeSize;
-		Vector2 offset = w.pivotOffset;
-		Vector4 padding = w.relativePadding;
-
-		float x0 = offset.x * size.x - padding.x;
-		float y0 = offset.y * size.y + padding.y;
-
-		float x1 = x0 + size.x + padding.x + padding.z;
-		float y1 = y0 - size.y - padding.y - padding.w;
-
-		Transform wt = w.cachedTransform;
-
-		return new Vector3[]
-		{
-			wt.TransformPoint(x0, y0, 0f),
-			wt.TransformPoint(x0, y1, 0f),
-			wt.TransformPoint(x1, y1, 0f),
-			wt.TransformPoint(x1, y0, 0f)
-		};
-	}
-
-	/// <summary>
 	/// Calculate the combined bounds of all widgets attached to the specified game object or its children (in world space).
 	/// </summary>
 
@@ -364,34 +337,19 @@ static public class NGUIMath
 
 		Vector3 vMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
 		Vector3 vMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
-		Vector3 v;
 
 		for (int i = 0, imax = widgets.Length; i < imax; ++i)
 		{
 			UIWidget w = widgets[i];
-			Vector2 size = w.relativeSize;
-			Vector2 offset = w.pivotOffset;
-			float x = (offset.x + 0.5f) * size.x;
-			float y = (offset.y - 0.5f) * size.y;
-			size *= 0.5f;
+			if (!w.enabled) continue;
 
-			Transform wt = w.cachedTransform;
+			Vector3[] corners = w.worldCorners;
 
-			v = wt.TransformPoint(new Vector3(x - size.x, y - size.y, 0f));
-			vMax = Vector3.Max(v, vMax);
-			vMin = Vector3.Min(v, vMin);
-
-			v = wt.TransformPoint(new Vector3(x - size.x, y + size.y, 0f));
-			vMax = Vector3.Max(v, vMax);
-			vMin = Vector3.Min(v, vMin);
-
-			v = wt.TransformPoint(new Vector3(x + size.x, y - size.y, 0f));
-			vMax = Vector3.Max(v, vMax);
-			vMin = Vector3.Min(v, vMin);
-
-			v = wt.TransformPoint(new Vector3(x + size.x, y + size.y, 0f));
-			vMax = Vector3.Max(v, vMax);
-			vMin = Vector3.Min(v, vMin);
+			for (int j = 0; j < 4; ++j)
+			{
+				vMax = Vector3.Max(corners[j], vMax);
+				vMin = Vector3.Min(corners[j], vMin);
+			}
 		}
 
 		Bounds b = new Bounds(vMin, Vector3.zero);
@@ -403,65 +361,70 @@ static public class NGUIMath
 	/// Calculate the combined bounds of all widgets attached to the specified game object or its children (in relative-to-object space).
 	/// </summary>
 
+	static public Bounds CalculateRelativeWidgetBounds (Transform trans)
+	{
+		return CalculateRelativeWidgetBounds(trans, trans, false);
+	}
+
+	/// <summary>
+	/// Calculate the combined bounds of all widgets attached to the specified game object or its children (in relative-to-object space).
+	/// </summary>
+
+	static public Bounds CalculateRelativeWidgetBounds (Transform trans, bool considerInactive)
+	{
+		return CalculateRelativeWidgetBounds(trans, trans, considerInactive);
+	}
+
+	/// <summary>
+	/// Calculate the combined bounds of all widgets attached to the specified game object or its children (in relative-to-object space).
+	/// </summary>
+
 	static public Bounds CalculateRelativeWidgetBounds (Transform root, Transform child)
 	{
-		UIWidget[] widgets = child.GetComponentsInChildren<UIWidget>() as UIWidget[];
-		if (widgets.Length == 0) return new Bounds(Vector3.zero, Vector3.zero);
+		return CalculateRelativeWidgetBounds(root, child, false);
+	}
 
-		Vector3 vMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-		Vector3 vMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+	/// <summary>
+	/// Calculate the combined bounds of all widgets attached to the specified game object or its children (in relative-to-object space).
+	/// </summary>
 
-		Matrix4x4 toLocal = root.worldToLocalMatrix;
+	static public Bounds CalculateRelativeWidgetBounds (Transform root, Transform child, bool considerInactive)
+	{
+		UIWidget[] widgets = child.GetComponentsInChildren<UIWidget>(considerInactive) as UIWidget[];
 
-		for (int i = 0, imax = widgets.Length; i < imax; ++i)
+		if (widgets.Length > 0)
 		{
-			UIWidget w = widgets[i];
-			Vector2 size = w.relativeSize;
-			Vector2 offset = w.pivotOffset;
-			Transform toWorld = w.cachedTransform;
+			Vector3 vMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+			Vector3 vMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
 
-			float x = (offset.x + 0.5f) * size.x;
-			float y = (offset.y - 0.5f) * size.y;
-			size *= 0.5f;
-			
-			// Start with the corner of the widget
-			Vector3 v = new Vector3(x - size.x, y - size.y, 0f);
-			
-			// Transform the coordinate from relative-to-widget to world space
-			v = toWorld.TransformPoint(v);
-			
-			// Now transform from world space to relative-to-parent space
-			v = toLocal.MultiplyPoint3x4(v);
+			Matrix4x4 toLocal = root.worldToLocalMatrix;
+			bool isSet = false;
+			Vector3 v;
 
-			vMax = Vector3.Max(v, vMax);
-			vMin = Vector3.Min(v, vMin);
+			for (int i = 0, imax = widgets.Length; i < imax; ++i)
+			{
+				UIWidget w = widgets[i];
+				if (!considerInactive && !w.enabled) continue;
 
-			// Repeat for the other 3 corners
-			v = new Vector3(x - size.x, y + size.y, 0f);
-			v = toWorld.TransformPoint(v);
-			v = toLocal.MultiplyPoint3x4(v);
+				Vector3[] corners = w.worldCorners;
 
-			vMax = Vector3.Max(v, vMax);
-			vMin = Vector3.Min(v, vMin);
+				for (int j = 0; j < 4; ++j)
+				{
+					v = toLocal.MultiplyPoint3x4(corners[j]);
+					vMax = Vector3.Max(v, vMax);
+					vMin = Vector3.Min(v, vMin);
+				}
+				isSet = true;
+			}
 
-			v = new Vector3(x + size.x, y - size.y, 0f);
-			v = toWorld.TransformPoint(v);
-			v = toLocal.MultiplyPoint3x4(v);
-
-			vMax = Vector3.Max(v, vMax);
-			vMin = Vector3.Min(v, vMin);
-
-			v = new Vector3(x + size.x, y + size.y, 0f);
-			v = toWorld.TransformPoint(v);
-			v = toLocal.MultiplyPoint3x4(v);
-
-			vMax = Vector3.Max(v, vMax);
-			vMin = Vector3.Min(v, vMin);
+			if (isSet)
+			{
+				Bounds b = new Bounds(vMin, Vector3.zero);
+				b.Encapsulate(vMax);
+				return b;
+			}
 		}
-
-		Bounds b = new Bounds(vMin, Vector3.zero);
-		b.Encapsulate(vMax);
-		return b;
+		return new Bounds(Vector3.zero, Vector3.zero);
 	}
 
 	/// <summary>
@@ -472,73 +435,24 @@ static public class NGUIMath
 	{
 		if (sprite.type == UISprite.Type.Sliced)
 		{
+			Vector3 vMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+			Vector3 vMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+
 			Matrix4x4 toLocal = root.worldToLocalMatrix;
-			Vector2 size = sprite.relativeSize;
-			Vector2 offset = sprite.pivotOffset;
-			Transform toWorld = sprite.cachedTransform;
+			Vector3[] corners = sprite.innerWorldCorners;
 
-			float x = (offset.x + 0.5f) * size.x;
-			float y = (offset.y - 0.5f) * size.y;
-			size *= 0.5f;
-
-			float sx = toWorld.localScale.x;
-			float sy = toWorld.localScale.y;
-
-			// Get the border in pixels
-			Vector4 border = sprite.border;
-
-			// Convert pixels to relative coordinates
-			if (sx != 0f)
+			for (int j = 0; j < 4; ++j)
 			{
-				border.x /= sx;
-				border.z /= sx;
+				Vector4 v = toLocal.MultiplyPoint3x4(corners[j]);
+				vMax = Vector3.Max(v, vMax);
+				vMin = Vector3.Min(v, vMin);
 			}
 
-			if (sy != 0f)
-			{
-				border.y /= sy;
-				border.w /= sy;
-			}
-
-			// Calculate the relative dimensions
-			float left = x - size.x + border.x;
-			float right = x + size.x - border.z;
-			float top = y - size.y + border.y;
-			float bottom = y + size.y - border.w;
-
-			// Start with the corner of the widget
-			Vector3 v = new Vector3(left, top, 0f);
-			v = toWorld.TransformPoint(v);
-			v = toLocal.MultiplyPoint3x4(v);
-			Bounds b = new Bounds(v, Vector3.zero);
-
-			// Repeat for the other 3 corners
-			v = new Vector3(left, bottom, 0f);
-			v = toWorld.TransformPoint(v);
-			v = toLocal.MultiplyPoint3x4(v);
-			b.Encapsulate(v);
-
-			v = new Vector3(right, bottom, 0f);
-			v = toWorld.TransformPoint(v);
-			v = toLocal.MultiplyPoint3x4(v);
-			b.Encapsulate(v);
-
-			v = new Vector3(right, top, 0f);
-			v = toWorld.TransformPoint(v);
-			v = toLocal.MultiplyPoint3x4(v);
-			b.Encapsulate(v);
+			Bounds b = new Bounds(vMin, Vector3.zero);
+			b.Encapsulate(vMax);
 			return b;
 		}
 		return CalculateRelativeWidgetBounds(root, sprite.cachedTransform);
-	}
-
-	/// <summary>
-	/// Calculate the combined bounds of all widgets attached to the specified game object or its children (in relative-to-object space).
-	/// </summary>
-
-	static public Bounds CalculateRelativeWidgetBounds (Transform trans)
-	{
-		return CalculateRelativeWidgetBounds(trans, trans);
 	}
 
 	/// <summary>
@@ -554,20 +468,13 @@ static public class NGUIMath
 
 	static public Vector3 SpringDampen (ref Vector3 velocity, float strength, float deltaTime)
 	{
-		// Dampening factor applied each millisecond
 		if (deltaTime > 1f) deltaTime = 1f;
 		float dampeningFactor = 1f - strength * 0.001f;
 		int ms = Mathf.RoundToInt(deltaTime * 1000f);
-		Vector3 offset = Vector3.zero;
-
-		// Apply the offset for each millisecond
-		for (int i = 0; i < ms; ++i)
-		{
-			// Mimic 60 FPS the editor runs at
-			offset += velocity * 0.06f;
-			velocity *= dampeningFactor;
-		}
-		return offset;
+		float totalDampening = Mathf.Pow(dampeningFactor, ms);
+		Vector3 vTotal = velocity * ((totalDampening - 1f) / Mathf.Log(dampeningFactor));
+		velocity = velocity * totalDampening;
+		return vTotal * 0.06f;
 	}
 
 	/// <summary>
@@ -576,20 +483,13 @@ static public class NGUIMath
 
 	static public Vector2 SpringDampen (ref Vector2 velocity, float strength, float deltaTime)
 	{
-		// Dampening factor applied each millisecond
 		if (deltaTime > 1f) deltaTime = 1f;
 		float dampeningFactor = 1f - strength * 0.001f;
 		int ms = Mathf.RoundToInt(deltaTime * 1000f);
-		Vector2 offset = Vector2.zero;
-
-		// Apply the offset for each millisecond
-		for (int i = 0; i < ms; ++i)
-		{
-			// Mimic 60 FPS the editor runs at
-			offset += velocity * 0.06f;
-			velocity *= dampeningFactor;
-		}
-		return offset;
+		float totalDampening = Mathf.Pow(dampeningFactor, ms);
+		Vector2 vTotal = velocity * ((totalDampening - 1f) / Mathf.Log(dampeningFactor));
+		velocity = velocity * totalDampening;
+		return vTotal * 0.06f;
 	}
 
 	/// <summary>
@@ -724,5 +624,24 @@ static public class NGUIMath
 		for (int i = 0; i < 4; ++i)
 			screenPoints[i] = cam.WorldToScreenPoint(worldPoints[i]);
 		return DistanceToRectangle(screenPoints, mousePos);
+	}
+
+	/// <summary>
+	/// Helper function that converts the widget's pivot enum into a 0-1 range vector.
+	/// </summary>
+
+	static public Vector2 GetPivotOffset (UIWidget.Pivot pv)
+	{
+		Vector2 v = Vector2.zero;
+
+		if (pv == UIWidget.Pivot.Top || pv == UIWidget.Pivot.Center || pv == UIWidget.Pivot.Bottom) v.x = 0.5f;
+		else if (pv == UIWidget.Pivot.TopRight || pv == UIWidget.Pivot.Right || pv == UIWidget.Pivot.BottomRight) v.x = 1f;
+		else v.x = 0f;
+
+		if (pv == UIWidget.Pivot.Left || pv == UIWidget.Pivot.Center || pv == UIWidget.Pivot.Right) v.y = 0.5f;
+		else if (pv == UIWidget.Pivot.TopLeft || pv == UIWidget.Pivot.Top || pv == UIWidget.Pivot.TopRight) v.y = 1f;
+		else v.y = 0f;
+
+		return v;
 	}
 }

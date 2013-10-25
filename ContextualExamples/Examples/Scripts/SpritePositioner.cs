@@ -17,7 +17,7 @@ public class SpritePositioner : MonoBehaviour
 	
 	void Update()
 	{
-		Camera cam = Camera.mainCamera;
+		Camera cam = Camera.main;
 		
 		if (cam == null || targetObject == null || sprite == null)
 			return;
@@ -31,7 +31,7 @@ public class SpritePositioner : MonoBehaviour
 		
 			screenPos = cam.WorldToScreenPoint(pos);
 			
-			float tanFOV = Mathf.Tan(cam.fov*0.5f*Mathf.Deg2Rad);
+			float tanFOV = Mathf.Tan(cam.fieldOfView*0.5f*Mathf.Deg2Rad);
 			if (tanFOV != 0f)
 				screenPos += Offset(pos, targetDistance, cam.transform.position, tanFOV);
 		}

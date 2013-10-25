@@ -1,4 +1,4 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
 // Copyright © 2011-2013 Tasharen Entertainment
 //----------------------------------------------
@@ -9,7 +9,7 @@ using UnityEngine;
 /// Tween the object's position.
 /// </summary>
 
-[AddComponentMenu("NGUI/Tween/Position")]
+[AddComponentMenu("NGUI/Tween/Tween Position")]
 public class TweenPosition : UITweener
 {
 	public Vector3 from;

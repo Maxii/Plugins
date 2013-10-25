@@ -9,11 +9,16 @@ using UnityEngine;
 /// Tween the object's alpha.
 /// </summary>
 
-[AddComponentMenu("NGUI/Tween/Alpha")]
+[AddComponentMenu("NGUI/Tween/Tween Alpha")]
 public class TweenAlpha : UITweener
 {
+#if UNITY_3_5
 	public float from = 1f;
 	public float to = 1f;
+#else
+	[Range(0f, 1f)] public float from = 1f;
+	[Range(0f, 1f)] public float to = 1f;
+#endif
 
 	Transform mTrans;
 	UIWidget mWidget;

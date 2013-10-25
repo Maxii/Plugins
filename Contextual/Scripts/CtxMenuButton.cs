@@ -4,6 +4,7 @@
 //=========================================================
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 /// <summary>
 /// Menu button class. Similar in behavior to UIPopupList but utilizing CtxMenu
@@ -47,57 +48,26 @@ public class CtxMenuButton : MonoBehaviour
 	/// only work properly when the menu items have icons.
 	/// </summary>
 	public UISprite currentItemIcon;
-
-	/// <summary>
-	/// Target game object that will be notified when a selection is made.
-	/// </summary>
-	public GameObject eventReceiver;
-
-	/// <summary>
-	/// Function to call when the selection is made. [eg void OnSelectionChange(int item);]
-	/// </summary>
-	public string functionName = "OnSelectionChange";
-		
-	/// <summary>
-	/// Delegate type used for notifications.
-	/// </summary>
-	public delegate void OnSelection(int item);
-
-	/// <summary>
-	/// Delegate to call when the selection is made. Faster than using the 'eventReceiver'.
-	/// </summary>
-	public OnSelection onSelection;
-		
-	/// <summary>
-	/// Delegate type used for notifications.
-	/// </summary>
-	public delegate void OnMenuEvent(CtxMenuButton menu);
 	
 	/// <summary>
-	/// Delegate to call just prior to the menu being shown. This is an opportunity to set
-	/// up the menu parameters in an event-driven way before the menu is actually shown.
+	/// The current menu button. Valid only during event callbacks.
 	/// </summary>
-	public OnMenuEvent onShow;
-		
-	/// <summary>
-	/// Name of function which is called just prior to the menu being shown. The parameter to
-	/// this function is a reference to this CtxMenuButton instance. Equivalent to the onShow
-	/// delegate for non-C# applications.
-	/// </summary>
-	public string showFunction;
+	public static CtxMenuButton current;
 	
 	/// <summary>
-	/// Delegate to call just after the menu is hidden. This is an opportunity to do
-	/// post-menu cleanup.
+	/// The onSelection event.
 	/// </summary>
-	public OnMenuEvent onHide;
+	public List<EventDelegate> onSelection = new List<EventDelegate>();
 	
 	/// <summary>
-	/// Name of function which is called just after this menu is hidden. The parameter to
-	/// this function is a reference to this CtxMenuButton instance. Equivalent to the onHide delegate
-	/// for non-C# applications.
+	/// The onShow event.
 	/// </summary>
-	public string hideFunction;
+	public List<EventDelegate> onShow = new List<EventDelegate>();
+	
+	/// <summary>
+	/// The onHide event.
+	/// </summary>
+	public List<EventDelegate> onHide = new List<EventDelegate>();
 
 	#endregion
 		
@@ -166,41 +136,34 @@ public class CtxMenuButton : MonoBehaviour
 		}
 		else if (enabled && contextMenu != null)
 		{
+			current = this;
 			if (onShow != null)
-				onShow(this);
-					
-			if (eventReceiver != null && ! string.IsNullOrEmpty(showFunction))
-				eventReceiver.SendMessage(showFunction, this, SendMessageOptions.DontRequireReceiver);
+				EventDelegate.Execute(onShow);
 
 			CtxMenu.Item[] items = MenuItems;
 			
 			if (items != null || contextMenu.onShow != null)
 			{
-				// Grab the menu's onSelection delegate so we can receive events.
-				contextMenu.onSelection = OnMenuSelection;
+				EventDelegate.Add(contextMenu.onSelection, OnMenuSelection, true);
+				EventDelegate.Add(contextMenu.onHide, OnHide, true);
 			
 				if (menuItems != null && menuItems.Length > 0)
 					contextMenu.Show(menuPosition, menuItems);
 				else
 					contextMenu.Show(menuPosition);
-				
-				contextMenu.onHide = OnHide;
 			}
 		}
 	}
 	
-	void OnHide(CtxMenu menu)
+	void OnHide()
 	{
 		if (onHide != null)
-			onHide(this);
-		
-		if (eventReceiver != null && ! string.IsNullOrEmpty(hideFunction))
-			eventReceiver.SendMessage(hideFunction, this, SendMessageOptions.DontRequireReceiver);
+			EventDelegate.Execute(onHide);
 	}
 	
-	void OnMenuSelection(int item)
+	void OnMenuSelection()
 	{
-		selection = item;
+		selection = CtxMenu.current.selectedItem;
 		
 		// Update the button label and/or icon so that they agree with the 
 		// menu item selection.
@@ -209,16 +172,8 @@ public class CtxMenuButton : MonoBehaviour
 		
 		// Dispatch selection events.
 		
-		if (onSelection != null)
-			onSelection(item);
-		
-		if (eventReceiver != null)
-			eventReceiver.SendMessage(functionName, item, SendMessageOptions.DontRequireReceiver);
-
-		// We only grab the delegate while the menu is active and clear
-		// it when done.
-		
-		contextMenu.onSelection = null;
+		current = this;
+		EventDelegate.Execute(onSelection);
 	}
 	
 	void OnSelect(bool isSelected)
@@ -390,7 +345,7 @@ public class CtxMenuButton : MonoBehaviour
 	#endregion
 	
 	#region Private Member Functions
-	
+
 	void UpdateSelectionWidgets()
 	{
 		CtxMenu.Item[] items = MenuItems;

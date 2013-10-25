@@ -39,7 +39,7 @@ public class SaucerHandler : MonoBehaviour
 	public Material[] hullMaterials;
 	public Material[] glowMaterials;
 	
-	void OnMenuSelection(int item)
+	public void OnMenuSelection(int item)
 	{
 		MenuCommands cmd = (MenuCommands)item;
 		
@@ -90,7 +90,7 @@ public class SaucerHandler : MonoBehaviour
 		}
 	}
 		
-	void OnShowMenu(CtxMenu menu)
+	public void OnShowMenu(CtxObject obj)
 	{
 		//Debug.Log("SaucerHandler.OnShowMenu() "+menu);
 	}

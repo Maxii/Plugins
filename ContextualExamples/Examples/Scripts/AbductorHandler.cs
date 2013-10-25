@@ -12,24 +12,24 @@ public class AbductorHandler : SaucerBaseHandler
 		UseProbeDevice,
 	}
 	
-	void OnShowMenu(CtxPopup popup)
+	public void OnShowPopupMenu()
 	{
 		BuildMenu();
-		popup.menuItems = menuItems;
+		CtxPopup.current.menuItems = menuItems;
 	}
 	
-	void OnShowMenu(CtxObject obj)
+	public void OnShowMenu(CtxObject obj)
 	{
 		BuildMenu();
 		obj.menuItems = menuItems;
 	}
 	
-	void OnHideMenu(CtxPopup popup)
+	public void OnHidePopupMenu()
 	{
 		Debug.Log("Abductor menu hidden (popup)");
 	}
 	
-	void OnHideMenu(CtxObject obj)
+	public void OnHideMenu(CtxObject obj)
 	{
 		Debug.Log("Abductor menu hidden (object)");
 	}
@@ -65,8 +65,10 @@ public class AbductorHandler : SaucerBaseHandler
 		menuItems[baseItem].submenuItems[2].text = "Use 'Probe' Device";
 	}
 	
-	new void OnMenuSelection(int selection)
+	public new void OnMenuSelection()
 	{
+		int selection = CtxMenu.current.selectedItem;
+		
 		Commands cmd = (Commands)selection;
 		switch (cmd)
 		{
@@ -76,7 +78,7 @@ public class AbductorHandler : SaucerBaseHandler
 			Debug.Log("Abductor: "+cmd.ToString());
 			break;
 		default:
-			base.OnMenuSelection(selection);
+			base.OnMenuSelection();
 			break;
 		}
 	}
