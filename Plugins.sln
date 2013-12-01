@@ -21,6 +21,22 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GridFrameworkEditor", "Grid
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GridFrameworkDebug", "GridFrameworkDebug\GridFrameworkDebug.csproj", "{384A49F9-8BED-431A-8397-FDD87D599FA0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AStar", "AStar\AStar.csproj", "{7E32BD55-F315-4BDE-885C-646841C273F7}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AStarPlugins", "AStarPlugins", "{250733FE-01D4-469A-89B9-20F929CCF094}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DotNetZip", "DotNetZip", "{6AE1FB36-A813-4126-99BE-9DB7C87D48AE}"
+	ProjectSection(SolutionItems) = preProject
+		AStarPlugins\DotNetZip\Ionic.Zip.Reduced.dll = AStarPlugins\DotNetZip\Ionic.Zip.Reduced.dll
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "JsonFx", "JsonFx", "{35C53D29-C4FF-4B62-A231-65357632F17B}"
+	ProjectSection(SolutionItems) = preProject
+		AStarPlugins\JsonFx\JsonFx.Json.dll = AStarPlugins\JsonFx\JsonFx.Json.dll
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AStarEditor", "AStarEditor\AStarEditor.csproj", "{89B92DFD-410D-4E95-BF4E-4A42868C5AE3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -67,8 +83,20 @@ Global
 		{384A49F9-8BED-431A-8397-FDD87D599FA0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{384A49F9-8BED-431A-8397-FDD87D599FA0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{384A49F9-8BED-431A-8397-FDD87D599FA0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E32BD55-F315-4BDE-885C-646841C273F7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E32BD55-F315-4BDE-885C-646841C273F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E32BD55-F315-4BDE-885C-646841C273F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E32BD55-F315-4BDE-885C-646841C273F7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{89B92DFD-410D-4E95-BF4E-4A42868C5AE3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{89B92DFD-410D-4E95-BF4E-4A42868C5AE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{89B92DFD-410D-4E95-BF4E-4A42868C5AE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{89B92DFD-410D-4E95-BF4E-4A42868C5AE3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{6AE1FB36-A813-4126-99BE-9DB7C87D48AE} = {250733FE-01D4-469A-89B9-20F929CCF094}
+		{35C53D29-C4FF-4B62-A231-65357632F17B} = {250733FE-01D4-469A-89B9-20F929CCF094}
 	EndGlobalSection
 EndGlobal
