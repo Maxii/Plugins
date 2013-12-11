@@ -390,7 +390,7 @@ static public class NGUIMath
 
 	static public Bounds CalculateRelativeWidgetBounds (Transform root, Transform child, bool considerInactive)
 	{
-		UIWidget[] widgets = child.GetComponentsInChildren<UIWidget>(considerInactive) as UIWidget[];
+		UIWidget[] widgets = child.GetComponentsInChildren<UIWidget>(considerInactive);
 
 		if (widgets.Length > 0)
 		{
@@ -431,29 +431,29 @@ static public class NGUIMath
 	/// Convenience function.
 	/// </summary>
 
-	static public Bounds CalculateRelativeInnerBounds (Transform root, UISprite sprite)
-	{
-		if (sprite.type == UISprite.Type.Sliced)
-		{
-			Vector3 vMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-			Vector3 vMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+	//static public Bounds CalculateRelativeInnerBounds (Transform root, UISprite sprite)
+	//{
+	//    if (sprite.type == UISprite.Type.Sliced)
+	//    {
+	//        Vector3 vMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+	//        Vector3 vMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
 
-			Matrix4x4 toLocal = root.worldToLocalMatrix;
-			Vector3[] corners = sprite.innerWorldCorners;
+	//        Matrix4x4 toLocal = root.worldToLocalMatrix;
+	//        Vector3[] corners = sprite.innerWorldCorners;
 
-			for (int j = 0; j < 4; ++j)
-			{
-				Vector4 v = toLocal.MultiplyPoint3x4(corners[j]);
-				vMax = Vector3.Max(v, vMax);
-				vMin = Vector3.Min(v, vMin);
-			}
+	//        for (int j = 0; j < 4; ++j)
+	//        {
+	//            Vector4 v = toLocal.MultiplyPoint3x4(corners[j]);
+	//            vMax = Vector3.Max(v, vMax);
+	//            vMin = Vector3.Min(v, vMin);
+	//        }
 
-			Bounds b = new Bounds(vMin, Vector3.zero);
-			b.Encapsulate(vMax);
-			return b;
-		}
-		return CalculateRelativeWidgetBounds(root, sprite.cachedTransform);
-	}
+	//        Bounds b = new Bounds(vMin, Vector3.zero);
+	//        b.Encapsulate(vMax);
+	//        return b;
+	//    }
+	//    return CalculateRelativeWidgetBounds(root, sprite.cachedTransform);
+	//}
 
 	/// <summary>
 	/// This code is not framerate-independent:

@@ -10,7 +10,7 @@ using System.Collections;
 [System.Serializable]
 public class GFBoolVector3 {
 	[SerializeField]
-	private bool[] values = new bool[3];
+	private bool[] values = new bool[3] {false, false, false};
 	/**
 	 * \brief X component of the bool vector.
 	 */

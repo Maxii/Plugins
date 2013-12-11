@@ -6,7 +6,8 @@
 using UnityEngine;
 using UnityEditor;
 
-[CustomEditor(typeof(UIDraggablePanel))]
-public class UIDraggablePanelEditor : Editor
+[CanEditMultipleObjects]
+[CustomEditor(typeof(UISlider))]
+public class UISliderEditor : UIProgressBarEditor
 {
 }

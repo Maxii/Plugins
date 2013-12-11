@@ -21,387 +21,487 @@ public class NGUISettings
 		Blue,
 	}
 
-	static bool mLoaded = false;
-	static UIFont mFont;
-	static UIAtlas mAtlas;
-	static UIWidget.Pivot mPivot = UIWidget.Pivot.Center;
-	static TextAsset mFontData;
-	static Texture2D mFontTexture;
-	static string mPartial = "";
-	static string mFontName = "New Font";
-	static string mAtlasName = "New Atlas";
-	static string mSpriteName;
-	static int mAtlasPadding = 1;
-	static public bool mAtlasTrimming = true;
-	static public bool mAtlasPMA = false;
-	static bool mUnityPacking = true;
-	static bool mForceSquare = true;
-	static bool mAllow4096 = false;
-	static Color mColor = Color.white;
-	static int mLayer = 0;
-	static Font mDynFont;
-	static int mDynFontSize = 16;
-	static FontStyle mDynFontStyle = FontStyle.Normal;
-	static ColorMode mColorMode = ColorMode.Blue;
-	static bool mAllDCs = false;
+#region Generic Get and Set methods
+	/// <summary>
+	/// Save the specified boolean value in settings.
+	/// </summary>
 
-	static Object GetObject (string name)
+	static public void SetBool (string name, bool val) { EditorPrefs.SetBool(name, val); }
+
+	/// <summary>
+	/// Save the specified integer value in settings.
+	/// </summary>
+
+	static public void SetInt (string name, int val) { EditorPrefs.SetInt(name, val); }
+
+	/// <summary>
+	/// Save the specified float value in settings.
+	/// </summary>
+
+	static public void SetFloat (string name, float val) { EditorPrefs.SetFloat(name, val); }
+
+	/// <summary>
+	/// Save the specified string value in settings.
+	/// </summary>
+
+	static public void SetString (string name, string val) { EditorPrefs.SetString(name, val); }
+
+	/// <summary>
+	/// Save the specified color value in settings.
+	/// </summary>
+
+	static public void SetColor (string name, Color c) { SetString(name, c.r + " " + c.g + " " + c.b + " " + c.a); }
+
+	/// <summary>
+	/// Save the specified enum value to settings.
+	/// </summary>
+
+	static public void SetEnum (string name, System.Enum val) { SetString(name, val.ToString()); }
+
+	/// <summary>
+	/// Save the specified object in settings.
+	/// </summary>
+
+	static public void Set (string name, Object obj)
 	{
-		int assetID = EditorPrefs.GetInt(name, -1);
-		return (assetID != -1) ? EditorUtility.InstanceIDToObject(assetID) : null;
-	}
-
-	static void Load ()
-	{
-		mLoaded			= true;
-		mPartial		= EditorPrefs.GetString("NGUI Partial");
-		mFontName		= EditorPrefs.GetString("NGUI Font Name");
-		mAtlasName		= EditorPrefs.GetString("NGUI Atlas Name");
-		mSpriteName		= EditorPrefs.GetString("NGUI Selected Sprite");
-		mFontData		= GetObject("NGUI Font Asset") as TextAsset;
-		mFontTexture	= GetObject("NGUI Font Texture") as Texture2D;
-		mFont			= GetObject("NGUI Font") as UIFont;
-		mAtlas			= GetObject("NGUI Atlas") as UIAtlas;
-		mAtlasPadding	= EditorPrefs.GetInt("NGUI Atlas Padding", 1);
-		mAtlasTrimming	= EditorPrefs.GetBool("NGUI Atlas Trimming", true);
-		mAtlasPMA		= EditorPrefs.GetBool("NGUI Atlas PMA", true);
-		mUnityPacking	= EditorPrefs.GetBool("NGUI Unity Packing", true);
-		mForceSquare	= EditorPrefs.GetBool("NGUI Force Square Atlas", true);
-		mPivot			= (UIWidget.Pivot)EditorPrefs.GetInt("NGUI Pivot", (int)mPivot);
-		mLayer			= EditorPrefs.GetInt("NGUI Layer", -1);
-		mDynFont		= GetObject("NGUI DynFont") as Font;
-		mDynFontSize	= EditorPrefs.GetInt("NGUI DynFontSize", 16);
-		mDynFontStyle	= (FontStyle)EditorPrefs.GetInt("NGUI DynFontStyle", (int)FontStyle.Normal);
-		mColorMode		= (ColorMode)EditorPrefs.GetInt("NGUI Color Mode", (int)ColorMode.Blue);
-		mAllDCs			= EditorPrefs.GetBool("NGUI All DCs", false);
-
-		if (mLayer < 0 || string.IsNullOrEmpty(LayerMask.LayerToName(mLayer))) mLayer = -1;
-
-		if (mLayer == -1) mLayer = LayerMask.NameToLayer("UI");
-		if (mLayer == -1) mLayer = LayerMask.NameToLayer("GUI");
-		if (mLayer == -1) mLayer = 5;
-
-		EditorPrefs.SetInt("UI Layer", mLayer);
-
-		LoadColor();
-	}
-
-	static void Save ()
-	{
-		EditorPrefs.SetString("NGUI Partial", mPartial);
-		EditorPrefs.SetString("NGUI Font Name", mFontName);
-		EditorPrefs.SetString("NGUI Atlas Name", mAtlasName);
-		EditorPrefs.SetString("NGUI Selected Sprite", mSpriteName);
-		EditorPrefs.SetInt("NGUI Font Asset", (mFontData != null) ? mFontData.GetInstanceID() : -1);
-		EditorPrefs.SetInt("NGUI Font Texture", (mFontTexture != null) ? mFontTexture.GetInstanceID() : -1);
-		EditorPrefs.SetInt("NGUI Font", (mFont != null) ? mFont.GetInstanceID() : -1);
-		EditorPrefs.SetInt("NGUI Atlas", (mAtlas != null) ? mAtlas.GetInstanceID() : -1);
-		EditorPrefs.SetInt("NGUI Atlas Padding", mAtlasPadding);
-		EditorPrefs.SetBool("NGUI Atlas Trimming", mAtlasTrimming);
-		EditorPrefs.SetBool("NGUI Atlas PMA", mAtlasPMA);
-		EditorPrefs.SetBool("NGUI Unity Packing", mUnityPacking);
-		EditorPrefs.SetBool("NGUI Force Square Atlas", mForceSquare);
-		EditorPrefs.SetInt("NGUI Pivot", (int)mPivot);
-		EditorPrefs.SetInt("NGUI Layer", mLayer);
-		EditorPrefs.SetInt("NGUI DynFont", (mDynFont != null) ? mDynFont.GetInstanceID() : -1);
-		EditorPrefs.SetInt("NGUI DynFontSize", mDynFontSize);
-		EditorPrefs.SetInt("NGUI DynFontStyle", (int)mDynFontStyle);
-		EditorPrefs.SetInt("NGUI Color Mode", (int)mColorMode);
-		EditorPrefs.SetBool("NGUI All DCs", mAllDCs);
-
-		SaveColor();
-	}
-
-	static void LoadColor ()
-	{
-		string sc = EditorPrefs.GetString("NGUI Color");
-
-		if (!string.IsNullOrEmpty(sc))
+		if (obj == null)
 		{
-			string[] colors = sc.Split(' ');
-
-			if (colors.Length == 4)
+			EditorPrefs.DeleteKey(name);
+		}
+		else
+		{
+			if (obj != null)
 			{
-				float.TryParse(colors[0], out mColor.r);
-				float.TryParse(colors[1], out mColor.g);
-				float.TryParse(colors[2], out mColor.b);
-				float.TryParse(colors[3], out mColor.a);
+				string path = AssetDatabase.GetAssetPath(obj);
+
+				if (!string.IsNullOrEmpty(path))
+				{
+					EditorPrefs.SetString(name, path);
+				}
+				else
+				{
+					EditorPrefs.SetString(name, obj.GetInstanceID().ToString());
+				}
 			}
+			else EditorPrefs.DeleteKey(name);
 		}
 	}
 
-	static void SaveColor ()
+	/// <summary>
+	/// Get the previously saved boolean value.
+	/// </summary>
+
+	static public bool GetBool (string name, bool defaultValue) { return EditorPrefs.GetBool(name, defaultValue); }
+
+	/// <summary>
+	/// Get the previously saved integer value.
+	/// </summary>
+
+	static public int GetInt (string name, int defaultValue) { return EditorPrefs.GetInt(name, defaultValue); }
+
+	/// <summary>
+	/// Get the previously saved float value.
+	/// </summary>
+
+	static public float GetFloat (string name, float defaultValue) { return EditorPrefs.GetFloat(name, defaultValue); }
+
+	/// <summary>
+	/// Get the previously saved string value.
+	/// </summary>
+
+	static public string GetString (string name, string defaultValue) { return EditorPrefs.GetString(name, defaultValue); }
+	
+	/// <summary>
+	/// Get a previously saved color value.
+	/// </summary>
+
+	static public Color GetColor (string name, Color c)
 	{
-		EditorPrefs.SetString("NGUI Color", mColor.r + " " + mColor.g + " " + mColor.b + " " + mColor.a);
+		string strVal = GetString(name, c.r + " " + c.g + " " + c.b + " " + c.a);
+		string[] parts = strVal.Split(' ');
+
+		if (parts.Length == 4)
+		{
+			float.TryParse(parts[0], out c.r);
+			float.TryParse(parts[1], out c.g);
+			float.TryParse(parts[2], out c.b);
+			float.TryParse(parts[3], out c.a);
+		}
+		return c;
 	}
 
 	/// <summary>
-	/// Color is used to easily copy/paste the widget's color value.
+	/// Get a previously saved enum from settings.
 	/// </summary>
+
+	static public T GetEnum<T> (string name, T defaultValue)
+	{
+		string val = GetString(name, defaultValue.ToString());
+		string[] names = System.Enum.GetNames(typeof(T));
+		System.Array values = System.Enum.GetValues(typeof(T));
+		
+		for (int i = 0; i < names.Length; ++i)
+		{
+			if (names[i] == val)
+				return (T)values.GetValue(i);
+		}
+		return defaultValue;
+	}
+
+	/// <summary>
+	/// Get a previously saved object from settings.
+	/// </summary>
+
+	static public T Get<T> (string name, T defaultValue) where T : Object
+	{
+		string path = EditorPrefs.GetString(name);
+		if (string.IsNullOrEmpty(path)) return null;
+		
+		T retVal = NGUIEditorTools.LoadAsset<T>(path);
+		
+		if (retVal == null)
+		{
+			int id;
+			if (int.TryParse(path, out id))
+				return EditorUtility.InstanceIDToObject(id) as T;
+		}
+		return retVal;
+	}
+#endregion
+
+#region Convenience accessor properties
 
 	static public Color color
 	{
-		get
-		{
-			if (!mLoaded) Load();
-			return mColor;
-		}
-		set
-		{
-			if (mColor != value)
-			{
-				mColor = value;
-				SaveColor();
-			}
-		}
+		get { return GetColor("NGUI Color", Color.white); }
+		set { SetColor("NGUI Color", value); }
 	}
-
-	/// <summary>
-	/// Color mode changes how the selection looks.
-	/// </summary>
 
 	static public ColorMode colorMode
 	{
-		get
-		{
-			if (!mLoaded) Load();
-			return mColorMode;
-		}
-		set
-		{
-			if (mColorMode != value)
-			{
-				mColorMode = value;
-				Save();
-			}
-		}
+		get { return GetEnum("NGUI Color Mode", ColorMode.Blue); }
+		set { SetEnum("NGUI Color Mode", value); }
 	}
 
-	/// <summary>
-	/// Default bitmap font used by NGUI.
-	/// </summary>
-
-	static public UIFont font
+	static public Object ambigiousFont
 	{
 		get
 		{
-			if (!mLoaded) Load();
-			return mFont;
+			Font fnt = Get<Font>("NGUI Dynamic Font", null);
+			if (fnt != null) return fnt;
+			return Get<UIFont>("NGUI Bitmap Font", null);
 		}
 		set
 		{
-			if (mFont != value)
+			if (value == null)
 			{
-				mFont = value;
-				mFontName = (mFont != null) ? mFont.name : "New Font";
-				Save();
+				Set("NGUI Bitmap Font", null);
+				Set("NGUI Dynamic Font", null);
+			}
+			else if (value is Font)
+			{
+				Set("NGUI Bitmap Font", null);
+				Set("NGUI Dynamic Font", value as Font);
+			}
+			else if (value is UIFont)
+			{
+				Set("NGUI Bitmap Font", value as UIFont);
+				Set("NGUI Dynamic Font", null);
 			}
 		}
 	}
-
-	/// <summary>
-	/// Default dynamic font used by NGUI.
-	/// </summary>
-
-	static public Font dynamicFont
-	{
-		get
-		{
-			if (!mLoaded) Load();
-			return mDynFont;
-		}
-		set
-		{
-			if (mDynFont != value)
-			{
-				mDynFont = value;
-				mFontName = (mDynFont != null) ? mDynFont.name : "New Font";
-				Save();
-			}
-		}
-	}
-
-	/// <summary>
-	/// Default atlas used by NGUI.
-	/// </summary>
 
 	static public UIAtlas atlas
 	{
-		get
-		{
-			if (!mLoaded) Load();
-			return mAtlas;
-		}
-		set
-		{
-			if (mAtlas != value)
-			{
-				mAtlas = value;
-				mAtlasName = (mAtlas != null) ? mAtlas.name : "New Atlas";
-				Save();
-			}
-		}
+		get { return Get<UIAtlas>("NGUI Atlas", null); }
+		set { Set("NGUI Atlas", value); }
 	}
 
-	/// <summary>
-	/// Currently selected sprite.
-	/// </summary>
+	static public Texture texture
+	{
+		get { return Get<Texture>("NGUI Texture", null); }
+		set { Set("NGUI Texture", value); }
+	}
+
+#if !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2
+	static public Sprite sprite2D
+	{
+		get { return Get<Sprite>("NGUI Sprite2D", null); }
+		set { Set("NGUI Sprite2D", value); }
+	}
+#endif
 
 	static public string selectedSprite
 	{
-		get
-		{
-			if (!mLoaded) Load();
-			return mSpriteName;
-		}
-		set
-		{
-			if (mSpriteName != value)
-			{
-				mSpriteName = value;
-				Save();
-			}
-		}
+		get { return GetString("NGUI Sprite", null); }
+		set { SetString("NGUI Sprite", value); }
 	}
-
-	/// <summary>
-	/// Default pivot point used by sprites.
-	/// </summary>
 
 	static public UIWidget.Pivot pivot
 	{
-		get
-		{
-			if (!mLoaded) Load();
-			return mPivot;
-		}
-		set
-		{
-			if (mPivot != value)
-			{
-				mPivot = value;
-				Save();
-			}
-		}
+		get { return GetEnum("NGUI Pivot", UIWidget.Pivot.Center); }
+		set { SetEnum("NGUI Pivot", value); }
 	}
-
-	/// <summary>
-	/// Default layer used by the UI.
-	/// </summary>
 
 	static public int layer
 	{
 		get
 		{
-			if (!mLoaded) Load();
-			return mLayer;
+			int layer = GetInt("NGUI Layer", -1);
+			if (layer == -1) layer = LayerMask.NameToLayer("UI");
+			if (layer == -1) layer = LayerMask.NameToLayer("2D UI");
+			return (layer == -1) ? 9 : layer;
 		}
 		set
 		{
-			if (mLayer != value)
-			{
-				mLayer = value;
-				Save();
-			}
+			SetInt("NGUI Layer", value);
 		}
 	}
 
-	/// <summary>
-	/// Name of the font, used by the Font Maker.
-	/// </summary>
+	static public TextAsset fontData
+	{
+		get { return Get<TextAsset>("NGUI Font Data", null); }
+		set { Set("NGUI Font Data", value); }
+	}
 
-	static public string fontName { get { if (!mLoaded) Load(); return mFontName; } set { if (mFontName != value) { mFontName = value; Save(); } } }
+	static public Texture2D fontTexture
+	{
+		get { return Get<Texture2D>("NGUI Font Texture", null); }
+		set { Set("NGUI Font Texture", value); }
+	}
 
-	/// <summary>
-	/// Data used to create the font, used by the Font Maker.
-	/// </summary>
+	static public int fontSize
+	{
+		get { return GetInt("NGUI Font Size", 16); }
+		set { SetInt("NGUI Font Size", value); }
+	}
 
-	static public TextAsset fontData { get { if (!mLoaded) Load(); return mFontData; } set { if (mFontData != value) { mFontData = value; Save(); } } }
+	static public FontStyle fontStyle
+	{
+		get { return GetEnum("NGUI Font Style", FontStyle.Normal); }
+		set { SetEnum("NGUI Font Style", value); }
+	}
 
-	/// <summary>
-	/// Texture used to create the font, used by the Font Maker.
-	/// </summary>
-
-	static public Texture2D fontTexture { get { if (!mLoaded) Load(); return mFontTexture; } set { if (mFontTexture != value) { mFontTexture = value; Save(); } } }
-
-	/// <summary>
-	/// Name of the atlas, used by the Atlas maker.
-	/// </summary>
-
-	static public string atlasName { get { if (!mLoaded) Load(); return mAtlasName; } set { if (mAtlasName != value) { mAtlasName = value; Save(); } } }
-
-	/// <summary>
-	/// Size of the dynamic font.
-	/// </summary>
-
-	static public int dynamicFontSize { get { if (!mLoaded) Load(); return mDynFontSize; } set { if (mDynFontSize != value) { mDynFontSize = value; Save(); } } }
-
-	/// <summary>
-	/// Dynamic font's style.
-	/// </summary>
-
-	static public FontStyle dynamicFontStyle { get { if (!mLoaded) Load(); return mDynFontStyle; } set { if (mDynFontStyle != value) { mDynFontStyle = value; Save(); } } }
-
-	/// <summary>
-	/// Name of the partial sprite name, used to filter sprites.
-	/// </summary>
+	static public UILabel.Overflow overflowStyle
+	{
+		get { return GetEnum("NGUI Overflow", UILabel.Overflow.ShrinkContent); }
+		set { SetEnum("NGUI Overflow", value); }
+	}
 
 	static public string partialSprite
 	{
-		get
-		{
-			if (!mLoaded) Load();
-			return mPartial;
-		}
-		set
-		{
-			if (mPartial != value)
-			{
-				mPartial = value;
-				EditorPrefs.SetString("NGUI Partial", mPartial);
-			}
-		}
+		get { return GetString("NGUI Partial", null); }
+		set { SetString("NGUI Partial", value); }
+	}
+
+	static public int atlasPadding
+	{
+		get { return GetInt("NGUI Padding", 1); }
+		set { SetInt("NGUI Padding", value); }
+	}
+
+	static public bool atlasTrimming
+	{
+		get { return GetBool("NGUI Trim", true); }
+		set { SetBool("NGUI Trim", value); }
+	}
+
+	static public bool atlasPMA
+	{
+		get { return GetBool("NGUI PMA", false); }
+		set { SetBool("NGUI PMA", value); }
+	}
+
+	static public bool unityPacking
+	{
+		get { return GetBool("NGUI Packing", true); }
+		set { SetBool("NGUI Packing", value); }
+	}
+
+	static public bool forceSquareAtlas
+	{
+		get { return GetBool("NGUI Square", false); }
+		set { SetBool("NGUI Square", value); }
+	}
+
+	static public bool allow4096
+	{
+		get { return GetBool("NGUI 4096", true); }
+		set { SetBool("NGUI 4096", value); }
+	}
+
+	static public bool showAllDCs
+	{
+		get { return GetBool("NGUI DCs", true); }
+		set { SetBool("NGUI DCs", value); }
+	}
+#endregion
+
+	/// <summary>
+	/// Convenience method -- add a widget.
+	/// </summary>
+
+	static public UIWidget AddWidget (GameObject go)
+	{
+		UIWidget w = NGUITools.AddWidget<UIWidget>(go);
+		w.name = "Container";
+		w.pivot = pivot;
+		w.width = 100;
+		w.height = 100;
+		return w;
 	}
 
 	/// <summary>
-	/// Added padding in-between of sprites when creating an atlas.
+	/// Convenience method -- add a texture.
 	/// </summary>
 
-	static public int atlasPadding { get { if (!mLoaded) Load(); return mAtlasPadding; } set { if (mAtlasPadding != value) { mAtlasPadding = value; Save(); } } }
+	static public UITexture AddTexture (GameObject go)
+	{
+		UITexture w = NGUITools.AddWidget<UITexture>(go);
+		w.name = "Texture";
+		w.pivot = pivot;
+		w.mainTexture = texture;
+		w.width = 100;
+		w.height = 100;
+		return w;
+	}
+
+#if !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2
+	/// <summary>
+	/// Convenience method -- add a UnityEngine.Sprite.
+	/// </summary>
+
+	static public UI2DSprite Add2DSprite (GameObject go)
+	{
+		UI2DSprite w = NGUITools.AddWidget<UI2DSprite>(go);
+		w.name = "2D Sprite";
+		w.pivot = pivot;
+		w.sprite2D = sprite2D;
+		w.width = 100;
+		w.height = 100;
+		return w;
+	}
+#endif
+	/// <summary>
+	/// Convenience method -- add a sprite.
+	/// </summary>
+
+	static public UISprite AddSprite (GameObject go)
+	{
+		UISprite w = NGUITools.AddWidget<UISprite>(go);
+		w.name = "Sprite";
+		w.atlas = atlas;
+		w.spriteName = selectedSprite;
+
+		if (w.atlas != null && !string.IsNullOrEmpty(w.spriteName))
+		{
+			UISpriteData sp = w.atlas.GetSprite(w.spriteName);
+			if (sp != null && sp.hasBorder)
+				w.type = UISprite.Type.Sliced;
+		}
+
+		w.pivot = pivot;
+		w.width = 100;
+		w.height = 100;
+		w.MakePixelPerfect();
+		return w;
+	}
 
 	/// <summary>
-	/// Whether the transparent pixels will be trimmed away when creating an atlas.
+	/// Convenience method -- add a label with default parameters.
 	/// </summary>
 
-	static public bool atlasTrimming { get { if (!mLoaded) Load(); return mAtlasTrimming; } set { if (mAtlasTrimming != value) { mAtlasTrimming = value; Save(); } } }
+	static public UILabel AddLabel (GameObject go)
+	{
+		UILabel w = NGUITools.AddWidget<UILabel>(go);
+		w.name = "Label";
+		w.ambigiousFont = ambigiousFont;
+		w.text = "New Label";
+		w.pivot = pivot;
+		w.width = 120;
+		w.height = Mathf.Max(20, GetInt("NGUI Font Height", 16));
+		w.fontStyle = fontStyle;
+		w.fontSize = fontSize;
+		w.applyGradient = true;
+		w.gradientBottom = new Color(0.7f, 0.7f, 0.7f);
+		w.AssumeNaturalSize();
+		return w;
+	}
 
 	/// <summary>
-	/// Whether the transparent pixels will affect the color.
+	/// Convenience method -- add a new panel.
 	/// </summary>
 
-	static public bool atlasPMA { get { if (!mLoaded) Load(); return mAtlasPMA; } set { if (mAtlasPMA != value) { mAtlasPMA = value; Save(); } } }
+	static public UIPanel AddPanel (GameObject go)
+	{
+		if (go == null) return null;
+		int depth = UIPanel.nextUnusedDepth;
+		UIPanel panel = NGUITools.AddChild<UIPanel>(go);
+		panel.depth = depth;
+		return panel;
+	}
 
 	/// <summary>
-	/// Whether Unity's method or MaxRectBinPack will be used when creating an atlas
+	/// Copy the specified widget's style.
 	/// </summary>
 
-	static public bool unityPacking { get { if (!mLoaded) Load(); return mUnityPacking; } set { if (mUnityPacking != value) { mUnityPacking = value; Save(); } } }
-	
-	/// <summary>
-	/// Whether the Atlas Maker will force a square atlas texture when creating an atlas
-	/// </summary>
-	
-	static public bool forceSquareAtlas { get { if (!mLoaded) Load(); return mForceSquare; } set { if (mForceSquare != value) { mForceSquare = value; Save(); } } }
-
-	/// <summary>
-	/// Whether the atlas maker will allow 4096 width/height textures on mobiles.
-	/// </summary>
-
-	static public bool allow4096 { get { if (!mLoaded) Load(); return mAllow4096; } set { if (mAllow4096 != value) { mAllow4096 = value; Save(); } } }
+	static public void CopyStyle (UIWidget widget)
+	{
+		SetColor("Widget Color", widget.color);
+		SetEnum("Widget Pivot", widget.pivot);
+		if (widget is UILabel) CopyLabelStyle(widget as UILabel);
+	}
 
 	/// <summary>
-	/// Whether panels will show all draw calls or just those that belong to them.
+	/// Paste the specified widget's style.
 	/// </summary>
 
-	static public bool showAllDCs { get { if (!mLoaded) Load(); return mAllDCs; } set { if (mAllDCs != value) { mAllDCs = value; Save(); } } }
+	static public void PasteStyle (UIWidget widget)
+	{
+		widget.color = GetColor("Widget Color", widget.color);
+		widget.pivot = GetEnum<UIWidget.Pivot>("Widget Pivot", widget.pivot);
+		if (widget is UILabel) PasteLabelStyle(widget as UILabel);
+	}
+
+	/// <summary>
+	/// Copy the specified label's style.
+	/// </summary>
+
+	static void CopyLabelStyle (UILabel lbl)
+	{
+		SetEnum("Overflow", lbl.overflowMethod);
+		SetInt("SpacingX", lbl.spacingX);
+		SetInt("SpacingY", lbl.spacingY);
+		SetInt("MaxLines", lbl.maxLineCount);
+		SetBool("Encoding", lbl.supportEncoding);
+		SetBool("Gradient", lbl.applyGradient);
+		SetColor("Gradient B", lbl.gradientBottom);
+		SetColor("Gradient T", lbl.gradientTop);
+		SetEnum("Effect", lbl.effectStyle);
+		SetColor("Effect C", lbl.effectColor);
+		SetFloat("Effect X", lbl.effectDistance.x);
+		SetFloat("Effect Y", lbl.effectDistance.y);
+	}
+
+	/// <summary>
+	/// Paste the specified label's style.
+	/// </summary>
+
+	static void PasteLabelStyle (UILabel lbl)
+	{
+		lbl.overflowMethod = GetEnum<UILabel.Overflow>("Overflow", lbl.overflowMethod);
+		lbl.spacingX = GetInt("SpacingX", lbl.spacingX);
+		lbl.spacingY = GetInt("SpacingY", lbl.spacingY);
+		lbl.maxLineCount = GetInt("MaxLines", lbl.maxLineCount);
+		lbl.supportEncoding = GetBool("Encoding", lbl.supportEncoding);
+		lbl.applyGradient = GetBool("Gradient", lbl.applyGradient);
+		lbl.gradientBottom = GetColor("Gradient B", lbl.gradientBottom);
+		lbl.gradientTop = GetColor("Gradient T", lbl.gradientTop);
+		lbl.effectStyle = GetEnum<UILabel.Effect>("Effect", lbl.effectStyle);
+		lbl.effectColor = GetColor("Effect C", lbl.effectColor);
+
+		float x = GetFloat("Effect X", lbl.effectDistance.x);
+		float y = GetFloat("Effect Y", lbl.effectDistance.y);
+		lbl.effectDistance = new Vector2(x, y);
+	}
 }

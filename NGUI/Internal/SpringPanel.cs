@@ -22,7 +22,7 @@ public class SpringPanel : MonoBehaviour
 	UIPanel mPanel;
 	Transform mTrans;
 	float mThreshold = 0f;
-	UIDraggablePanel mDrag;
+	UIScrollView mDrag;
 
 	/// <summary>
 	/// Cache the transform.
@@ -31,7 +31,7 @@ public class SpringPanel : MonoBehaviour
 	void Start ()
 	{
 		mPanel = GetComponent<UIPanel>();
-		mDrag = GetComponent<UIDraggablePanel>();
+		mDrag = GetComponent<UIScrollView>();
 		mTrans = transform;
 	}
 
@@ -41,35 +41,44 @@ public class SpringPanel : MonoBehaviour
 
 	void Update ()
 	{
-		float delta = RealTime.deltaTime;
-
-		if (mThreshold == 0f)
-		{
-			mThreshold = (target - mTrans.localPosition).magnitude * 0.005f;
-			mThreshold = Mathf.Max(mThreshold, 0.00001f);
-		}
-
-		bool trigger = false;
-		Vector3 before = mTrans.localPosition;
-		Vector3 after = NGUIMath.SpringLerp(mTrans.localPosition, target, strength, delta);
-
-		if (mThreshold >= Vector3.Magnitude(after - target))
-		{
-			after = target;
-			enabled = false;
-			trigger = true;
-		}
-		mTrans.localPosition = after;
-
-		Vector3 offset = after - before;
-		Vector4 cr = mPanel.clipRange;
-		cr.x -= offset.x;
-		cr.y -= offset.y;
-		mPanel.clipRange = cr;
-
-		if (mDrag != null) mDrag.UpdateScrollbars(false);
-		if (trigger && onFinished != null) onFinished();
+	    AdvanceTowardsPosition();
 	}
+
+    /// <summary>
+    /// Advance toward the target position.
+    /// </summary>
+    
+    protected virtual void AdvanceTowardsPosition()
+    {
+        float delta = RealTime.deltaTime;
+
+        if (mThreshold == 0f)
+        {
+            mThreshold = (target - mTrans.localPosition).magnitude * 0.005f;
+            mThreshold = Mathf.Max(mThreshold, 0.00001f);
+        }
+
+        bool trigger = false;
+        Vector3 before = mTrans.localPosition;
+        Vector3 after = NGUIMath.SpringLerp(mTrans.localPosition, target, strength, delta);
+
+        if (mThreshold >= Vector3.Magnitude(after - target))
+        {
+            after = target;
+            enabled = false;
+            trigger = true;
+        }
+        mTrans.localPosition = after;
+
+        Vector3 offset = after - before;
+        Vector4 cr = mPanel.clipRange;
+        cr.x -= offset.x;
+        cr.y -= offset.y;
+        mPanel.clipRange = cr;
+
+        if (mDrag != null) mDrag.UpdateScrollbars(false);
+        if (trigger && onFinished != null) onFinished();
+    }
 
 	/// <summary>
 	/// Start the tweening process.

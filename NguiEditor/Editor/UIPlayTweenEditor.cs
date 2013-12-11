@@ -38,7 +38,7 @@ public class UIPlayTweenEditor : Editor
 		AnimationOrTween.Direction dir = (AnimationOrTween.Direction)EditorGUILayout.EnumPopup("Play direction", tw.playDirection);
 		AnimationOrTween.EnableCondition enab = (AnimationOrTween.EnableCondition)EditorGUILayout.EnumPopup("If target is disabled", tw.ifDisabledOnPlay);
 		ResetOnPlay rs = tw.resetOnPlay ? ResetOnPlay.Restart : (tw.resetIfDisabled ? ResetOnPlay.RestartIfNotPlaying : ResetOnPlay.Continue);
-		ResetOnPlay reset = (ResetOnPlay)EditorGUILayout.EnumPopup("If tween is present", rs);
+		ResetOnPlay reset = (ResetOnPlay)EditorGUILayout.EnumPopup("If already playing", rs);
 		AnimationOrTween.DisableCondition dis = (AnimationOrTween.DisableCondition)EditorGUILayout.EnumPopup("When finished", tw.disableWhenFinished);
 
 		if (GUI.changed)

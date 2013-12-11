@@ -38,7 +38,7 @@ public class GFPolarGrid : GFLayeredGrid {
 		get{return _size;}
 		set{if(value == _size)// needed because the editor fires the setter even if this wasn't changed
 				return;
-			_gridChanged = true;
+			hasChanged = true;
 			//_size = Vector3.Max(Vector3.Min(value, value[idx[0]] * units[idx[0]] + 2 * Mathf.PI * units[idx[1]] + value[idx[2]] * units[idx[2]]), Vector3.zero);
 			_size[idx[0]] = Mathf.Max(value[idx[0]], 0);
 			_size[idx[1]] = Mathf.Max(Mathf.Min(value[idx[1]], 2 * Mathf.PI), 0);
@@ -50,7 +50,7 @@ public class GFPolarGrid : GFLayeredGrid {
 		get{return _renderFrom;}
 		set{if(value == _renderFrom)// needed because the editor fires the setter even if this wasn't changed
 				return;
-			_gridChanged = true;
+			hasChanged = true;
 			//_renderFrom = Vector3.Min(value, renderTo);
 			_renderFrom[idx[0]] = Mathf.Max(Mathf.Min(value[idx[0]], renderTo[idx[0]]), 0); // prevent negative quasi-X and keep lower than renderTo
 			_renderFrom[idx[1]] = Float2Rad(value[idx[1]]);
@@ -62,7 +62,7 @@ public class GFPolarGrid : GFLayeredGrid {
 		get{return _renderTo;}
 		set{if(value == _renderTo)// needed because the editor fires the setter even if this wasn't changed
 				return;
-			_gridChanged = true;
+			hasChanged = true;
 			//_renderTo = Vector3.Max(value, _renderFrom);
 			_renderTo[idx[0]] = Mathf.Max(renderFrom[idx[0]], value[idx[0]]); // prevent negative quasi-X
 			_renderTo[idx[1]] = Float2Rad(value[idx[1]]);
@@ -84,7 +84,7 @@ public class GFPolarGrid : GFLayeredGrid {
 		set{if(value == _radius)// needed because the editor fires the setter even if this wasn't changed
 				return;
 			_radius = Mathf.Max(0.01f, value);
-			_gridChanged = true;
+			hasChanged = true;
 		}
 	}
 	
@@ -100,7 +100,7 @@ public class GFPolarGrid : GFLayeredGrid {
 		set{if(value == _sectors)// needed because the editor fires the setter even if this wasn't changed
 				return;
 			_sectors = Mathf.Max(1, value);
-			_gridChanged = true;
+			hasChanged = true;
 		}
 	}
 			
@@ -119,7 +119,7 @@ public class GFPolarGrid : GFLayeredGrid {
 		set{if(value == _smoothness)// needed because the editor fires the setter even if this wasn't changed
 				return;
 			_smoothness = Mathf.Max(1, value);
-			_gridChanged = true;
+			hasChanged = true;
 		}
 	}
 	#endregion
@@ -616,9 +616,8 @@ public class GFPolarGrid : GFLayeredGrid {
 	#endregion
 	protected override Vector3[][][] CalculateDrawPoints(Vector3 from, Vector3 to){
 		// reuse the points if the grid hasn't changed, we already have some points and we use the same range
-		if(!hasChanged && _drawPoints != null && from == renderFrom && to == renderTo){
+		if( RecyclePoints( from, to ) )
 			return _drawPoints;
-		}
 		
 		if (relativeSize) {
 			from[idx[0]] *= radius; to[idx[0]] *= radius;

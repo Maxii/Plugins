@@ -13,45 +13,20 @@ using System.Collections.Generic;
 
 public class SpriteSelector : ScriptableWizard
 {
+	static public SpriteSelector instance;
+
+	void OnEnable () { instance = this; }
+	void OnDisable () { instance = null; }
+
 	public delegate void Callback (string sprite);
 
-	UIAtlas mAtlas;
+	SerializedObject mObject;
+	SerializedProperty mProperty;
+
 	UISprite mSprite;
-	string mName;
 	Vector2 mPos = Vector2.zero;
 	Callback mCallback;
 	float mClickTime = 0f;
-
-	/// <summary>
-	/// Name of the selected sprite.
-	/// </summary>
-
-	public string spriteName { get { return (mSprite != null) ? mSprite.spriteName : mName; } }
-
-	/// <summary>
-	/// Show the selection wizard.
-	/// </summary>
-
-	public static void Show (UIAtlas atlas, string selectedSprite, Callback callback)
-	{
-		SpriteSelector comp = ScriptableWizard.DisplayWizard<SpriteSelector>("Select a Sprite");
-		comp.mAtlas = atlas;
-		comp.mSprite = null;
-		comp.mName = selectedSprite;
-		comp.mCallback = callback;
-	}
-
-	/// <summary>
-	/// Show the selection wizard.
-	/// </summary>
-
-	public static void Show (UIAtlas atlas, UISprite selectedSprite)
-	{
-		SpriteSelector comp = ScriptableWizard.DisplayWizard<SpriteSelector>("Select a Sprite");
-		comp.mAtlas = atlas;
-		comp.mSprite = selectedSprite;
-		comp.mCallback = null;
-	}
 
 	/// <summary>
 	/// Draw the custom wizard.
@@ -61,14 +36,15 @@ public class SpriteSelector : ScriptableWizard
 	{
 		NGUIEditorTools.SetLabelWidth(80f);
 
-		if (mAtlas == null)
+		if (NGUISettings.atlas == null)
 		{
 			GUILayout.Label("No Atlas selected.", "LODLevelNotifyText");
 		}
 		else
 		{
+			UIAtlas atlas = NGUISettings.atlas;
 			bool close = false;
-			GUILayout.Label(mAtlas.name + " Sprites", "LODLevelNotifyText");
+			GUILayout.Label(atlas.name + " Sprites", "LODLevelNotifyText");
 			NGUIEditorTools.DrawSeparator();
 
 			GUILayout.BeginHorizontal();
@@ -86,7 +62,7 @@ public class SpriteSelector : ScriptableWizard
 			GUILayout.Space(84f);
 			GUILayout.EndHorizontal();
 
-			Texture2D tex = mAtlas.texture as Texture2D;
+			Texture2D tex = atlas.texture as Texture2D;
 
 			if (tex == null)
 			{
@@ -94,7 +70,7 @@ public class SpriteSelector : ScriptableWizard
 				return;
 			}
 
-			BetterList<string> sprites = mAtlas.GetListOfSprites(NGUISettings.partialSprite);
+			BetterList<string> sprites = atlas.GetListOfSprites(NGUISettings.partialSprite);
 			
 			float size = 80f;
 			float padded = size + 10f;
@@ -106,6 +82,7 @@ public class SpriteSelector : ScriptableWizard
 
 			GUILayout.Space(10f);
 			mPos = GUILayout.BeginScrollView(mPos);
+			int rows = 1;
 
 			while (offset < sprites.size)
 			{
@@ -116,32 +93,38 @@ public class SpriteSelector : ScriptableWizard
 
 					for (; offset < sprites.size; ++offset)
 					{
-						UISpriteData sprite = mAtlas.GetSprite(sprites[offset]);
+						UISpriteData sprite = atlas.GetSprite(sprites[offset]);
 						if (sprite == null) continue;
 
 						// Button comes first
 						if (GUI.Button(rect, ""))
 						{
-							float delta = Time.realtimeSinceStartup - mClickTime;
-							mClickTime = Time.realtimeSinceStartup;
-
-							if (spriteName != sprite.name)
+							if (Event.current.button == 0)
 							{
-								if (mSprite != null)
+								float delta = Time.realtimeSinceStartup - mClickTime;
+								mClickTime = Time.realtimeSinceStartup;
+
+								if (NGUISettings.selectedSprite != sprite.name)
 								{
-									NGUIEditorTools.RegisterUndo("Atlas Selection", mSprite);
-									mSprite.spriteName = sprite.name;
-									mSprite.MakePixelPerfect();
-									EditorUtility.SetDirty(mSprite.gameObject);
+									if (mSprite != null)
+									{
+										NGUIEditorTools.RegisterUndo("Atlas Selection", mSprite);
+										mSprite.MakePixelPerfect();
+										EditorUtility.SetDirty(mSprite.gameObject);
+									}
+
+									NGUISettings.selectedSprite = sprite.name;
+									NGUIEditorTools.RepaintSprites();
+									if (mCallback != null) mCallback(sprite.name);
 								}
-								
-								if (mCallback != null)
-								{
-									mName = sprite.name;
-									mCallback(sprite.name);
-								}
+								else if (delta < 0.5f) close = true;
 							}
-							else if (delta < 0.5f) close = true;
+							else
+							{
+								NGUIContextMenu.AddItem("Edit", false, EditSprite, sprite);
+								NGUIContextMenu.AddItem("Delete", false, DeleteSprite, sprite);
+								NGUIContextMenu.Show();
+							}
 						}
 
 						if (Event.current.type == EventType.Repaint)
@@ -180,7 +163,7 @@ public class SpriteSelector : ScriptableWizard
 							GUI.DrawTextureWithTexCoords(clipRect, tex, uv);
 	
 							// Draw the selection
-							if (spriteName == sprite.name)
+							if (NGUISettings.selectedSprite == sprite.name)
 							{
 								NGUIEditorTools.DrawOutline(rect, new Color(0.4f, 1f, 0f, 1f));
 							}
@@ -203,9 +186,113 @@ public class SpriteSelector : ScriptableWizard
 				GUILayout.EndHorizontal();
 				GUILayout.Space(padded);
 				rect.y += padded + 26;
+				++rows;
 			}
+			GUILayout.Space(rows * 26);
 			GUILayout.EndScrollView();
+
 			if (close) Close();
 		}
+	}
+
+	/// <summary>
+	/// Edit the sprite (context menu selection)
+	/// </summary>
+
+	void EditSprite (object obj)
+	{
+		if (this == null) return;
+		UISpriteData sd = obj as UISpriteData;
+		NGUIEditorTools.SelectSprite(sd.name);
+		Close();
+	}
+
+	/// <summary>
+	/// Delete the sprite (context menu selection)
+	/// </summary>
+
+	void DeleteSprite (object obj)
+	{
+		if (this == null) return;
+		UISpriteData sd = obj as UISpriteData;
+
+		List<UIAtlasMaker.SpriteEntry> sprites = new List<UIAtlasMaker.SpriteEntry>();
+		UIAtlasMaker.ExtractSprites(NGUISettings.atlas, sprites);
+
+		for (int i = sprites.Count; i > 0; )
+		{
+			UIAtlasMaker.SpriteEntry ent = sprites[--i];
+			if (ent.name == sd.name)
+				sprites.RemoveAt(i);
+		}
+		UIAtlasMaker.UpdateAtlas(NGUISettings.atlas, sprites);
+		NGUIEditorTools.RepaintSprites();
+	}
+
+	/// <summary>
+	/// Property-based selection result.
+	/// </summary>
+
+	void OnSpriteSelection (string sp)
+	{
+		if (mObject != null && mProperty != null)
+		{
+			mObject.Update();
+			mProperty.stringValue = sp;
+			mObject.ApplyModifiedProperties();
+		}
+	}
+
+	/// <summary>
+	/// Show the sprite selection wizard.
+	/// </summary>
+
+	static public void ShowSelected ()
+	{
+		if (NGUISettings.atlas != null)
+		{
+			Show(delegate(string sel) { NGUIEditorTools.SelectSprite(sel); });
+		}
+	}
+
+	/// <summary>
+	/// Show the sprite selection wizard.
+	/// </summary>
+
+	static public void Show (SerializedObject ob, SerializedProperty pro, UIAtlas atlas)
+	{
+		if (instance != null)
+		{
+			instance.Close();
+			instance = null;
+		}
+
+		if (ob != null && pro != null && atlas != null)
+		{
+			SpriteSelector comp = ScriptableWizard.DisplayWizard<SpriteSelector>("Select a Sprite");
+			NGUISettings.atlas = atlas;
+			NGUISettings.selectedSprite = pro.hasMultipleDifferentValues ? null : pro.stringValue;
+			comp.mSprite = null;
+			comp.mObject = ob;
+			comp.mProperty = pro;
+			comp.mCallback = comp.OnSpriteSelection;
+		}
+	}
+
+	/// <summary>
+	/// Show the selection wizard.
+	/// </summary>
+
+	static public void Show (Callback callback)
+	{
+		if (instance != null)
+		{
+			instance.Close();
+			instance = null;
+		}
+
+		SpriteSelector comp = ScriptableWizard.DisplayWizard<SpriteSelector>("Select a Sprite");
+		comp.mSprite = null;
+		comp.mCallback = callback;
 	}
 }

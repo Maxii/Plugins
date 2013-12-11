@@ -6,6 +6,7 @@
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
+using System.IO;
 
 /// <summary>
 /// Inspector class used to edit the UIAtlas.
@@ -42,10 +43,11 @@ public class UIAtlasInspector : Editor
 
 		foreach (UISprite sp in sprites)
 		{
-			if (sp.spriteName == sprite.name)
+			if (UIAtlas.CheckIfRelated(sp.atlas, mAtlas) && sp.spriteName == sprite.name)
 			{
+				UIAtlas atl = sp.atlas;
 				sp.atlas = null;
-				sp.atlas = mAtlas;
+				sp.atlas = atl;
 				EditorUtility.SetDirty(sp);
 			}
 		}
@@ -54,11 +56,11 @@ public class UIAtlasInspector : Editor
 
 		foreach (UILabel lbl in labels)
 		{
-			if (lbl.font != null && UIAtlas.CheckIfRelated(lbl.font.atlas, mAtlas) && lbl.font.UsesSprite(sprite.name))
+			if (lbl.bitmapFont != null && UIAtlas.CheckIfRelated(lbl.bitmapFont.atlas, mAtlas) && lbl.bitmapFont.UsesSprite(sprite.name))
 			{
-				UIFont font = lbl.font;
-				lbl.font = null;
-				lbl.font = font;
+				UIFont font = lbl.bitmapFont;
+				lbl.bitmapFont = null;
+				lbl.bitmapFont = font;
 				EditorUtility.SetDirty(lbl);
 			}
 		}
@@ -68,7 +70,7 @@ public class UIAtlasInspector : Editor
 	/// Replacement atlas selection callback.
 	/// </summary>
 
-	void OnSelectAtlas (MonoBehaviour obj)
+	void OnSelectAtlas (Object obj)
 	{
 		if (mReplacement != obj)
 		{
@@ -122,7 +124,7 @@ public class UIAtlasInspector : Editor
 
 		if (mType == AtlasType.Reference)
 		{
-			ComponentSelector.Draw<UIAtlas>(mAtlas.replacement, OnSelectAtlas);
+			ComponentSelector.Draw<UIAtlas>(mAtlas.replacement, OnSelectAtlas, true);
 
 			GUILayout.Space(6f);
 			EditorGUILayout.HelpBox("You can have one atlas simply point to " +
@@ -154,7 +156,7 @@ public class UIAtlasInspector : Editor
 			// Ensure that this atlas has valid import settings
 			if (mAtlas.texture != null) NGUIEditorTools.ImportTexture(mAtlas.texture, false, false, !mAtlas.premultipliedAlpha);
 
-			mAtlas.MarkAsDirty();
+			mAtlas.MarkAsChanged();
 		}
 
 		if (mat != null)
@@ -169,7 +171,7 @@ public class UIAtlasInspector : Editor
 				NGUIEditorTools.RegisterUndo("Import Sprites", mAtlas);
 				NGUIJson.LoadSpriteData(mAtlas, ta);
 				if (sprite != null) sprite = mAtlas.GetSprite(sprite.name);
-				mAtlas.MarkAsDirty();
+				mAtlas.MarkAsChanged();
 			}
 
 			float pixelSize = EditorGUILayout.FloatField("Pixel Size", mAtlas.pixelSize, GUILayout.Width(120f));
@@ -206,7 +208,7 @@ public class UIAtlasInspector : Editor
 					NGUIEditorTools.BeginContents();
 
 					GUILayout.Space(3f);
-					NGUIEditorTools.AdvancedSpriteField(mAtlas, sprite.name, SelectSprite, true);
+					NGUIEditorTools.DrawAdvancedSpriteField(mAtlas, sprite.name, SelectSprite, true);
 					GUILayout.Space(6f);
 
 					GUI.changed = false;
@@ -245,6 +247,24 @@ public class UIAtlasInspector : Editor
 						sprite.borderTop = borderB.y;
 
 						MarkSpriteAsDirty();
+					}
+
+					if (sprite != null && GUILayout.Button("Extract Sprite"))
+					{
+						string path = EditorUtility.SaveFilePanelInProject("Save As", sprite.name + ".png", "png", "Extract sprite into which file?");
+
+						if (!string.IsNullOrEmpty(path))
+						{
+							UIAtlasMaker.SpriteEntry se = UIAtlasMaker.ExtractSprite(mAtlas, sprite.name);
+							
+							if (se != null)
+							{
+								byte[] bytes = se.tex.EncodeToPNG();
+								File.WriteAllBytes(path, bytes);
+								AssetDatabase.ImportAsset(path);
+							}
+							if (se.temporaryTexture) DestroyImmediate(se.tex);
+						}
 					}
 					NGUIEditorTools.EndContents();
 				}

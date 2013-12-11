@@ -12,7 +12,6 @@ using System.Collections.Generic;
 /// (think "table" tag in HTML).
 /// </summary>
 
-[ExecuteInEditMode]
 [AddComponentMenu("NGUI/Interaction/Table")]
 public class UITable : UIWidgetContainer
 {
@@ -29,14 +28,20 @@ public class UITable : UIWidgetContainer
 	public bool sorted = false;
 	public bool hideInactive = true;
 	public bool keepWithinPanel = false;
-	public bool repositionNow = false;
 	public OnReposition onReposition;
 	public Vector2 padding = Vector2.zero;
 
 	UIPanel mPanel;
-	UIDraggablePanel mDrag;
-	bool mStarted = false;
+	UIScrollView mDrag;
+	bool mInitDone = false;
+	bool mReposition = false;
 	List<Transform> mChildren = new List<Transform>();
+
+	/// <summary>
+	/// Reposition the children on the next Update().
+	/// </summary>
+
+	public bool repositionNow { set { if (value) { mReposition = true; enabled = true; } } }
 
 	/// <summary>
 	/// Function that sorts items by name.
@@ -152,27 +157,35 @@ public class UITable : UIWidgetContainer
 	/// Recalculate the position of all elements within the table, sorting them alphabetically if necessary.
 	/// </summary>
 
+	[ContextMenu("Execute")]
 	public void Reposition ()
 	{
-		if (mStarted)
+		if (Application.isPlaying && !mInitDone)
 		{
-			Transform myTrans = transform;
-			mChildren.Clear();
-			List<Transform> ch = children;
-			if (ch.Count > 0) RepositionVariableSize(ch);
-
-			if (mDrag != null)
-			{
-				mDrag.UpdateScrollbars(true);
-				mDrag.RestrictWithinBounds(true);
-			}
-			else if (mPanel != null)
-			{
-				mPanel.ConstrainTargetToBounds(myTrans, true);
-			}
-			if (onReposition != null) onReposition();
+			mReposition = true;
+			return;
 		}
-		else repositionNow = true;
+
+		if (!mInitDone) Init();
+
+		mReposition = false;
+		Transform myTrans = transform;
+		mChildren.Clear();
+		List<Transform> ch = children;
+		if (ch.Count > 0) RepositionVariableSize(ch);
+
+		if (mDrag != null)
+		{
+			mDrag.UpdateScrollbars(true);
+			mDrag.RestrictWithinBounds(true);
+		}
+		else if (mPanel != null)
+		{
+			mPanel.ConstrainTargetToBounds(myTrans, true);
+		}
+
+		if (onReposition != null)
+			onReposition();
 	}
 
 	/// <summary>
@@ -181,17 +194,24 @@ public class UITable : UIWidgetContainer
 
 	void Start ()
 	{
-		mStarted = true;
+		Init();
+		Reposition();
+		enabled = false;
+	}
+
+	/// <summary>
+	/// Find the necessary components.
+	/// </summary>
+
+	void Init ()
+	{
+		mInitDone = true;
 
 		if (keepWithinPanel)
 		{
 			mPanel = NGUITools.FindInParents<UIPanel>(gameObject);
-			mDrag = NGUITools.FindInParents<UIDraggablePanel>(gameObject);
+			mDrag = NGUITools.FindInParents<UIScrollView>(gameObject);
 		}
-#if UNITY_EDITOR
-		if (Application.isPlaying)
-#endif
-		Reposition();
 	}
 
 	/// <summary>
@@ -200,10 +220,7 @@ public class UITable : UIWidgetContainer
 
 	void LateUpdate ()
 	{
-		if (repositionNow)
-		{
-			repositionNow = false;
-			Reposition();
-		}
+		if (mReposition) Reposition();
+		enabled = false;
 	}
 }

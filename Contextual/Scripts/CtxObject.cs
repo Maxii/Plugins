@@ -93,7 +93,7 @@ public class CtxObject : MonoBehaviour
 	{
 		if (contextMenu != null)
 		{
-			EventDelegate.Add(contextMenu.onSelection, OnMenuSelect, true);
+			EventDelegate.Add(contextMenu.onSelection, OnMenuSelect);
 			EventDelegate.Add(contextMenu.onHide, OnHide, true);
 			
 			current = this;
@@ -121,6 +121,7 @@ public class CtxObject : MonoBehaviour
 	{
 		current = this;
 		EventDelegate.Execute(onHide);
+		EventDelegate.Remove(contextMenu.onSelection, OnMenuSelect);	// <-- In case the menu was hidden with no selection made
 
 		gameObject.SendMessage("OnHideMenu", this, SendMessageOptions.DontRequireReceiver);
 	}

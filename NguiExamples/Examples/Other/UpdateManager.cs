@@ -3,7 +3,10 @@
 // Copyright © 2011-2013 Tasharen Entertainment
 //----------------------------------------------
 
-using UnityEngine;
+// This class has not been needed for a very long time (ever since script execution order feature was added).
+// I'm keeping it here in case you are still using it in your own projects, but note that it's no longer supported.
+
+/*using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -255,4 +258,4 @@ public class UpdateManager : MonoBehaviour
 		}
 		else DestroyImmediate(obj);
 	}
-}
+}*/

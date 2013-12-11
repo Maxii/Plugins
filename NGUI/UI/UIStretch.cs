@@ -45,9 +45,10 @@ public class UIStretch : MonoBehaviour
 
 	/// <summary>
 	/// Whether the operation will occur only once and the script will then be disabled.
+	/// Screen size changes will still cause the script's logic to execute.
 	/// </summary>
 
-	public bool runOnlyOnce = false;
+	public bool runOnlyOnce = true;
 
 	/// <summary>
 	/// Relative-to-target size.
@@ -80,7 +81,7 @@ public class UIStretch : MonoBehaviour
 	Animation mAnim;
 	Rect mRect;
 
-	void OnEnable ()
+	void Awake ()
 	{
 		mAnim = animation;
 		mRect = new Rect();
@@ -88,7 +89,13 @@ public class UIStretch : MonoBehaviour
 		mWidget = GetComponent<UIWidget>();
 		mSprite = GetComponent<UISprite>();
 		mPanel = GetComponent<UIPanel>();
+
+		UICamera.onScreenResize += ScreenSizeChanged;
 	}
+
+	void OnDestroy () { UICamera.onScreenResize -= ScreenSizeChanged; }
+
+	void ScreenSizeChanged () { if (runOnlyOnce) Update(); }
 
 	void Start ()
 	{
@@ -283,7 +290,7 @@ public class UIStretch : MonoBehaviour
 			if (mTrans.localScale != size)
 				mTrans.localScale = size;
 
-			if (runOnlyOnce && Application.isPlaying) Destroy(this);
+			if (runOnlyOnce && Application.isPlaying) enabled = false;
 		}
 	}
 }

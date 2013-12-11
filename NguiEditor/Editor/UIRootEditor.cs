@@ -10,4 +10,24 @@ using UnityEditor;
 [CustomEditor(typeof(UIRoot))]
 public class UIRootEditor : Editor
 {
+	public override void OnInspectorGUI ()
+	{
+		serializedObject.Update();
+
+		SerializedProperty sp = NGUIEditorTools.DrawProperty("Scaling Style", serializedObject, "scalingStyle");
+
+		UIRoot.Scaling scaling = (UIRoot.Scaling)sp.intValue;
+
+		if (scaling != UIRoot.Scaling.PixelPerfect)
+		{
+			NGUIEditorTools.DrawProperty("Manual Height", serializedObject, "manualHeight");
+		}
+
+		if (scaling != UIRoot.Scaling.FixedSize)
+		{
+			NGUIEditorTools.DrawProperty("Minimum Height", serializedObject, "minimumHeight");
+			NGUIEditorTools.DrawProperty("Maximum Height", serializedObject, "maximumHeight");
+		}
+		serializedObject.ApplyModifiedProperties();
+	}
 }

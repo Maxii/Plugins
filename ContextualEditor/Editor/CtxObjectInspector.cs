@@ -23,7 +23,7 @@ public class CtxObjectInspector : CtxMenuItemInspector
 	{
 		contextObject = target as CtxObject;
 		
-		EditorGUIUtility.LookLikeControls(100f);
+		EditorGUIUtility.labelWidth = 100f;
 		
 		CtxMenu contextMenu = (CtxMenu)EditorGUILayout.ObjectField("Context Menu", contextObject.contextMenu, 
 			typeof(CtxMenu), true);

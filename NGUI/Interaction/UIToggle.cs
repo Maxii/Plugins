@@ -96,7 +96,22 @@ public class UIToggle : UIWidgetContainer
 	[System.Obsolete("Use 'value' instead")]
 	public bool isChecked { get { return value; } set { this.value = value; } }
 
-	void OnEnable ()  { list.Add(this); }
+	/// <summary>
+	/// Return the first active toggle within the specified group.
+	/// </summary>
+
+	static public UIToggle GetActiveToggle (int group)
+	{
+		for (int i = 0; i < list.size; ++i)
+		{
+			UIToggle toggle = list[i];
+			if (toggle != null && toggle.group == group && toggle.mIsActive)
+				return toggle;
+		}
+		return null;
+	}
+
+	void OnEnable () { list.Add(this); }
 	void OnDisable () { list.Remove(this); }
 
 	/// <summary>
@@ -174,10 +189,17 @@ public class UIToggle : UIWidgetContainer
 			// Uncheck all other toggles
 			if (group != 0 && state)
 			{
-				for (int i = 0, imax = list.size; i < imax; ++i)
+				for (int i = 0, imax = list.size; i < imax; )
 				{
 					UIToggle cb = list[i];
 					if (cb != this && cb.group == group) cb.Set(false);
+					
+					if (list.size != imax)
+					{
+						imax = list.size;
+						i = 0;
+					}
+					else ++i;
 				}
 			}
 

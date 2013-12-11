@@ -23,7 +23,7 @@ public class CtxPickHandlerInspector : Editor
 	{
 		pickHandler = target as CtxPickHandler;
 		
-		EditorGUIUtility.LookLikeControls(100f);
+		EditorGUIUtility.labelWidth = 100f;
 		
 		int pickLayers = UICameraTool.LayerMaskField("Pick Layers", pickHandler.pickLayers);
 		if (pickHandler.pickLayers != pickLayers)

@@ -14,25 +14,20 @@ public class WindowDragTilt : MonoBehaviour
 	Vector3 mLastPos;
 	Transform mTrans;
 	float mAngle = 0f;
-	bool mInit = true;
 
-	void Start () { UpdateManager.AddCoroutine(this, updateOrder, CoroutineUpdate); }
-	void OnEnable () { mInit = true; }
-
-	void CoroutineUpdate (float delta)
+	void OnEnable ()
 	{
-		if (mInit)
-		{
-			mInit = false;
-			mTrans = transform;
-			mLastPos = mTrans.position;
-		}
+		mTrans = transform;
+		mLastPos = mTrans.position;
+	}
 
+	void Update ()
+	{
 		Vector3 deltaPos = mTrans.position - mLastPos;
 		mLastPos = mTrans.position;
 
 		mAngle += deltaPos.x * degrees;
-		mAngle = NGUIMath.SpringLerp(mAngle, 0f, 20f, delta);
+		mAngle = NGUIMath.SpringLerp(mAngle, 0f, 20f, Time.deltaTime);
 
 		mTrans.localRotation = Quaternion.Euler(0f, 0f, -mAngle);
 	}

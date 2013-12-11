@@ -38,7 +38,7 @@ public class BMSymbol
 	/// Mark this symbol as dirty, clearing the sprite reference.
 	/// </summary>
 
-	public void MarkAsDirty () { mIsValid = false; }
+	public void MarkAsChanged () { mIsValid = false; }
 
 	/// <summary>
 	/// Validate this symbol, given the specified atlas.

@@ -54,10 +54,11 @@ public class UIAnchor : MonoBehaviour
 	public bool halfPixelOffset = true;
 
 	/// <summary>
-	/// If set to 'true', UIAnchor will execute once, then will be removed. Useful if your screen resolution never changes.
+	/// If set to 'true', UIAnchor will execute once, then will be disabled.
+	/// Screen size changes will still cause the anchor to update itself, even if it's disabled.
 	/// </summary>
 
-	public bool runOnlyOnce = false;
+	public bool runOnlyOnce = true;
 
 	/// <summary>
 	/// Relative offset value, if any. For example "0.25" with 'side' set to Left, means 25% from the left side.
@@ -84,7 +85,12 @@ public class UIAnchor : MonoBehaviour
 	{
 		mTrans = transform;
 		mAnim = animation;
+		UICamera.onScreenResize += ScreenSizeChanged;
 	}
+
+	void OnDestroy () { UICamera.onScreenResize -= ScreenSizeChanged; }
+
+	void ScreenSizeChanged () { if (runOnlyOnce) Update(); }
 
 	/// <summary>
 	/// Automatically find the camera responsible for drawing the widgets under this object.
@@ -126,10 +132,10 @@ public class UIAnchor : MonoBehaviour
 
 		UIWidget wc = (container == null) ? null : container.GetComponent<UIWidget>();
 		UIPanel pc = (container == null && wc == null) ? null : container.GetComponent<UIPanel>();
-		
+
 		if (wc != null)
 		{
-			Bounds b = wc.CalculateBounds(transform.parent);
+			Bounds b = wc.CalculateBounds(container.transform.parent);
 
 			mRect.x = b.min.x;
 			mRect.y = b.min.y;
@@ -160,7 +166,7 @@ public class UIAnchor : MonoBehaviour
 		}
 		else if (container != null)
 		{
-			Transform root = transform.parent;
+			Transform root = container.transform.parent;
 			Bounds b = (root != null) ? NGUIMath.CalculateRelativeWidgetBounds(root, container.transform) :
 				NGUIMath.CalculateRelativeWidgetBounds(container.transform);
 
@@ -234,6 +240,6 @@ public class UIAnchor : MonoBehaviour
 
 		// Wrapped in an 'if' so the scene doesn't get marked as 'edited' every frame
 		if (mTrans.position != v) mTrans.position = v;
-		if (runOnlyOnce && Application.isPlaying) Destroy(this);
+		if (runOnlyOnce && Application.isPlaying) enabled = false;
 	}
 }

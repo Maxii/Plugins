@@ -22,7 +22,7 @@ public class GFRectGrid: GFGrid{
 		get{return _spacing;}
 		set{if(value == _spacing)// needed because the editor fires the setter even if this wasn't changed
 				return;
-			_gridChanged = true;
+			hasChanged = true;
 			_spacing = Vector3.Max(value, 0.1f*Vector3.one);
 		}
 	}
@@ -316,9 +316,8 @@ public class GFRectGrid: GFGrid{
 	// second set are the vertical lines (X and Z), the third set the forward lines (X and Y).
 	protected override Vector3[][][] CalculateDrawPoints(Vector3 from, Vector3 to){
 		// reuse the points if the grid hasn't changed, we already have some points and we use the same range
-		if(!hasChanged && _drawPoints != null && from == renderFrom && to == renderTo){
+		if( RecyclePoints( from, to ) )
 			return _drawPoints;
-		}
 		
 		// our old points are of no ue, so let's create a new set
 		_drawPoints = new Vector3[3][][];
@@ -385,10 +384,6 @@ public class GFRectGrid: GFGrid{
 			}
 			_drawPoints[i] = lineSet;
 		}
-		// if the points were calculated from the outside chances are they don't match the range anymore and the rendering could show the wrong range
-		if(from != renderFrom || to != renderTo)
-			_gridChanged = true;
-		// in that case set _gridChanged to force a second calculation with the proper range
 
 		// apply pivot offset
 		ApplyDrawOffset ();

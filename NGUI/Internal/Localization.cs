@@ -188,15 +188,24 @@ public class Localization : MonoBehaviour
 	/// Load the specified asset and activate the localization.
 	/// </summary>
 
-	void Load (TextAsset asset)
+	public void Load (TextAsset asset)
+	{
+		ByteReader reader = new ByteReader(asset);
+		Set(asset.name, reader.ReadDictionary());
+	}
+
+	/// <summary>
+	/// Load the specified asset and activate the localization.
+	/// </summary>
+
+	public void Set (string languageName, Dictionary<string, string> dictionary)
 	{
 #if SHOW_REPORT
 		mUsed.Clear();
 #endif
-		mLanguage = asset.name;
+		mLanguage = languageName;
 		PlayerPrefs.SetString("Language", mLanguage);
-		ByteReader reader = new ByteReader(asset);
-		mDictionary = reader.ReadDictionary();
+		mDictionary = dictionary;
 		UIRoot.Broadcast("OnLocalize", this);
 	}
 

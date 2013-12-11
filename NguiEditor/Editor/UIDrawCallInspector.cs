@@ -23,10 +23,10 @@ public class UIDrawCallInspector : Editor
 		{
 			UIDrawCall dc = target as UIDrawCall;
 
-			if (dc.panel != null)
+			if (dc.manager != null)
 			{
 				EditorGUILayout.LabelField("Render Queue", dc.renderQueue.ToString());
-				EditorGUILayout.LabelField("Owner Panel", NGUITools.GetHierarchy(dc.panel.gameObject));
+				EditorGUILayout.LabelField("Owner Panel", NGUITools.GetHierarchy(dc.manager.gameObject));
 				EditorGUILayout.LabelField("Triangles", dc.triangles.ToString());
 			}
 			else if (Event.current.type == EventType.Repaint)

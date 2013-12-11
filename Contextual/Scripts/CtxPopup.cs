@@ -40,6 +40,11 @@ public class CtxPopup : MonoBehaviour
 	public int selectedItem;
 	
 	/// <summary>
+	/// The mouse button (0-2) that triggers this popup menu.
+	/// </summary>
+	public int mouseButton;
+	
+	/// <summary>
 	/// The onSelection event.
 	/// </summary>
 	public List<EventDelegate> onSelection = new List<EventDelegate>();
@@ -63,28 +68,33 @@ public class CtxPopup : MonoBehaviour
 
 	void OnPress(bool isPressed)
 	{
-		// We show the menu on the up-press not the down-press. Otherwise NGUI would steal
-		// the selection state from the context menu on the up-press, causing the menu to
-		// close immediately.
+		// Filter for touches or selected mouse button.
 		
-		if (! isPressed)
+		if (UICamera.currentTouchID >= 0 || UICamera.currentTouchID == (-1 - mouseButton))
 		{
-			current = this;
-			EventDelegate.Execute(onShow);
-
-			Vector3 menuPosition = CtxHelper.ComputeMenuPosition(contextMenu, gameObject);
+			// We show the menu on the up-press not the down-press. Otherwise NGUI would steal
+			// the selection state from the context menu on the up-press, causing the menu to
+			// close immediately.
 			
-			CtxMenu.Item[] items = MenuItems;
-			
-			if (items != null || contextMenu.onShow.Count > 0)
+			if (! isPressed)
 			{
-				EventDelegate.Add(contextMenu.onSelection, OnMenuSelection, true);
-				EventDelegate.Add(contextMenu.onHide, OnHide, true);
-			
-				if (menuItems != null && menuItems.Length > 0)
-					contextMenu.Show(menuPosition, menuItems);
-				else
-					contextMenu.Show(menuPosition);
+				current = this;
+				EventDelegate.Execute(onShow);
+	
+				Vector3 menuPosition = CtxHelper.ComputeMenuPosition(contextMenu, gameObject);
+				
+				CtxMenu.Item[] items = MenuItems;
+				
+				if (items != null || contextMenu.onShow.Count > 0)
+				{
+					EventDelegate.Add(contextMenu.onSelection, OnMenuSelection);
+					EventDelegate.Add(contextMenu.onHide, OnHide, true);
+				
+					if (menuItems != null && menuItems.Length > 0)
+						contextMenu.Show(menuPosition, menuItems);
+					else
+						contextMenu.Show(menuPosition);
+				}
 			}
 		}
 	}
@@ -93,6 +103,7 @@ public class CtxPopup : MonoBehaviour
 	{
 		current = this;
 		EventDelegate.Execute(onHide);
+		EventDelegate.Remove(contextMenu.onSelection, OnMenuSelection);	// <-- In case the menu was hidden with no selection made
 	}
 	
 	void OnMenuSelection()

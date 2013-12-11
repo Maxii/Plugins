@@ -33,9 +33,6 @@ public class UIButton : UIButtonColor
 
 	protected override void OnEnable ()
 	{
-		//Collider col = collider;
-		//if (col != null) col.enabled = true;
-
 		if (isEnabled)
 		{
 			if (mStarted)
@@ -45,13 +42,6 @@ public class UIButton : UIButtonColor
 			}
 		}
 		else UpdateColor(false, true);
-	}
-
-	protected override void OnDisable()
-	{
-		//Collider col = collider;
-		//if (col != null) col.enabled = false;
-		if (mStarted) UpdateColor(false, false);
 	}
 
 	public override void OnHover (bool isOver) { if (isEnabled) base.OnHover(isOver); }
@@ -87,7 +77,8 @@ public class UIButton : UIButtonColor
 		{
 			Collider col = collider;
 			if (col != null) col.enabled = value;
-			enabled = value;
+			else enabled = value;
+			UpdateColor(value, false);
 		}
 	}
 
@@ -108,7 +99,7 @@ public class UIButton : UIButtonColor
 			Color c = shouldBeEnabled ? defaultColor : disabledColor;
 			TweenColor tc = TweenColor.Begin(tweenTarget, 0.15f, c);
 
-			if (immediate)
+			if (tc != null && immediate)
 			{
 				tc.color = c;
 				tc.enabled = false;

@@ -5,6 +5,7 @@
 
 using UnityEngine;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 /// <summary>
 /// This improved version of the System.Collections.Generic.List that doesn't release the buffer on Clear(), resulting in better performance and less garbage collection.
@@ -116,6 +117,8 @@ public class BetterList<T>
 	/// For 'foreach' functionality.
 	/// </summary>
 
+	[DebuggerHidden]
+	[DebuggerStepThrough]
 	public IEnumerator<T> GetEnumerator ()
 	{
 		if (buffer != null)
@@ -130,7 +133,8 @@ public class BetterList<T>
 	/// <summary>
 	/// Convenience function. I recommend using .buffer instead.
 	/// </summary>
-	
+
+	[DebuggerHidden]
 	public T this[int i]
 	{
 		get { return buffer[i]; }
@@ -234,6 +238,7 @@ public class BetterList<T>
 					--size;
 					buffer[i] = default(T);
 					for (int b = i; b < size; ++b) buffer[b] = buffer[b + 1];
+					buffer[size] = default(T);
 					return true;
 				}
 			}
@@ -252,6 +257,7 @@ public class BetterList<T>
 			--size;
 			buffer[index] = default(T);
 			for (int b = index; b < size; ++b) buffer[b] = buffer[b + 1];
+			buffer[size] = default(T);
 		}
 	}
 
@@ -276,29 +282,67 @@ public class BetterList<T>
 
 	public T[] ToArray () { Trim(); return buffer; }
 
+	//class Comparer : System.Collections.IComparer
+	//{
+	//    public System.Comparison<T> func;
+	//    public int Compare (object x, object y) { return func((T)x, (T)y); }
+	//}
+
+	//Comparer mComp = new Comparer();
+
 	/// <summary>
-	/// List.Sort equivalent.
+	/// List.Sort equivalent. Doing Array.Sort causes GC allocations.
 	/// </summary>
 
-	public void Sort (System.Comparison<T> comparer)
+	//public void Sort (System.Comparison<T> comparer)
+	//{
+	//    if (size > 0)
+	//    {
+	//        mComp.func = comparer;
+	//        System.Array.Sort(buffer, 0, size, mComp);
+	//    }
+	//}
+
+	/// <summary>
+	/// List.Sort equivalent. Manual sorting causes no GC allocations.
+	/// </summary>
+
+	[DebuggerHidden]
+	[DebuggerStepThrough]
+	public void Sort (CompareFunc comparer)
 	{
+		int start = 0;
+		int max = size - 1;
 		bool changed = true;
 
 		while (changed)
 		{
 			changed = false;
 
-			for (int i = 1; i < size; ++i)
+			for (int i = start; i < max; ++i)
 			{
-				if (comparer.Invoke(buffer[i - 1], buffer[i]) > 0)
+				// Compare the two values
+				if (comparer(buffer[i], buffer[i + 1]) > 0)
 				{
+					// Swap the values
 					T temp = buffer[i];
-					buffer[i] = buffer[i - 1];
-					buffer[i - 1] = temp;
+					buffer[i] = buffer[i + 1];
+					buffer[i + 1] = temp;
 					changed = true;
+				}
+				else if (!changed)
+				{
+					// Nothing has changed -- we can start here next time
+					start = (i == 0) ? 0 : i - 1;
 				}
 			}
 		}
 	}
+
+	/// <summary>
+	/// Comparison function should return -1 if left is less than right, 1 if left is greater than right, and 0 if they match.
+	/// </summary>
+
+	public delegate int CompareFunc (T left, T right);
 #endif
 }

@@ -10,7 +10,7 @@ using System.Collections;
 [System.Serializable]
 public class GFColorVector3{
 	[SerializeField]
-	private Color[] values = new Color[3];
+	private Color[] values = new Color[3] {new Color(1.0f, 0.0f, 0.0f, 0.5f), new Color(0.0f, 1.0f, 0.0f, 0.5f), new Color(0.0f, 0.0f, 1.0f, 0.5f)};
 	/**
 	 * \brief X component of the colour vector.
 	 */

@@ -26,7 +26,7 @@ public abstract class GFLayeredGrid : GFGrid {
 		set{if(value == _depth)// needed because the editor fires the setter even if this wasn't changed
 				return;
 			_depth = Mathf.Max(value, 0.1f);
-			_gridChanged = true;
+			hasChanged = true;
 		}
 	}
 	
@@ -46,7 +46,7 @@ public abstract class GFLayeredGrid : GFGrid {
 			if(value == _gridPlane)
 				{return;}
 			_gridPlane = value;
-			_gridChanged = true;
+			hasChanged = true;
 		}
 	}
 	

@@ -12,7 +12,6 @@ public class ChatInput : MonoBehaviour
 	public bool fillWithDummyData = false;
 
 	UIInput mInput;
-	bool mIgnoreNextEnter = false;
 
 	/// <summary>
 	/// Add some dummy text to the text list.
@@ -21,6 +20,7 @@ public class ChatInput : MonoBehaviour
 	void Start ()
 	{
 		mInput = GetComponent<UIInput>();
+		mInput.label.maxLineCount = 1;
 
 		if (fillWithDummyData && textList != null)
 		{
@@ -33,23 +33,6 @@ public class ChatInput : MonoBehaviour
 	}
 
 	/// <summary>
-	/// Pressing 'enter' should immediately give focus to the input field.
-	/// </summary>
-
-	void Update ()
-	{
-		if (Input.GetKeyUp(KeyCode.Return))
-		{
-			if (!mIgnoreNextEnter && !mInput.selected)
-			{
-				mInput.label.maxLineCount = 1;
-				mInput.selected = true;
-			}
-			mIgnoreNextEnter = false;
-		}
-	}
-
-	/// <summary>
 	/// Submit notification is sent by UIInput when 'enter' is pressed or iOS/Android keyboard finalizes input.
 	/// </summary>
 
@@ -58,15 +41,14 @@ public class ChatInput : MonoBehaviour
 		if (textList != null)
 		{
 			// It's a good idea to strip out all symbols as we don't want user input to alter colors, add new lines, etc
-			string text = NGUITools.StripSymbols(mInput.value);
+			string text = NGUIText.StripSymbols(mInput.value);
 
 			if (!string.IsNullOrEmpty(text))
 			{
 				textList.Add(text);
 				mInput.value = "";
-				mInput.selected = false;
+				mInput.isSelected = false;
 			}
 		}
-		mIgnoreNextEnter = true;
 	}
 }

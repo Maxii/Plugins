@@ -47,13 +47,15 @@ public class UIToggledObjects : MonoBehaviour
 
 	public void Toggle ()
 	{
+		bool val = UIToggle.current.value;
+
 		if (enabled)
 		{
 			for (int i = 0; i < activate.Count; ++i)
-				Set(activate[i], UIToggle.current.value);
+				Set(activate[i], val);
 
 			for (int i = 0; i < deactivate.Count; ++i)
-				Set(deactivate[i], !UIToggle.current.value);
+				Set(deactivate[i], !val);
 		}
 	}
 

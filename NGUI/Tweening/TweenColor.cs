@@ -70,6 +70,9 @@ public class TweenColor : UITweener
 
 	static public TweenColor Begin (GameObject go, float duration, Color color)
 	{
+#if UNITY_EDITOR
+		if (!Application.isPlaying) return null;
+#endif
 		TweenColor comp = UITweener.Begin<TweenColor>(go, duration);
 		comp.from = comp.color;
 		comp.to = color;

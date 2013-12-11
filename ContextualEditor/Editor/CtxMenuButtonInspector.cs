@@ -21,7 +21,7 @@ public class CtxMenuButtonInspector : CtxMenuItemInspector
 	{
 		menuButton = target as CtxMenuButton;
 		
-		EditorGUIUtility.LookLikeControls(120f);
+		EditorGUIUtility.labelWidth = 120f;
 		
 		CtxMenu contextMenu = (CtxMenu)EditorGUILayout.ObjectField("Context Menu", menuButton.contextMenu, 
 			typeof(CtxMenu), true);

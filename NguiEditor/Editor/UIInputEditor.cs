@@ -1,7 +1,11 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
 // Copyright © 2011-2013 Tasharen Entertainment
 //----------------------------------------------
+
+#if UNITY_IPHONE || UNITY_ANDROID || UNITY_WP8 || UNITY_BLACKBERRY
+#define MOBILE
+#endif
 
 using UnityEngine;
 using UnityEditor;
@@ -10,91 +14,68 @@ using UnityEditor;
 [CustomEditor(typeof(UIInput))]
 public class UIInputEditor : UIWidgetContainerEditor
 {
-	public enum DefaultText
-	{
-		Blank,
-		KeepLabelsText,
-	}
-
 	public override void OnInspectorGUI ()
 	{
-		NGUIEditorTools.SetLabelWidth(120f);
 		UIInput input = target as UIInput;
+		serializedObject.Update();
+		GUILayout.Space(3f);
+		NGUIEditorTools.SetLabelWidth(110f);
+		//NGUIEditorTools.DrawProperty(serializedObject, "m_Script");
 
-		GUILayout.Space(6f);
-		GUI.changed = false;
+		EditorGUI.BeginDisabledGroup(serializedObject.isEditingMultipleObjects);
+		SerializedProperty label = NGUIEditorTools.DrawProperty(serializedObject, "label");
+		EditorGUI.EndDisabledGroup();
 
-		UILabel label = (UILabel)EditorGUILayout.ObjectField("Input Label", input.label, typeof(UILabel), true);
-
-		if (GUI.changed)
+		EditorGUI.BeginDisabledGroup(label == null || label.objectReferenceValue == null);
 		{
-			NGUIEditorTools.RegisterUndo("Input Change", input);
-			input.label = label;
-			UnityEditor.EditorUtility.SetDirty(input);
-		}
+			if (Application.isPlaying) NGUIEditorTools.DrawPaddedProperty("Value", serializedObject, "mValue");
+			else NGUIEditorTools.DrawPaddedProperty("Starting Value", serializedObject, "mValue");
+			NGUIEditorTools.DrawPaddedProperty(serializedObject, "savedAs");
+			NGUIEditorTools.DrawProperty("Active Text", serializedObject, "activeTextColor");
 
-		if (input.label != null)
-		{
-			GUI.changed = false;
-			Color ia = EditorGUILayout.ColorField("Inactive Color", input.label.color);
-
-			if (GUI.changed)
+			EditorGUI.BeginDisabledGroup(serializedObject.isEditingMultipleObjects);
 			{
-				NGUIEditorTools.RegisterUndo("Input Change", input.label);
-				input.label.color = ia;
-				UnityEditor.EditorUtility.SetDirty(input.label);
+				if (label != null && label.objectReferenceValue != null)
+				{
+					SerializedObject ob = new SerializedObject(label.objectReferenceValue);
+					ob.Update();
+					NGUIEditorTools.DrawProperty("Inactive", ob, "mColor");
+					ob.ApplyModifiedProperties();
+				}
+				else EditorGUILayout.ColorField("Inactive", Color.white);
 			}
+			EditorGUI.EndDisabledGroup();
+#if !MOBILE
+			NGUIEditorTools.DrawProperty(serializedObject, "selectOnTab");
+#endif
+			NGUIEditorTools.DrawPaddedProperty(serializedObject, "inputType");
+#if MOBILE
+			NGUIEditorTools.DrawPaddedProperty(serializedObject, "keyboardType");
+#endif
+			NGUIEditorTools.DrawPaddedProperty(serializedObject, "validation");
+
+			SerializedProperty sp = serializedObject.FindProperty("characterLimit");
+
+			GUILayout.BeginHorizontal();
+
+			if (sp.hasMultipleDifferentValues || input.characterLimit > 0)
+			{
+				EditorGUILayout.PropertyField(sp);
+				GUILayout.Space(18f);
+			}
+			else
+			{
+				EditorGUILayout.PropertyField(sp);
+				GUILayout.Label("unlimited");
+			}
+			GUILayout.EndHorizontal();
+
+			NGUIEditorTools.SetLabelWidth(80f);
+			EditorGUI.BeginDisabledGroup(serializedObject.isEditingMultipleObjects);
+			NGUIEditorTools.DrawEvents("On Submit", input, input.onSubmit);
+			EditorGUI.EndDisabledGroup();
 		}
-
-		GUI.changed = false;
-		Color c = EditorGUILayout.ColorField("Active Color", input.activeColor);
-
-		GUILayout.BeginHorizontal();
-		DefaultText dt = input.useLabelTextAtStart ? DefaultText.KeepLabelsText : DefaultText.Blank;
-		bool def = (DefaultText)EditorGUILayout.EnumPopup("Default Text", dt) == DefaultText.KeepLabelsText;
-		GUILayout.Space(18f);
-		GUILayout.EndHorizontal();
-
-		GUILayout.BeginHorizontal();
-		UIInput.KeyboardType type = (UIInput.KeyboardType)EditorGUILayout.EnumPopup("Keyboard Type", input.type);
-		GUILayout.Space(18f);
-		GUILayout.EndHorizontal();
-
-		GameObject sel = (GameObject)EditorGUILayout.ObjectField("Select on Tab", input.selectOnTab, typeof(GameObject), true);
-
-		if (GUI.changed)
-		{
-			NGUIEditorTools.RegisterUndo("Input Change", input);
-			input.activeColor = c;
-			input.type = type;
-			input.useLabelTextAtStart = def;
-			input.selectOnTab = sel;
-			UnityEditor.EditorUtility.SetDirty(input);
-		}
-
-		GUI.changed = false;
-		GUILayout.BeginHorizontal();
-		string pp = EditorGUILayout.TextField("Auto-save Key", input.playerPrefsField);
-		GUILayout.Space(18f);
-		GUILayout.EndHorizontal();
-
-		int max = EditorGUILayout.IntField("Max Characters", input.maxChars, GUILayout.Width(160f));
-		string car = EditorGUILayout.TextField("Carat Character", input.caratChar, GUILayout.Width(160f));
-		bool pw = EditorGUILayout.Toggle("Password", input.isPassword);
-		bool ac = EditorGUILayout.Toggle("Auto-correct", input.autoCorrect);
-
-		if (GUI.changed)
-		{
-			NGUIEditorTools.RegisterUndo("Input Change", input);
-			input.playerPrefsField = pp;
-			input.maxChars = max;
-			input.caratChar = car;
-			input.isPassword = pw;
-			input.autoCorrect = ac;
-			UnityEditor.EditorUtility.SetDirty(input);
-		}
-
-		NGUIEditorTools.SetLabelWidth(80f);
-		NGUIEditorTools.DrawEvents("On Submit", input, input.onSubmit);
+		EditorGUI.EndDisabledGroup();
+		serializedObject.ApplyModifiedProperties();
 	}
 }

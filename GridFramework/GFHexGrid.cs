@@ -60,7 +60,7 @@ public class GFHexGrid : GFLayeredGrid {
 			if (value == _radius)// needed because the editor fires the setter even if this wasn't changed
 				return;
 			_radius = Mathf.Max(value, 0.1f);
-			_gridChanged = true;
+			hasChanged = true;
 		}
 	}
 	
@@ -149,7 +149,7 @@ public class GFHexGrid : GFLayeredGrid {
 				return;
 			}
 			_hexSideMode = value;
-			_gridChanged = true;
+			hasChanged = true;
 		}
 	}
 	/// <summary>Flat tops or pointy tops.</summary>
@@ -179,7 +179,7 @@ public class GFHexGrid : GFLayeredGrid {
 	/// 	The shape of the overall grid, affects only drawing and rendering, not the calculations.
 	/// </summary>
 	/// <value>The shape when drawing or rendering the grid. This only affects the grid’s appearance, but not how it works.</value>
-	public HexGridShape gridStyle {get{return _gridStyle;}set{if(value == _gridStyle){return;} _gridStyle = value; _gridChanged = true;}}
+	public HexGridShape gridStyle {get{return _gridStyle;}set{if(value == _gridStyle){return;} _gridStyle = value; hasChanged = true;}}
 	
 	#endregion
 
@@ -868,9 +868,8 @@ public class GFHexGrid : GFLayeredGrid {
 	
 	protected Vector3[][][] CalculateDrawPointsRect(Vector3 from, Vector3 to, bool isCompact = false){
 		// reuse the points if the grid hasn't changed, we already have some points and we use the same range
-		if(!hasChanged && _drawPoints != null && from == renderFrom && to == renderTo && isCompact == (gridStyle == HexGridShape.CompactRectangle)){
+		if( RecyclePoints( from, to ) )
 			return _drawPoints;
-		}
 
 		_drawPoints = new Vector3[3][][];
 		Vector3 spacing = CombineRadiusDepth();

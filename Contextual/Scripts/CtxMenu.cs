@@ -651,6 +651,8 @@ public class CtxMenu : MonoBehaviour
 	{
 		if (isHiding)
 			return;
+
+		//Debug.Log("Menu "+this+" is hiding");
 		
 		isHiding = true;
 		isShowing = false;
@@ -1187,7 +1189,10 @@ public class CtxMenu : MonoBehaviour
 						Hide();
 					}
 					else
+					{
+						//Debug.Log("CtxMenu.LateUpdate() - "+this+" wants to hide [sel = "+UICamera.selectedObject+"] [index = "+index+"]");
 						pendingHide = true;
+					}
 				}
 			}
 			else
@@ -1203,17 +1208,20 @@ public class CtxMenu : MonoBehaviour
 		// forced to poll here.
 		if (menuBar && background != null)
 		{
+			UIRoot root = NGUITools.FindInParents<UIRoot>(background.gameObject);
+			float adjust = (root != null) ? root.GetPixelSizeAdjustment(Screen.height) : 1f;
+			
 			if (style == Style.Horizontal)
 			{
-				int w = (int)Screen.width;
-				if (background.width != w)
-					background.width = w;
+				int size = (int)((float)Screen.width * adjust);
+				if (background.width != size)
+					background.width = size;
 			}
 			else
 			{
-				int h = (int)Screen.height;
-				if (background.height != h)
-					background.height = h;
+				int size = (int)((float)Screen.height * adjust);
+				if (background.height != size)
+					background.height = size;
 			}
 		}
 	}
@@ -1329,7 +1337,7 @@ public class CtxMenu : MonoBehaviour
 		// Hovering over an item will potentially result in it becoming the
 		// active item.
 		
-		if (isOver)
+		if (isOver && (! menuBar || menuBarActive))
 			SelectInUI(FindItem(go));
 	}
 		
@@ -1511,7 +1519,7 @@ public class CtxMenu : MonoBehaviour
 			
 			UICamera uiCam = uiCamera;
 			
-			EventDelegate.Add(currentSubmenu.onSelection, OnSubmenuSelection, true);
+			EventDelegate.Add(currentSubmenu.onSelection, OnSubmenuSelection);
 			currentSubmenu.parentMenu = this;
 			
 			float dx = 0f, dy = 0f;
@@ -1528,7 +1536,7 @@ public class CtxMenu : MonoBehaviour
 				if (itemData[itemIndex].shadow != null)
 					CtxHelper.SetActive(itemData[itemIndex].shadow.gameObject, false);
 				
-				highlightBounds = NGUIMath.CalculateRelativeInnerBounds(menuRoot.transform, itemData[itemIndex].background);
+				highlightBounds = NGUIMath.CalculateRelativeWidgetBounds(menuRoot.transform, itemData[itemIndex].background.transform, true);
 				
 				if (itemData[itemIndex].shadow != null)
 					CtxHelper.SetActive(itemData[itemIndex].shadow.gameObject, true);
@@ -1538,7 +1546,7 @@ public class CtxMenu : MonoBehaviour
 			}
 			else
 			{
-				// We don't want to the shadow to be part of the bounds calculation,
+				// We don't want the shadow to be part of the bounds calculation,
 				// so we disable it temporarily.
 				if (shadow != null)
 					CtxHelper.SetActive(shadow.gameObject, false);
@@ -1548,7 +1556,7 @@ public class CtxMenu : MonoBehaviour
 				if (shadow != null)
 					CtxHelper.SetActive(shadow.gameObject, true);
 				
-				highlightBounds = NGUIMath.CalculateRelativeInnerBounds(menuRoot.transform, itemData[itemIndex].highlight);
+				highlightBounds = NGUIMath.CalculateRelativeWidgetBounds(menuRoot.transform, itemData[itemIndex].highlight.transform, true);
 
 				// Adjust the highlight boundaries so that it accounts for the menu
 				// dimensions. Otherwise the submenu will butt up against the highlight
@@ -1647,7 +1655,13 @@ public class CtxMenu : MonoBehaviour
 		}
 		
 		if (currentSubmenu == submenu)
+		{
+			EventDelegate.Remove(currentSubmenu.onSelection, OnSubmenuSelection);	// <-- In case the submenu was hidden with no selection being made.
 			currentSubmenu = null;
+		}
+
+		if (submenu.parentMenu == this)
+			UICamera.selectedObject = gameObject;
 	}
 	
 	void OnSubmenuSelection()
@@ -1761,7 +1775,7 @@ public class CtxMenu : MonoBehaviour
 		// we don't yet know how big they need to be and won't until after they are
 		// created and we can get thier metrics from the NGUI APIs.
 		
-		float itemHeight = ((font != null) ? font.size : 15f) * labelScale + padding.y;
+		float itemHeight = ((font != null) ? font.defaultSize : 15f) * labelScale + padding.y;
 		float itemWidth = 0f;
 				
 		float angle = pieStartingAngle;
@@ -1866,8 +1880,9 @@ public class CtxMenu : MonoBehaviour
 				if (! string.IsNullOrEmpty(item.text))
 				{
 					UILabel label = NGUITools.AddWidget<UILabel>(menuRoot);
-					label.font = font;
+					label.bitmapFont = font;
 					label.text = (isLocalized && Localization.instance != null) ? Localization.instance.Get(item.text) : item.text;
+					label.overflowMethod = UILabel.Overflow.ResizeFreely;
 					label.color = item.isDisabled ? labelColorDisabled : labelColorNormal;
 					label.pivot = UIWidget.Pivot.TopLeft;
 					label.depth = NGUITools.CalculateNextDepth(panel.gameObject);
@@ -2827,8 +2842,11 @@ public class CtxMenu : MonoBehaviour
 			if (itemData[newIndex].highlight != null)
 				sel = itemData[newIndex].highlight.gameObject;
 		}
+
+		//Debug.Log("CtxMenu.SelectInUI() "+newIndex+": "+sel);
 		
 		UICamera.selectedObject = sel;
+		pendingHide = false;
 	}
 	
 	// We use the UICamera enough that caching it seems a good idea.
@@ -2846,6 +2864,8 @@ public class CtxMenu : MonoBehaviour
 	// Send the necessary events in response to an item being selected.
 	void SendEvent(int id)
 	{
+		CtxMenu previous = current;
+		
 		if (onSelection != null)
 		{
 			current = this;
@@ -2853,7 +2873,7 @@ public class CtxMenu : MonoBehaviour
 			EventDelegate.Execute(onSelection);
 		}
 		
-		current = null;
+		current = previous;
 	}
 	
 	// Given the game object that was collided, find the item index.

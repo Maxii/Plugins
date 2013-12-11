@@ -15,7 +15,6 @@ public class CtxMenus
 
 		if (gameObj != null)
 		{
-			Undo.RegisterSceneUndo("Add a Context Menu");
 			EditorUtility.SetDirty(gameObj);
 						
 			GameObject ctxMenuObj = new GameObject("Context Menu");
@@ -29,6 +28,8 @@ public class CtxMenus
 
 			ctxMenuObj.AddComponent<CtxMenu>();
 			Selection.activeGameObject = ctxMenuObj;
+
+			Undo.RegisterCreatedObjectUndo(ctxMenuObj, "Add a Context Menu");
 		}
 	}
 
@@ -39,7 +40,6 @@ public class CtxMenus
 
 		if (rootObj != null)
 		{
-			Undo.RegisterSceneUndo("Add a Menu Button");
 			EditorUtility.SetDirty(rootObj);
 			
 			// Create a menu object.
@@ -78,7 +78,7 @@ public class CtxMenus
 			bg.MakePixelPerfect();
 
 			UILabel lbl = NGUITools.AddWidget<UILabel>(ctxButtonObj);
-			lbl.font = PickFont();
+			lbl.bitmapFont = PickFont();
 			lbl.text = ctxButtonObj.name;
 			lbl.color = Color.black;
 			lbl.MakePixelPerfect();
@@ -98,6 +98,8 @@ public class CtxMenus
 			ctxButtonObj.AddComponent<UIPlaySound>();
 
 			Selection.activeGameObject = ctxButtonObj;
+
+			Undo.RegisterCreatedObjectUndo(ctxButtonObj, "Add a Menu Button");
 		}
 	}
 	
@@ -108,7 +110,6 @@ public class CtxMenus
 
 		if (gameObj != null)
 		{
-			Undo.RegisterSceneUndo("Add a Menu Bar");
 			EditorUtility.SetDirty(gameObj);
 						
 			GameObject ctxMenuObj = new GameObject("MenuBar");
@@ -125,6 +126,8 @@ public class CtxMenus
 			ctxMenu.style = CtxMenu.Style.Horizontal;
 			
 			Selection.activeGameObject = ctxMenuObj;
+
+			Undo.RegisterCreatedObjectUndo(ctxMenuObj, "Add a Menu Bar");
 		}
 	}
 	
@@ -156,7 +159,7 @@ public class CtxMenus
 	
 	private static UIFont PickFont()
 	{
-		UIFont font = NGUISettings.font;
+		UIFont font = NGUISettings.ambigiousFont as UIFont;
 		
 		if (font == null)
 		{

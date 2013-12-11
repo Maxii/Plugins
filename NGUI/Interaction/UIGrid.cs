@@ -11,7 +11,6 @@ using System.Collections.Generic;
 /// If you want the cells to automatically set their scale based on the dimensions of their content, take a look at UITable.
 /// </summary>
 
-[ExecuteInEditMode]
 [AddComponentMenu("NGUI/Interaction/Grid")]
 public class UIGrid : UIWidgetContainer
 {
@@ -48,10 +47,10 @@ public class UIGrid : UIWidgetContainer
 	public float cellHeight = 200f;
 
 	/// <summary>
-	/// Reposition the children on the next Update().
+	/// Whether the grid will smoothly animate its children into the correct place.
 	/// </summary>
 
-	public bool repositionNow = false;
+	public bool animateSmoothly = false;
 
 	/// <summary>
 	/// Whether the children will be sorted alphabetically prior to repositioning.
@@ -65,24 +64,29 @@ public class UIGrid : UIWidgetContainer
 
 	public bool hideInactive = true;
 
+	/// <summary>
+	/// Reposition the children on the next Update().
+	/// </summary>
+
+	public bool repositionNow { set { if (value) { mReposition = true; enabled = true; } } }
+
 	bool mStarted = false;
+	bool mReposition = false;
 
 	void Start ()
 	{
 		mStarted = true;
-#if UNITY_EDITOR
-		if (Application.isPlaying)
-#endif
+		bool smooth = animateSmoothly;
+		animateSmoothly = false;
 		Reposition();
+		animateSmoothly = smooth;
+		enabled = false;
 	}
 
 	void Update ()
 	{
-		if (repositionNow)
-		{
-			repositionNow = false;
-			Reposition();
-		}
+		if (mReposition) Reposition();
+		enabled = false;
 	}
 
 	static public int SortByName (Transform a, Transform b) { return string.Compare(a.name, b.name); }
@@ -91,14 +95,16 @@ public class UIGrid : UIWidgetContainer
 	/// Recalculate the position of all elements within the grid, sorting them alphabetically if necessary.
 	/// </summary>
 
+	[ContextMenu("Execute")]
 	public void Reposition ()
 	{
-		if (!mStarted)
+		if (Application.isPlaying && !mStarted)
 		{
-			repositionNow = true;
+			mReposition = true;
 			return;
 		}
 
+		mReposition = false;
 		Transform myTrans = transform;
 
 		int x = 0;
@@ -122,9 +128,15 @@ public class UIGrid : UIWidgetContainer
 				if (!NGUITools.GetActive(t.gameObject) && hideInactive) continue;
 
 				float depth = t.localPosition.z;
-				t.localPosition = (arrangement == Arrangement.Horizontal) ?
+				Vector3 pos = (arrangement == Arrangement.Horizontal) ?
 					new Vector3(cellWidth * x, -cellHeight * y, depth) :
 					new Vector3(cellWidth * y, -cellHeight * x, depth);
+
+				if (animateSmoothly && Application.isPlaying)
+				{
+					SpringPosition.Begin(t.gameObject, pos, 15f);
+				}
+				else t.localPosition = pos;
 
 				if (++x >= maxPerLine && maxPerLine > 0)
 				{
@@ -142,9 +154,15 @@ public class UIGrid : UIWidgetContainer
 				if (!NGUITools.GetActive(t.gameObject) && hideInactive) continue;
 
 				float depth = t.localPosition.z;
-				t.localPosition = (arrangement == Arrangement.Horizontal) ?
+				Vector3 pos = (arrangement == Arrangement.Horizontal) ?
 					new Vector3(cellWidth * x, -cellHeight * y, depth) :
 					new Vector3(cellWidth * y, -cellHeight * x, depth);
+
+				if (animateSmoothly && Application.isPlaying)
+				{
+					SpringPosition.Begin(t.gameObject, pos, 15f);
+				}
+				else t.localPosition = pos;
 
 				if (++x >= maxPerLine && maxPerLine > 0)
 				{
@@ -154,7 +172,7 @@ public class UIGrid : UIWidgetContainer
 			}
 		}
 
-		UIDraggablePanel drag = NGUITools.FindInParents<UIDraggablePanel>(gameObject);
+		UIScrollView drag = NGUITools.FindInParents<UIScrollView>(gameObject);
 		if (drag != null) drag.UpdateScrollbars(true);
 	}
 }

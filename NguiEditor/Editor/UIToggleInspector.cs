@@ -6,6 +6,7 @@
 using UnityEngine;
 using UnityEditor;
 
+[CanEditMultipleObjects]
 [CustomEditor(typeof(UIToggle))]
 public class UIToggleInspector : UIWidgetContainerEditor
 {
@@ -17,55 +18,52 @@ public class UIToggleInspector : UIWidgetContainerEditor
 
 	public override void OnInspectorGUI ()
 	{
-		NGUIEditorTools.SetLabelWidth(80f);
+		serializedObject.Update();
+
+		NGUIEditorTools.SetLabelWidth(100f);
 		UIToggle toggle = target as UIToggle;
 
 		GUILayout.Space(6f);
 		GUI.changed = false;
 
 		GUILayout.BeginHorizontal();
-		int group = EditorGUILayout.IntField("Group", toggle.group, GUILayout.Width(120f));
+		NGUIEditorTools.DrawProperty("Group", serializedObject, "group", GUILayout.Width(120f));
 		GUILayout.Label(" - zero means 'none'");
 		GUILayout.EndHorizontal();
 
-		bool starts = EditorGUILayout.Toggle("Start State", toggle.startsActive);
-		bool none = toggle.optionCanBeNone;
-		UIWidget w = toggle.activeSprite;
-		Animation anim = toggle.activeAnimation;
-		bool instant = toggle.instantTween;
-
-		// This is a questionable feature at best... commenting it out for now
-		//if (group != 0) none = EditorGUILayout.Toggle("Can Be None", toggle.optionCanBeNone);
-
-		bool changed = GUI.changed;
+		NGUIEditorTools.DrawProperty("Starting State", serializedObject, "startsActive");
+		NGUIEditorTools.SetLabelWidth(80f);
 
 		if (NGUIEditorTools.DrawHeader("State Transition"))
 		{
 			NGUIEditorTools.BeginContents();
-			anim = EditorGUILayout.ObjectField("Animation", anim, typeof(Animation), true) as Animation;
-			w = EditorGUILayout.ObjectField("Sprite", w, typeof(UIWidget), true) as UIWidget;
+			NGUIEditorTools.DrawProperty("Sprite", serializedObject, "activeSprite");
+			NGUIEditorTools.DrawProperty("Animation", serializedObject, "activeAnimation");
 
-			Transition tr = instant ? Transition.Instant : Transition.Smooth;
-			GUILayout.BeginHorizontal();
-			tr = (Transition)EditorGUILayout.EnumPopup("Transition", tr);
-			GUILayout.Space(18f);
-			GUILayout.EndHorizontal();
-			instant = (tr == Transition.Instant);
+			if (serializedObject.isEditingMultipleObjects)
+			{
+				NGUIEditorTools.DrawProperty("Instant", serializedObject, "instantTween");
+			}
+			else
+			{
+				GUI.changed = false;
+				Transition tr = toggle.instantTween ? Transition.Instant : Transition.Smooth;
+				GUILayout.BeginHorizontal();
+				tr = (Transition)EditorGUILayout.EnumPopup("Transition", tr);
+				GUILayout.Space(18f);
+				GUILayout.EndHorizontal();
+
+				if (GUI.changed)
+				{
+					NGUIEditorTools.RegisterUndo("Toggle Change", toggle);
+					toggle.instantTween = (tr == Transition.Instant);
+					UnityEditor.EditorUtility.SetDirty(toggle);
+				}
+			}
 			NGUIEditorTools.EndContents();
 		}
 
-		if (changed || GUI.changed)
-		{
-			NGUIEditorTools.RegisterUndo("Toggle Change", toggle);
-			toggle.group = group;
-			toggle.activeSprite = w;
-			toggle.activeAnimation = anim;
-			toggle.startsActive = starts;
-			toggle.instantTween = instant;
-			toggle.optionCanBeNone = none;
-			UnityEditor.EditorUtility.SetDirty(toggle);
-		}
-
 		NGUIEditorTools.DrawEvents("On Value Change", toggle, toggle.onChange);
+		serializedObject.ApplyModifiedProperties();
 	}
 }

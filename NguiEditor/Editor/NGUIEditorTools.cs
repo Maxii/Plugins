@@ -356,8 +356,8 @@ public class NGUIEditorTools
 
 			// Draw the sprite selection popup
 			index = string.IsNullOrEmpty(field) ?
-				EditorGUILayout.Popup(index, list, "DropDownButton", options) :
-				EditorGUILayout.Popup(field, index, list, "DropDownButton", options);
+				DrawPrefixList(index, list, options) :
+				DrawPrefixList(field, index, list, options);
 
 			return list[index];
 		}
@@ -401,7 +401,7 @@ public class NGUIEditorTools
 			}
 
 			// No UI present -- create a new one
-			if (go == null) go = UICreateNewUIWizard.CreateNewUI();
+			if (go == null) go = UICreateNewUIWizard.CreateNewUI(UICreateNewUIWizard.CameraType.Simple2D);
 		}
 		return go;
 	}
@@ -663,6 +663,26 @@ public class NGUIEditorTools
 		return list;
 	}
 
+	static public bool DrawPrefixButton (string text)
+	{
+		return GUILayout.Button(text, "DropDownButton", GUILayout.Width(76f));
+	}
+
+	static public bool DrawPrefixButton (string text, params GUILayoutOption[] options)
+	{
+		return GUILayout.Button(text, "DropDownButton", options);
+	}
+
+	static public int DrawPrefixList (int index, string[] list, params GUILayoutOption[] options)
+	{
+		return EditorGUILayout.Popup(index, list, "DropDownButton", options);
+	}
+
+	static public int DrawPrefixList (string text, int index, string[] list, params GUILayoutOption[] options)
+	{
+		return EditorGUILayout.Popup(text, index, list, "DropDownButton", options);
+	}
+
 	/// <summary>
 	/// Draw a sprite preview.
 	/// </summary>
@@ -678,6 +698,8 @@ public class NGUIEditorTools
 
 	static public void DrawSprite (Texture2D tex, Rect drawRect, UISpriteData sprite, Color color, Material mat)
 	{
+		if (!tex || sprite == null) return;
+
 		// Create the texture rectangle that is centered inside rect.
 		Rect outerRect = drawRect;
 		outerRect.width = sprite.width;
@@ -839,15 +861,16 @@ public class NGUIEditorTools
 	/// Draw a sprite selection field.
 	/// </summary>
 
-	static public void SpriteField (string fieldName, UIAtlas atlas, string spriteName,
-		SpriteSelector.Callback callback, params GUILayoutOption[] options)
+	static public void DrawSpriteField (string label, UIAtlas atlas, string spriteName, SpriteSelector.Callback callback, params GUILayoutOption[] options)
 	{
 		GUILayout.BeginHorizontal();
-		GUILayout.Label(fieldName, GUILayout.Width(76f));
+		GUILayout.Label(label, GUILayout.Width(76f));
 
 		if (GUILayout.Button(spriteName, "MiniPullDown", options))
 		{
-			SpriteSelector.Show(atlas, spriteName, callback);
+			NGUISettings.atlas = atlas;
+			NGUISettings.selectedSprite = spriteName;
+			SpriteSelector.Show(callback);
 		}
 		GUILayout.EndHorizontal();
 	}
@@ -856,26 +879,38 @@ public class NGUIEditorTools
 	/// Draw a sprite selection field.
 	/// </summary>
 
-	static public void SpriteField (string fieldName, UIAtlas atlas, string spriteName, SpriteSelector.Callback callback)
+	static public void DrawPaddedSpriteField (string label, UIAtlas atlas, string spriteName, SpriteSelector.Callback callback, params GUILayoutOption[] options)
 	{
-		SpriteField(fieldName, null, atlas, spriteName, callback);
+		GUILayout.BeginHorizontal();
+		GUILayout.Label(label, GUILayout.Width(76f));
+
+		if (GUILayout.Button(spriteName, "MiniPullDown", options))
+		{
+			NGUISettings.atlas = atlas;
+			NGUISettings.selectedSprite = spriteName;
+			SpriteSelector.Show(callback);
+		}
+		GUILayout.Space(18f);
+		GUILayout.EndHorizontal();
 	}
 
 	/// <summary>
 	/// Draw a sprite selection field.
 	/// </summary>
 
-	static public void SpriteField (string fieldName, string caption, UIAtlas atlas, string spriteName, SpriteSelector.Callback callback)
+	static public void DrawSpriteField (string label, string caption, UIAtlas atlas, string spriteName, SpriteSelector.Callback callback, params GUILayoutOption[] options)
 	{
 		GUILayout.BeginHorizontal();
-		GUILayout.Label(fieldName, GUILayout.Width(76f));
+		GUILayout.Label(label, GUILayout.Width(76f));
 
 		if (atlas.GetSprite(spriteName) == null)
 			spriteName = "";
 
-		if (GUILayout.Button(spriteName, "MiniPullDown", GUILayout.Width(120f)))
+		if (GUILayout.Button(spriteName, "MiniPullDown", options))
 		{
-			SpriteSelector.Show(atlas, spriteName, callback);
+			NGUISettings.atlas = atlas;
+			NGUISettings.selectedSprite = spriteName;
+			SpriteSelector.Show(callback);
 		}
 		
 		if (!string.IsNullOrEmpty(caption))
@@ -890,14 +925,16 @@ public class NGUIEditorTools
 	/// Draw a simple sprite selection button.
 	/// </summary>
 
-	static public bool SimpleSpriteField (UIAtlas atlas, string spriteName, SpriteSelector.Callback callback, params GUILayoutOption[] options)
+	static public bool DrawSpriteField (UIAtlas atlas, string spriteName, SpriteSelector.Callback callback, params GUILayoutOption[] options)
 	{
 		if (atlas.GetSprite(spriteName) == null)
 			spriteName = "";
 
-		if (GUILayout.Button(spriteName, "DropDown", options))
+		if (NGUIEditorTools.DrawPrefixButton(spriteName, options))
 		{
-			SpriteSelector.Show(atlas, spriteName, callback);
+			NGUISettings.atlas = atlas;
+			NGUISettings.selectedSprite = spriteName;
+			SpriteSelector.Show(callback);
 			return true;
 		}
 		return false;
@@ -907,12 +944,70 @@ public class NGUIEditorTools
 	static string mLastSprite = null;
 
 	/// <summary>
+	/// Draw a sprite selection field.
+	/// </summary>
+
+	static public void DrawSpriteField (string label, SerializedObject ob, string spriteField, params GUILayoutOption[] options)
+	{
+		DrawSpriteField(label, ob, ob.FindProperty("atlas"), ob.FindProperty(spriteField), 76f, false, options);
+	}
+
+	/// <summary>
+	/// Draw a sprite selection field.
+	/// </summary>
+
+	static public void DrawSpriteField (string label, SerializedObject ob, SerializedProperty atlas, SerializedProperty sprite, params GUILayoutOption[] options)
+	{
+		DrawSpriteField(label, ob, atlas, sprite, 76f, false, options);
+	}
+
+	/// <summary>
+	/// Draw a sprite selection field.
+	/// </summary>
+
+	static public void DrawSpriteField (string label, SerializedObject ob, SerializedProperty atlas, SerializedProperty sprite, float width, bool padded, params GUILayoutOption[] options)
+	{
+		if (atlas != null && atlas.objectReferenceValue != null)
+		{
+			GUILayout.BeginHorizontal();
+			GUILayout.Label(label, GUILayout.Width(width));
+
+			if (sprite == null)
+			{
+				GUILayout.Label("Invalid field name");
+			}
+			else
+			{
+				string spriteName = sprite.hasMultipleDifferentValues ? "-" : sprite.stringValue;
+
+				if (padded) GUILayout.BeginHorizontal();
+
+				EditorGUI.BeginDisabledGroup(atlas.hasMultipleDifferentValues);
+				{
+					if (GUILayout.Button(spriteName, "MiniPullDown", options))
+						SpriteSelector.Show(ob, sprite, atlas.objectReferenceValue as UIAtlas);
+				}
+				EditorGUI.EndDisabledGroup();
+
+				if (padded)
+				{
+					GUILayout.Space(18f);
+					GUILayout.EndHorizontal();
+				}
+			}
+			GUILayout.EndHorizontal();
+		}
+	}
+
+	/// <summary>
 	/// Convenience function that displays a list of sprites and returns the selected value.
 	/// </summary>
 
-	static public void AdvancedSpriteField (UIAtlas atlas, string spriteName, SpriteSelector.Callback callback, bool editable,
+	static public void DrawAdvancedSpriteField (UIAtlas atlas, string spriteName, SpriteSelector.Callback callback, bool editable,
 		params GUILayoutOption[] options)
 	{
+		if (atlas == null) return;
+
 		// Give the user a warning if there are no sprites in the atlas
 		if (atlas.spriteList.Count == 0)
 		{
@@ -923,9 +1018,11 @@ public class NGUIEditorTools
 		// Sprite selection drop-down list
 		GUILayout.BeginHorizontal();
 		{
-			if (GUILayout.Button("Sprite", "DropDownButton", GUILayout.Width(76f)))
+			if (NGUIEditorTools.DrawPrefixButton("Sprite"))
 			{
-				SpriteSelector.Show(atlas, spriteName, callback);
+				NGUISettings.atlas = atlas;
+				NGUISettings.selectedSprite = spriteName;
+				SpriteSelector.Show(callback);
 			}
 
 			if (editable)
@@ -968,6 +1065,7 @@ public class NGUIEditorTools
 							spriteName = newName;
 							mEditedName = null;
 
+							NGUISettings.atlas = atlas;
 							NGUISettings.selectedSprite = spriteName;
 						}
 					}
@@ -982,12 +1080,54 @@ public class NGUIEditorTools
 
 				if (GUILayout.Button("Edit", GUILayout.Width(40f)))
 				{
+					NGUISettings.atlas = atlas;
 					NGUISettings.selectedSprite = spriteName;
 					Select(atlas.gameObject);
 				}
 			}
 		}
 		GUILayout.EndHorizontal();
+	}
+
+	static public void RepaintSprites ()
+	{
+		if (UIAtlasInspector.instance != null)
+			UIAtlasInspector.instance.Repaint();
+
+		if (UIAtlasMaker.instance != null)
+			UIAtlasMaker.instance.Repaint();
+
+		if (SpriteSelector.instance != null)
+			SpriteSelector.instance.Repaint();
+	}
+
+	/// <summary>
+	/// Select the specified sprite within the currently selected atlas.
+	/// </summary>
+
+	static public void SelectSprite (string spriteName)
+	{
+		if (NGUISettings.atlas != null)
+		{
+			NGUISettings.selectedSprite = spriteName;
+			NGUIEditorTools.Select(NGUISettings.atlas.gameObject);
+			RepaintSprites();
+		}
+	}
+
+	/// <summary>
+	/// Select the specified atlas and sprite.
+	/// </summary>
+
+	static public void SelectSprite (UIAtlas atlas, string spriteName)
+	{
+		if (atlas != null)
+		{
+			NGUISettings.atlas = atlas;
+			NGUISettings.selectedSprite = spriteName;
+			NGUIEditorTools.Select(atlas.gameObject);
+			RepaintSprites();
+		}
 	}
 
 	/// <summary>
@@ -1159,6 +1299,66 @@ public class NGUIEditorTools
 	}
 
 	/// <summary>
+	/// Helper function that draws a serialized property.
+	/// </summary>
+
+	static public SerializedProperty DrawProperty (SerializedObject serializedObject, string property, params GUILayoutOption[] options)
+	{
+		return DrawProperty(null, serializedObject, property, false, options);
+	}
+
+	/// <summary>
+	/// Helper function that draws a serialized property.
+	/// </summary>
+
+	static public SerializedProperty DrawProperty (string label, SerializedObject serializedObject, string property, params GUILayoutOption[] options)
+	{
+		return DrawProperty(label, serializedObject, property, false, options);
+	}
+
+	/// <summary>
+	/// Helper function that draws a serialized property.
+	/// </summary>
+
+	static public SerializedProperty DrawPaddedProperty (SerializedObject serializedObject, string property, params GUILayoutOption[] options)
+	{
+		return DrawProperty(null, serializedObject, property, true, options);
+	}
+
+	/// <summary>
+	/// Helper function that draws a serialized property.
+	/// </summary>
+
+	static public SerializedProperty DrawPaddedProperty (string label, SerializedObject serializedObject, string property, params GUILayoutOption[] options)
+	{
+		return DrawProperty(label, serializedObject, property, true, options);
+	}
+
+	/// <summary>
+	/// Helper function that draws a serialized property.
+	/// </summary>
+
+	static public SerializedProperty DrawProperty (string label, SerializedObject serializedObject, string property, bool padding, params GUILayoutOption[] options)
+	{
+		SerializedProperty sp = serializedObject.FindProperty(property);
+
+		if (sp != null)
+		{
+			if (padding) EditorGUILayout.BeginHorizontal();
+			
+			if (label != null) EditorGUILayout.PropertyField(sp, new GUIContent(label), options);
+			else EditorGUILayout.PropertyField(sp, options);
+
+			if (padding) 
+			{
+				GUILayout.Space(18f);
+				EditorGUILayout.EndHorizontal();
+			}
+		}
+		return sp;
+	}
+
+	/// <summary>
 	/// Determine the distance from the mouse position to the world rectangle specified by the 4 points.
 	/// </summary>
 
@@ -1192,6 +1392,12 @@ public class NGUIEditorTools
 	}
 
 	/// <summary>
+	/// Select the topmost widget underneath the specified screen coordinate.
+	/// </summary>
+
+	static public bool SelectWidget (Vector2 pos) { return SelectWidget(null, pos, true); }
+
+	/// <summary>
 	/// Select the next widget in line.
 	/// </summary>
 
@@ -1199,27 +1405,44 @@ public class NGUIEditorTools
 	{
 		GameObject go = null;
 		BetterList<UIWidget> widgets = SceneViewRaycast(pos);
+		if (widgets == null || widgets.size == 0) return false;
+		bool found = false;
 
-		if (inFront)
+		if (!inFront)
 		{
-			if (widgets.size > 0)
+			if (start != null)
 			{
 				for (int i = 0; i < widgets.size; ++i)
 				{
 					UIWidget w = widgets[i];
-					if (w.cachedGameObject == start) break;
+
+					if (w.cachedGameObject == start)
+					{
+						found = true;
+						break;
+					}
 					go = w.cachedGameObject;
 				}
 			}
+			if (!found) go = widgets[0].cachedGameObject;
 		}
 		else
 		{
-			for (int i = widgets.size; i > 0; )
+			if (start != null)
 			{
-				UIWidget w = widgets[--i];
-				if (w.cachedGameObject == start) break;
-				go = w.cachedGameObject;
+				for (int i = widgets.size; i > 0; )
+				{
+					UIWidget w = widgets[--i];
+
+					if (w.cachedGameObject == start)
+					{
+						found = true;
+						break;
+					}
+					go = w.cachedGameObject;
+				}
 			}
+			if (!found) go = widgets[widgets.size - 1].cachedGameObject;
 		}
 
 		if (go != null && go != start)
@@ -1228,28 +1451,6 @@ public class NGUIEditorTools
 			return true;
 		}
 		return false;
-	}
-
-	/// <summary>
-	/// Select the next widget or container.
-	/// </summary>
-
-	static public bool SelectWidgetOrContainer (GameObject go, Vector2 pos, bool inFront)
-	{
-		if (!SelectWidget(go, pos, inFront))
-		{
-			if (inFront)
-			{
-				UIWidgetContainer wc = NGUITools.FindInParents<UIWidgetContainer>(go);
-
-				if (wc != null && wc.gameObject != go)
-				{
-					Selection.activeGameObject = wc.gameObject;
-					return true;
-				}
-			}
-		}
-		return true;
 	}
 
 	/// <summary>
@@ -1294,6 +1495,22 @@ public class NGUIEditorTools
 	{
 #if !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2 && !UNITY_4_3
 		UnityEditor.Tools.hidden = hide && (UnityEditor.Tools.current == UnityEditor.Tool.Move);
+#endif
+	}
+
+	/// <summary>
+	/// Get the size of the game view. This is a hacky method using reflection due to the function being internal.
+	/// </summary>
+
+	static public Vector2 GetMainGameViewSize ()
+	{
+#if UNITY_3_5 || UNITY_4_0 || UNITY_4_1 || UNITY_4_2 || UNITY_4_3
+		System.Type T = System.Type.GetType("UnityEditor.GameView,UnityEditor");
+		System.Reflection.MethodInfo GetSizeOfMainGameView = T.GetMethod("GetSizeOfMainGameView", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+		System.Object Res = GetSizeOfMainGameView.Invoke(null, null);
+		return (Vector2)Res;
+#else
+		return Handles.GetMainGameViewSize();
 #endif
 	}
 
@@ -1349,5 +1566,126 @@ public class NGUIEditorTools
 				Selection.activeGameObject = null;
 			}
 		}
+	}
+
+	class MenuEntry
+	{
+		public string name;
+		public GameObject go;
+		public MenuEntry (string name, GameObject go) { this.name = name; this.go = go; }
+	}
+
+	/// <summary>
+	/// Show a sprite selection context menu listing all sprites under the specified screen position.
+	/// </summary>
+
+	static public void ShowSpriteSelectionMenu (Vector2 screenPos)
+	{
+		BetterList<UIWidget> widgets = NGUIEditorTools.SceneViewRaycast(screenPos);
+		BetterList<UIWidgetContainer> containers = new BetterList<UIWidgetContainer>();
+		BetterList<MenuEntry> entries = new BetterList<MenuEntry>();
+		BetterList<UIPanel> panels = new BetterList<UIPanel>();
+
+		bool divider = false;
+		UIWidget topWidget = null;
+		UIPanel topPanel = null;
+
+		// Process widgets and their containers in the raycast order
+		for (int i = 0; i < widgets.size; ++i)
+		{
+			UIWidget w = widgets[i];
+			if (topWidget == null) topWidget = w;
+
+			UIPanel panel = w.panel;
+			if (topPanel == null) topPanel = panel;
+
+			if (panel != null && !panels.Contains(panel))
+			{
+				panels.Add(panel);
+
+				if (!divider)
+				{
+					entries.Add(null);
+					divider = true;
+				}
+				entries.Add(new MenuEntry(panel.name + " (panel)", panel.gameObject));
+			}
+
+			UIWidgetContainer wc = NGUITools.FindInParents<UIWidgetContainer>(w.cachedGameObject);
+
+			// If we get a new container, we should add it to the list
+			if (wc != null && !containers.Contains(wc))
+			{
+				containers.Add(wc);
+
+				// Only proceed if there is no widget on the container
+				if (wc.gameObject != w.cachedGameObject)
+				{
+					if (!divider)
+					{
+						entries.Add(null);
+						divider = true;
+					}
+					entries.Add(new MenuEntry(wc.name + " (container)", wc.gameObject));
+				}
+			}
+
+			string name = (i + 1 == widgets.size) ? (w.name + " (top-most)") : w.name;
+			entries.Add(new MenuEntry(name, w.gameObject));
+			divider = false;
+		}
+
+		// Common items used by NGUI
+		NGUIContextMenu.AddCommonItems(Selection.activeGameObject);
+
+		// Add widgets to the menu in the reverse order so that they are shown with the top-most widget first (on top)
+		for (int i = entries.size; i > 0; )
+		{
+			MenuEntry ent = entries[--i];
+
+			if (ent != null)
+			{
+				NGUIContextMenu.AddItem("Select/" + ent.name, Selection.activeGameObject == ent.go,
+					delegate(object go) { Selection.activeGameObject = (GameObject)go; }, ent.go);
+			}
+			else if (!divider)
+			{
+				NGUIContextMenu.AddSeparator("Select/");
+			}
+		}
+		NGUIContextMenu.AddHelp(Selection.activeGameObject, true);
+		NGUIContextMenu.Show();
+	}
+	/// <summary>
+	/// Load the asset at the specified path.
+	/// </summary>
+
+	static public Object LoadAsset (string path)
+	{
+		if (string.IsNullOrEmpty(path)) return null;
+		return AssetDatabase.LoadMainAssetAtPath(path);
+	}
+
+	/// <summary>
+	/// Convenience function to load an asset of specified type, given the full path to it.
+	/// </summary>
+
+	static public T LoadAsset<T> (string path) where T: Object
+	{
+		Object obj = LoadAsset(path);
+		if (obj == null) return null;
+
+		T val = obj as T;
+		if (val != null) return val;
+
+		if (typeof(T).IsSubclassOf(typeof(Component)))
+		{
+			if (obj.GetType() == typeof(GameObject))
+			{
+				GameObject go = obj as GameObject;
+				return go.GetComponent(typeof(T)) as T;
+			}
+		}
+		return null;
 	}
 }

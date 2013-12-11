@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR, UNITY_4_2</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR, UNITY_4_3</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -38,7 +38,7 @@
     <Reference Include="System.Data" />
     <Reference Include="System.XML" />
     <Reference Include="UnityEditor">
-      <HintPath>..\..\..\..\..\Program Files (x86)\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine">
@@ -57,28 +57,32 @@
     <Compile Include="Interaction\UIButton.cs" />
     <Compile Include="Interaction\UIButtonActivate.cs" />
     <Compile Include="Interaction\UIButtonColor.cs" />
-    <Compile Include="Interaction\UIButtonKeyBinding.cs" />
     <Compile Include="Interaction\UIButtonKeys.cs" />
     <Compile Include="Interaction\UIButtonMessage.cs" />
     <Compile Include="Interaction\UIButtonOffset.cs" />
     <Compile Include="Interaction\UIButtonRotation.cs" />
     <Compile Include="Interaction\UIButtonScale.cs" />
     <Compile Include="Interaction\UICenterOnChild.cs" />
+    <Compile Include="Interaction\UICenterOnClick.cs" />
     <Compile Include="Interaction\UIDragCamera.cs" />
+    <Compile Include="Interaction\UIDragDropContainer.cs" />
+    <Compile Include="Interaction\UIDragDropItem.cs" />
+    <Compile Include="Interaction\UIDragDropRoot.cs" />
     <Compile Include="Interaction\UIDraggableCamera.cs" />
-    <Compile Include="Interaction\UIDraggablePanel.cs" />
     <Compile Include="Interaction\UIDragObject.cs" />
-    <Compile Include="Interaction\UIDragPanelContents.cs" />
+    <Compile Include="Interaction\UIDragScrollView.cs" />
     <Compile Include="Interaction\UIForwardEvents.cs" />
     <Compile Include="Interaction\UIGrid.cs" />
     <Compile Include="Interaction\UIImageButton.cs" />
-    <Compile Include="Interaction\UIInputValidator.cs" />
+    <Compile Include="Interaction\UIKeyBinding.cs" />
     <Compile Include="Interaction\UIPlayAnimation.cs" />
     <Compile Include="Interaction\UIPlaySound.cs" />
     <Compile Include="Interaction\UIPlayTween.cs" />
     <Compile Include="Interaction\UIPopupList.cs" />
+    <Compile Include="Interaction\UIProgressBar.cs" />
     <Compile Include="Interaction\UISavedOption.cs" />
     <Compile Include="Interaction\UIScrollBar.cs" />
+    <Compile Include="Interaction\UIScrollView.cs" />
     <Compile Include="Interaction\UISlider.cs" />
     <Compile Include="Interaction\UISoundVolume.cs" />
     <Compile Include="Interaction\UITable.cs" />
@@ -97,6 +101,7 @@
     <Compile Include="Internal\Localization.cs" />
     <Compile Include="Internal\NGUIDebug.cs" />
     <Compile Include="Internal\NGUIMath.cs" />
+    <Compile Include="Internal\NGUIText.cs" />
     <Compile Include="Internal\NGUITools.cs" />
     <Compile Include="Internal\RealTime.cs" />
     <Compile Include="Internal\SpringPanel.cs" />
@@ -120,6 +125,7 @@
     <Compile Include="Tweening\TweenVolume.cs" />
     <Compile Include="Tweening\TweenWidth.cs" />
     <Compile Include="Tweening\UITweener.cs" />
+    <Compile Include="UI\UI2DSprite.cs" />
     <Compile Include="UI\UIAnchor.cs" />
     <Compile Include="UI\UIAtlas.cs" />
     <Compile Include="UI\UICamera.cs" />

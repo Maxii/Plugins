@@ -36,13 +36,13 @@ public class CtxMenuInspector : CtxMenuItemInspector
 		refresh = true;
 	}
 
-	void OnSelectAtlas(MonoBehaviour obj)
+	void OnSelectAtlas(Object obj)
 	{
 		RegisterUndo();
 		contextMenu.atlas = obj as UIAtlas;
 	}
 	
-	void OnSelectFont(MonoBehaviour obj)
+	void OnSelectFont(Object obj)
 	{
 		RegisterUndo();
 		contextMenu.font = obj as UIFont;
@@ -94,10 +94,13 @@ public class CtxMenuInspector : CtxMenuItemInspector
 	{
 		contextMenu = target as CtxMenu;
 		
-		EditorGUIUtility.LookLikeControls(80f);
+		EditorGUIUtility.labelWidth = 80f;
 		
-		ComponentSelector.Draw<UIAtlas>(contextMenu.atlas, OnSelectAtlas);
+		ComponentSelector.Draw<UIAtlas>(contextMenu.atlas, OnSelectAtlas, false, GUILayout.Width(140f));
 		
+		//if (NGUIEditorTools.DrawPrefixButton("Atlas"))
+		//	ComponentSelector.Show<UIAtlas>(OnSelectAtlas);
+
 		EditorGUILayout.BeginHorizontal();
 		
 		CtxMenu.Style style = (CtxMenu.Style)EditorGUILayout.EnumPopup("Style", contextMenu.style,GUILayout.Width(180f));
@@ -166,7 +169,7 @@ public class CtxMenuInspector : CtxMenuItemInspector
 			contextMenu.padding = padding;
 		}
 		
-		EditorGUIUtility.LookLikeControls(100f);
+		EditorGUIUtility.labelWidth = 100f;
 
 		NGUIEditorTools.DrawEvents("On Selection", contextMenu, contextMenu.onSelection);
 		NGUIEditorTools.DrawEvents("On Show", contextMenu, contextMenu.onShow);
@@ -174,7 +177,7 @@ public class CtxMenuInspector : CtxMenuItemInspector
 		
 		EditorGUILayout.Space();
 
-		EditorGUIUtility.LookLikeControls(80f);
+		EditorGUIUtility.labelWidth = 80f;
 		
 		Rect box = EditorGUILayout.BeginVertical();
 		GUI.Box(box, "");
@@ -216,7 +219,7 @@ public class CtxMenuInspector : CtxMenuItemInspector
 		
 		if (contextMenu.style == CtxMenu.Style.Pie)
 		{
-			EditorGUIUtility.LookLikeControls(100f);
+			EditorGUIUtility.labelWidth = 100f;
 			
 			box = EditorGUILayout.BeginVertical();
 			GUI.Box(box, "");
@@ -257,7 +260,7 @@ public class CtxMenuInspector : CtxMenuItemInspector
 			EditorGUILayout.EndVertical();
 			EditorGUILayout.Space();
 			
-			EditorGUIUtility.LookLikeControls(80f);
+			EditorGUIUtility.labelWidth = 80f;
 		}
 		else
 		{
@@ -285,7 +288,9 @@ public class CtxMenuInspector : CtxMenuItemInspector
 		if (EditorFoldout(Flags.EditText, "Text Options:"))
 		{
 			GUILayout.Space(4f);
-			ComponentSelector.Draw<UIFont>(contextMenu.font, OnSelectFont);
+
+			ComponentSelector.Draw<UIFont>(contextMenu.font, OnSelectFont, false, GUILayout.Width(140f));
+			
 			if (contextMenu.font == null)
 				EditorGUILayout.HelpBox("Warning: please select a valid font if you want this menu to behave correctly.", MessageType.Warning);
 			
@@ -410,7 +415,7 @@ public class CtxMenuInspector : CtxMenuItemInspector
 					contextMenu.animationDuration = animationDuration;
 				}
 				
-				EditorGUIUtility.LookLikeControls(100f);
+				EditorGUIUtility.labelWidth = 100f;
 	
 				CtxMenu.GrowDirection growDirection = (CtxMenu.GrowDirection)EditorGUILayout.EnumPopup("Grow Direction", 
 					contextMenu.growDirection, GUILayout.Width(192f));
@@ -467,7 +472,7 @@ public class CtxMenuInspector : CtxMenuItemInspector
 		{
 			GUILayout.Space(4f);
 			
-			EditorGUIUtility.LookLikeControls(70f);
+			EditorGUIUtility.labelWidth = 70f;
 			EditorGUILayout.BeginHorizontal();
 			
 			AudioClip showSound = EditorGUILayout.ObjectField("Show", contextMenu.showSound, typeof(AudioClip), false) as AudioClip;
@@ -502,7 +507,7 @@ public class CtxMenuInspector : CtxMenuItemInspector
 			}
 			
 			EditorGUILayout.EndHorizontal();
-			EditorGUIUtility.LookLikeControls(100f);
+			EditorGUIUtility.labelWidth = 100f;
 			
 			GUILayout.Space(4f);
 		}
@@ -562,13 +567,13 @@ public class CtxMenuInspector : CtxMenuItemInspector
 	{
 		EditorGUILayout.BeginHorizontal();
 		EditorGUILayout.LabelField(label, GUILayout.Width(76f));
-		EditorGUIUtility.LookLikeControls(20f);
+		EditorGUIUtility.labelWidth = 20f;
 		v.x = EditorGUILayout.FloatField("X", v.x, GUILayout.Width(115));
 		GUILayout.Space(15f);
 		v.y = EditorGUILayout.FloatField("Y", v.y, GUILayout.Width(115));
 		EditorGUILayout.EndHorizontal();
 
-		EditorGUIUtility.LookLikeControls(100f);
+		EditorGUIUtility.labelWidth = 100f;
 		
 		return v;
 	}

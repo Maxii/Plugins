@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR, UNITY_4_2</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR, UNITY_4_3</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -57,11 +57,14 @@
     <Compile Include="Editor\BMFontReader.cs" />
     <Compile Include="Editor\ComponentSelector.cs" />
     <Compile Include="Editor\EventDelegateEditor.cs" />
+    <Compile Include="Editor\NGUIContextMenu.cs" />
     <Compile Include="Editor\NGUIEditorTools.cs" />
+    <Compile Include="Editor\NGUIHelp.cs" />
     <Compile Include="Editor\NGUIJson.cs" />
     <Compile Include="Editor\NGUIMenu.cs" />
     <Compile Include="Editor\NGUISelectionTools.cs" />
     <Compile Include="Editor\NGUISettings.cs" />
+    <Compile Include="Editor\NGUISnap.cs" />
     <Compile Include="Editor\NGUITransformInspector.cs" />
     <Compile Include="Editor\SpriteSelector.cs" />
     <Compile Include="Editor\TweenAlphaEditor.cs" />
@@ -75,6 +78,7 @@
     <Compile Include="Editor\TweenTransformEditor.cs" />
     <Compile Include="Editor\TweenVolumeEditor.cs" />
     <Compile Include="Editor\TweenWidthEditor.cs" />
+    <Compile Include="Editor\UI2DSpriteEditor.cs" />
     <Compile Include="Editor\UIAnchorEditor.cs" />
     <Compile Include="Editor\UIAtlasInspector.cs" />
     <Compile Include="Editor\UIAtlasMaker.cs" />
@@ -84,8 +88,8 @@
     <Compile Include="Editor\UICameraTool.cs" />
     <Compile Include="Editor\UICreateNewUIWizard.cs" />
     <Compile Include="Editor\UICreateWidgetWizard.cs" />
-    <Compile Include="Editor\UIDraggablePanelEditor.cs" />
     <Compile Include="Editor\UIDrawCallInspector.cs" />
+    <Compile Include="Editor\UIDrawCallViewer.cs" />
     <Compile Include="Editor\UIFontInspector.cs" />
     <Compile Include="Editor\UIFontMaker.cs" />
     <Compile Include="Editor\UIGridEditor.cs" />
@@ -97,9 +101,11 @@
     <Compile Include="Editor\UIPlayAnimationEditor.cs" />
     <Compile Include="Editor\UIPlayTweenEditor.cs" />
     <Compile Include="Editor\UIPopupListInspector.cs" />
+    <Compile Include="Editor\UIProgressBarEditor.cs" />
     <Compile Include="Editor\UIRootEditor.cs" />
-    <Compile Include="Editor\UIScrollBarInspector.cs" />
-    <Compile Include="Editor\UISliderInspector.cs" />
+    <Compile Include="Editor\UIScrollBarEditor.cs" />
+    <Compile Include="Editor\UIScrollViewEditor.cs" />
+    <Compile Include="Editor\UISliderEditor.cs" />
     <Compile Include="Editor\UISpriteAnimationInspector.cs" />
     <Compile Include="Editor\UISpriteInspector.cs" />
     <Compile Include="Editor\UIStretchEditor.cs" />

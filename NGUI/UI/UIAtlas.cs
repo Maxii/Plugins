@@ -16,7 +16,7 @@ public class UIAtlas : MonoBehaviour
 {
 	// Legacy functionality, removed in 3.0. Do not use.
 	[System.Serializable]
-	public class Sprite
+	class Sprite
 	{
 		public string name = "Unity Bug";
 		public Rect outer = new Rect(0f, 0f, 1f, 1f);
@@ -86,10 +86,10 @@ public class UIAtlas : MonoBehaviour
 				}
 				else
 				{
-					MarkAsDirty();
+					MarkAsChanged();
 					mPMA = -1;
 					material = value;
-					MarkAsDirty();
+					MarkAsChanged();
 				}
 			}
 		}
@@ -122,8 +122,9 @@ public class UIAtlas : MonoBehaviour
 	{
 		get
 		{
+			if (mReplacement != null) return mReplacement.spriteList;
 			if (mSprites.Count == 0) Upgrade();
-			return (mReplacement != null) ? mReplacement.spriteList : mSprites;
+			return mSprites;
 		}
 		set
 		{
@@ -169,7 +170,7 @@ public class UIAtlas : MonoBehaviour
 				if (mPixelSize != val)
 				{
 					mPixelSize = val;
-					MarkAsDirty();
+					MarkAsChanged();
 				}
 			}
 		}
@@ -195,9 +196,9 @@ public class UIAtlas : MonoBehaviour
 			if (mReplacement != rep)
 			{
 				if (rep != null && rep.replacement == this) rep.replacement = null;
-				if (mReplacement != null) MarkAsDirty();
+				if (mReplacement != null) MarkAsChanged();
 				mReplacement = rep;
-				MarkAsDirty();
+				MarkAsChanged();
 			}
 		}
 	}
@@ -265,7 +266,7 @@ public class UIAtlas : MonoBehaviour
 
 	public BetterList<string> GetListOfSprites (string match)
 	{
-		if (mReplacement != null) return mReplacement.GetListOfSprites(match);
+		if (mReplacement) return mReplacement.GetListOfSprites(match);
 		if (string.IsNullOrEmpty(match)) return GetListOfSprites();
 
 		if (mSprites.Count == 0) Upgrade();
@@ -332,12 +333,12 @@ public class UIAtlas : MonoBehaviour
 	/// Mark all widgets associated with this atlas as having changed.
 	/// </summary>
 
-	public void MarkAsDirty ()
+	public void MarkAsChanged ()
 	{
 #if UNITY_EDITOR
 		UnityEditor.EditorUtility.SetDirty(gameObject);
 #endif
-		if (mReplacement != null) mReplacement.MarkAsDirty();
+		if (mReplacement != null) mReplacement.MarkAsChanged();
 
 		UISprite[] list = NGUITools.FindActive<UISprite>();
 
@@ -379,11 +380,11 @@ public class UIAtlas : MonoBehaviour
 		{
 			UILabel lbl = labels[i];
 
-			if (lbl.font != null && CheckIfRelated(this, lbl.font.atlas))
+			if (lbl.bitmapFont != null && CheckIfRelated(this, lbl.bitmapFont.atlas))
 			{
-				UIFont font = lbl.font;
-				lbl.font = null;
-				lbl.font = font;
+				UIFont font = lbl.bitmapFont;
+				lbl.bitmapFont = null;
+				lbl.bitmapFont = font;
 #if UNITY_EDITOR
 				UnityEditor.EditorUtility.SetDirty(lbl);
 #endif
@@ -397,7 +398,9 @@ public class UIAtlas : MonoBehaviour
 
 	bool Upgrade ()
 	{
-		if (mSprites.Count == 0 && sprites.Count > 0)
+		if (mReplacement) return mReplacement.Upgrade();
+
+		if (mSprites.Count == 0 && sprites.Count > 0 && material)
 		{
 			Texture tex = material.mainTexture;
 			int width = (tex != null) ? tex.width : 512;

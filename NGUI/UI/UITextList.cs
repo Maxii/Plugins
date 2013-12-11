@@ -3,6 +3,10 @@
 // Copyright © 2011-2013 Tasharen Entertainment
 //----------------------------------------------
 
+#if !UNITY_3_5 && !UNITY_FLASH
+#define DYNAMIC_FONT
+#endif
+
 using UnityEngine;
 using System.Collections.Generic;
 using System.Text;
@@ -77,12 +81,14 @@ public class UITextList : MonoBehaviour
 		ce.text = text;
 		mParagraphs.Add(ce);
 		
-		if (textLabel != null && textLabel.font != null)
+		if (textLabel != null && textLabel.ambigiousFont != null)
 		{
 			// Rebuild the line
-			string line;
-			textLabel.font.WrapText(ce.text, out line, textLabel.width, 100000,
-				0, textLabel.supportEncoding, textLabel.symbolStyle);
+			textLabel.overflowMethod = UILabel.Overflow.ResizeHeight;
+			string before = textLabel.text;
+			textLabel.text = text;
+			string line = textLabel.processedText;
+			textLabel.text = before;
 			ce.lines = line.Split(mSeparator);
 
 			// Recalculate the total number of lines
@@ -126,12 +132,23 @@ public class UITextList : MonoBehaviour
 	{
 		if (textLabel != null)
 		{
-			UIFont font = textLabel.font;
-
-			if (font != null)
+			if (textLabel.ambigiousFont != null)
 			{
 				int lines = 0;
-				int maxLines = maxHeight > 0 ? Mathf.FloorToInt(maxHeight / (textLabel.font.size * textLabel.font.pixelSize)) : 100000;
+
+				int maxLines = 100000;
+
+				if (maxHeight > 0)
+				{
+					if (textLabel.bitmapFont != null)
+					{
+						maxLines = Mathf.FloorToInt(maxHeight / (textLabel.fontSize * textLabel.bitmapFont.pixelSize));
+					}
+					else
+					{
+						maxLines = Mathf.FloorToInt(maxHeight / textLabel.fontSize);
+					}
+				}
 				int offset = Mathf.RoundToInt(mScroll);
 
 				// Don't let scrolling to exceed the visible number of lines

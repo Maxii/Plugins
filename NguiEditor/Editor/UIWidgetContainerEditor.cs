@@ -33,88 +33,92 @@ public class UIWidgetContainerEditor : Editor
 	public void OnSceneGUI ()
 	{
 		NGUIEditorTools.HideMoveTool(true);
-		if (Tools.current != Tool.Move) return;
+		if (!UIWidget.showHandles) return;
+		if (UnityEditor.Tools.current != Tool.Move) return;
 
 		MonoBehaviour mb = target as MonoBehaviour;
 		if (mb.GetComponent<UIWidget>() != null) return;
+		if (mb.GetComponent<UIPanel>() != null) return;
 
 		Transform t = mb.transform;
 		UIWidget[] widgets = t.GetComponentsInChildren<UIWidget>();
-		if (widgets.Length == 0) return;
-
-		Matrix4x4 worldToLocal = t.worldToLocalMatrix;
-		Matrix4x4 localToWorld = t.localToWorldMatrix;
-		Bounds bounds = new Bounds();
-
-		// Calculate the local bounds
-		for (int i = 0; i < widgets.Length; ++i)
-		{
-			Vector3[] wcs = widgets[i].worldCorners;
-
-			for (int b = 0; b < 4; ++b)
-			{
-				wcs[b] = worldToLocal.MultiplyPoint3x4(wcs[b]);
-				if (i == 0 && b == 0) bounds = new Bounds(wcs[b], Vector3.zero);
-				else bounds.Encapsulate(wcs[b]);
-			}
-		}
-
-		// Calculate the 4 local corners
-		Vector3 v0 = bounds.min;
-		Vector3 v1 = bounds.max;
-
-		float z = Mathf.Min(v0.z, v1.z);
-		Vector3[] corners = new Vector3[4];
-		corners[0] = new Vector3(v0.x, v0.y, z);
-		corners[1] = new Vector3(v0.x, v1.y, z);
-		corners[2] = new Vector3(v1.x, v1.y, z);
-		corners[3] = new Vector3(v1.x, v0.y, z);
-
-		// Transform the 4 corners into world space
-		for (int i = 0; i < 4; ++i)
-			corners[i] = localToWorld.MultiplyPoint3x4(corners[i]);
 
 		Event e = Event.current;
 		int id = GUIUtility.GetControlID(mHash, FocusType.Passive);
 		EventType type = e.GetTypeForControl(id);
+		bool isWithinRect = false;
+		Vector3[] corners = null;
+		Vector3[] worldPos = null;
 
-		Handles.color = UIWidgetInspector.handlesColor;
-		Handles.DrawLine(corners[0], corners[1]);
-		Handles.DrawLine(corners[1], corners[2]);
-		Handles.DrawLine(corners[2], corners[3]);
-		Handles.DrawLine(corners[0], corners[3]);
-
-		Vector3[] worldPos = new Vector3[8];
-
-		worldPos[0] = corners[0];
-		worldPos[1] = corners[1];
-		worldPos[2] = corners[2];
-		worldPos[3] = corners[3];
-
-		worldPos[4] = (corners[0] + corners[1]) * 0.5f;
-		worldPos[5] = (corners[1] + corners[2]) * 0.5f;
-		worldPos[6] = (corners[2] + corners[3]) * 0.5f;
-		worldPos[7] = (corners[0] + corners[3]) * 0.5f;
-
-		bool isWithinRect = mIsDragging || (e.modifiers == 0 &&
-			NGUIEditorTools.SceneViewDistanceToRectangle(corners, e.mousePosition) == 0f);
-
-#if !UNITY_3_5
-		// Change the mouse cursor to a more appropriate one
+		if (widgets.Length > 0)
 		{
+			Matrix4x4 worldToLocal = t.worldToLocalMatrix;
+			Matrix4x4 localToWorld = t.localToWorldMatrix;
+			Bounds bounds = new Bounds();
+
+			// Calculate the local bounds
+			for (int i = 0; i < widgets.Length; ++i)
+			{
+				Vector3[] wcs = widgets[i].worldCorners;
+
+				for (int b = 0; b < 4; ++b)
+				{
+					wcs[b] = worldToLocal.MultiplyPoint3x4(wcs[b]);
+					if (i == 0 && b == 0) bounds = new Bounds(wcs[b], Vector3.zero);
+					else bounds.Encapsulate(wcs[b]);
+				}
+			}
+
+			// Calculate the 4 local corners
+			Vector3 v0 = bounds.min;
+			Vector3 v1 = bounds.max;
+
+			float z = Mathf.Min(v0.z, v1.z);
+			corners = new Vector3[4];
+			corners[0] = new Vector3(v0.x, v0.y, z);
+			corners[1] = new Vector3(v0.x, v1.y, z);
+			corners[2] = new Vector3(v1.x, v1.y, z);
+			corners[3] = new Vector3(v1.x, v0.y, z);
+
+			// Transform the 4 corners into world space
+			for (int i = 0; i < 4; ++i)
+				corners[i] = localToWorld.MultiplyPoint3x4(corners[i]);
+
+			Handles.color = UIWidgetInspector.handlesColor;
+			Handles.DrawLine(corners[0], corners[1]);
+			Handles.DrawLine(corners[1], corners[2]);
+			Handles.DrawLine(corners[2], corners[3]);
+			Handles.DrawLine(corners[0], corners[3]);
+
+			worldPos = new Vector3[8];
+
+			worldPos[0] = corners[0];
+			worldPos[1] = corners[1];
+			worldPos[2] = corners[2];
+			worldPos[3] = corners[3];
+
+			worldPos[4] = (corners[0] + corners[1]) * 0.5f;
+			worldPos[5] = (corners[1] + corners[2]) * 0.5f;
+			worldPos[6] = (corners[2] + corners[3]) * 0.5f;
+			worldPos[7] = (corners[0] + corners[3]) * 0.5f;
+
+			isWithinRect = mIsDragging || (e.modifiers == 0 &&
+				NGUIEditorTools.SceneViewDistanceToRectangle(corners, e.mousePosition) == 0f);
+#if !UNITY_3_5
+			// Change the mouse cursor to a more appropriate one
 			Vector2[] screenPos = new Vector2[8];
 			for (int i = 0; i < 8; ++i) screenPos[i] = HandleUtility.WorldToGUIPoint(worldPos[i]);
 
-			Bounds b = new Bounds(screenPos[0], Vector3.zero);
-			for (int i = 1; i < 8; ++i) b.Encapsulate(screenPos[i]);
+			bounds = new Bounds(screenPos[0], Vector3.zero);
+			for (int i = 1; i < 8; ++i) bounds.Encapsulate(screenPos[i]);
 
 			// Change the cursor to a move arrow when it's within the screen rectangle
-			Vector2 min = b.min;
-			Vector2 max = b.max;
+			Vector2 min = bounds.min;
+			Vector2 max = bounds.max;
 			Rect rect = new Rect(min.x, min.y, max.x - min.x, max.y - min.y);
 			UIWidgetInspector.SetCursorRect(rect, isWithinRect ? MouseCursor.MoveArrow : MouseCursor.Arrow);
-		}
 #endif
+		}
 
 		switch (type)
 		{
@@ -122,9 +126,12 @@ public class UIWidgetContainerEditor : Editor
 			{
 				Handles.BeginGUI();
 				{
-					for (int i = 0; i < 8; ++i)
+					if (worldPos != null)
 					{
-						UIWidgetInspector.DrawKnob(worldPos[i], false, false, id);
+						for (int i = 0; i < 8; ++i)
+						{
+							UIWidgetInspector.DrawKnob(worldPos[i], false, false, id);
+						}
 					}
 				}
 				Handles.EndGUI();
@@ -141,7 +148,7 @@ public class UIWidgetContainerEditor : Editor
 					GUIUtility.hotControl = GUIUtility.keyboardControl = id;
 					e.Use();
 				}
-				else if (e.button == 0 && isWithinRect && UIWidgetInspector.Raycast(corners, out mStartDrag))
+				else if (e.button == 0 && isWithinRect && corners != null && UIWidgetInspector.Raycast(corners, out mStartDrag))
 				{
 					mCanDrag = true;
 					mStartPos = t.position;
@@ -165,7 +172,7 @@ public class UIWidgetContainerEditor : Editor
 					{
 						Vector3 pos;
 
-						if (UIWidgetInspector.Raycast(corners, out pos))
+						if (corners != null & UIWidgetInspector.Raycast(corners, out pos))
 						{
 							// Wait until the mouse moves by more than a few pixels
 							if (!mIsDragging && dragStarted)
@@ -208,12 +215,19 @@ public class UIWidgetContainerEditor : Editor
 							pos.z = Mathf.Round(pos.z);
 							t.localPosition = pos;
 						}
+						else if (mAllowSelection)
+						{
+							// Left-click: Select the topmost widget
+							NGUIEditorTools.SelectWidget(e.mousePosition);
+							e.Use();
+						}
 						e.Use();
 					}
-					else if (e.button == 1 && mAllowSelection)
+					else
 					{
-						if (NGUIEditorTools.SelectWidgetOrContainer(mb.gameObject, e.mousePosition, false))
-							e.Use();
+						// Right-click: Open a context menu listing all widgets underneath
+						NGUIEditorTools.ShowSpriteSelectionMenu(e.mousePosition);
+						e.Use();
 					}
 					mCanDrag = false;
 				}

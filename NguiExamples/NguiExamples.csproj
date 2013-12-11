@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR, UNITY_4_3</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -38,7 +38,7 @@
     <Reference Include="System.Data" />
     <Reference Include="System.XML" />
     <Reference Include="UnityEditor">
-      <HintPath>..\..\..\..\..\Program Files (x86)\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine">
@@ -70,10 +70,8 @@
     <Compile Include="Examples\InventorySystem\System\InvStat.cs" />
     <Compile Include="Examples\Other\ChatInput.cs" />
     <Compile Include="Examples\Other\DownloadTexture.cs" />
-    <Compile Include="Examples\Other\DragDropContainer.cs" />
-    <Compile Include="Examples\Other\DragDropItem.cs" />
-    <Compile Include="Examples\Other\DragDropRoot.cs" />
-    <Compile Include="Examples\Other\DragDropSurface.cs" />
+    <Compile Include="Examples\Other\ExampleDragDropItem.cs" />
+    <Compile Include="Examples\Other\ExampleDragDropSurface.cs" />
     <Compile Include="Examples\Other\LagPosition.cs" />
     <Compile Include="Examples\Other\LagRotation.cs" />
     <Compile Include="Examples\Other\LoadLevelOnClick.cs" />
@@ -85,6 +83,7 @@
     <Compile Include="Examples\Other\Spin.cs" />
     <Compile Include="Examples\Other\SpinWithMouse.cs" />
     <Compile Include="Examples\Other\TypewriterEffect.cs" />
+    <Compile Include="Examples\Other\UISliderColors.cs" />
     <Compile Include="Examples\Other\UpdateManager.cs" />
     <Compile Include="Examples\Other\WindowAutoYaw.cs" />
     <Compile Include="Examples\Other\WindowDragTilt.cs" />

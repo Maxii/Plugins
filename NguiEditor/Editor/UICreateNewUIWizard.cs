@@ -8,7 +8,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// UI Creation Wizard
+/// UI Creation Wizard. This tool has been made obsolete with NGUI 3.0.6.
 /// </summary>
 
 public class UICreateNewUIWizard : EditorWindow
@@ -57,28 +57,30 @@ public class UICreateNewUIWizard : EditorWindow
 		bool create = GUILayout.Button("Create Your UI", GUILayout.Width(120f));
 		GUILayout.EndHorizontal();
 
-		if (create) CreateNewUI();
+		if (create) CreateNewUI(camType);
+
+		EditorGUILayout.HelpBox("This tool has become obsolete with NGUI 3.0.6. You can create UIs from the NGUI -> Create menu.", MessageType.Warning);
 	}
 
 	/// <summary>
 	/// Create a brand-new UI hierarchy.
 	/// </summary>
 
-	static public GameObject CreateNewUI ()
+	static public GameObject CreateNewUI (CameraType type)
 	{
 		NGUIEditorTools.RegisterUndo("Create New UI");
 
 		// Root for the UI
 		GameObject root = null;
 
-		if (camType == CameraType.Simple2D)
+		if (type == CameraType.Simple2D)
 		{
 			root = new GameObject("UI Root (2D)");
 			root.AddComponent<UIRoot>().scalingStyle = UIRoot.Scaling.PixelPerfect;
 		}
 		else
 		{
-			root = new GameObject((camType == CameraType.Advanced3D) ? "UI Root (3D)" : "UI Root");
+			root = new GameObject((type == CameraType.Advanced3D) ? "UI Root (3D)" : "UI Root");
 			root.transform.localScale = new Vector3(0.0025f, 0.0025f, 0.0025f);
 			root.AddComponent<UIRoot>().scalingStyle = UIRoot.Scaling.FixedSize;
 		}
@@ -87,7 +89,7 @@ public class UICreateNewUIWizard : EditorWindow
 		root.layer = NGUISettings.layer;
 
 		// Figure out the depth of the highest camera
-		if (camType == CameraType.None)
+		if (type == CameraType.None)
 		{
 			// No camera requested -- simply add a panel
 			UIPanel panel = NGUITools.AddChild<UIPanel>(root.gameObject);
@@ -123,7 +125,7 @@ public class UICreateNewUIWizard : EditorWindow
 			cam.backgroundColor = Color.grey;
 			cam.cullingMask = mask;
 
-			if (camType == CameraType.Simple2D)
+			if (type == CameraType.Simple2D)
 			{
 				cam.orthographicSize = 1f;
 				cam.orthographic = true;
@@ -146,7 +148,7 @@ public class UICreateNewUIWizard : EditorWindow
 			// Add a UI Camera for event handling
 			cam.gameObject.AddComponent<UICamera>();
 
-			if (camType == CameraType.Simple2D)
+			if (type == CameraType.Simple2D)
 			{
 				// Anchor is useful to have
 				UIAnchor anchor = NGUITools.AddChild<UIAnchor>(cam.gameObject);

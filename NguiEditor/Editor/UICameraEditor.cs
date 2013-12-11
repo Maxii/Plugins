@@ -44,7 +44,6 @@ public class UICameraEditor : Editor
 			EditorGUI.BeginDisabledGroup(!mouse.boolValue && !touch.boolValue);
 			{
 				EditorGUILayout.PropertyField(serializedObject.FindProperty("allowMultiTouch"));
-				EditorGUILayout.PropertyField(serializedObject.FindProperty("stickyPress"));
 			}
 			EditorGUI.EndDisabledGroup();
 
@@ -90,25 +89,25 @@ public class UICameraEditor : Editor
 				{
 					EditorGUI.BeginDisabledGroup(!mouse.boolValue);
 					GUILayout.BeginHorizontal();
-					EditorGUILayout.PropertyField(serializedObject.FindProperty("mouseDragThreshold"), new GUIContent("Mouse Drag"));
-					GUILayout.Label("pixels", GUILayout.MinWidth(100f));
+					EditorGUILayout.PropertyField(serializedObject.FindProperty("mouseDragThreshold"), new GUIContent("Mouse Drag"), GUILayout.Width(120f));
+					GUILayout.Label("pixels");
 					GUILayout.EndHorizontal();
 
 					GUILayout.BeginHorizontal();
-					EditorGUILayout.PropertyField(serializedObject.FindProperty("mouseClickThreshold"), new GUIContent("Mouse Click"));
-					GUILayout.Label("pixels", GUILayout.MinWidth(100f));
+					EditorGUILayout.PropertyField(serializedObject.FindProperty("mouseClickThreshold"), new GUIContent("Mouse Click"), GUILayout.Width(120f));
+					GUILayout.Label("pixels");
 					GUILayout.EndHorizontal();
 					EditorGUI.EndDisabledGroup();
 
 					EditorGUI.BeginDisabledGroup(!touch.boolValue);
 					GUILayout.BeginHorizontal();
-					EditorGUILayout.PropertyField(serializedObject.FindProperty("touchDragThreshold"), new GUIContent("Touch Drag"));
-					GUILayout.Label("pixels", GUILayout.MinWidth(100f));
+					EditorGUILayout.PropertyField(serializedObject.FindProperty("touchDragThreshold"), new GUIContent("Touch Drag"), GUILayout.Width(120f));
+					GUILayout.Label("pixels");
 					GUILayout.EndHorizontal();
 
 					GUILayout.BeginHorizontal();
-					EditorGUILayout.PropertyField(serializedObject.FindProperty("touchClickThreshold"), new GUIContent("Touch Tap"));
-					GUILayout.Label("pixels", GUILayout.MinWidth(100f));
+					EditorGUILayout.PropertyField(serializedObject.FindProperty("touchClickThreshold"), new GUIContent("Touch Tap"), GUILayout.Width(120f));
+					GUILayout.Label("pixels");
 					GUILayout.EndHorizontal();
 					EditorGUI.EndDisabledGroup();
 				}

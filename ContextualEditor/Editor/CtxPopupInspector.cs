@@ -21,7 +21,7 @@ public class CtxPopupInspector : CtxMenuItemInspector
 	{
 		popup = target as CtxPopup;
 		
-		EditorGUIUtility.LookLikeControls(120f);
+		EditorGUIUtility.labelWidth = 120f;
 		
 		CtxMenu contextMenu = (CtxMenu)EditorGUILayout.ObjectField("Context Menu", popup.contextMenu, 
 			typeof(CtxMenu), true);
@@ -30,6 +30,13 @@ public class CtxPopupInspector : CtxMenuItemInspector
 		{
 			RegisterUndo();
 			popup.contextMenu = contextMenu;
+		}
+		
+		int mouseButton = EditorGUILayout.IntField("Mouse Button", popup.mouseButton);
+		if (popup.mouseButton != mouseButton)
+		{
+			RegisterUndo();
+			popup.mouseButton = mouseButton;
 		}
 
 		NGUIEditorTools.DrawEvents("On Selection", popup, popup.onSelection);

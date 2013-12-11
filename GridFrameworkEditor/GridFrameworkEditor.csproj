@@ -39,9 +39,11 @@
     <Reference Include="System.XML" />
     <Reference Include="UnityEditor">
       <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine">
       <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>

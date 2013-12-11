@@ -144,7 +144,7 @@ public class CtxMenuButton : MonoBehaviour
 			
 			if (items != null || contextMenu.onShow != null)
 			{
-				EventDelegate.Add(contextMenu.onSelection, OnMenuSelection, true);
+				EventDelegate.Add(contextMenu.onSelection, OnMenuSelection);
 				EventDelegate.Add(contextMenu.onHide, OnHide, true);
 			
 				if (menuItems != null && menuItems.Length > 0)
@@ -158,7 +158,10 @@ public class CtxMenuButton : MonoBehaviour
 	void OnHide()
 	{
 		if (onHide != null)
+		{
 			EventDelegate.Execute(onHide);
+			EventDelegate.Remove(contextMenu.onSelection, OnMenuSelection);	// <-- In case the menu was hidden with no selection being made.
+		}
 	}
 	
 	void OnMenuSelection()

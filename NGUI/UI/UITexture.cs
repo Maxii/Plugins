@@ -13,33 +13,53 @@ using System.Collections.Generic;
 /// </summary>
 
 [ExecuteInEditMode]
-[AddComponentMenu("NGUI/UI/Texture")]
+[AddComponentMenu("NGUI/UI/NGUI Texture")]
 public class UITexture : UIWidget
 {
 	[HideInInspector][SerializeField] Rect mRect = new Rect(0f, 0f, 1f, 1f);
-	[HideInInspector][SerializeField] Shader mShader;
 	[HideInInspector][SerializeField] Texture mTexture;
 	[HideInInspector][SerializeField] Material mMat;
+	[HideInInspector][SerializeField] Shader mShader;
 
-	bool mCreatingMat = false;
-	Material mDynamicMat = null;
 	int mPMA = -1;
 
 	/// <summary>
-	/// UV rectangle used by the texture.
+	/// Texture used by the UITexture. You can set it directly, without the need to specify a material.
 	/// </summary>
 
-	public Rect uvRect
+	public override Texture mainTexture
 	{
 		get
 		{
-			return mRect;
+			return mTexture;
 		}
 		set
 		{
-			if (mRect != value)
+			if (mTexture != value)
 			{
-				mRect = value;
+				mTexture = value;
+				RemoveFromPanel();
+			}
+		}
+	}
+
+	/// <summary>
+	/// Material used by the widget.
+	/// </summary>
+
+	public override Material material
+	{
+		get
+		{
+			return mMat;
+		}
+		set
+		{
+			if (mMat != value)
+			{
+				RemoveFromPanel();
+				mMat = value;
+				mPMA = -1;
 				MarkAsChanged();
 			}
 		}
@@ -49,16 +69,12 @@ public class UITexture : UIWidget
 	/// Shader used by the texture when creating a dynamic material (when the texture was specified, but the material was not).
 	/// </summary>
 
-	public Shader shader
+	public override Shader shader
 	{
 		get
 		{
-			if (mShader == null)
-			{
-				Material mat = material;
-				if (mat != null) mShader = mat.shader;
-				if (mShader == null) mShader = Shader.Find("Unlit/Texture");
-			}
+			if (mMat != null) return mMat.shader;
+			if (mShader == null) mShader = Shader.Find("Unlit/Transparent Colored");
 			return mShader;
 		}
 		set
@@ -66,54 +82,12 @@ public class UITexture : UIWidget
 			if (mShader != value)
 			{
 				mShader = value;
-				Material mat = material;
-				if (mat != null) mat.shader = value;
-				mPMA = -1;
-			}
-		}
-	}
 
-	/// <summary>
-	/// Whether the texture has created its material dynamically.
-	/// </summary>
-
-	public bool hasDynamicMaterial { get { return mDynamicMat != null; } }
-
-	/// <summary>
-	/// Automatically destroy the dynamically-created material.
-	/// </summary>
-
-	public override Material material
-	{
-		get
-		{
-			if (mMat != null) return mMat;
-			if (mDynamicMat != null) return mDynamicMat;
-
-			if (!mCreatingMat && mDynamicMat == null)
-			{
-				mCreatingMat = true;
-
-				if (mShader == null) mShader = Shader.Find("Unlit/Transparent Colored");
-
-				Cleanup();
-
-				mDynamicMat = new Material(mShader);
-				mDynamicMat.hideFlags = HideFlags.DontSave;
-				mDynamicMat.mainTexture = mTexture;
-				mPMA = 0;
-				mCreatingMat = false;
-			}
-			return mDynamicMat;
-		}
-		set
-		{
-			if (mMat != value)
-			{
-				Cleanup();
-				mMat = value;
-				mPMA = -1;
-				MarkAsChanged();
+				if (mMat == null)
+				{
+					mPMA = -1;
+					MarkAsChanged();
+				}
 			}
 		}
 	}
@@ -136,32 +110,21 @@ public class UITexture : UIWidget
 	}
 
 	/// <summary>
-	/// Texture used by the UITexture. You can set it directly, without the need to specify a material.
+	/// UV rectangle used by the texture.
 	/// </summary>
 
-	public override Texture mainTexture
+	public Rect uvRect
 	{
 		get
 		{
-			if (mMat != null) return mMat.mainTexture;
-			if (mTexture != null) return mTexture;
-			return null;
+			return mRect;
 		}
 		set
 		{
-			RemoveFromPanel();
-
-			Material mat = material;
-
-			if (mat != null)
+			if (mRect != value)
 			{
-				mPanel = null;
-				mTexture = value;
-				mat.mainTexture = value;
-				MarkAsChangedLite();
-
-				if (enabled) CreatePanel();
-				if (mPanel != null) mPanel.Refresh();
+				mRect = value;
+				MarkAsChanged();
 			}
 		}
 	}
@@ -172,57 +135,29 @@ public class UITexture : UIWidget
 	/// It's used to achieve pixel-perfect sprites even when an odd dimension widget happens to be centered.
 	/// </summary>
 
-	Vector4 drawingDimensions
+	public override Vector4 drawingDimensions
 	{
 		get
 		{
-			float left = 0f;
-			float bottom = 0f;
-			float right = 0f;
-			float top = 0f;
+			Vector2 offset = pivotOffset;
+
+			float x0 = -offset.x * mWidth;
+			float y0 = -offset.y * mHeight;
+			float x1 = x0 + mWidth;
+			float y1 = y0 + mHeight;
 
 			Texture tex = mainTexture;
-			Rect rect = (tex != null) ? new Rect(0f, 0f, tex.width, tex.height) : new Rect(0f, 0f, mWidth, mHeight);
+			int w = (tex != null) ? tex.width : mWidth;
+			int h = (tex != null) ? tex.height : mHeight;
 
-			Vector2 pv = pivotOffset;
-			int w = Mathf.RoundToInt(rect.width);
-			int h = Mathf.RoundToInt(rect.height);
+			if ((w & 1) != 0) x1 -= (1f / w) * mWidth;
+			if ((h & 1) != 0) y1 -= (1f / h) * mHeight;
 
-			float paddedW = ((w & 1) == 0) ? w : w + 1;
-			float paddedH = ((h & 1) == 0) ? h : h + 1;
-
-			Vector4 v = new Vector4(
-				left / paddedW,
-				bottom / paddedH,
-				(w - right) / paddedW,
-				(h - top) / paddedH);
-
-			v.x -= pv.x;
-			v.y -= pv.y;
-			v.z -= pv.x;
-			v.w -= pv.y;
-
-			v.x *= mWidth;
-			v.y *= mHeight;
-			v.z *= mWidth;
-			v.w *= mHeight;
-
-			return v;
-		}
-	}
-
-	/// <summary>
-	/// Clean up.
-	/// </summary>
-
-	void OnDestroy () { Cleanup(); }
-
-	void Cleanup ()
-	{
-		if (mDynamicMat != null)
-		{
-			NGUITools.Destroy(mDynamicMat);
-			mDynamicMat = null;
+			return new Vector4(
+				mDrawRegion.x == 0f ? x0 : Mathf.Lerp(x0, x1, mDrawRegion.x),
+				mDrawRegion.y == 0f ? y0 : Mathf.Lerp(y0, y1, mDrawRegion.y),
+				mDrawRegion.z == 1f ? x1 : Mathf.Lerp(x0, x1, mDrawRegion.z),
+				mDrawRegion.w == 1f ? y1 : Mathf.Lerp(y0, y1, mDrawRegion.w));
 		}
 	}
 
@@ -249,13 +184,13 @@ public class UITexture : UIWidget
 	}
 
 	/// <summary>
-	/// Virtual function called by the UIScreen that fills the buffers.
+	/// Virtual function called by the UIPanel that fills the buffers.
 	/// </summary>
 
 	public override void OnFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color32> cols)
 	{
 		Color colF = color;
-		colF.a *= mPanel.alpha;
+		colF.a *= mPanel.finalAlpha;
 		Color32 col = premultipliedAlpha ? NGUITools.ApplyPMA(colF) : colF;
 
 		Vector4 v = drawingDimensions;

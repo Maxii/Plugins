@@ -160,7 +160,7 @@ public abstract class CtxMenuItemInspector : Editor
 		EditorGUILayout.BeginHorizontal();
 		item.isSelected = EditorGUILayout.Toggle(item.isSelected, GUILayout.Width(12f));
 		
-		EditorGUIUtility.LookLikeControls(64f);
+		EditorGUIUtility.labelWidth = 64f;
 		CtxMenu.ItemStyle itemStyle = (CtxMenu.ItemStyle)EditorGUILayout.EnumMaskField("Style", item.style,
 			GUILayout.Width(188f));
 		
@@ -178,7 +178,7 @@ public abstract class CtxMenuItemInspector : Editor
 		
 		if (item.isCheckable)
 		{
-			EditorGUIUtility.LookLikeControls(44f);
+			EditorGUIUtility.labelWidth = 44f;
 			int mutexGroup = EditorGUILayout.IntField("Mutex", item.mutexGroup, GUILayout.Width(88f));
 			if (mutexGroup != item.mutexGroup)
 			{
@@ -187,7 +187,7 @@ public abstract class CtxMenuItemInspector : Editor
 			}
 		}
 		 
-		EditorGUIUtility.LookLikeControls(80f);
+		EditorGUIUtility.labelWidth = 80f;
 		EditorGUILayout.EndHorizontal();
 
 		if ((item.style & CtxMenu.ItemStyle.Separator) != (CtxMenu.ItemStyle)0)
@@ -202,7 +202,7 @@ public abstract class CtxMenuItemInspector : Editor
 				item.text = text;
 			}
 		
-			EditorGUIUtility.LookLikeControls(32f);
+			EditorGUIUtility.labelWidth = 32f;
 			GUILayout.Space(12f);
 			int itemId = EditorGUILayout.IntField("ID", item.id, GUILayout.Width(76f));
 			if (item.id != itemId)
@@ -210,7 +210,7 @@ public abstract class CtxMenuItemInspector : Editor
 				RegisterUndo();
 				item.id = itemId;
 			}
-			EditorGUIUtility.LookLikeControls(80f);
+			EditorGUIUtility.labelWidth = 80f;
 			
 			EditorGUILayout.EndHorizontal();
 
@@ -224,7 +224,8 @@ public abstract class CtxMenuItemInspector : Editor
 			if (GUILayout.Button(iconTitle, itemSpriteOpt))
 			{
 				currentItem = item;
-				SpriteSelector.Show(atlas, item.icon, OnItemIcon);
+				NGUISettings.atlas = atlas;
+				SpriteSelector.Show(OnItemIcon);
 			}
 
 			GUILayout.Space(12f);
@@ -300,7 +301,8 @@ public abstract class CtxMenuItemInspector : Editor
 		
 		if (GUILayout.Button(buttonLabel, itemSpriteOpt))
 		{
-			SpriteSelector.Show(atlas, sprite, callback);
+			NGUISettings.atlas = atlas;
+			SpriteSelector.Show(callback);
 		}
 
 		GUILayout.Space(12f);

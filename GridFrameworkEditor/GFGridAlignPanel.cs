@@ -24,6 +24,7 @@ public class GFGridAlignPanel : EditorWindow {
 	bool ignoreRootObjects;
 	LayerMask affectedLayers;
 	bool inculdeChildren;
+	bool rotateTransform = true;
 	bool autoSnapping = false;
 	bool autoRotating = false;
 	GFBoolVector3 lockAxes = new GFBoolVector3(false);
@@ -41,6 +42,7 @@ public class GFGridAlignPanel : EditorWindow {
 	void OnGUI(){
 		GridField();
 		LayerField();
+		RotateOptions ();
 		InclusionOptions();
 		AlignButtons();
 		if(grid)
@@ -62,6 +64,10 @@ public class GFGridAlignPanel : EditorWindow {
 	
 	void LayerField (){
 		affectedLayers = LayerMaskField("Affected Layers", affectedLayers);
+	}
+
+	void RotateOptions () {
+		rotateTransform = EditorGUILayout.Toggle ("Rotate to Grid", rotateTransform);
 	}
 	
 	void InclusionOptions () {
@@ -156,8 +162,11 @@ public class GFGridAlignPanel : EditorWindow {
 		RemoveAlignedRotated(ref allTransforms, pGrid);
 		if(allTransforms.Count == 0)
 			return;
-		Undo.RegisterSceneUndo(name);
+		//Undo.RegisterSceneUndo(name);
+		Undo.RecordObjects (allTransforms.ToArray (), name);
 		AlignRotateTransforms (pGrid, allTransforms);
+		foreach (Transform t in allTransforms)
+			EditorUtility.SetDirty (t);
 	}
 
 	void AlignRotateSelected (GFPolarGrid pGrid) {
@@ -233,8 +242,11 @@ public class GFGridAlignPanel : EditorWindow {
 		RemoveAligned(ref allTransforms);
 		if(allTransforms.Count == 0)
 			return;
-		Undo.RegisterSceneUndo(name);
+		//Undo.RegisterSceneUndo(name);
+		Undo.RecordObjects (allTransforms.ToArray (), name);
 		AlignTransforms (allTransforms);
+		foreach (Transform t in allTransforms)
+			EditorUtility.SetDirty (t);
 	}
 
 	void AlignTransforms (List<Transform> allTransforms) {
@@ -243,7 +255,7 @@ public class GFGridAlignPanel : EditorWindow {
 				AlignTransform (curTransform, true);
 				if(inculdeChildren){
 					foreach(Transform child in curTransform){
-						AlignTransform (child, true);
+						AlignTransform (child, rotateTransform);
 					}
 				}
 			}
@@ -274,8 +286,11 @@ public class GFGridAlignPanel : EditorWindow {
 		if(!grid)
 			return;
 		allTransforms.Remove(grid.transform);
-		Undo.RegisterSceneUndo(name);
+		//Undo.RegisterSceneUndo(name);
+		Undo.RecordObjects (allTransforms.ToArray (), name);
 		ScaleTransforms (allTransforms);
+		foreach (Transform t in allTransforms)
+			EditorUtility.SetDirty (t);
 	}
 
 	void ScaleTransforms (List<Transform> allTransforms) {

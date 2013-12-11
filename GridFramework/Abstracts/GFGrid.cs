@@ -41,7 +41,7 @@ public abstract class GFGrid : MonoBehaviour {
 		public Quaternion oldRotation;
 		
 		// true if values have changed, false if they re the same
-		public bool needRecalculation{get{return !(oldPosition == _gridTransform.position && oldRotation == _gridTransform.rotation);}}
+		public bool needRecalculation{ get{ return !(oldPosition == _gridTransform.position && oldRotation == _gridTransform.rotation); } }
 		
 		public void Recache(){
 			oldPosition = _gridTransform.position;
@@ -83,7 +83,7 @@ public abstract class GFGrid : MonoBehaviour {
 		set{
 			if(value == _relativeSize)// needed because the editor fires the setter even if this wasn't changed
 				return;
-			_gridChanged = true;
+			hasChanged = true;
 			_relativeSize = value;
 		}
 	}
@@ -100,7 +100,7 @@ public abstract class GFGrid : MonoBehaviour {
 		get{return _size;}
 		set{if(value == _size)// needed because the editor fires the setter even if this wasn't changed
 			return;
-			_gridChanged = true;
+			hasChanged = true;
 			_size = Vector3.Max(value, Vector3.zero);}
 	}
 
@@ -113,7 +113,7 @@ public abstract class GFGrid : MonoBehaviour {
 		get{return _renderFrom;}
 		set{if(value == _renderFrom)// needed because the editor fires the setter even if this wasn't changed
 			return;
-			_gridChanged = true;
+			hasChanged = true;
 			_renderFrom = Vector3.Min(value, renderTo);}
 	}
 
@@ -126,7 +126,7 @@ public abstract class GFGrid : MonoBehaviour {
 		get{return _renderTo;}
 		set{if(value == _renderTo)// needed because the editor fires the setter even if this wasn't changed
 			return;
-			_gridChanged = true;
+			hasChanged = true;
 			_renderTo = Vector3.Max(value, _renderFrom);}
 	}
 	#endregion
@@ -224,7 +224,7 @@ public abstract class GFGrid : MonoBehaviour {
 	 * If this flagis set to @c true the grid rendering an drawing will use the values of @c #renderFrom and @c #renderTo as limits.
 	 * Otherwise it will use the @c #size instead.
 	 */
-	public bool useCustomRenderRange{get{return _useCustomRenderRange;}set{if(value == _useCustomRenderRange){return;} _useCustomRenderRange = value; _gridChanged = true;}}
+	public bool useCustomRenderRange{get{return _useCustomRenderRange;}set{if(value == _useCustomRenderRange){return;} _useCustomRenderRange = value; hasChanged = true;}}
 
 	[SerializeField]
 	protected int _renderLineWidth = 1;
@@ -265,6 +265,9 @@ public abstract class GFGrid : MonoBehaviour {
 	#region cache members
 	// we store the draw points here for re-use
 	protected Vector3[][][] _drawPoints;
+	/// <summary>When requesting draw points we store the last request here.</summary>
+	/// If the request matches the previous one we can reuse points, otherwise we have to calculate them anew.
+	protected Vector3 lastFromPoint, lastToPoint;
 	#region optimization
 	// caching the transform for performance
 	protected Transform cachedTransform; //this is the real cache
@@ -292,10 +295,30 @@ public abstract class GFGrid : MonoBehaviour {
 			if(_gridChanged || transformCache.needRecalculation){
 				_gridChanged = false;
 				transformCache.Recache();
+				if( GridChangedEvent != null ) // fire the event
+					GridChangedEvent( this );
 				return true;
 			} else{
 				return _gridChanged;
 			}
+		}
+		set {
+			_gridChanged = value;
+			if( GridChangedEvent != null && _gridChanged == true) // fire the event
+				GridChangedEvent( this );
+		}
+	}
+	/// <summary>Returns whether we can recyle points fromt he previous drawing.</summary>
+	/// <returns>Returns <c>true</c>, if the grid hasn't changed and the range request is the same as last time, <c>false</c> otherwise.</returns>
+	/// <param name="from">The lower end of the range request.</param>
+	/// <param name="to">The upper end of the range request.</param>
+	protected bool RecyclePoints (Vector3 from, Vector3 to) {
+		if (!hasChanged && _drawPoints != null && from == lastFromPoint && to == lastToPoint)
+			return true;
+		else {
+			lastFromPoint = from; // set the new range
+			lastToPoint = to;
+			return false;
 		}
 	}
 	#endregion
@@ -304,6 +327,18 @@ public abstract class GFGrid : MonoBehaviour {
 	#region helper values (read only)
 	// the normal X-, Y- and Z- vectors in world-space
 	protected Vector3[] units {get {return new Vector3[3]{Vector3.right, Vector3.up, Vector3.forward};}}
+	#endregion
+
+	#region Events
+	/// <summary>A delegate for handling events when the grid has been changed in such a way that it requires a redraw</summary>
+	/// <param name="grid">The grid that calls the delegate</param>
+	/// This is the delegate type for methods to be called when changes to the grid occur. It is best used together with the #GridChangedEvent event.
+	public delegate void GridChangedDelegate( GFGrid grid );
+	/// <summary>An even that gets fired </summary>
+	/// This is the event that gets fired when one of the grid's properties is changed. If the Transform (position or rotation) is changed this event
+	/// will only be fired if there is a camera trying to render the grid or some other method tries to draw the gird (like drawing in the editor or 
+	/// calling #GetVectrosityPoints). You can learn more about events ont he @ref events page of the user manual.
+	public event GridChangedDelegate GridChangedEvent;
 	#endregion
 	#endregion
 	
@@ -880,7 +915,7 @@ public abstract class GFGrid : MonoBehaviour {
 	#endregion
 	
 	#region deprecated methods (used for backwards compatibility with older releases)
-	#if !DOXYGEN_SHOULD_SKIP_THIS // make doxygen skip the following lines
+	///@cond EXCLUDE_THIS
 	// world space
 	[System.Obsolete("Deprecated, please use NearestVertexW instead",false)]
 	public Vector3 FindNearestVertex(Vector3 fromPoint, bool doDebug = false) {return NearestVertexW(fromPoint, doDebug);}
@@ -895,7 +930,7 @@ public abstract class GFGrid : MonoBehaviour {
 	public Vector3 GetFaceCoordinates(Vector3 world, GridPlane thePlane) {return NearestFaceG(world, thePlane);}
 	[System.Obsolete("Deprecated, please use NearestBoxG instead",false)]
 	public Vector3 GetBoxCoordinates(Vector3 world) {return NearestBoxG(world);}
-	#endif
+	///@endcond
 	#endregion
 }
 

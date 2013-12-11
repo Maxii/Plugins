@@ -32,7 +32,7 @@ public class UIRoot : MonoBehaviour
 	/// Type of scaling used by the UIRoot.
 	/// </summary>
 
-	public Scaling scalingStyle = Scaling.FixedSize;
+	public Scaling scalingStyle = Scaling.PixelPerfect;
 
 	/// <summary>
 	/// Height of the screen when the scaling style is set to FixedSize.
@@ -133,6 +133,10 @@ public class UIRoot : MonoBehaviour
 
 	void Update ()
 	{
+#if UNITY_EDITOR
+		if (!Application.isPlaying && gameObject.layer != 0)
+			UnityEditor.EditorPrefs.SetInt("NGUI Layer", gameObject.layer);
+#endif
 		if (mTrans != null)
 		{
 			float calcActiveHeight = activeHeight;
