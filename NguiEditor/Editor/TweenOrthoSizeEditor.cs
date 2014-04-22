@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -28,7 +28,7 @@ public class TweenOrthoSizeEditor : UITweenerEditor
 			NGUIEditorTools.RegisterUndo("Tween Change", tw);
 			tw.from = from;
 			tw.to = to;
-			UnityEditor.EditorUtility.SetDirty(tw);
+			NGUITools.SetDirty(tw);
 		}
 
 		DrawCommonProperties();

@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -14,78 +14,32 @@ using System.Collections.Generic;
 [CustomEditor(typeof(UIImageButton))]
 public class UIImageButtonInspector : Editor
 {
-	UIImageButton mButton;
-	UISprite mSprite;
-
-	/// <summary>
-	/// Atlas selection callback.
-	/// </summary>
-
-	void OnSelectAtlas (Object obj)
-	{
-		if (mButton.target != null)
-		{
-			NGUIEditorTools.RegisterUndo("Atlas Selection", mButton.target);
-			mButton.target.atlas = obj as UIAtlas;
-			mButton.target.MakePixelPerfect();
-		}
-	}
-
 	public override void OnInspectorGUI ()
 	{
-		NGUIEditorTools.SetLabelWidth(80f);
-		mButton = target as UIImageButton;
-		mSprite = EditorGUILayout.ObjectField("Sprite", mButton.target, typeof(UISprite), true) as UISprite;
+		EditorGUILayout.HelpBox("Image Button component's functionality is now a part of UIButton. You no longer need UIImageButton.", MessageType.Warning, true);
 
-		if (mButton.target != mSprite)
+		if (GUILayout.Button("Auto-Upgrade"))
 		{
-			NGUIEditorTools.RegisterUndo("Image Button Change", mButton);
-			mButton.target = mSprite;
-			if (mSprite != null) mSprite.spriteName = mButton.normalSprite;
-		}
+			UIImageButton img = target as UIImageButton;
 
-		if (mSprite != null)
-		{
-			ComponentSelector.Draw<UIAtlas>(mSprite.atlas, OnSelectAtlas, true);
+			UIButton btn = img.GetComponent<UIButton>();
 
-			if (mSprite.atlas != null)
+			if (btn == null)
 			{
-				NGUIEditorTools.DrawSpriteField("Normal", mSprite.atlas, mButton.normalSprite, OnNormal);
-				NGUIEditorTools.DrawSpriteField("Hover", mSprite.atlas, mButton.hoverSprite, OnHover);
-				NGUIEditorTools.DrawSpriteField("Pressed", mSprite.atlas, mButton.pressedSprite, OnPressed);
-				NGUIEditorTools.DrawSpriteField("Disabled", mSprite.atlas, mButton.disabledSprite, OnDisabled);
+				btn = img.gameObject.AddComponent<UIButton>();
+				if (img.target != null) btn.tweenTarget = img.target.gameObject;
+				else btn.tweenTarget = img.gameObject;
+
+				UISprite sp = btn.tweenTarget.GetComponent<UISprite>();
+				if (sp != null) sp.spriteName = img.normalSprite;
 			}
+
+			btn.hoverSprite = img.hoverSprite;
+			btn.pressedSprite = img.pressedSprite;
+			btn.disabledSprite = img.disabledSprite;
+			btn.pixelSnap = img.pixelSnap;
+
+			NGUITools.DestroyImmediate(img);
 		}
-	}
-
-	void OnNormal (string spriteName)
-	{
-		NGUIEditorTools.RegisterUndo("Image Button Change", mButton, mButton.gameObject, mSprite);
-		mButton.normalSprite = spriteName;
-		mSprite.spriteName = spriteName;
-		mSprite.MakePixelPerfect();
-		if (mButton.collider == null || (mButton.collider is BoxCollider)) NGUITools.AddWidgetCollider(mButton.gameObject);
-		Repaint();
-	}
-
-	void OnHover (string spriteName)
-	{
-		NGUIEditorTools.RegisterUndo("Image Button Change", mButton, mButton.gameObject, mSprite);
-		mButton.hoverSprite = spriteName;
-		Repaint();
-	}
-
-	void OnPressed (string spriteName)
-	{
-		NGUIEditorTools.RegisterUndo("Image Button Change", mButton, mButton.gameObject, mSprite);
-		mButton.pressedSprite = spriteName;
-		Repaint();
-	}
-	
-	void OnDisabled(string spriteName)
-	{
-		NGUIEditorTools.RegisterUndo("Image Button Change", mButton, mButton.gameObject, mSprite);
-		mButton.disabledSprite = spriteName;
-		Repaint();
 	}
 }

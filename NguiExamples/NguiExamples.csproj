@@ -76,6 +76,7 @@
     <Compile Include="Examples\Other\LagRotation.cs" />
     <Compile Include="Examples\Other\LoadLevelOnClick.cs" />
     <Compile Include="Examples\Other\LookAtTarget.cs" />
+    <Compile Include="Examples\Other\OpenURLOnClick.cs" />
     <Compile Include="Examples\Other\PanWithMouse.cs" />
     <Compile Include="Examples\Other\PlayIdleAnimations.cs" />
     <Compile Include="Examples\Other\SetColorOnSelection.cs" />
@@ -84,7 +85,6 @@
     <Compile Include="Examples\Other\SpinWithMouse.cs" />
     <Compile Include="Examples\Other\TypewriterEffect.cs" />
     <Compile Include="Examples\Other\UISliderColors.cs" />
-    <Compile Include="Examples\Other\UpdateManager.cs" />
     <Compile Include="Examples\Other\WindowAutoYaw.cs" />
     <Compile Include="Examples\Other\WindowDragTilt.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -99,6 +99,7 @@
       <Name>Ngui</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

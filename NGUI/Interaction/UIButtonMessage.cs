@@ -1,6 +1,6 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -9,7 +9,7 @@ using UnityEngine;
 /// Sends a message to the remote object when something happens.
 /// </summary>
 
-[AddComponentMenu("NGUI/Interaction/Button Message")]
+[AddComponentMenu("NGUI/Interaction/Button Message (Legacy)")]
 public class UIButtonMessage : MonoBehaviour
 {
 	public enum Trigger
@@ -28,11 +28,10 @@ public class UIButtonMessage : MonoBehaviour
 	public bool includeChildren = false;
 
 	bool mStarted = false;
-	bool mHighlighted = false;
 
 	void Start () { mStarted = true; }
 
-	void OnEnable () { if (mStarted && mHighlighted) OnHover(UICamera.IsHighlighted(gameObject)); }
+	void OnEnable () { if (mStarted) OnHover(UICamera.IsHighlighted(gameObject)); }
 
 	void OnHover (bool isOver)
 	{
@@ -40,7 +39,6 @@ public class UIButtonMessage : MonoBehaviour
 		{
 			if (((isOver && trigger == Trigger.OnMouseOver) ||
 				(!isOver && trigger == Trigger.OnMouseOut))) Send();
-			mHighlighted = isOver;
 		}
 	}
 
@@ -51,6 +49,12 @@ public class UIButtonMessage : MonoBehaviour
 			if (((isPressed && trigger == Trigger.OnPress) ||
 				(!isPressed && trigger == Trigger.OnRelease))) Send();
 		}
+	}
+
+	void OnSelect (bool isSelected)
+	{
+		if (enabled && (!isSelected || UICamera.currentScheme == UICamera.ControlScheme.Controller))
+			OnHover(isSelected);
 	}
 
 	void OnClick () { if (enabled && trigger == Trigger.OnClick) Send(); }

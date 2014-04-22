@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEditor;
@@ -81,50 +81,6 @@ public class UIPanelTool : EditorWindow
 	}
 
 	/// <summary>
-	/// Activate or deactivate the children of the specified transform recursively.
-	/// </summary>
-
-	static void SetActiveState (Transform t, bool state)
-	{
-		for (int i = 0; i < t.childCount; ++i)
-		{
-			Transform child = t.GetChild(i);
-			//if (child.GetComponent<UIPanel>() != null) continue;
-
-			if (state)
-			{
-				NGUITools.SetActiveSelf(child.gameObject, true);
-				SetActiveState(child, true);
-			}
-			else
-			{
-				SetActiveState(child, false);
-				NGUITools.SetActiveSelf(child.gameObject, false);
-			}
-			EditorUtility.SetDirty(child.gameObject);
-		}
-	}
-
-	/// <summary>
-	/// Activate or deactivate the specified panel and all of its children.
-	/// </summary>
-
-	static void SetActiveState (UIPanel panel, bool state)
-	{
-		if (state)
-		{
-			NGUITools.SetActiveSelf(panel.gameObject, true);
-			SetActiveState(panel.transform, true);
-		}
-		else
-		{
-			SetActiveState(panel.transform, false);
-			NGUITools.SetActiveSelf(panel.gameObject, false);
-		}
-		EditorUtility.SetDirty(panel.gameObject);
-	}
-
-	/// <summary>
 	/// Draw the custom wizard.
 	/// </summary>
 
@@ -188,12 +144,12 @@ public class UIPanelTool : EditorWindow
 			{
 				foreach (Entry ent in entries)
 				{
-					SetActiveState(ent.panel, !allEnabled);
+					NGUITools.SetActive(ent.panel.gameObject, !allEnabled);
 				}
 			}
 			else if (selectedEntry != null)
 			{
-				SetActiveState(selectedEntry.panel, !selectedEntry.widgetsEnabled);
+				NGUITools.SetActive(selectedEntry.panel.gameObject, !selectedEntry.widgetsEnabled);
 			}
 		}
 		else
@@ -217,7 +173,7 @@ public class UIPanelTool : EditorWindow
 			layer = LayerMask.LayerToName(ent.panel.gameObject.layer);
 			depth = ent.panel.depth.ToString();
 			widgetCount = ent.widgets.Count.ToString();
-			drawCalls = ent.panel.drawCallCount.ToString();
+			drawCalls = ent.panel.drawCalls.size.ToString();
 			clipping = (ent.panel.clipping != UIDrawCall.Clipping.None) ? "Yes" : "";
 		}
 		else

@@ -43,19 +43,48 @@ public class NGUIJson
 	/// Parse the specified JSon file, loading sprite information for the specified atlas.
 	/// </summary>
 
-	public static void LoadSpriteData (UIAtlas atlas, TextAsset asset)
+	static public void LoadSpriteData (UIAtlas atlas, TextAsset asset)
 	{
 		if (asset == null || atlas == null) return;
 
 		string jsonString = asset.text;
+
 		Hashtable decodedHash = jsonDecode(jsonString) as Hashtable;
-		
+
 		if (decodedHash == null)
 		{
 			Debug.LogWarning("Unable to parse Json file: " + asset.name);
-			return;
 		}
+		else LoadSpriteData(atlas, decodedHash);
 
+		asset = null;
+		Resources.UnloadUnusedAssets();
+	}
+
+	/// <summary>
+	/// Parse the specified JSon file, loading sprite information for the specified atlas.
+	/// </summary>
+
+	static public void LoadSpriteData (UIAtlas atlas, string jsonData)
+	{
+		if (string.IsNullOrEmpty(jsonData) || atlas == null) return;
+
+		Hashtable decodedHash = jsonDecode(jsonData) as Hashtable;
+
+		if (decodedHash == null)
+		{
+			Debug.LogWarning("Unable to parse the provided Json string");
+		}
+		else LoadSpriteData(atlas, decodedHash);
+	}
+
+	/// <summary>
+	/// Parse the specified JSon file, loading sprite information for the specified atlas.
+	/// </summary>
+
+	static void LoadSpriteData (UIAtlas atlas, Hashtable decodedHash)
+	{
+		if (decodedHash == null || atlas == null) return;
 		List<UISpriteData> oldSprites = atlas.spriteList;
 		atlas.spriteList = new List<UISpriteData>();
 
@@ -150,10 +179,6 @@ public class NGUIJson
 		// Sort imported sprites alphabetically
 		atlas.spriteList.Sort(CompareSprites);
 		Debug.Log("Imported " + atlas.spriteList.Count + " sprites");
-
-		// Unload the asset
-		asset = null;
-		Resources.UnloadUnusedAssets();
 	}
 
 	/// <summary>

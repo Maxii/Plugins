@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -10,6 +10,7 @@ using System.Collections;
 /// Allows dragging of the specified target object by mouse or touch, optionally limiting it to be within the UIPanel's clipped rectangle.
 /// </summary>
 
+[ExecuteInEditMode]
 [AddComponentMenu("NGUI/Interaction/Drag Object")]
 public class UIDragObject : MonoBehaviour
 {
@@ -30,19 +31,25 @@ public class UIDragObject : MonoBehaviour
 	/// Scale value applied to the drag delta. Set X or Y to 0 to disallow dragging in that direction.
 	/// </summary>
 
-	public Vector3 scale = Vector3.one;
+	public Vector3 dragMovement { get { return scale; } set { scale = value; } }
 
 	/// <summary>
-	/// Effect the scroll wheel will have on the momentum.
+	/// Momentum added from the mouse scroll wheel.
 	/// </summary>
 
-	public float scrollWheelFactor = 0f;
+	public Vector3 scrollMomentum = Vector3.zero;
 
 	/// <summary>
 	/// Whether the dragging will be restricted to be within the parent panel's bounds.
 	/// </summary>
 
 	public bool restrictWithinPanel = false;
+
+	/// <summary>
+	/// Rectangle to be used as the draggable object's bounds. If none specified, all widgets' bounds get added up.
+	/// </summary>
+
+	public UIRect contentRect = null;
 
 	/// <summary>
 	/// Effect to apply when dragging.
@@ -56,15 +63,43 @@ public class UIDragObject : MonoBehaviour
 
 	public float momentumAmount = 35f;
 
+	// Obsolete property. Use 'dragMovement' instead.
+	[SerializeField] protected Vector3 scale = new Vector3(1f, 1f, 0f);
+
+	// Obsolete property. Use 'scrollMomentum' instead.
+	[SerializeField][HideInInspector] float scrollWheelFactor = 0f;
+
 	Plane mPlane;
+	Vector3 mTargetPos;
 	Vector3 mLastPos;
 	UIPanel mPanel;
-	bool mPressed = false;
 	Vector3 mMomentum = Vector3.zero;
-	float mScroll = 0f;
+	Vector3 mScroll = Vector3.zero;
 	Bounds mBounds;
 	int mTouchID = 0;
 	bool mStarted = false;
+	bool mPressed = false;
+
+	/// <summary>
+	/// Auto-upgrade the legacy data.
+	/// </summary>
+
+	void OnEnable ()
+	{
+		if (scrollWheelFactor != 0f)
+		{
+			scrollMomentum = scale * scrollWheelFactor;
+			scrollWheelFactor = 0f;
+		}
+
+		if (contentRect == null && target != null && Application.isPlaying)
+		{
+			UIWidget w = target.GetComponent<UIWidget>();
+			if (w != null) contentRect = w;
+		}
+	}
+
+	void OnDisable () { mStarted = false; }
 
 	/// <summary>
 	/// Find the panel responsible for this object.
@@ -72,8 +107,29 @@ public class UIDragObject : MonoBehaviour
 
 	void FindPanel ()
 	{
-		mPanel = (target != null) ? UIPanel.Find(target.transform, false) : null;
+		mPanel = (target != null) ? UIPanel.Find(target.transform.parent) : null;
 		if (mPanel == null) restrictWithinPanel = false;
+	}
+
+	/// <summary>
+	/// Recalculate the bounds of the dragged content.
+	/// </summary>
+
+	void UpdateBounds ()
+	{
+		if (contentRect)
+		{
+			Transform t = mPanel.cachedTransform;
+			Matrix4x4 toLocal = t.worldToLocalMatrix;
+			Vector3[] corners = contentRect.worldCorners;
+			for (int i = 0; i < 4; ++i) corners[i] = toLocal.MultiplyPoint3x4(corners[i]);
+			mBounds = new Bounds(corners[0], Vector3.zero);
+			for (int i = 1; i < 4; ++i) mBounds.Encapsulate(corners[i]);
+		}
+		else
+		{
+			mBounds = NGUIMath.CalculateRelativeWidgetBounds(mPanel.cachedTransform, target);
+		}
 	}
 
 	/// <summary>
@@ -90,17 +146,15 @@ public class UIDragObject : MonoBehaviour
 				{
 					// Remove all momentum on press
 					mTouchID = UICamera.currentTouchID;
-					mMomentum = Vector3.zero;
 					mPressed = true;
 					mStarted = false;
-					mScroll = 0f;
+					CancelMovement();
 
 					if (restrictWithinPanel && mPanel == null) FindPanel();
-					if (restrictWithinPanel) mBounds = NGUIMath.CalculateRelativeWidgetBounds(mPanel.cachedTransform, target);
+					if (restrictWithinPanel) UpdateBounds();
 
 					// Disable the spring movement
-					SpringPosition sp = target.GetComponent<SpringPosition>();
-					if (sp != null) sp.enabled = false;
+					CancelSpring();
 
 					// Create the plane to drag along
 					Transform trans = UICamera.currentCamera.transform;
@@ -110,8 +164,12 @@ public class UIDragObject : MonoBehaviour
 			else if (mPressed && mTouchID == UICamera.currentTouchID)
 			{
 				mPressed = false;
-				if (restrictWithinPanel && mPanel.clipping != UIDrawCall.Clipping.None && dragEffect == DragEffect.MomentumAndSpring)
-					mPanel.ConstrainTargetToBounds(target, ref mBounds, false);
+				
+				if (restrictWithinPanel && dragEffect == DragEffect.MomentumAndSpring)
+				{
+					if (mPanel.ConstrainTargetToBounds(target, ref mBounds, false))
+						CancelMovement();
+				}
 			}
 		}
 	}
@@ -149,31 +207,46 @@ public class UIDragObject : MonoBehaviour
 				}
 
 				// Adjust the momentum
-				if (dragEffect != DragEffect.None) mMomentum = Vector3.Lerp(mMomentum, mMomentum + offset * (0.01f * momentumAmount), 0.67f);
+				if (dragEffect != DragEffect.None)
+					mMomentum = Vector3.Lerp(mMomentum, mMomentum + offset * (0.01f * momentumAmount), 0.67f);
+
+				// Adjust the position and bounds
+				Vector3 before = target.localPosition;
+				Move(offset);
 
 				// We want to constrain the UI to be within bounds
 				if (restrictWithinPanel)
 				{
-					// Adjust the position and bounds
-					Vector3 localPos = target.localPosition;
-					target.position += offset;
-					mBounds.center = mBounds.center + (target.localPosition - localPos);
+					mBounds.center = mBounds.center + (target.localPosition - before);
 
-					// Constrain the UI to the bounds, and if done so, eliminate the momentum
-					if (dragEffect != DragEffect.MomentumAndSpring && mPanel.clipping != UIDrawCall.Clipping.None &&
-						mPanel.ConstrainTargetToBounds(target, ref mBounds, true))
-					{
-						mMomentum = Vector3.zero;
-						mScroll = 0f;
-					}
-				}
-				else
-				{
-					// Adjust the position
-					target.position += offset;
+					// Constrain the UI to the bounds, and if done so, immediately eliminate the momentum
+					if (dragEffect != DragEffect.MomentumAndSpring && mPanel.ConstrainTargetToBounds(target, ref mBounds, true))
+						CancelMovement();
 				}
 			}
 		}
+	}
+
+	/// <summary>
+	/// Move the dragged object by the specified amount.
+	/// </summary>
+
+	void Move (Vector3 worldDelta)
+	{
+		if (mPanel != null)
+		{
+			mTargetPos += worldDelta;
+			target.position = mTargetPos;
+
+			Vector3 after = target.localPosition;
+			after.x = Mathf.Round(after.x);
+			after.y = Mathf.Round(after.y);
+			target.localPosition = after;
+
+			UIScrollView ds = mPanel.GetComponent<UIScrollView>();
+			if (ds != null) ds.UpdateScrollbars(true);
+		}
+		else target.position += worldDelta;
 	}
 
 	/// <summary>
@@ -182,48 +255,61 @@ public class UIDragObject : MonoBehaviour
 
 	void LateUpdate ()
 	{
-		float delta = RealTime.deltaTime;
+#if UNITY_EDITOR
+		if (!Application.isPlaying) return;
+#endif
 		if (target == null) return;
+		float delta = RealTime.deltaTime;
 
-		if (mPressed)
-		{
-			// Disable the spring movement
-			SpringPosition sp = target.GetComponent<SpringPosition>();
-			if (sp != null) sp.enabled = false;
-			mScroll = 0f;
-		}
-		else
-		{
-			mMomentum += scale * (-mScroll * 0.05f);
-			mScroll = NGUIMath.SpringLerp(mScroll, 0f, 20f, delta);
+		mMomentum -= mScroll;
+		mScroll = NGUIMath.SpringLerp(mScroll, Vector3.zero, 20f, delta);
 
-			if (mMomentum.magnitude > 0.0001f)
+		if (!mPressed)
+		{
+			// No momentum? Exit.
+			if (mMomentum.magnitude < 0.0001f) return;
+
+			// Apply the momentum
+			if (mPanel == null) FindPanel();
+
+			Move(NGUIMath.SpringDampen(ref mMomentum, 9f, delta));
+
+			if (restrictWithinPanel && mPanel != null)
 			{
-				// Apply the momentum
-				if (mPanel == null) FindPanel();
+				UpdateBounds();
 
-				if (mPanel != null)
+				if (mPanel.ConstrainTargetToBounds(target, ref mBounds, dragEffect == DragEffect.None))
 				{
-					target.position += NGUIMath.SpringDampen(ref mMomentum, 9f, delta);
-
-					if (restrictWithinPanel && mPanel.clipping != UIDrawCall.Clipping.None)
-					{
-						mBounds = NGUIMath.CalculateRelativeWidgetBounds(mPanel.cachedTransform, target);
-						
-						if (!mPanel.ConstrainTargetToBounds(target, ref mBounds, dragEffect == DragEffect.None))
-						{
-							SpringPosition sp = target.GetComponent<SpringPosition>();
-							if (sp != null) sp.enabled = false;
-						}
-					}
-					return;
+					CancelMovement();
 				}
+				else CancelSpring();
 			}
-			else mScroll = 0f;
 		}
+		else mTargetPos = (target != null) ? target.position : Vector3.zero;
 
 		// Dampen the momentum
 		NGUIMath.SpringDampen(ref mMomentum, 9f, delta);
+	}
+
+	/// <summary>
+	/// Cancel all movement.
+	/// </summary>
+
+	public void CancelMovement ()
+	{
+		mTargetPos = (target != null) ? target.position : Vector3.zero;
+		mMomentum = Vector3.zero;
+		mScroll = Vector3.zero;
+	}
+
+	/// <summary>
+	/// Cancel the spring movement.
+	/// </summary>
+
+	public void CancelSpring ()
+	{
+		SpringPosition sp = target.GetComponent<SpringPosition>();
+		if (sp != null) sp.enabled = false;
 	}
 
 	/// <summary>
@@ -233,9 +319,6 @@ public class UIDragObject : MonoBehaviour
 	void OnScroll (float delta)
 	{
 		if (enabled && NGUITools.GetActive(gameObject))
-		{
-			if (Mathf.Sign(mScroll) != Mathf.Sign(delta)) mScroll = 0f;
-			mScroll += delta * scrollWheelFactor;
-		}
+			mScroll -= scrollMomentum * (delta * 0.05f);
 	}
 }

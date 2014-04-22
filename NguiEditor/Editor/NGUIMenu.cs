@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -183,7 +183,7 @@ static public class NGUIMenu
 	[MenuItem("NGUI/Create/", false, 6)]
 	static void AddBreaker123 () {}
 
-	[MenuItem("NGUI/Create/Anchor", false, 6)]
+	[MenuItem("NGUI/Create/Anchor (Legacy)", false, 6)]
 	static void AddAnchor2 () { Add<UIAnchor>(); }
 
 	[MenuItem("NGUI/Create/Panel", false, 6)]
@@ -200,6 +200,7 @@ static public class NGUIMenu
 		if (panel == null) panel = NGUIEditorTools.SelectedRoot(true).GetComponent<UIPanel>();
 		panel.clipping = UIDrawCall.Clipping.SoftClip;
 		panel.name = "Scroll View";
+		panel.gameObject.AddComponent<UIScrollView>();
 		Selection.activeGameObject = panel.gameObject;
 	}
 
@@ -222,7 +223,7 @@ static public class NGUIMenu
 
 	[MenuItem("NGUI/Create/2D UI", true)]
 	[MenuItem("Assets/NGUI/Create 2D UI", true, 1)]
-	static bool Create2Da () { return UIRoot.list.Count == 0; }
+	static bool Create2Da () { return UIRoot.list.Count == 0 || UICamera.list.size == 0 || !UICamera.list[0].camera.isOrthoGraphic; }
 
 	[MenuItem("NGUI/Create/3D UI", false, 6)]
 	[MenuItem("Assets/NGUI/Create 3D UI", false, 1)]
@@ -230,7 +231,7 @@ static public class NGUIMenu
 
 	[MenuItem("NGUI/Create/3D UI", true)]
 	[MenuItem("Assets/NGUI/Create 3D UI", true, 1)]
-	static bool Create3Da () { return UIRoot.list.Count == 0; }
+	static bool Create3Da () { return UIRoot.list.Count == 0 || UICamera.list.size == 0 || UICamera.list[0].camera.isOrthoGraphic; }
 
 #endregion
 #region Attach
@@ -268,20 +269,20 @@ static public class NGUIMenu
 		}
 	}
 
-	[MenuItem("NGUI/Attach/Anchor", false, 7)]
-	static public void Add1 () { AddIfMissing<UIAnchor>(); }
+	//[MenuItem("NGUI/Attach/Anchor", false, 7)]
+	//static public void Add1 () { AddIfMissing<UIAnchor>(); }
 
-	[MenuItem("NGUI/Attach/Anchor", true)]
-	static public bool Add1a () { return !Exists<UIAnchor>(); }
+	//[MenuItem("NGUI/Attach/Anchor", true)]
+	//static public bool Add1a () { return !Exists<UIAnchor>(); }
 
-	[MenuItem("NGUI/Attach/Stretch", false, 7)]
-	static public void Add2 () { AddIfMissing<UIStretch>(); }
+	//[MenuItem("NGUI/Attach/Stretch (Legacy)", false, 7)]
+	//static public void Add2 () { AddIfMissing<UIStretch>(); }
 
-	[MenuItem("NGUI/Attach/Stretch", true)]
-	static public bool Add2a () { return !Exists<UIStretch>(); }
+	//[MenuItem("NGUI/Attach/Stretch (Legacy)", true)]
+	//static public bool Add2a () { return !Exists<UIStretch>(); }
 
-	[MenuItem("NGUI/Attach/", false, 7)]
-	static public void Add3s () {}
+	//[MenuItem("NGUI/Attach/", false, 7)]
+	//static public void Add3s () {}
 
 	[MenuItem("NGUI/Attach/Button Script", false, 7)]
 	static public void Add3 () { AddIfMissing<UIButton>(); }
@@ -312,6 +313,12 @@ static public class NGUIMenu
 
 	[MenuItem("NGUI/Attach/Play Animation Script", false, 7)]
 	static public void Add12 () { AddIfMissing<UIPlayAnimation>(); }
+
+	[MenuItem("NGUI/Attach/Play Sound Script", false, 7)]
+	static public void Add13 () { AddIfMissing<UIPlaySound>(); }
+
+	[MenuItem("NGUI/Attach/Localization Script", false, 7)]
+	static public void Add14 () { AddIfMissing<UILocalize>(); }
 
 #endregion
 #region Tweens
@@ -477,6 +484,18 @@ static public class NGUIMenu
 
 	[MenuItem("NGUI/Options/Snapping/Turn Off", true, 10)]
 	static public bool TurnSnapOffCheck () { return NGUISnap.allow; }
+
+	[MenuItem("NGUI/Options/Guides/Always On", false, 10)]
+	static public void TurnGuidesOn () { NGUISettings.drawGuides = true; }
+
+	[MenuItem("NGUI/Options/Guides/Always On", true, 10)]
+	static public bool TurnGuidesOnCheck () { return !NGUISettings.drawGuides; }
+
+	[MenuItem("NGUI/Options/Guides/Only When Needed", false, 10)]
+	static public void TurnGuidesOff () { NGUISettings.drawGuides = false; }
+
+	[MenuItem("NGUI/Options/Guides/Only When Needed", true, 10)]
+	static public bool TurnGuidesOffCheck () { return NGUISettings.drawGuides; }
 
 #endregion
 

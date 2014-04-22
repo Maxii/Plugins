@@ -1,13 +1,17 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
 using UnityEditor;
 
 [CanEditMultipleObjects]
+#if UNITY_3_5
 [CustomEditor(typeof(UIProgressBar))]
+#else
+[CustomEditor(typeof(UIProgressBar), true)]
+#endif
 public class UIProgressBarEditor : UIWidgetContainerEditor
 {
 	public override void OnInspectorGUI ()
@@ -57,10 +61,21 @@ public class UIProgressBarEditor : UIWidgetContainerEditor
 		if (sb.value != val ||
 			sb.alpha != alpha)
 		{
-			NGUIEditorTools.RegisterUndo("Scroll Bar Change", sb);
+			NGUIEditorTools.RegisterUndo("Progress Bar Change", sb);
 			sb.value = val;
 			sb.alpha = alpha;
-			UnityEditor.EditorUtility.SetDirty(sb);
+			NGUITools.SetDirty(sb);
+
+			for (int i = 0; i < UIScrollView.list.size; ++i)
+			{
+				UIScrollView sv = UIScrollView.list[i];
+
+				if (sv.horizontalScrollBar == sb || sv.verticalScrollBar == sb)
+				{
+					NGUIEditorTools.RegisterUndo("Progress Bar Change", sv);
+					sv.UpdatePosition();
+				}
+			}
 		}
 	}
 

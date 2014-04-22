@@ -14,23 +14,22 @@ public class LocalizeDemo : MonoBehaviour
 		Spanish,
 		End
 	}
-	
+
 	void Start()
 	{
-		Localization loc = Localization.instance;
-		if (loc != null)
-		{
-			if (loc.currentLanguage == "English")
-				menuBar.SetChecked((int)LanguageItem.English, true);
-			else if (loc.currentLanguage == "French")
-				menuBar.SetChecked((int)LanguageItem.French, true);
-			else if (loc.currentLanguage == "Italian")
-				menuBar.SetChecked((int)LanguageItem.Italian, true);
-			else if (loc.currentLanguage == "German")
-				menuBar.SetChecked((int)LanguageItem.German, true);
-			else if (loc.currentLanguage == "Spanish")
-				menuBar.SetChecked((int)LanguageItem.Spanish, true);
-		}
+		TextAsset txt = Resources.Load("CtxDemoLocalization", typeof(TextAsset)) as TextAsset;
+		Localization.LoadCSV(txt);
+
+		if (Localization.language == "English")
+			menuBar.SetChecked((int)LanguageItem.English, true);
+		else if (Localization.language == "French")
+			menuBar.SetChecked((int)LanguageItem.French, true);
+		else if (Localization.language == "Italian")
+			menuBar.SetChecked((int)LanguageItem.Italian, true);
+		else if (Localization.language == "German")
+			menuBar.SetChecked((int)LanguageItem.German, true);
+		else if (Localization.language == "Spanish")
+			menuBar.SetChecked((int)LanguageItem.Spanish, true);
 	}
 	
 	public void OnMenuSelection()
@@ -41,7 +40,7 @@ public class LocalizeDemo : MonoBehaviour
 		
 		if (li >= LanguageItem.English && li < LanguageItem.End)
 		{
-			Localization.instance.currentLanguage = itemText;
+			Localization.language = itemText;
 			Debug.Log("Language selected: "+itemText);
 		}
 		else

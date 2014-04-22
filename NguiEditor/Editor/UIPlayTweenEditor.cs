@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -53,7 +53,7 @@ public class UIPlayTweenEditor : Editor
 			tw.resetOnPlay = (reset == ResetOnPlay.Restart);
 			tw.resetIfDisabled = (reset == ResetOnPlay.RestartIfNotPlaying);
 			tw.disableWhenFinished = dis;
-			UnityEditor.EditorUtility.SetDirty(tw);
+			NGUITools.SetDirty(tw);
 		}
 
 		NGUIEditorTools.SetLabelWidth(80f);

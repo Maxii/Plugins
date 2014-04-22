@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -86,6 +86,21 @@ public class BetterList<T>
 	/// </summary>
 
 	public void RemoveAt (int index) { mList.RemoveAt(index); }
+
+	/// <summary>
+	/// Remove an item from the end.
+	/// </summary>
+
+	public T Pop ()
+	{
+		if (buffer != null && size != 0)
+		{
+			T val = buffer[mList.Count - 1];
+			mList.RemoveAt(mList.Count - 1);
+			return val;
+		}
+		return default(T);
+	}
 
 	/// <summary>
 	/// Mimic List's ToArray() functionality, except that in this case the list is resized to match the current size.

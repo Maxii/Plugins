@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 #if UNITY_IPHONE || UNITY_ANDROID || UNITY_WP8 || UNITY_BLACKBERRY
@@ -11,7 +11,11 @@ using UnityEngine;
 using UnityEditor;
 
 [CanEditMultipleObjects]
+#if UNITY_3_5
 [CustomEditor(typeof(UIInput))]
+#else
+[CustomEditor(typeof(UIInput), true)]
+#endif
 public class UIInputEditor : UIWidgetContainerEditor
 {
 	public override void OnInspectorGUI ()
@@ -31,7 +35,7 @@ public class UIInputEditor : UIWidgetContainerEditor
 			if (Application.isPlaying) NGUIEditorTools.DrawPaddedProperty("Value", serializedObject, "mValue");
 			else NGUIEditorTools.DrawPaddedProperty("Starting Value", serializedObject, "mValue");
 			NGUIEditorTools.DrawPaddedProperty(serializedObject, "savedAs");
-			NGUIEditorTools.DrawProperty("Active Text", serializedObject, "activeTextColor");
+			NGUIEditorTools.DrawProperty("Active Text Color", serializedObject, "activeTextColor");
 
 			EditorGUI.BeginDisabledGroup(serializedObject.isEditingMultipleObjects);
 			{
@@ -39,12 +43,15 @@ public class UIInputEditor : UIWidgetContainerEditor
 				{
 					SerializedObject ob = new SerializedObject(label.objectReferenceValue);
 					ob.Update();
-					NGUIEditorTools.DrawProperty("Inactive", ob, "mColor");
+					NGUIEditorTools.DrawProperty("Inactive Color", ob, "mColor");
 					ob.ApplyModifiedProperties();
 				}
-				else EditorGUILayout.ColorField("Inactive", Color.white);
+				else EditorGUILayout.ColorField("Inactive Color", Color.white);
 			}
 			EditorGUI.EndDisabledGroup();
+
+			NGUIEditorTools.DrawProperty("Caret Color", serializedObject, "caretColor");
+			NGUIEditorTools.DrawProperty("Selection Color", serializedObject, "selectionColor");
 #if !MOBILE
 			NGUIEditorTools.DrawProperty(serializedObject, "selectOnTab");
 #endif
@@ -73,6 +80,7 @@ public class UIInputEditor : UIWidgetContainerEditor
 			NGUIEditorTools.SetLabelWidth(80f);
 			EditorGUI.BeginDisabledGroup(serializedObject.isEditingMultipleObjects);
 			NGUIEditorTools.DrawEvents("On Submit", input, input.onSubmit);
+			NGUIEditorTools.DrawEvents("On Change", input, input.onChange);
 			EditorGUI.EndDisabledGroup();
 		}
 		EditorGUI.EndDisabledGroup();

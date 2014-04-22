@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 #if !UNITY_3_5 && !UNITY_FLASH
@@ -185,7 +185,7 @@ public class UIPopupListInspector : UIWidgetContainerEditor
 					}
 					else
 					{
-						ComponentSelector.Show<Font>(OnDynamicFont);
+						ComponentSelector.Show<Font>(OnDynamicFont, new string[] { ".ttf", ".otf"});
 					}
 				}
 

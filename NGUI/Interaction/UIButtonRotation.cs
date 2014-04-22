@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -19,7 +19,6 @@ public class UIButtonRotation : MonoBehaviour
 
 	Quaternion mRot;
 	bool mStarted = false;
-	bool mHighlighted = false;
 
 	void Start ()
 	{
@@ -31,7 +30,7 @@ public class UIButtonRotation : MonoBehaviour
 		}
 	}
 
-	void OnEnable () { if (mStarted && mHighlighted) OnHover(UICamera.IsHighlighted(gameObject)); }
+	void OnEnable () { if (mStarted) OnHover(UICamera.IsHighlighted(gameObject)); }
 
 	void OnDisable ()
 	{
@@ -41,7 +40,7 @@ public class UIButtonRotation : MonoBehaviour
 
 			if (tc != null)
 			{
-				tc.rotation = mRot;
+				tc.value = mRot;
 				tc.enabled = false;
 			}
 		}
@@ -62,8 +61,14 @@ public class UIButtonRotation : MonoBehaviour
 		if (enabled)
 		{
 			if (!mStarted) Start();
-			TweenRotation.Begin(tweenTarget.gameObject, duration, isOver ? mRot * Quaternion.Euler(hover) : mRot).method = UITweener.Method.EaseInOut;
-			mHighlighted = isOver;
+			TweenRotation.Begin(tweenTarget.gameObject, duration, isOver ? mRot * Quaternion.Euler(hover) :
+				mRot).method = UITweener.Method.EaseInOut;
 		}
+	}
+
+	void OnSelect (bool isSelected)
+	{
+		if (enabled && (!isSelected || UICamera.currentScheme == UICamera.ControlScheme.Controller))
+			OnHover(isSelected);
 	}
 }

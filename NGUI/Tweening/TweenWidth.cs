@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -22,11 +22,22 @@ public class TweenWidth : UITweener
 
 	public UIWidget cachedWidget { get { if (mWidget == null) mWidget = GetComponent<UIWidget>(); return mWidget; } }
 
-	public int width { get { return cachedWidget.width; } set { cachedWidget.width = value; } }
+	[System.Obsolete("Use 'value' instead")]
+	public int width { get { return this.value; } set { this.value = value; } }
+
+	/// <summary>
+	/// Tween's current value.
+	/// </summary>
+
+	public int value { get { return cachedWidget.width; } set { cachedWidget.width = value; } }
+
+	/// <summary>
+	/// Tween the value.
+	/// </summary>
 
 	protected override void OnUpdate (float factor, bool isFinished)
 	{
-		cachedWidget.width = Mathf.RoundToInt(from * (1f - factor) + to * factor);
+		value = Mathf.RoundToInt(from * (1f - factor) + to * factor);
 
 		if (updateTable)
 		{
@@ -56,4 +67,16 @@ public class TweenWidth : UITweener
 		}
 		return comp;
 	}
+
+	[ContextMenu("Set 'From' to current value")]
+	public override void SetStartToCurrentValue () { from = value; }
+
+	[ContextMenu("Set 'To' to current value")]
+	public override void SetEndToCurrentValue () { to = value; }
+
+	[ContextMenu("Assume value of 'From'")]
+	void SetCurrentValueToStart () { value = from; }
+
+	[ContextMenu("Assume value of 'To'")]
+	void SetCurrentValueToEnd () { value = to; }
 }

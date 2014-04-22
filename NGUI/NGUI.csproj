@@ -71,7 +71,9 @@
     <Compile Include="Interaction\UIDragDropRoot.cs" />
     <Compile Include="Interaction\UIDraggableCamera.cs" />
     <Compile Include="Interaction\UIDragObject.cs" />
+    <Compile Include="Interaction\UIDragResize.cs" />
     <Compile Include="Interaction\UIDragScrollView.cs" />
+    <Compile Include="Interaction\UIEventTrigger.cs" />
     <Compile Include="Interaction\UIForwardEvents.cs" />
     <Compile Include="Interaction\UIGrid.cs" />
     <Compile Include="Interaction\UIImageButton.cs" />
@@ -109,6 +111,7 @@
     <Compile Include="Internal\UIDrawCall.cs" />
     <Compile Include="Internal\UIEventListener.cs" />
     <Compile Include="Internal\UIGeometry.cs" />
+    <Compile Include="Internal\UIRect.cs" />
     <Compile Include="Internal\UIWidget.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Tweening\AnimatedAlpha.cs" />
@@ -127,6 +130,7 @@
     <Compile Include="Tweening\TweenWidth.cs" />
     <Compile Include="Tweening\UITweener.cs" />
     <Compile Include="UI\UI2DSprite.cs" />
+    <Compile Include="UI\UI2DSpriteAnimation.cs" />
     <Compile Include="UI\UIAnchor.cs" />
     <Compile Include="UI\UIAtlas.cs" />
     <Compile Include="UI\UICamera.cs" />

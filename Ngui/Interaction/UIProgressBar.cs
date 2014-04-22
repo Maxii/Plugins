@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -50,7 +50,6 @@ public class UIProgressBar : UIWidgetContainer
 	protected Transform mTrans;
 	protected bool mIsDirty = false;
 	protected Camera mCam;
-	protected UISprite mSprite;
 	protected float mOffset = 0f;
 
 	/// <summary>
@@ -104,8 +103,7 @@ public class UIProgressBar : UIWidgetContainer
 			if (mFill != value)
 			{
 				mFill = value;
-				mIsDirty = true;
-				if (!Application.isPlaying) ForceUpdate();
+				ForceUpdate();
 			}
 		}
 	}
@@ -127,16 +125,27 @@ public class UIProgressBar : UIWidgetContainer
 
 			if (mValue != val)
 			{
+				float before = this.value;
 				mValue = val;
-				mIsDirty = true;
 
-				if (EventDelegate.IsValid(onChange))
+				if (Mathf.Abs(before - this.value) > 0.001f)
 				{
-					current = this;
-					EventDelegate.Execute(onChange);
-					current = null;
+					ForceUpdate();
+
+					if (NGUITools.GetActive(this))
+					{
+						if (EventDelegate.IsValid(onChange))
+						{
+							current = this;
+							EventDelegate.Execute(onChange);
+							current = null;
+						}
+					}
 				}
-				if (!Application.isPlaying) ForceUpdate();
+#if UNITY_EDITOR
+				if (!Application.isPlaying)
+					NGUITools.SetDirty(this);
+#endif
 			}
 		}
 	}
@@ -200,8 +209,6 @@ public class UIProgressBar : UIWidgetContainer
 	{
 		Upgrade();
 
-		mSprite = mFG as UISprite;
-
 		if (Application.isPlaying)
 		{
 			if (mFG == null)
@@ -255,14 +262,25 @@ public class UIProgressBar : UIWidgetContainer
 
 	protected void OnValidate ()
 	{
-		Upgrade();
-		mIsDirty = true;
-		mSprite = mFG as UISprite;
-		float val = Mathf.Clamp01(mValue);
-		if (mValue != val) mValue = val;
-		if (numberOfSteps < 0) numberOfSteps = 0;
-		else if (numberOfSteps > 20) numberOfSteps = 20;
-		ForceUpdate();
+		// For some bizarre reason Unity calls this function on prefabs, even if prefabs
+		// are not actually used in the scene, nor selected in inspector. Dafuq?
+		if (NGUITools.GetActive(this))
+		{
+			Upgrade();
+			mIsDirty = true;
+			float val = Mathf.Clamp01(mValue);
+			if (mValue != val) mValue = val;
+			if (numberOfSteps < 0) numberOfSteps = 0;
+			else if (numberOfSteps > 20) numberOfSteps = 20;
+			ForceUpdate();
+		}
+		else
+		{
+			float val = Mathf.Clamp01(mValue);
+			if (mValue != val) mValue = val;
+			if (numberOfSteps < 0) numberOfSteps = 0;
+			else if (numberOfSteps > 20) numberOfSteps = 20;
+		}
 	}
 
 	/// <summary>
@@ -298,12 +316,12 @@ public class UIProgressBar : UIWidgetContainer
 			if (isHorizontal)
 			{
 				float diff = (localPos.x - corners[0].x) / size.x;
-				return Mathf.Clamp01(isInverted ? 1f - diff : diff);
+				return isInverted ? 1f - diff : diff;
 			}
 			else
 			{
 				float diff = (localPos.y - corners[0].y) / size.y;
-				return Mathf.Clamp01(isInverted ? 1f - diff : diff);
+				return isInverted ? 1f - diff : diff;
 			}
 		}
 		return value;
@@ -319,13 +337,15 @@ public class UIProgressBar : UIWidgetContainer
 
 		if (mFG != null)
 		{
+			UISprite sprite = mFG as UISprite;
+
 			if (isHorizontal)
 			{
-				if (mSprite != null && mSprite.type == UISprite.Type.Filled)
+				if (sprite != null && sprite.type == UISprite.Type.Filled)
 				{
-					mSprite.fillDirection = UISprite.FillDirection.Horizontal;
-					mSprite.invert = isInverted;
-					mSprite.fillAmount = value;
+					sprite.fillDirection = UISprite.FillDirection.Horizontal;
+					sprite.invert = isInverted;
+					sprite.fillAmount = value;
 				}
 				else
 				{
@@ -334,11 +354,11 @@ public class UIProgressBar : UIWidgetContainer
 						new Vector4(0f, 0f, value, 1f);
 				}
 			}
-			else if (mSprite != null && mSprite.type == UISprite.Type.Filled)
+			else if (sprite != null && sprite.type == UISprite.Type.Filled)
 			{
-				mSprite.fillDirection = UISprite.FillDirection.Vertical;
-				mSprite.invert = isInverted;
-				mSprite.fillAmount = value;
+				sprite.fillDirection = UISprite.FillDirection.Vertical;
+				sprite.invert = isInverted;
+				sprite.fillAmount = value;
 			}
 			else
 			{
@@ -350,7 +370,21 @@ public class UIProgressBar : UIWidgetContainer
 
 		if (thumb != null && (mFG != null || mBG != null))
 		{
-			Vector3[] corners = (mFG != null) ? mFG.worldCorners : mBG.worldCorners;
+			Vector3[] corners = (mFG != null) ? mFG.localCorners : mBG.localCorners;
+
+			Vector4 br = (mFG != null) ? mFG.border : mBG.border;
+			corners[0].x += br.x;
+			corners[1].x += br.x;
+			corners[2].x -= br.z;
+			corners[3].x -= br.z;
+
+			corners[0].y += br.y;
+			corners[1].y -= br.w;
+			corners[2].y -= br.w;
+			corners[3].y += br.y;
+
+			Transform t = (mFG != null) ? mFG.cachedTransform : mBG.cachedTransform;
+			for (int i = 0; i < 4; ++i) corners[i] = t.TransformPoint(corners[i]);
 
 			if (isHorizontal)
 			{

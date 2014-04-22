@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -57,7 +57,7 @@ public class UIToggleInspector : UIWidgetContainerEditor
 				{
 					NGUIEditorTools.RegisterUndo("Toggle Change", toggle);
 					toggle.instantTween = (tr == Transition.Instant);
-					UnityEditor.EditorUtility.SetDirty(toggle);
+					NGUITools.SetDirty(toggle);
 				}
 			}
 			NGUIEditorTools.EndContents();

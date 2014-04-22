@@ -544,7 +544,7 @@ public class CtxMenu : MonoBehaviour
 	private bool pendingHide;
 	private bool isHiding;
 	private bool isShowing;
-	private string language;
+	private bool selectionToParent = false;
 	
 	// Every menu item gets an ItemData struct to keep track of all of the internal
 	// state for that item. The itemData array corresponds exactly to the items array
@@ -557,7 +557,8 @@ public class CtxMenu : MonoBehaviour
 		public Item menuItem;
 		public UISprite background;
 		public UISprite shadow;
-		public UISprite highlight;
+		public UIWidget highlight;
+		public UISprite highlightSprite;
 		public UISprite icon;
 		public UILabel label;
 		public UISprite checkmark;
@@ -568,7 +569,9 @@ public class CtxMenu : MonoBehaviour
 	}
 	
 	private ItemData[] itemData;
-	
+
+	private static GameObject pendingSelection;
+
 	[HideInInspector]
 	public uint editorFlags = 0xFFFFF8FFu;
 	
@@ -995,7 +998,7 @@ public class CtxMenu : MonoBehaviour
 					if (index == i)
 					{
 						SetHighlight(-1);
-						UICamera.selectedObject = gameObject;
+						SelectObject(gameObject);
 					}
 					
 					if (style == Style.Pie)
@@ -1121,7 +1124,7 @@ public class CtxMenu : MonoBehaviour
 						GameObject newSel = itemData[best].background.gameObject;
 						if (newSel != UICamera.selectedObject)
 						{
-							UICamera.selectedObject = newSel;
+							SelectObject(newSel);
 							pieMenuJoystickSelection = best;
 						}
 						
@@ -1131,7 +1134,7 @@ public class CtxMenu : MonoBehaviour
 
 				if (pieMenuJoystickSelection >= 0)
 				{
-					UICamera.selectedObject = gameObject;
+					SelectObject(gameObject);
 					pieMenuJoystickSelection = -1;
 				}
 			}
@@ -1139,7 +1142,7 @@ public class CtxMenu : MonoBehaviour
 		
 		if (isShowing)
 		{
-			UICamera.selectedObject = gameObject;
+			SelectObject(gameObject);
 			isShowing = false;
 		}
 		
@@ -1152,12 +1155,16 @@ public class CtxMenu : MonoBehaviour
 			submenuTimer -= Time.deltaTime;
 			if (submenuTimer <= 0f)
 			{
+				//Debug.Log("CtxMenu.LateUpdate() - "+this+" popping submenu [index = "+index+"]");
 				submenuTimer = 0f;
 				if (items[index].isSubmenu && items[index].submenu != null)
 				{
 					ShowSubmenu(index);
 					if (currentSubmenu != null)
-						UICamera.selectedObject = currentSubmenu.gameObject;
+					{
+						selectionToParent = true;
+						SelectObject(currentSubmenu.gameObject);
+					}
 				}
 				
 				submenuTimer = 0f;
@@ -1174,34 +1181,20 @@ public class CtxMenu : MonoBehaviour
 				// Special case handling for submenus: if the parent item associated
 				// with opening this submenu is still highlighted, we don't want to
 				// close. In that case select this menu again to keep it open.
+				/*
 				if (parentMenu != null && parentMenu.IsSubmenuItemSelected(this))
+					SelectObject(gameObject);
+				else 
+				*/
+
+				if (! pendingHide)
 				{
-					UICamera.selectedObject = gameObject;
-					pendingHide = false;
-				}
-				else
-				{
-					// We need to see this two frames in a row before taking action.
-					// The pendingHide flag is used to ensure this.
-					if (pendingHide)
-					{
-						pendingHide = false;
-						Hide();
-					}
-					else
-					{
-						//Debug.Log("CtxMenu.LateUpdate() - "+this+" wants to hide [sel = "+UICamera.selectedObject+"] [index = "+index+"]");
-						pendingHide = true;
-					}
+					StartCoroutine(PendingHide());
+					pendingHide = true;
 				}
 			}
-			else
-				pendingHide = false;
 		}
-		else
-			pendingHide = false;
-		
-		
+
 		// For menu bars we need to ensure that the width (horizontal) or
 		// height (vertical) continues to match the screen dimensions. Since we
 		// don't get any notification of when the screen size changes, we are
@@ -1224,6 +1217,26 @@ public class CtxMenu : MonoBehaviour
 					background.height = size;
 			}
 		}
+	}
+
+	IEnumerator PendingHide()
+	{
+		// These yields are basically to give the NGUI selection state a chance to catch up,
+		// since it is potentially delayed in a coroutine.
+
+		yield return new WaitForEndOfFrame();
+		yield return new WaitForEndOfFrame();
+
+		if (UICamera.selectedObject != gameObject && pendingSelection != gameObject && FindItem(pendingSelection) == -1)
+		{
+			if (index == -1 && currentSubmenu == null)
+			{
+				//Debug.Log("CtxMenu.PendingHide() - "+this+" now hiding [sel = "+UICamera.selectedObject+"/"+pendingSelection+"] [index = "+index+"]");
+				Hide();
+			}
+		}
+
+		pendingHide = false;
 	}
 	
 	void OnItemPress(GameObject go, bool isPressed)
@@ -1259,8 +1272,11 @@ public class CtxMenu : MonoBehaviour
 				
 				if (menuBar)
 				{
-					menuBarActive = true;
-					SelectItem(items[index]);
+					if (index >= 0)
+					{
+						menuBarActive = true;
+						SelectItem(items[index]);
+					}
 				}
 				else if (index >= 0)
 				{
@@ -1343,11 +1359,15 @@ public class CtxMenu : MonoBehaviour
 		
 	void OnItemSelect(GameObject go, bool isSelected)
 	{
+		//Debug.Log("CtxMenu.OnItemSelect() "+this+": "+go.name+" "+isSelected);
+
 		// We use the NGUI selection state to keep track of which menu item is
 		// currently active -- that is, highlighted. This allows us to make use
 		// of NGUI's standard submit/cancel and navigation semantics, which in
 		// turn allows us to support keyboard and game controller input.
 		
+		ObjectSelected(go);
+
 		if (isSelected)
 		{
 			int newIndex = FindItem(go);
@@ -1359,9 +1379,14 @@ public class CtxMenu : MonoBehaviour
 		}
 		else
 		{
-			int newIndex = FindItem(go);
-			if (newIndex >= 0 && newIndex == index)
-				SetHighlight(-1);
+			if (selectionToParent)
+				selectionToParent = false;
+			else
+			{
+				int newIndex = FindItem(go);
+				if (newIndex >= 0 && newIndex == index)
+					SetHighlight(-1);
+			}
 		}
 	}
 	
@@ -1385,12 +1410,38 @@ public class CtxMenu : MonoBehaviour
 		
 	void OnSelect(bool isSelected)
 	{
+		//Debug.Log("CtxMenu.OnSelect() "+this+" "+isSelected);
+
+		ObjectSelected(gameObject);
+
 		if (parentMenu != null)
 			parentMenu.OnSubmenuSelect(this, isSelected);
 	}
 
+	static void SelectObject(GameObject obj)
+	{
+		//Debug.Log("CtxMenu.SelectObject("+obj+")");
+		
+		pendingSelection = obj;
+		UICamera.selectedObject = obj;
+	}
+
+	static void ObjectSelected(GameObject obj)
+	{
+		if (pendingSelection == obj)
+			pendingSelection = null;
+	}
+
 	void OnKey(KeyCode key)
 	{
+		//Debug.Log("CtxMenu.OnKey() "+this+" "+key);
+
+		if (index < 0 && parentMenu != null)
+		{
+			parentMenu.OnKey(key);
+			return;
+		}
+
 		// Navigation semantics are slightly different for the different menu types:
 		// 	Horizontal menus track left/right arrows, tab/shift-tab and home/end.
 		//	Vertical menus track up/down arrows and home/end.
@@ -1407,6 +1458,23 @@ public class CtxMenu : MonoBehaviour
 			{
 				SelectInUI(PrevEnabledItem(index));
 				return;
+			}
+			else if (key == KeyCode.DownArrow)
+			{
+				if (currentSubmenu != null)
+				{
+					currentSubmenu.SelectInUI(0);
+					return;
+				}
+			}
+			else if (key == KeyCode.UpArrow)
+			{
+				if (parentMenu != null)
+				{
+					SetHighlight(-1);
+					SelectObject(gameObject);
+					return;
+				}
 			}
 			else if (key == KeyCode.Home)
 			{
@@ -1430,6 +1498,23 @@ public class CtxMenu : MonoBehaviour
 			{
 				SelectInUI(PrevEnabledItem(index));
 				return;
+			}
+			else if (key == KeyCode.RightArrow)
+			{
+				if (currentSubmenu != null)
+				{
+					currentSubmenu.SelectInUI(0);
+					return;
+				}
+			}
+			else if (key == KeyCode.LeftArrow)
+			{
+				if (parentMenu != null)
+				{
+					SetHighlight(-1);
+					SelectObject(gameObject);
+					return;
+				}
 			}
 			else if (key == KeyCode.Home)
 			{
@@ -1480,12 +1565,10 @@ public class CtxMenu : MonoBehaviour
 		DestroyMenu();
 	}
 	
-	void OnLocalize(Localization loc)
+	void OnLocalize()
 	{
-		if (isLocalized && language != loc.currentLanguage && itemData != null && items != null)
+		if (isLocalized && itemData != null && items != null)
 		{
-			language = loc.currentLanguage;
-			
 			// Would be nice not to have to rebuild the while menu, but typically
 			// this blows all the metrics to hell, so it's just easier to do this.
 			Refresh();
@@ -1498,6 +1581,8 @@ public class CtxMenu : MonoBehaviour
 	
 	void ShowSubmenu(int itemIndex)
 	{
+		//Debug.Log("CtxMenu.ShowSubmenu() "+itemIndex+" "+menuRoot);
+
 		// Occasionally seeing this pop up after the parent menu has been closed,
 		// probably because the submenu timer is still going. In this case we
 		// simply decline to show the submenu.
@@ -1645,6 +1730,8 @@ public class CtxMenu : MonoBehaviour
 	
 	void OnSubmenuHide(CtxMenu submenu)
 	{
+		//Debug.Log("CtxMenu.OnSubmenuHide() "+submenu);
+
 		int submenuIdx = FindItemForSubmenu(submenu);
 		if (submenuIdx >= 0)
 		{
@@ -1661,7 +1748,10 @@ public class CtxMenu : MonoBehaviour
 		}
 
 		if (submenu.parentMenu == this)
-			UICamera.selectedObject = gameObject;
+		{
+			if (! IsChildMenu(UICamera.selectedObject))
+				SelectObject(gameObject);
+		}
 	}
 	
 	void OnSubmenuSelection()
@@ -1842,11 +1932,21 @@ public class CtxMenu : MonoBehaviour
 				// is hovered or selected.
 				else
 				{
-					UISprite highlight = NGUITools.AddSprite(menuRoot, atlas, highlightSprite);
+					// As of NGUI 3.4.7 a sprite with alpha of 0 gets disabled, which means that
+					// highlights stop receiving events. To circumvent this, we now make the highlight
+					// a generic widget that just holds a collider and parent the highlight sprite to that.
+
+					UIWidget highlight = NGUITools.AddWidget<UIWidget>(menuRoot);
+					UISprite highlightSpr = NGUITools.AddSprite(highlight.gameObject, atlas, highlightSprite);
 					highlight.pivot = UIWidget.Pivot.TopLeft;
-					highlight.depth = NGUITools.CalculateNextDepth(panel.gameObject);
-					highlight.color = highlightColorFaded;
+					highlightSpr.pivot = UIWidget.Pivot.TopLeft;
+					highlightSpr.depth = NGUITools.CalculateNextDepth(panel.gameObject);
+					highlightSpr.color = highlightColorFaded;
+					highlightSpr.transform.localPosition = Vector3.zero;
+					highlight.name = "Highlight"+i.ToString();
+
 					itemData[i].highlight = highlight;
+					itemData[i].highlightSprite = highlightSpr;
 				}
 				
 				float width = padding.x * 2f;
@@ -1881,18 +1981,23 @@ public class CtxMenu : MonoBehaviour
 				{
 					UILabel label = NGUITools.AddWidget<UILabel>(menuRoot);
 					label.bitmapFont = font;
-					label.text = (isLocalized && Localization.instance != null) ? Localization.instance.Get(item.text) : item.text;
+					label.fontSize = font.defaultSize;
 					label.overflowMethod = UILabel.Overflow.ResizeFreely;
 					label.color = item.isDisabled ? labelColorDisabled : labelColorNormal;
 					label.pivot = UIWidget.Pivot.TopLeft;
 					label.depth = NGUITools.CalculateNextDepth(panel.gameObject);
-	
+
 					label.cachedTransform.localPosition = Vector3.zero;
+					if (isLocalized)
+						label.text = Localization.Get(item.text);
+					else
+						label.text = item.text;
+
+					label.height = 1;
 					label.MakePixelPerfect();
 					label.cachedTransform.localScale = new Vector3(labelScale, labelScale, 1f);
 					
 					Vector2 labelSize = label.printedSize * labelScale;
-					
 					width += labelSize.x;
 					
 					itemData[i].label = label;
@@ -2108,6 +2213,8 @@ public class CtxMenu : MonoBehaviour
 						itemData[i].highlight.cachedTransform.localPosition = itemPos;
 						itemData[i].highlight.width = (int)itemData[i].size.x;
 						itemData[i].highlight.height = (int)itemData[i].size.y;
+						itemData[i].highlightSprite.width = itemData[i].highlight.width;
+						itemData[i].highlightSprite.height = itemData[i].highlight.height;
 						
 						// Add a collider to the highlight item. The size of the highlight
 						// conveniently agrees with the extent of the box we want to track.
@@ -2115,9 +2222,9 @@ public class CtxMenu : MonoBehaviour
 							NGUITools.AddWidgetCollider(itemData[i].highlight.gameObject);
 						
 						if (string.IsNullOrEmpty(items[i].text))
-							itemData[i].highlight.name = items[i].icon;
+							itemData[i].highlightSprite.name = items[i].icon;
 						else
-							itemData[i].highlight.name = items[i].text;
+							itemData[i].highlightSprite.name = items[i].text;
 					}
 
 					itemPos.x += padding.x;
@@ -2224,16 +2331,18 @@ public class CtxMenu : MonoBehaviour
 						itemData[i].highlight.cachedTransform.localPosition = itemPos;
 						itemData[i].highlight.width = (int)itemData[i].size.x;
 						itemData[i].highlight.height = (int)itemData[i].size.y;
-						
+						itemData[i].highlightSprite.width = itemData[i].highlight.width;
+						itemData[i].highlightSprite.height = itemData[i].highlight.height;
+
 						// Add a collider to the highlight item. The size of the highlight
 						// conveniently agrees with the extent of the box we want to track.
 						if (! items[i].isDisabled)
 							NGUITools.AddWidgetCollider(itemData[i].highlight.gameObject);
 						
 						if (string.IsNullOrEmpty(items[i].text))
-							itemData[i].highlight.name = items[i].icon;
+							itemData[i].highlightSprite.name = items[i].icon;
 						else
-							itemData[i].highlight.name = items[i].text;
+							itemData[i].highlightSprite.name = items[i].text;
 					}
 
 					itemPos.x += padding.x;
@@ -2754,7 +2863,9 @@ public class CtxMenu : MonoBehaviour
 	{
 		if (items == null || items.Length == 0)
 			return;
-		
+
+		//Debug.Log("CtxMenu.SetHighlight() "+newIndex);
+
 		bool openSubmenu = (newIndex >= 0 && items[newIndex].isSubmenu && items[newIndex].submenu != null && (menuBar == false || menuBarActive));
 		
 		if (newIndex >= 0 && ! IsCurrentSubmenu(index) && ! IsCurrentSubmenu(newIndex))
@@ -2770,7 +2881,7 @@ public class CtxMenu : MonoBehaviour
 				Color highlightColorFaded = highlightColor;
 				highlightColorFaded.a = 0f;
 				
-				TweenColor.Begin(itemData[index].highlight.gameObject, 0.2f, highlightColorFaded);
+				TweenColor.Begin(itemData[index].highlightSprite.gameObject, 0.2f, highlightColorFaded);
 				
 				if (itemData[index].label != null && ! items[index].isDisabled)
 					TweenColor.Begin(itemData[index].label.gameObject, 0.2f, labelColorNormal);
@@ -2778,7 +2889,7 @@ public class CtxMenu : MonoBehaviour
 			
 			if (newIndex >= 0)
 			{
-				TweenColor.Begin(itemData[newIndex].highlight.gameObject, 0.2f, highlightColor);
+				TweenColor.Begin(itemData[newIndex].highlightSprite.gameObject, 0.2f, highlightColor);
 				
 				if (itemData[newIndex].label != null && ! items[newIndex].isDisabled)
 					TweenColor.Begin(itemData[newIndex].label.gameObject, 0.2f, labelColorSelected);
@@ -2809,7 +2920,7 @@ public class CtxMenu : MonoBehaviour
 		if (openSubmenu)
 		{
 			if (! IsCurrentSubmenu(newIndex))
-				submenuTimer = submenuTimeDelay;
+				submenuTimer = 0.0001f;	//submenuTimeDelay;
 		}
 		else
 			submenuTimer = 0f;
@@ -2827,7 +2938,7 @@ public class CtxMenu : MonoBehaviour
 	// Sets the NGUI selection state to the selected menu item.
 	void SelectInUI(int newIndex)
 	{
-		if (items == null || newIndex < 0 || newIndex > items.Length)
+		if (items == null || itemData == null || newIndex < 0 || newIndex >= items.Length)
 			return;
 	
 		GameObject sel = null;
@@ -2845,7 +2956,7 @@ public class CtxMenu : MonoBehaviour
 
 		//Debug.Log("CtxMenu.SelectInUI() "+newIndex+": "+sel);
 		
-		UICamera.selectedObject = sel;
+		SelectObject(sel);
 		pendingHide = false;
 	}
 	

@@ -39,6 +39,8 @@ public class CtxPopupInspector : CtxMenuItemInspector
 			popup.mouseButton = mouseButton;
 		}
 
+		popup.placeAtTouchPosition = EditorGUILayout.Toggle("Place at Touch Pos", popup.placeAtTouchPosition);
+
 		NGUIEditorTools.DrawEvents("On Selection", popup, popup.onSelection);
 		NGUIEditorTools.DrawEvents("On Show", popup, popup.onShow);
 		NGUIEditorTools.DrawEvents("On Hide", popup, popup.onHide);

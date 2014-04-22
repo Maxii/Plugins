@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -20,25 +20,20 @@ public class LanguageSelection : MonoBehaviour
 	{
 		mList = GetComponent<UIPopupList>();
 
-		if (Localization.instance != null && Localization.instance.languages != null && Localization.instance.languages.Length > 0)
+		if (Localization.knownLanguages != null)
 		{
 			mList.items.Clear();
 
-			for (int i = 0, imax = Localization.instance.languages.Length; i < imax; ++i)
-			{
-				TextAsset asset = Localization.instance.languages[i];
-				if (asset != null) mList.items.Add(asset.name);
-			}
-			mList.value = Localization.instance.currentLanguage;
+			for (int i = 0, imax = Localization.knownLanguages.Length; i < imax; ++i)
+				mList.items.Add(Localization.knownLanguages[i]);
+
+			mList.value = Localization.language;
 		}
 		EventDelegate.Add(mList.onChange, OnChange);
 	}
 
 	void OnChange ()
 	{
-		if (Localization.instance != null)
-		{
-			Localization.instance.currentLanguage = UIPopupList.current.value;
-		}
+		Localization.language = UIPopupList.current.value;
 	}
 }

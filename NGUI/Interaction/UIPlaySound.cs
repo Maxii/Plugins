@@ -1,6 +1,6 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -19,10 +19,13 @@ public class UIPlaySound : MonoBehaviour
 		OnMouseOut,
 		OnPress,
 		OnRelease,
+		Custom,
 	}
 
 	public AudioClip audioClip;
 	public Trigger trigger = Trigger.OnClick;
+
+	bool mIsOver = false;
 
 #if UNITY_3_5
 	public float volume = 1f;
@@ -34,25 +37,42 @@ public class UIPlaySound : MonoBehaviour
 
 	void OnHover (bool isOver)
 	{
-		if (enabled && ((isOver && trigger == Trigger.OnMouseOver) || (!isOver && trigger == Trigger.OnMouseOut)))
+		if (trigger == Trigger.OnMouseOver)
 		{
-			NGUITools.PlaySound(audioClip, volume, pitch);
+			if (mIsOver == isOver) return;
+			mIsOver = isOver;
 		}
+
+		if (enabled && ((isOver && trigger == Trigger.OnMouseOver) || (!isOver && trigger == Trigger.OnMouseOut)))
+			NGUITools.PlaySound(audioClip, volume, pitch);
 	}
 
 	void OnPress (bool isPressed)
 	{
-		if (enabled && ((isPressed && trigger == Trigger.OnPress) || (!isPressed && trigger == Trigger.OnRelease)))
+		if (trigger == Trigger.OnPress)
 		{
-			NGUITools.PlaySound(audioClip, volume, pitch);
+			if (mIsOver == isPressed) return;
+			mIsOver = isPressed;
 		}
+
+		if (enabled && ((isPressed && trigger == Trigger.OnPress) || (!isPressed && trigger == Trigger.OnRelease)))
+			NGUITools.PlaySound(audioClip, volume, pitch);
 	}
 
 	void OnClick ()
 	{
 		if (enabled && trigger == Trigger.OnClick)
-		{
 			NGUITools.PlaySound(audioClip, volume, pitch);
-		}
+	}
+
+	void OnSelect (bool isSelected)
+	{
+		if (enabled && (!isSelected || UICamera.currentScheme == UICamera.ControlScheme.Controller))
+			OnHover(isSelected);
+	}
+
+	public void Play ()
+	{
+		NGUITools.PlaySound(audioClip, volume, pitch);
 	}
 }

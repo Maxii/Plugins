@@ -57,8 +57,10 @@
     <Compile Include="Editor\BMFontReader.cs" />
     <Compile Include="Editor\ComponentSelector.cs" />
     <Compile Include="Editor\EventDelegateEditor.cs" />
+    <Compile Include="Editor\FreeType.cs" />
     <Compile Include="Editor\NGUIContextMenu.cs" />
     <Compile Include="Editor\NGUIEditorTools.cs" />
+    <Compile Include="Editor\NGUIHandles.cs" />
     <Compile Include="Editor\NGUIHelp.cs" />
     <Compile Include="Editor\NGUIJson.cs" />
     <Compile Include="Editor\NGUIMenu.cs" />
@@ -84,24 +86,30 @@
     <Compile Include="Editor\UIAtlasMaker.cs" />
     <Compile Include="Editor\UIButtonColorEditor.cs" />
     <Compile Include="Editor\UIButtonEditor.cs" />
+    <Compile Include="Editor\UIButtonMessageEditor.cs" />
     <Compile Include="Editor\UICameraEditor.cs" />
     <Compile Include="Editor\UICameraTool.cs" />
     <Compile Include="Editor\UICreateNewUIWizard.cs" />
     <Compile Include="Editor\UICreateWidgetWizard.cs" />
+    <Compile Include="Editor\UIDragObjectEditor.cs" />
     <Compile Include="Editor\UIDrawCallInspector.cs" />
     <Compile Include="Editor\UIDrawCallViewer.cs" />
+    <Compile Include="Editor\UIEventTriggerEditor.cs" />
     <Compile Include="Editor\UIFontInspector.cs" />
     <Compile Include="Editor\UIFontMaker.cs" />
+    <Compile Include="Editor\UIForwardEventsEditor.cs" />
     <Compile Include="Editor\UIGridEditor.cs" />
     <Compile Include="Editor\UIImageButtonInspector.cs" />
     <Compile Include="Editor\UIInputEditor.cs" />
     <Compile Include="Editor\UILabelInspector.cs" />
+    <Compile Include="Editor\UILocalizeEditor.cs" />
     <Compile Include="Editor\UIPanelInspector.cs" />
     <Compile Include="Editor\UIPanelTool.cs" />
     <Compile Include="Editor\UIPlayAnimationEditor.cs" />
     <Compile Include="Editor\UIPlayTweenEditor.cs" />
     <Compile Include="Editor\UIPopupListInspector.cs" />
     <Compile Include="Editor\UIProgressBarEditor.cs" />
+    <Compile Include="Editor\UIRectEditor.cs" />
     <Compile Include="Editor\UIRootEditor.cs" />
     <Compile Include="Editor\UIScrollBarEditor.cs" />
     <Compile Include="Editor\UIScrollViewEditor.cs" />
@@ -124,6 +132,7 @@
       <Name>Ngui</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

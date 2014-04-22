@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 #if !UNITY_3_5 && !UNITY_FLASH
@@ -708,9 +708,9 @@ public class UICreateWidgetWizard : EditorWindow
 	void OnSelectionChange () { Repaint(); }
 
 #if DYNAMIC_FONT
-	UILabelInspector.FontType mType = UILabelInspector.FontType.Dynamic;
+	UILabelInspector.FontType mType = UILabelInspector.FontType.Unity;
 #else
-	UILabelInspector.FontType mType = UILabelInspector.FontType.Bitmap;
+	UILabelInspector.FontType mType = UILabelInspector.FontType.Unity;
 #endif
 
 	void OnFont (Object obj) { NGUISettings.ambigiousFont = obj; }
@@ -728,9 +728,9 @@ public class UICreateWidgetWizard : EditorWindow
 			Load();
 #if DYNAMIC_FONT
 			Object font = NGUISettings.ambigiousFont;
-			mType = ((font != null) && (font is UIFont)) ? UILabelInspector.FontType.Bitmap : UILabelInspector.FontType.Dynamic;
+			mType = ((font != null) && (font is UIFont)) ? UILabelInspector.FontType.NGUI : UILabelInspector.FontType.Unity;
 #else
-			mType = UILabelInspector.FontType.Bitmap;
+			mType = UILabelInspector.FontType.NGUI;
 #endif
 		}
 
@@ -759,20 +759,20 @@ public class UICreateWidgetWizard : EditorWindow
 
 			if (NGUIEditorTools.DrawPrefixButton("Font"))
 			{
-				if (mType == UILabelInspector.FontType.Bitmap)
+				if (mType == UILabelInspector.FontType.NGUI)
 				{
 					ComponentSelector.Show<UIFont>(OnFont);
 				}
 				else
 				{
-					ComponentSelector.Show<Font>(OnFont);
+					ComponentSelector.Show<Font>(OnFont, new string[] { ".ttf", ".otf" });
 				}
 			}
 
 #if DYNAMIC_FONT
 			GUI.changed = false;
 
-			if (mType == UILabelInspector.FontType.Dynamic)
+			if (mType == UILabelInspector.FontType.Unity)
 			{
 				NGUISettings.ambigiousFont = EditorGUILayout.ObjectField(NGUISettings.ambigiousFont, typeof(Font), false, GUILayout.Width(140f));
 			}
@@ -785,7 +785,7 @@ public class UICreateWidgetWizard : EditorWindow
 			NGUISettings.ambigiousFont = EditorGUILayout.ObjectField(NGUISettings.ambigiousFont, typeof(UIFont), false, GUILayout.Width(140f));
 #endif
 			GUILayout.Label("size", GUILayout.Width(30f));
-			EditorGUI.BeginDisabledGroup(mType == UILabelInspector.FontType.Bitmap);
+			EditorGUI.BeginDisabledGroup(mType == UILabelInspector.FontType.NGUI);
 			NGUISettings.fontSize = EditorGUILayout.IntField(NGUISettings.fontSize, GUILayout.Width(30f));
 			EditorGUI.EndDisabledGroup();
 			GUILayout.Label("font used by the labels");

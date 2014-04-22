@@ -1,6 +1,6 @@
 ﻿//----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -13,7 +13,7 @@ using System.Collections.Generic;
 [System.Serializable]
 public class BMFont
 {
-	[HideInInspector][SerializeField] int mSize = 0;			// How much to move the cursor when moving to the next line
+	[HideInInspector][SerializeField] int mSize = 16;			// How much to move the cursor when moving to the next line
 	[HideInInspector][SerializeField] int mBase = 0;			// Offset from the top of the line to the base of each character
 	[HideInInspector][SerializeField] int mWidth = 0;			// Original width of the texture
 	[HideInInspector][SerializeField] int mHeight = 0;			// Original height of the texture

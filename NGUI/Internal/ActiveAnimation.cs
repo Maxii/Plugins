@@ -1,7 +1,11 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
+
+#if !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2
+#define USE_MECANIM
+#endif
 
 using UnityEngine;
 using AnimationOrTween;
@@ -12,7 +16,6 @@ using System.Collections.Generic;
 /// the specified function on the game object after it finishes animating.
 /// </summary>
 
-[RequireComponent(typeof(Animation))]
 [AddComponentMenu("NGUI/Internal/Active Animation")]
 public class ActiveAnimation : MonoBehaviour
 {
@@ -37,6 +40,20 @@ public class ActiveAnimation : MonoBehaviour
 	Direction mDisableDirection = Direction.Toggle;
 	bool mNotify = false;
 
+#if USE_MECANIM
+	Animator mAnimator;
+	string mClip = "";
+
+	float playbackTime
+	{
+		get
+		{
+			AnimatorStateInfo state = mAnimator.GetCurrentAnimatorStateInfo(0);
+			return Mathf.Clamp01(state.normalizedTime);
+		}
+	}
+#endif
+
 	/// <summary>
 	/// Whether the animation is currently playing.
 	/// </summary>
@@ -45,7 +62,21 @@ public class ActiveAnimation : MonoBehaviour
 	{
 		get
 		{
-			if (mAnim == null) return false;
+			if (mAnim == null)
+			{
+#if USE_MECANIM
+				if (mAnimator != null)
+				{
+					if (mLastDirection == Direction.Reverse)
+					{
+						if (playbackTime == 0f) return false;
+					}
+					else if (playbackTime == 1f) return false;
+					return true;
+				}
+#endif
+				return false;
+			}
 
 			foreach (AnimationState state in mAnim)
 			{
@@ -79,6 +110,12 @@ public class ActiveAnimation : MonoBehaviour
 				else if (mLastDirection == Direction.Forward) state.time = 0f;
 			}
 		}
+#if USE_MECANIM
+		else if (mAnimator != null)
+		{
+			mAnimator.Play(mClip, 0, (mLastDirection == Direction.Reverse) ? 1f : 0f);
+		}
+#endif
 	}
 
 	/// <summary>
@@ -103,9 +140,20 @@ public class ActiveAnimation : MonoBehaviour
 		float delta = RealTime.deltaTime;
 		if (delta == 0f) return;
 
-		if (mAnim != null)
+#if USE_MECANIM
+		if (mAnimator != null)
 		{
-			bool isPlaying = false;
+			mAnimator.Update((mLastDirection == Direction.Reverse) ? -delta : delta);
+			if (isPlaying) return;
+			mAnimator.enabled = false;
+			enabled = false;
+		}
+		else if (mAnim != null)
+#else
+		if (mAnim != null)
+#endif
+		{
+			bool playing = false;
 
 			foreach (AnimationState state in mAnim)
 			{
@@ -115,38 +163,42 @@ public class ActiveAnimation : MonoBehaviour
 
 				if (movement < 0f)
 				{
-					if (state.time > 0f) isPlaying = true;
+					if (state.time > 0f) playing = true;
 					else state.time = 0f;
 				}
 				else
 				{
-					if (state.time < state.length) isPlaying = true;
+					if (state.time < state.length) playing = true;
 					else state.time = state.length;
 				}
 			}
 
 			mAnim.Sample();
-			if (isPlaying) return;
+			if (playing) return;
 			enabled = false;
-
-			if (mNotify)
-			{
-				mNotify = false;
-
-				current = this;
-				EventDelegate.Execute(onFinished);
-
-				// Deprecated functionality, kept for backwards compatibility
-				if (eventReceiver != null && !string.IsNullOrEmpty(callWhenFinished))
-					eventReceiver.SendMessage(callWhenFinished, SendMessageOptions.DontRequireReceiver);
-
-				current = null;
-
-				if (mDisableDirection != Direction.Toggle && mLastDirection == mDisableDirection)
-					NGUITools.SetActive(gameObject, false);
-			}
 		}
-		else enabled = false;
+		else
+		{
+			enabled = false;
+			return;
+		}
+
+		if (mNotify)
+		{
+			mNotify = false;
+
+			current = this;
+			EventDelegate.Execute(onFinished);
+
+			// Deprecated functionality, kept for backwards compatibility
+			if (eventReceiver != null && !string.IsNullOrEmpty(callWhenFinished))
+				eventReceiver.SendMessage(callWhenFinished, SendMessageOptions.DontRequireReceiver);
+
+			current = null;
+
+			if (mDisableDirection != Direction.Toggle && mLastDirection == mDisableDirection)
+				NGUITools.SetActive(gameObject, false);
+		}
 	}
 
 	/// <summary>
@@ -155,17 +207,15 @@ public class ActiveAnimation : MonoBehaviour
 
 	void Play (string clipName, Direction playDirection)
 	{
+		// Determine the play direction
+		if (playDirection == Direction.Toggle)
+			playDirection = (mLastDirection != Direction.Forward) ? Direction.Forward : Direction.Reverse;
+
 		if (mAnim != null)
 		{
 			// We will sample the animation manually so that it works when the time is paused
 			enabled = true;
 			mAnim.enabled = false;
-
-			// Determine the play direction
-			if (playDirection == Direction.Toggle)
-			{
-				playDirection = (mLastDirection != Direction.Forward) ? Direction.Forward : Direction.Reverse;
-			}
 
 			bool noName = string.IsNullOrEmpty(clipName);
 
@@ -198,6 +248,28 @@ public class ActiveAnimation : MonoBehaviour
 			mNotify = true;
 			mAnim.Sample();
 		}
+#if USE_MECANIM
+		else if (mAnimator != null)
+		{
+			if (enabled && isPlaying)
+			{
+				if (mClip == clipName)
+				{
+					mLastDirection = playDirection;
+					return;
+				}
+			}
+
+			enabled = true;
+			mNotify = true;
+			mLastDirection = playDirection;
+			mClip = clipName;
+			mAnimator.Play(mClip, 0, (playDirection == Direction.Forward) ? 0f : 1f);
+
+			// NOTE: If you are getting a message "Animator.GotoState: State could not be found"
+			// it means that you chose a state name that doesn't exist in the Animator window.
+		}
+#endif
 	}
 
 	/// <summary>
@@ -246,4 +318,35 @@ public class ActiveAnimation : MonoBehaviour
 	{
 		return Play(anim, null, playDirection, EnableCondition.DoNothing, DisableCondition.DoNotDisable);
 	}
+
+#if USE_MECANIM
+	/// <summary>
+	/// Play the specified animation on the specified object.
+	/// </summary>
+
+	static public ActiveAnimation Play (Animator anim, string clipName, Direction playDirection,
+		EnableCondition enableBeforePlay, DisableCondition disableCondition)
+	{
+		if (!NGUITools.GetActive(anim.gameObject))
+		{
+			// If the object is disabled, don't do anything
+			if (enableBeforePlay != EnableCondition.EnableThenPlay) return null;
+
+			// Enable the game object before animating it
+			NGUITools.SetActive(anim.gameObject, true);
+
+			// Refresh all panels right away so that there is no one frame delay
+			UIPanel[] panels = anim.gameObject.GetComponentsInChildren<UIPanel>();
+			for (int i = 0, imax = panels.Length; i < imax; ++i) panels[i].Refresh();
+		}
+
+		ActiveAnimation aa = anim.GetComponent<ActiveAnimation>();
+		if (aa == null) aa = anim.gameObject.AddComponent<ActiveAnimation>();
+		aa.mAnimator = anim;
+		aa.mDisableDirection = (Direction)(int)disableCondition;
+		aa.onFinished.Clear();
+		aa.Play(clipName, playDirection);
+		return aa;
+	}
+#endif
 }

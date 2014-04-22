@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -17,7 +17,8 @@ public class UIImageButton : MonoBehaviour
 	public string hoverSprite;
 	public string pressedSprite;
 	public string disabledSprite;
-	
+	public bool pixelSnap = true;
+
 	public bool isEnabled
 	{
 		get
@@ -43,39 +44,43 @@ public class UIImageButton : MonoBehaviour
 		if (target == null) target = GetComponentInChildren<UISprite>();
 		UpdateImage();
 	}
-	
+
+	void OnValidate ()
+	{
+		if (target != null)
+		{
+			if (string.IsNullOrEmpty(normalSprite)) normalSprite = target.spriteName;
+			if (string.IsNullOrEmpty(hoverSprite)) hoverSprite = target.spriteName;
+			if (string.IsNullOrEmpty(pressedSprite)) pressedSprite = target.spriteName;
+			if (string.IsNullOrEmpty(disabledSprite)) disabledSprite = target.spriteName;
+		}
+	}
+
 	void UpdateImage()
 	{
 		if (target != null)
 		{
-			if (isEnabled)
-			{
-				target.spriteName = UICamera.IsHighlighted(gameObject) ? hoverSprite : normalSprite;
-			}
-			else
-			{
-				target.spriteName = disabledSprite;
-			}
-			target.MakePixelPerfect();
+			if (isEnabled) SetSprite(UICamera.IsHighlighted(gameObject) ? hoverSprite : normalSprite);
+			else SetSprite(disabledSprite);
 		}
 	}
 
 	void OnHover (bool isOver)
 	{
 		if (isEnabled && target != null)
-		{
-			target.spriteName = isOver ? hoverSprite : normalSprite;
-			target.MakePixelPerfect();
-		}
+			SetSprite(isOver ? hoverSprite : normalSprite);
 	}
 
 	void OnPress (bool pressed)
 	{
-		if (pressed)
-		{
-			target.spriteName = pressedSprite;
-			target.MakePixelPerfect();
-		}
+		if (pressed) SetSprite(pressedSprite);
 		else UpdateImage();
+	}
+
+	void SetSprite (string sprite)
+	{
+		if (target.atlas == null || target.atlas.GetSprite(sprite) == null) return;
+		target.spriteName = sprite;
+		if (pixelSnap) target.MakePixelPerfect();
 	}
 }

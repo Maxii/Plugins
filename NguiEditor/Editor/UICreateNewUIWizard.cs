@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEditor;
@@ -68,102 +68,8 @@ public class UICreateNewUIWizard : EditorWindow
 
 	static public GameObject CreateNewUI (CameraType type)
 	{
-		NGUIEditorTools.RegisterUndo("Create New UI");
-
-		// Root for the UI
-		GameObject root = null;
-
-		if (type == CameraType.Simple2D)
-		{
-			root = new GameObject("UI Root (2D)");
-			root.AddComponent<UIRoot>().scalingStyle = UIRoot.Scaling.PixelPerfect;
-		}
-		else
-		{
-			root = new GameObject((type == CameraType.Advanced3D) ? "UI Root (3D)" : "UI Root");
-			root.transform.localScale = new Vector3(0.0025f, 0.0025f, 0.0025f);
-			root.AddComponent<UIRoot>().scalingStyle = UIRoot.Scaling.FixedSize;
-		}
-
-		// Assign the layer to be used by everything
-		root.layer = NGUISettings.layer;
-
-		// Figure out the depth of the highest camera
-		if (type == CameraType.None)
-		{
-			// No camera requested -- simply add a panel
-			UIPanel panel = NGUITools.AddChild<UIPanel>(root.gameObject);
-			Selection.activeGameObject = panel.gameObject;
-		}
-		else
-		{
-			int mask = 1 << NGUISettings.layer;
-			float depth = -1f;
-			bool clearColor = true;
-			bool audioListener = true;
-
-			List<Camera> cameras = NGUIEditorTools.FindAll<Camera>();
-
-			foreach (Camera c in cameras)
-			{
-				// Choose the maximum depth
-				depth = Mathf.Max(depth, c.depth);
-
-				// Automatically exclude the specified layer mask from the camera if it can see more than that layer
-				if (NGUISettings.layer != 0 && c.cullingMask != mask) c.cullingMask = (c.cullingMask & (~mask));
-
-				// Only consider this object if it's active
-				if (c.enabled && NGUITools.GetActive(c.gameObject)) clearColor = false;
-
-				// If this camera has an audio listener, we won't need to add one
-				if (c.GetComponent<AudioListener>() != null) audioListener = false;
-			}
-
-			// Camera and UICamera for this UI
-			Camera cam = NGUITools.AddChild<Camera>(root);
-			cam.depth = depth + 1;
-			cam.backgroundColor = Color.grey;
-			cam.cullingMask = mask;
-
-			if (type == CameraType.Simple2D)
-			{
-				cam.orthographicSize = 1f;
-				cam.orthographic = true;
-				cam.nearClipPlane = -2f;
-				cam.farClipPlane = 2f;
-			}
-			else
-			{
-				cam.nearClipPlane = 0.1f;
-				cam.farClipPlane = 4f;
-				cam.transform.localPosition = new Vector3(0f, 0f, -700f);
-			}
-
-			// We don't want to clear color if this is not the first camera
-			if (cameras.Count > 0) cam.clearFlags = clearColor ? CameraClearFlags.Skybox : CameraClearFlags.Depth;
-
-			// Add an audio listener if we need one
-			if (audioListener) cam.gameObject.AddComponent<AudioListener>();
-
-			// Add a UI Camera for event handling
-			cam.gameObject.AddComponent<UICamera>();
-
-			if (type == CameraType.Simple2D)
-			{
-				// Anchor is useful to have
-				UIAnchor anchor = NGUITools.AddChild<UIAnchor>(cam.gameObject);
-				anchor.uiCamera = cam;
-
-				// And finally -- the first UI panel
-				UIPanel panel = NGUITools.AddChild<UIPanel>(anchor.gameObject);
-				Selection.activeGameObject = panel.gameObject;
-			}
-			else
-			{
-				UIPanel panel = NGUITools.AddChild<UIPanel>(root);
-				Selection.activeGameObject = panel.gameObject;
-			}
-		}
+		UIPanel p = NGUITools.CreateUI(type == CameraType.Advanced3D, NGUISettings.layer);
+		Selection.activeGameObject = p.gameObject;
 		return Selection.activeGameObject;
 	}
 }

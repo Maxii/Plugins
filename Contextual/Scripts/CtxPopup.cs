@@ -43,6 +43,11 @@ public class CtxPopup : MonoBehaviour
 	/// The mouse button (0-2) that triggers this popup menu.
 	/// </summary>
 	public int mouseButton;
+
+	/// <summary>
+	/// Place the menu at the mouse/touch position that triggers it.
+	/// </summary>
+	public bool placeAtTouchPosition;
 	
 	/// <summary>
 	/// The onSelection event.
@@ -81,7 +86,8 @@ public class CtxPopup : MonoBehaviour
 				current = this;
 				EventDelegate.Execute(onShow);
 	
-				Vector3 menuPosition = CtxHelper.ComputeMenuPosition(contextMenu, gameObject);
+				Vector3 menuPosition = placeAtTouchPosition ? new Vector3(UICamera.currentTouch.pos.x, UICamera.currentTouch.pos.y, 0f) : 
+					CtxHelper.ComputeMenuPosition(contextMenu, gameObject);
 				
 				CtxMenu.Item[] items = MenuItems;
 				
@@ -120,7 +126,7 @@ public class CtxPopup : MonoBehaviour
 		// selected instead so that subsequent keyboard/controller
 		// navigation works correctly in the menu.
 		
-		if (isSelected && contextMenu != null)
+		if (isSelected && contextMenu != null && contextMenu.IsVisible)
 			UICamera.selectedObject = contextMenu.gameObject;
 	}
 	

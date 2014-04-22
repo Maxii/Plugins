@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 // Dynamic font support contributed by the NGUI community members:
@@ -26,7 +26,7 @@ public class UIFontInspector : Editor
 
 	enum FontType
 	{
-		Normal,
+		Bitmap,
 		Reference,
 		Dynamic,
 	}
@@ -35,7 +35,7 @@ public class UIFontInspector : Editor
 	static bool mUseShader = false;
 
 	UIFont mFont;
-	FontType mType = FontType.Normal;
+	FontType mType = FontType.Bitmap;
 	UIFont mReplacement = null;
 	string mSymbolSequence = "";
 	string mSymbolSprite = "";
@@ -51,8 +51,7 @@ public class UIFontInspector : Editor
 
 		mFont.replacement = obj as UIFont;
 		mReplacement = mFont.replacement;
-		UnityEditor.EditorUtility.SetDirty(mFont);
-		if (mReplacement == null) mType = FontType.Normal;
+		NGUITools.SetDirty(mFont);
 	}
 
 	void OnSelectAtlas (Object obj)
@@ -96,21 +95,16 @@ public class UIFontInspector : Editor
 			mType = FontType.Dynamic;
 		}
 
+		GUI.changed = false;
 		GUILayout.BeginHorizontal();
-		FontType fontType = (FontType)EditorGUILayout.EnumPopup("Font Type", mType);
+		mType = (FontType)EditorGUILayout.EnumPopup("Font Type", mType);
 		GUILayout.Space(18f);
 		GUILayout.EndHorizontal();
 
-		if (mType != fontType)
+		if (GUI.changed)
 		{
-			if (fontType == FontType.Normal)
-			{
+			if (mType == FontType.Bitmap)
 				OnSelectFont(null);
-			}
-			else
-			{
-				mType = fontType;
-			}
 
 			if (mType != FontType.Dynamic && mFont.dynamicFont != null)
 				mFont.dynamicFont = null;
@@ -134,7 +128,7 @@ public class UIFontInspector : Editor
 			{
 				NGUIEditorTools.RegisterUndo("Font Change", mFont);
 				mFont.replacement = mReplacement;
-				UnityEditor.EditorUtility.SetDirty(mFont);
+				NGUITools.SetDirty(mFont);
 			}
 			return;
 		}
@@ -180,8 +174,6 @@ public class UIFontInspector : Editor
 		}
 		else
 		{
-			NGUIEditorTools.DrawSeparator();
-
 			ComponentSelector.Draw<UIAtlas>(mFont.atlas, OnSelectAtlas, true);
 
 			if (mFont.atlas != null)
@@ -238,28 +230,7 @@ public class UIFontInspector : Editor
 					}
 
 					// Font sprite rectangle
-					GUI.backgroundColor = new Color(0.4f, 1f, 0f, 1f);
 					pixels = EditorGUILayout.RectField("Pixel Rect", pixels);
-					GUI.backgroundColor = Color.white;
-
-					// Create a button that can make the coordinates pixel-perfect on click
-					GUILayout.BeginHorizontal();
-					{
-						Rect corrected = NGUIMath.MakePixelPerfect(pixels);
-
-						if (corrected == pixels)
-						{
-							GUI.color = Color.grey;
-							GUILayout.Button("Make Pixel-Perfect");
-							GUI.color = Color.white;
-						}
-						else if (GUILayout.Button("Make Pixel-Perfect"))
-						{
-							pixels = corrected;
-							GUI.changed = true;
-						}
-					}
-					GUILayout.EndHorizontal();
 
 					// Convert the pixel coordinates back to UV coordinates
 					Rect uvRect = NGUIMath.ConvertToTexCoords(pixels, tex.width, tex.height);
@@ -282,14 +253,6 @@ public class UIFontInspector : Editor
 			{
 				mView = View.Font;
 				mUseShader = false;
-
-				float pixelSize = EditorGUILayout.FloatField("Pixel Size", mFont.pixelSize, GUILayout.Width(120f));
-
-				if (pixelSize != mFont.pixelSize)
-				{
-					NGUIEditorTools.RegisterUndo("Font Change", mFont);
-					mFont.pixelSize = pixelSize;
-				}
 			}
 			EditorGUILayout.Space();
 		}
@@ -323,7 +286,7 @@ public class UIFontInspector : Editor
 
 						GUILayout.BeginHorizontal();
 						GUILayout.Label(sym.sequence, GUILayout.Width(40f));
-						if (NGUIEditorTools.DrawSpriteField(mFont.atlas, sym.spriteName, ChangeSymbolSprite))
+						if (NGUIEditorTools.DrawSpriteField(mFont.atlas, sym.spriteName, ChangeSymbolSprite, GUILayout.MinWidth(100f)))
 							mSelectedSymbol = sym;
 
 						if (GUILayout.Button("Edit", GUILayout.Width(40f)))

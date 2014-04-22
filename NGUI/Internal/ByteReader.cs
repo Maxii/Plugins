@@ -1,6 +1,6 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -162,5 +162,76 @@ public class ByteReader
 			}
 		}
 		return dict;
+	}
+
+	static BetterList<string> mTemp = new BetterList<string>();
+
+	/// <summary>
+	/// Read a single line of Comma-Separated Values from the file.
+	/// </summary>
+
+	public BetterList<string> ReadCSV ()
+	{
+		mTemp.Clear();
+
+		if (canRead)
+		{
+			string line = ReadLine();
+			if (line == null) return null;
+			line = line.Replace("\\n", "\n");
+
+			int wordStart = 0;
+			bool insideQuotes = false;
+
+			for (int i = 0, imax = line.Length; i < imax; ++i)
+			{
+				char ch = line[i];
+
+				if (ch == ',')
+				{
+					if (!insideQuotes)
+					{
+						mTemp.Add(line.Substring(wordStart, i - wordStart));
+						wordStart = i + 1;
+					}
+				}
+				else if (ch == '"')
+				{
+					if (insideQuotes)
+					{
+						if (i + 1 >= imax)
+						{
+							mTemp.Add(line.Substring(wordStart, i - wordStart).Replace("\"\"", "\""));
+							return mTemp;
+						}
+
+						if (line[i + 1] != '"')
+						{
+							mTemp.Add(line.Substring(wordStart, i - wordStart));
+							insideQuotes = false;
+
+							if (line[i + 1] == ',')
+							{
+								++i;
+								wordStart = i + 1;
+							}
+						}
+						else ++i;
+					}
+					else
+					{
+						wordStart = i + 1;
+						insideQuotes = true;
+					}
+				}
+			}
+
+			if (wordStart < line.Length)
+			{
+				mTemp.Add(line.Substring(wordStart, line.Length - wordStart));
+			}
+			return mTemp;
+		}
+		return null;
 	}
 }

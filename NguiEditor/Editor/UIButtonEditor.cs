@@ -1,70 +1,70 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
 using UnityEditor;
 
+[CanEditMultipleObjects]
+#if UNITY_3_5
 [CustomEditor(typeof(UIButton))]
-public class UIButtonEditor : UIWidgetContainerEditor
+#else
+[CustomEditor(typeof(UIButton), true)]
+#endif
+public class UIButtonEditor : UIButtonColorEditor
 {
-	public override void OnInspectorGUI ()
+	enum Highlight
 	{
-		NGUIEditorTools.SetLabelWidth(80f);
-		UIButton button = target as UIButton;
+		DoNothing,
+		Press,
+	}
 
-		GUILayout.Space(6f);
+	protected override void DrawProperties ()
+	{
+		SerializedProperty sp = serializedObject.FindProperty("dragHighlight");
+		Highlight ht = sp.boolValue ? Highlight.Press : Highlight.DoNothing;
+		GUILayout.BeginHorizontal();
+		bool highlight = (Highlight)EditorGUILayout.EnumPopup("Drag Over", ht) == Highlight.Press;
+		GUILayout.Space(18f);
+		GUILayout.EndHorizontal();
+		if (sp.boolValue != highlight) sp.boolValue = highlight;
 
-		GUI.changed = false;
-		GameObject tt = (GameObject)EditorGUILayout.ObjectField("Target", button.tweenTarget, typeof(GameObject), true);
+		DrawTransition();
+		DrawColors();
 
-		if (GUI.changed)
+		UIButton btn = target as UIButton;
+
+		if (btn.tweenTarget != null)
 		{
-			NGUIEditorTools.RegisterUndo("Button Change", button);
-			button.tweenTarget = tt;
-			UnityEditor.EditorUtility.SetDirty(button);
-		}
+			UISprite sprite = btn.tweenTarget.GetComponent<UISprite>();
 
-		if (tt != null)
-		{
-			UIWidget w = tt.GetComponent<UIWidget>();
-
-			if (w != null)
+			if (sprite != null)
 			{
-				GUI.changed = false;
-				Color c = EditorGUILayout.ColorField("Normal", w.color);
-
-				if (GUI.changed)
+				if (NGUIEditorTools.DrawHeader("Sprites"))
 				{
-					NGUIEditorTools.RegisterUndo("Button Change", w);
-					w.color = c;
-					UnityEditor.EditorUtility.SetDirty(w);
+					NGUIEditorTools.BeginContents();
+					EditorGUI.BeginDisabledGroup(serializedObject.isEditingMultipleObjects);
+					{
+						SerializedObject obj = new SerializedObject(sprite);
+						obj.Update();
+						SerializedProperty atlas = obj.FindProperty("mAtlas");
+						NGUIEditorTools.DrawSpriteField("Normal", obj, atlas, obj.FindProperty("mSpriteName"));
+						obj.ApplyModifiedProperties();
+
+						NGUIEditorTools.DrawSpriteField("Hover", serializedObject, atlas, serializedObject.FindProperty("hoverSprite"));
+						NGUIEditorTools.DrawSpriteField("Pressed", serializedObject, atlas, serializedObject.FindProperty("pressedSprite"));
+						NGUIEditorTools.DrawSpriteField("Disabled", serializedObject, atlas, serializedObject.FindProperty("disabledSprite"));
+					}
+					EditorGUI.EndDisabledGroup();
+
+					NGUIEditorTools.DrawProperty("Pixel Snap", serializedObject, "pixelSnap");
+					NGUIEditorTools.EndContents();
 				}
 			}
 		}
 
-		GUI.changed = false;
-		Color hover = EditorGUILayout.ColorField("Hover", button.hover);
-		Color pressed = EditorGUILayout.ColorField("Pressed", button.pressed);
-		Color disabled = EditorGUILayout.ColorField("Disabled", button.disabledColor);
-
-		GUILayout.BeginHorizontal();
-		float duration = EditorGUILayout.FloatField("Duration", button.duration, GUILayout.Width(120f));
-		GUILayout.Label("seconds");
-		GUILayout.EndHorizontal();
-
-		GUILayout.Space(3f);
-
-		if (GUI.changed)
-		{
-			NGUIEditorTools.RegisterUndo("Button Change", button);
-			button.hover = hover;
-			button.pressed = pressed;
-			button.disabledColor = disabled;
-			button.duration = duration;
-			UnityEditor.EditorUtility.SetDirty(button);
-		}
+		UIButton button = target as UIButton;
 		NGUIEditorTools.DrawEvents("On Click", button, button.onClick);
 	}
 }

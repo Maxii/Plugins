@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 #if !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2
@@ -45,9 +45,10 @@ public class UI2DSprite : UIWidget
 		{
 			if (mSprite != value)
 			{
+				RemoveFromPanel();
 				mSprite = value;
 				nextSprite = null;
-				RemoveFromPanel();
+				MarkAsChanged();
 			}
 		}
 	}
@@ -150,9 +151,8 @@ public class UI2DSprite : UIWidget
 			float x1 = x0 + mWidth;
 			float y1 = y0 + mHeight;
 
-			Texture tex = mainTexture;
-			int w = (tex != null) ? tex.width : mWidth;
-			int h = (tex != null) ? tex.height : mHeight;
+			int w = (mSprite != null) ? Mathf.RoundToInt(mSprite.textureRect.width) : mWidth;
+			int h = (mSprite != null) ? Mathf.RoundToInt(mSprite.textureRect.height) : mHeight;
 
 			if ((w & 1) != 0) x1 -= (1f / w) * mWidth;
 			if ((h & 1) != 0) y1 -= (1f / h) * mHeight;
@@ -194,7 +194,7 @@ public class UI2DSprite : UIWidget
 	/// Update the sprite in case it was animated.
 	/// </summary>
 
-	public override void Update()
+	protected override void OnUpdate ()
 	{
 		if (nextSprite != null)
 		{
@@ -202,7 +202,7 @@ public class UI2DSprite : UIWidget
 				sprite2D = nextSprite;
 			nextSprite = null;
 		}
- 		base.Update();
+		base.OnUpdate();
 	}
 
 	/// <summary>
@@ -211,18 +211,17 @@ public class UI2DSprite : UIWidget
 
 	public override void MakePixelPerfect ()
 	{
-		Texture tex = mainTexture;
-
-		if (tex != null)
+		if (mSprite != null)
 		{
-			int x = tex.width;
-			if ((x & 1) == 1) ++x;
+			Rect rect = mSprite.textureRect;
+			int w = Mathf.RoundToInt(rect.width);
+			int h = Mathf.RoundToInt(rect.height);
 
-			int y = tex.height;
-			if ((y & 1) == 1) ++y;
+			if ((w & 1) == 1) ++w;
+			if ((h & 1) == 1) ++h;
 
-			width = x;
-			height = y;
+			width = w;
+			height = h;
 		}
 		base.MakePixelPerfect();
 	}
@@ -234,7 +233,7 @@ public class UI2DSprite : UIWidget
 	public override void OnFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color32> cols)
 	{
 		Color colF = color;
-		colF.a *= mPanel.finalAlpha;
+		colF.a = finalAlpha;
 		Color32 col = premultipliedAlpha ? NGUITools.ApplyPMA(colF) : colF;
 		Vector4 v = drawingDimensions;
 		Rect rect = uvRect;

@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -20,6 +20,7 @@ public class UISprite : UIWidget
 		Sliced,
 		Tiled,
 		Filled,
+		Advanced,
 	}
 
 	public enum FillDirection
@@ -31,10 +32,24 @@ public class UISprite : UIWidget
 		Radial360,
 	}
 
+	public enum AdvancedType
+	{
+		Invisible,
+		Sliced,
+		Tiled,
+	}
+
+	public enum Flip
+	{
+		Nothing,
+		Horizontally,
+		Vertically,
+		Both,
+	}
+
 	// Cached and saved values
 	[HideInInspector][SerializeField] UIAtlas mAtlas;
 	[HideInInspector][SerializeField] string mSpriteName;
-	[HideInInspector][SerializeField] bool mFillCenter = true;
 	[HideInInspector][SerializeField] Type mType = Type.Simple;
 	[HideInInspector][SerializeField] FillDirection mFillDirection = FillDirection.Radial360;
 #if !UNITY_3_5
@@ -42,17 +57,52 @@ public class UISprite : UIWidget
 #endif
 	[HideInInspector][SerializeField] float mFillAmount = 1.0f;
 	[HideInInspector][SerializeField] bool mInvert = false;
+	[HideInInspector][SerializeField] Flip mFlip = Flip.Nothing;
+
+	// Deprecated, no longer used
+	[HideInInspector][SerializeField] bool mFillCenter = true;
 
 	protected UISpriteData mSprite;
 	protected Rect mInnerUV = new Rect();
 	protected Rect mOuterUV = new Rect();
+	
 	bool mSpriteSet = false;
+
+	/// <summary>
+	/// When the sprite type is advanced, this determines whether the center is tiled or sliced.
+	/// </summary>
+
+	public AdvancedType centerType = AdvancedType.Sliced;
+
+	/// <summary>
+	/// When the sprite type is advanced, this determines whether the left edge is tiled or sliced.
+	/// </summary>
+
+	public AdvancedType leftType = AdvancedType.Sliced;
+
+	/// <summary>
+	/// When the sprite type is advanced, this determines whether the right edge is tiled or sliced.
+	/// </summary>
+
+	public AdvancedType rightType = AdvancedType.Sliced;
+
+	/// <summary>
+	/// When the sprite type is advanced, this determines whether the bottom edge is tiled or sliced.
+	/// </summary>
+
+	public AdvancedType bottomType = AdvancedType.Sliced;
+
+	/// <summary>
+	/// When the sprite type is advanced, this determines whether the top edge is tiled or sliced.
+	/// </summary>
+
+	public AdvancedType topType = AdvancedType.Sliced;
 
 	/// <summary>
 	/// How the sprite is drawn.
 	/// </summary>
 
-	virtual public Type type
+	public virtual Type type
 	{
 		get
 		{
@@ -112,9 +162,6 @@ public class UISprite : UIWidget
 					spriteName = sprite;
 					MarkAsChanged();
 				}
-
-				// Make sure the panel knows that the draw calls may have changed
-				UIPanel.RebuildAllDrawCalls(false);
 			}
 		}
 	}
@@ -163,7 +210,22 @@ public class UISprite : UIWidget
 	/// Whether the center part of the sprite will be filled or not. Turn it off if you want only to borders to show up.
 	/// </summary>
 
-	public bool fillCenter { get { return mFillCenter; } set { if (mFillCenter != value) { mFillCenter = value; MarkAsChanged(); } } }
+	[System.Obsolete("Use 'centerType' instead")]
+	public bool fillCenter
+	{
+		get
+		{
+			return centerType != AdvancedType.Invisible;
+		}
+		set
+		{
+			if (value != (centerType != AdvancedType.Invisible))
+			{
+				centerType = value ? AdvancedType.Sliced : AdvancedType.Invisible;
+				MarkAsChanged();
+			}
+		}
+	}
 
 	/// <summary>
 	/// Direction of the cut procedure.
@@ -235,7 +297,7 @@ public class UISprite : UIWidget
 	{
 		get
 		{
-			if (type == Type.Sliced)
+			if (type == Type.Sliced || type == Type.Advanced)
 			{
 				UISpriteData sp = GetAtlasSprite();
 				if (sp == null) return Vector2.zero;
@@ -253,11 +315,15 @@ public class UISprite : UIWidget
 	{
 		get
 		{
-			if (type == Type.Sliced)
+			if (type == Type.Sliced || type == Type.Advanced)
 			{
 				Vector4 b = border;
 				if (atlas != null) b *= atlas.pixelSize;
 				int min = Mathf.RoundToInt(b.x + b.z);
+
+				UISpriteData sp = GetAtlasSprite();
+				if (sp != null) min += sp.paddingLeft + sp.paddingRight;
+
 				return Mathf.Max(base.minWidth, ((min & 1) == 1) ? min + 1 : min);
 			}
 			return base.minWidth;
@@ -272,11 +338,15 @@ public class UISprite : UIWidget
 	{
 		get
 		{
-			if (type == Type.Sliced)
+			if (type == Type.Sliced || type == Type.Advanced)
 			{
 				Vector4 b = border;
 				if (atlas != null) b *= atlas.pixelSize;
 				int min = Mathf.RoundToInt(b.y + b.w);
+
+				UISpriteData sp = GetAtlasSprite();
+				if (sp != null) min += sp.paddingTop + sp.paddingBottom;
+
 				return Mathf.Max(base.minHeight, ((min & 1) == 1) ? min + 1 : min);
 			}
 			return base.minHeight;
@@ -381,12 +451,29 @@ public class UISprite : UIWidget
 	}
 
 	/// <summary>
+	/// Auto-upgrade.
+	/// </summary>
+
+	protected override void OnInit ()
+	{
+		if (!mFillCenter)
+		{
+			mFillCenter = true;
+			centerType = AdvancedType.Invisible;
+#if UNITY_EDITOR
+			NGUITools.SetDirty(this);
+#endif
+		}
+		base.OnInit();
+	}
+
+	/// <summary>
 	/// Update the UV coordinates.
 	/// </summary>
 
-	public override void Update ()
+	protected override void OnUpdate ()
 	{
-		base.Update();
+		base.OnUpdate();
 
 		if (mChanged || !mSpriteSet)
 		{
@@ -435,6 +522,10 @@ public class UISprite : UIWidget
 			case Type.Tiled:
 			TiledFill(verts, uvs, cols);
 			break;
+
+			case Type.Advanced:
+			AdvancedFill(verts, uvs, cols);
+			break;
 		}
 	}
 
@@ -461,7 +552,7 @@ public class UISprite : UIWidget
 			float x1 = x0 + mWidth;
 			float y1 = y0 + mHeight;
 
-			if (mSprite != null)
+			if (GetAtlasSprite() != null && mType != Type.Tiled)
 			{
 				int padLeft = mSprite.paddingLeft;
 				int padBottom = mSprite.paddingBottom;
@@ -470,52 +561,71 @@ public class UISprite : UIWidget
 
 				int w = mSprite.width + padLeft + padRight;
 				int h = mSprite.height + padBottom + padTop;
+				float px = 1f;
+				float py = 1f;
 
-				if (mType != Type.Sliced)
+				if (w > 0 && h > 0 && (mType == Type.Simple || mType == Type.Filled))
 				{
 					if ((w & 1) != 0) ++padRight;
 					if ((h & 1) != 0) ++padTop;
 
-					float px = (1f / w) * mWidth;
-					float py = (1f / h) * mHeight;
+					px = (1f / w) * mWidth;
+					py = (1f / h) * mHeight;
+				}
 
-					x0 += padLeft * px;
-					x1 -= padRight * px;
-					y0 += padBottom * py;
-					y1 -= padTop * py;
+				if (mFlip == Flip.Horizontally || mFlip == Flip.Both)
+				{
+					x0 += padRight * px;
+					x1 -= padLeft * px;
 				}
 				else
 				{
-					x0 += padLeft;
-					x1 -= padRight;
-					y0 += padBottom;
-					y1 -= padTop;
+					x0 += padLeft * px;
+					x1 -= padRight * px;
+				}
+
+				if (mFlip == Flip.Vertically || mFlip == Flip.Both)
+				{
+					y0 += padTop * py;
+					y1 -= padBottom * py;
+				}
+				else
+				{
+					y0 += padBottom * py;
+					y1 -= padTop * py;
 				}
 			}
 
-			Vector4 v = new Vector4(
-				mDrawRegion.x == 0f ? x0 : Mathf.Lerp(x0, x1, mDrawRegion.x),
-				mDrawRegion.y == 0f ? y0 : Mathf.Lerp(y0, y1, mDrawRegion.y),
-				mDrawRegion.z == 1f ? x1 : Mathf.Lerp(x0, x1, mDrawRegion.z),
-				mDrawRegion.w == 1f ? y1 : Mathf.Lerp(y0, y1, mDrawRegion.w));
+			Vector4 br = border * atlas.pixelSize;
 
-			float mw = minWidth;
-			float mh = minHeight;
+			float fw = br.x + br.z;
+			float fh = br.y + br.w;
 
-			if (v.z - v.x < mw)
+			float vx = Mathf.Lerp(x0, x1 - fw, mDrawRegion.x);
+			float vy = Mathf.Lerp(y0, y1 - fh, mDrawRegion.y);
+			float vz = Mathf.Lerp(x0 + fw, x1, mDrawRegion.z);
+			float vw = Mathf.Lerp(y0 + fh, y1, mDrawRegion.w);
+
+			return new Vector4(vx, vy, vz, vw);
+		}
+	}
+
+	/// <summary>
+	/// Convenience function that returns the drawn UVs after flipping gets considered.
+	/// X = left, Y = bottom, Z = right, W = top.
+	/// </summary>
+
+	protected virtual Vector4 drawingUVs
+	{
+		get
+		{
+			switch (mFlip)
 			{
-				float center = (v.x + v.z) * 0.5f;
-				v.x = Mathf.Round(center - mw * 0.5f);
-				v.z = v.x + mw;
+				case Flip.Horizontally:	return new Vector4(mOuterUV.xMax, mOuterUV.yMin, mOuterUV.xMin, mOuterUV.yMax);
+				case Flip.Vertically:	return new Vector4(mOuterUV.xMin, mOuterUV.yMax, mOuterUV.xMax, mOuterUV.yMin);
+				case Flip.Both:			return new Vector4(mOuterUV.xMax, mOuterUV.yMax, mOuterUV.xMin, mOuterUV.yMin);
+				default:				return new Vector4(mOuterUV.xMin, mOuterUV.yMin, mOuterUV.xMax, mOuterUV.yMax);
 			}
-
-			if (v.w - v.y < mh)
-			{
-				float center = (v.y + v.w) * 0.5f;
-				v.y = Mathf.Round(center - mh * 0.5f);
-				v.w = v.y + mw;
-			}
-			return v;
 		}
 	}
 
@@ -525,23 +635,21 @@ public class UISprite : UIWidget
 
 	protected void SimpleFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color32> cols)
 	{
-		Vector2 uv0 = new Vector2(mOuterUV.xMin, mOuterUV.yMin);
-		Vector2 uv1 = new Vector2(mOuterUV.xMax, mOuterUV.yMax);
-
 		Vector4 v = drawingDimensions;
+		Vector4 u = drawingUVs;
 
 		verts.Add(new Vector3(v.x, v.y));
 		verts.Add(new Vector3(v.x, v.w));
 		verts.Add(new Vector3(v.z, v.w));
 		verts.Add(new Vector3(v.z, v.y));
 
-		uvs.Add(uv0);
-		uvs.Add(new Vector2(uv0.x, uv1.y));
-		uvs.Add(uv1);
-		uvs.Add(new Vector2(uv1.x, uv0.y));
+		uvs.Add(new Vector2(u.x, u.y));
+		uvs.Add(new Vector2(u.x, u.w));
+		uvs.Add(new Vector2(u.z, u.w));
+		uvs.Add(new Vector2(u.z, u.y));
 
 		Color colF = color;
-		colF.a *= mPanel.finalAlpha;
+		colF.a = finalAlpha;
 		Color32 col = atlas.premultipliedAlpha ? NGUITools.ApplyPMA(colF) : colF;
 		
 		cols.Add(col);
@@ -556,8 +664,6 @@ public class UISprite : UIWidget
 
 	protected void SlicedFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color32> cols)
 	{
-		if (mSprite == null) return;
-
 		if (!mSprite.hasBorder)
 		{
 			SimpleFill(verts, uvs, cols);
@@ -572,18 +678,50 @@ public class UISprite : UIWidget
 		mTempPos[3].x = dr.z;
 		mTempPos[3].y = dr.w;
 
-		mTempPos[1].x = mTempPos[0].x + br.x;
-		mTempPos[1].y = mTempPos[0].y + br.y;
-		mTempPos[2].x = mTempPos[3].x - br.z;
-		mTempPos[2].y = mTempPos[3].y - br.w;
+		if (mFlip == Flip.Horizontally || mFlip == Flip.Both)
+		{
+			mTempPos[1].x = mTempPos[0].x + br.z;
+			mTempPos[2].x = mTempPos[3].x - br.x;
 
-		mTempUVs[0] = new Vector2(mOuterUV.xMin, mOuterUV.yMin);
-		mTempUVs[1] = new Vector2(mInnerUV.xMin, mInnerUV.yMin);
-		mTempUVs[2] = new Vector2(mInnerUV.xMax, mInnerUV.yMax);
-		mTempUVs[3] = new Vector2(mOuterUV.xMax, mOuterUV.yMax);
+			mTempUVs[3].x = mOuterUV.xMin;
+			mTempUVs[2].x = mInnerUV.xMin;
+			mTempUVs[1].x = mInnerUV.xMax;
+			mTempUVs[0].x = mOuterUV.xMax;
+		}
+		else
+		{
+			mTempPos[1].x = mTempPos[0].x + br.x;
+			mTempPos[2].x = mTempPos[3].x - br.z;
+			
+			mTempUVs[0].x = mOuterUV.xMin;
+			mTempUVs[1].x = mInnerUV.xMin;
+			mTempUVs[2].x = mInnerUV.xMax;
+			mTempUVs[3].x = mOuterUV.xMax;
+		}
+
+		if (mFlip == Flip.Vertically || mFlip == Flip.Both)
+		{
+			mTempPos[1].y = mTempPos[0].y + br.w;
+			mTempPos[2].y = mTempPos[3].y - br.y;
+
+			mTempUVs[3].y = mOuterUV.yMin;
+			mTempUVs[2].y = mInnerUV.yMin;
+			mTempUVs[1].y = mInnerUV.yMax;
+			mTempUVs[0].y = mOuterUV.yMax;
+		}
+		else
+		{
+			mTempPos[1].y = mTempPos[0].y + br.y;
+			mTempPos[2].y = mTempPos[3].y - br.w;
+
+			mTempUVs[0].y = mOuterUV.yMin;
+			mTempUVs[1].y = mInnerUV.yMin;
+			mTempUVs[2].y = mInnerUV.yMax;
+			mTempUVs[3].y = mOuterUV.yMax;
+		}
 
 		Color colF = color;
-		colF.a *= mPanel.finalAlpha;
+		colF.a = finalAlpha;
 		Color32 col = atlas.premultipliedAlpha ? NGUITools.ApplyPMA(colF) : colF;
 
 		for (int x = 0; x < 3; ++x)
@@ -592,7 +730,7 @@ public class UISprite : UIWidget
 
 			for (int y = 0; y < 3; ++y)
 			{
-				if (!mFillCenter && x == 1 && y == 1) continue;
+				if (centerType == AdvancedType.Invisible && x == 1 && y == 1) continue;
 
 				int y2 = y + 1;
 
@@ -623,41 +761,65 @@ public class UISprite : UIWidget
 		Texture tex = material.mainTexture;
 		if (tex == null) return;
 
-		Vector4 dr = drawingDimensions;
+		Vector4 v = drawingDimensions;
+		Vector4 u;
+
+		if (mFlip == Flip.Horizontally || mFlip == Flip.Both)
+		{
+			u.x = mInnerUV.xMax;
+			u.z = mInnerUV.xMin;
+		}
+		else
+		{
+			u.x = mInnerUV.xMin;
+			u.z = mInnerUV.xMax;
+		}
+
+		if (mFlip == Flip.Vertically || mFlip == Flip.Both)
+		{
+			u.y = mInnerUV.yMax;
+			u.w = mInnerUV.yMin;
+		}
+		else
+		{
+			u.y = mInnerUV.yMin;
+			u.w = mInnerUV.yMax;
+		}
+
 		Vector2 size = new Vector2(mInnerUV.width * tex.width, mInnerUV.height * tex.height);
 		size *= atlas.pixelSize;
 
 		Color colF = color;
-		colF.a *= mPanel.finalAlpha;
+		colF.a = finalAlpha;
 		Color32 col = atlas.premultipliedAlpha ? NGUITools.ApplyPMA(colF) : colF;
 
-		float x0 = dr.x;
-		float y0 = dr.y;
+		float x0 = v.x;
+		float y0 = v.y;
 
-		float u0 = mInnerUV.xMin;
-		float v0 = mInnerUV.yMin;
+		float u0 = u.x;
+		float v0 = u.y;
 
-		while (y0 < dr.w)
+		while (y0 < v.w)
 		{
-			x0 = dr.x;
+			x0 = v.x;
 			float y1 = y0 + size.y;
-			float v1 = mInnerUV.yMax;
+			float v1 = u.w;
 
-			if (y1 > dr.w)
+			if (y1 > v.w)
 			{
-				v1 = Mathf.Lerp(mInnerUV.yMin, mInnerUV.yMax, (dr.w - y0) / size.y);
-				y1 = dr.w;
+				v1 = Mathf.Lerp(u.y, u.w, (v.w - y0) / size.y);
+				y1 = v.w;
 			}
 
-			while (x0 < dr.z)
+			while (x0 < v.z)
 			{
 				float x1 = x0 + size.x;
-				float u1 = mInnerUV.xMax;
+				float u1 = u.z;
 
-				if (x1 > dr.z)
+				if (x1 > v.z)
 				{
-					u1 = Mathf.Lerp(mInnerUV.xMin, mInnerUV.xMax, (dr.z - x0) / size.x);
-					x1 = dr.z;
+					u1 = Mathf.Lerp(u.x, u.z, (v.z - x0) / size.x);
+					x1 = v.z;
 				}
 
 				verts.Add(new Vector3(x0, y0));
@@ -690,46 +852,42 @@ public class UISprite : UIWidget
 		if (mFillAmount < 0.001f) return;
 
 		Color colF = color;
-		colF.a *= mPanel.finalAlpha;
+		colF.a = finalAlpha;
 		Color32 col = atlas.premultipliedAlpha ? NGUITools.ApplyPMA(colF) : colF;
 		Vector4 v = drawingDimensions;
-
-		float tx0 = mOuterUV.xMin;
-		float ty0 = mOuterUV.yMin;
-		float tx1 = mOuterUV.xMax;
-		float ty1 = mOuterUV.yMax;
+		Vector4 u = drawingUVs;
 
 		// Horizontal and vertical filled sprites are simple -- just end the sprite prematurely
 		if (mFillDirection == FillDirection.Horizontal || mFillDirection == FillDirection.Vertical)
 		{
 			if (mFillDirection == FillDirection.Horizontal)
 			{
-				float fill = (tx1 - tx0) * mFillAmount;
+				float fill = (u.z - u.x) * mFillAmount;
 
 				if (mInvert)
 				{
 					v.x = v.z - (v.z - v.x) * mFillAmount;
-					tx0 = tx1 - fill;
+					u.x = u.z - fill;
 				}
 				else
 				{
 					v.z = v.x + (v.z - v.x) * mFillAmount;
-					tx1 = tx0 + fill;
+					u.z = u.x + fill;
 				}
 			}
 			else if (mFillDirection == FillDirection.Vertical)
 			{
-				float fill = (ty1 - ty0) * mFillAmount;
+				float fill = (u.w - u.y) * mFillAmount;
 
 				if (mInvert)
 				{
 					v.y = v.w - (v.w - v.y) * mFillAmount;
-					ty0 = ty1 - fill;
+					u.y = u.w - fill;
 				}
 				else
 				{
 					v.w = v.y + (v.w - v.y) * mFillAmount;
-					ty1 = ty0 + fill;
+					u.w = u.y + fill;
 				}
 			}
 		}
@@ -739,10 +897,10 @@ public class UISprite : UIWidget
 		mTempPos[2] = new Vector2(v.z, v.w);
 		mTempPos[3] = new Vector2(v.z, v.y);
 
-		mTempUVs[0] = new Vector2(tx0, ty0);
-		mTempUVs[1] = new Vector2(tx0, ty1);
-		mTempUVs[2] = new Vector2(tx1, ty1);
-		mTempUVs[3] = new Vector2(tx1, ty0);
+		mTempUVs[0] = new Vector2(u.x, u.y);
+		mTempUVs[1] = new Vector2(u.x, u.w);
+		mTempUVs[2] = new Vector2(u.z, u.w);
+		mTempUVs[3] = new Vector2(u.z, u.y);
 
 		if (mFillAmount < 1f)
 		{
@@ -782,13 +940,13 @@ public class UISprite : UIWidget
 					mTempPos[2].y = mTempPos[1].y;
 					mTempPos[3].y = mTempPos[0].y;
 
-					mTempUVs[0].x = Mathf.Lerp(tx0, tx1, fx0);
+					mTempUVs[0].x = Mathf.Lerp(u.x, u.z, fx0);
 					mTempUVs[1].x = mTempUVs[0].x;
-					mTempUVs[2].x = Mathf.Lerp(tx0, tx1, fx1);
+					mTempUVs[2].x = Mathf.Lerp(u.x, u.z, fx1);
 					mTempUVs[3].x = mTempUVs[2].x;
 
-					mTempUVs[0].y = Mathf.Lerp(ty0, ty1, fy0);
-					mTempUVs[1].y = Mathf.Lerp(ty0, ty1, fy1);
+					mTempUVs[0].y = Mathf.Lerp(u.y, u.w, fy0);
+					mTempUVs[1].y = Mathf.Lerp(u.y, u.w, fy1);
 					mTempUVs[2].y = mTempUVs[1].y;
 					mTempUVs[3].y = mTempUVs[0].y;
 
@@ -829,13 +987,13 @@ public class UISprite : UIWidget
 					mTempPos[2].y = mTempPos[1].y;
 					mTempPos[3].y = mTempPos[0].y;
 
-					mTempUVs[0].x = Mathf.Lerp(tx0, tx1, fx0);
+					mTempUVs[0].x = Mathf.Lerp(u.x, u.z, fx0);
 					mTempUVs[1].x = mTempUVs[0].x;
-					mTempUVs[2].x = Mathf.Lerp(tx0, tx1, fx1);
+					mTempUVs[2].x = Mathf.Lerp(u.x, u.z, fx1);
 					mTempUVs[3].x = mTempUVs[2].x;
 
-					mTempUVs[0].y = Mathf.Lerp(ty0, ty1, fy0);
-					mTempUVs[1].y = Mathf.Lerp(ty0, ty1, fy1);
+					mTempUVs[0].y = Mathf.Lerp(u.y, u.w, fy0);
+					mTempUVs[1].y = Mathf.Lerp(u.y, u.w, fy1);
 					mTempUVs[2].y = mTempUVs[1].y;
 					mTempUVs[3].y = mTempUVs[0].y;
 
@@ -972,6 +1130,243 @@ public class UISprite : UIWidget
 			if (invert) xy[i3].y = Mathf.Lerp(xy[i0].y, xy[i2].y, sin);
 			else xy[i1].x = Mathf.Lerp(xy[i0].x, xy[i2].x, cos);
 		}
+	}
+
+	/// <summary>
+	/// Advanced sprite fill function. Contributed by Nicki Hansen.
+	/// </summary>
+
+	protected void AdvancedFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color32> cols)
+	{
+		if (!mSprite.hasBorder)
+		{
+			SimpleFill(verts, uvs, cols);
+			return;
+		}
+		
+		Texture tex = material.mainTexture;
+		if (tex == null) return;
+
+		Vector4 dr = drawingDimensions;
+		Vector4 br = border * atlas.pixelSize;
+
+		Vector2 tileSize = new Vector2(mInnerUV.width * tex.width, mInnerUV.height * tex.height);
+		tileSize *= atlas.pixelSize;
+
+		if (tileSize.x < 1f) tileSize.x = 1f;
+		if (tileSize.y < 1f) tileSize.y = 1f;
+
+		mTempPos[0].x = dr.x;
+		mTempPos[0].y = dr.y;
+		mTempPos[3].x = dr.z;
+		mTempPos[3].y = dr.w;
+
+		if (mFlip == Flip.Horizontally || mFlip == Flip.Both)
+		{
+			mTempPos[1].x = mTempPos[0].x + br.z;
+			mTempPos[2].x = mTempPos[3].x - br.x;
+
+			mTempUVs[3].x = mOuterUV.xMin;
+			mTempUVs[2].x = mInnerUV.xMin;
+			mTempUVs[1].x = mInnerUV.xMax;
+			mTempUVs[0].x = mOuterUV.xMax;
+		}
+		else
+		{
+			mTempPos[1].x = mTempPos[0].x + br.x;
+			mTempPos[2].x = mTempPos[3].x - br.z;
+
+			mTempUVs[0].x = mOuterUV.xMin;
+			mTempUVs[1].x = mInnerUV.xMin;
+			mTempUVs[2].x = mInnerUV.xMax;
+			mTempUVs[3].x = mOuterUV.xMax;
+		}
+
+		if (mFlip == Flip.Vertically || mFlip == Flip.Both)
+		{
+			mTempPos[1].y = mTempPos[0].y + br.w;
+			mTempPos[2].y = mTempPos[3].y - br.y;
+
+			mTempUVs[3].y = mOuterUV.yMin;
+			mTempUVs[2].y = mInnerUV.yMin;
+			mTempUVs[1].y = mInnerUV.yMax;
+			mTempUVs[0].y = mOuterUV.yMax;
+		}
+		else
+		{
+			mTempPos[1].y = mTempPos[0].y + br.y;
+			mTempPos[2].y = mTempPos[3].y - br.w;
+
+			mTempUVs[0].y = mOuterUV.yMin;
+			mTempUVs[1].y = mInnerUV.yMin;
+			mTempUVs[2].y = mInnerUV.yMax;
+			mTempUVs[3].y = mOuterUV.yMax;
+		}
+
+		Color colF = color;
+		colF.a = finalAlpha;
+		Color32 col = atlas.premultipliedAlpha ? NGUITools.ApplyPMA(colF) : colF;
+
+		for (int x = 0; x < 3; ++x)
+		{
+			int x2 = x + 1;
+
+			for (int y = 0; y < 3; ++y)
+			{
+				if (centerType == AdvancedType.Invisible && x == 1 && y == 1) continue;
+				int y2 = y + 1;
+
+				if (x == 1 && y == 1) // Center
+				{
+					if (centerType == AdvancedType.Tiled)
+					{
+						float startPositionX = mTempPos[x].x;
+						float endPositionX = mTempPos[x2].x;
+						float startPositionY = mTempPos[y].y;
+						float endPositionY = mTempPos[y2].y;
+						float textureStartX = mTempUVs[x].x;
+						float textureStartY = mTempUVs[y].y;
+						float tileStartY = startPositionY;
+
+						while (tileStartY < endPositionY)
+						{
+							float tileStartX = startPositionX;
+							float textureEndY = mTempUVs[y2].y;
+							float tileEndY = tileStartY + tileSize.y;
+							
+							if (tileEndY > endPositionY)
+							{
+								textureEndY = Mathf.Lerp(textureStartY, textureEndY, (endPositionY - tileStartY) / tileSize.y);
+								tileEndY = endPositionY;
+							}
+
+							while (tileStartX < endPositionX)
+							{
+								float tileEndX = tileStartX + tileSize.x;
+								float textureEndX = mTempUVs[x2].x;
+								
+								if (tileEndX > endPositionX)
+								{
+									textureEndX = Mathf.Lerp(textureStartX, textureEndX, (endPositionX - tileStartX) / tileSize.x);
+									tileEndX = endPositionX;
+								}
+
+								FillBuffers(tileStartX, tileEndX, tileStartY, tileEndY, textureStartX,
+									textureEndX, textureStartY, textureEndY, col, verts, uvs, cols);
+
+								tileStartX += tileSize.x;
+							}
+							tileStartY += tileSize.y;
+						}
+					}
+					else if (centerType == AdvancedType.Sliced)
+					{
+						FillBuffers(mTempPos[x].x, mTempPos[x2].x, mTempPos[y].y, mTempPos[y2].y,
+							mTempUVs[x].x, mTempUVs[x2].x, mTempUVs[y].y, mTempUVs[y2].y, col, verts, uvs, cols);
+					}
+				}
+				else if (x == 1) // Top or bottom
+				{
+					if ((y == 0 && bottomType == AdvancedType.Tiled) || (y == 2 && topType == AdvancedType.Tiled))
+					{
+						float startPositionX = mTempPos[x].x;
+						float endPositionX = mTempPos[x2].x;
+						float startPositionY = mTempPos[y].y;
+						float endPositionY = mTempPos[y2].y;
+						float textureStartX = mTempUVs[x].x;
+						float textureStartY = mTempUVs[y].y;
+						float textureEndY = mTempUVs[y2].y;
+						float tileStartX = startPositionX;
+
+						while (tileStartX < endPositionX)
+						{
+							float tileEndX = tileStartX + tileSize.x;
+							float textureEndX = mTempUVs[x2].x;
+
+							if (tileEndX > endPositionX)
+							{
+								textureEndX = Mathf.Lerp(textureStartX, textureEndX, (endPositionX - tileStartX) / tileSize.x);
+								tileEndX = endPositionX;
+							}
+
+							FillBuffers(tileStartX, tileEndX, startPositionY, endPositionY, textureStartX,
+								textureEndX, textureStartY, textureEndY, col, verts, uvs, cols);
+
+							tileStartX += tileSize.x;
+						}
+					}
+					else if ((y == 0 && bottomType == AdvancedType.Sliced) || (y == 2 && topType == AdvancedType.Sliced))
+					{
+						FillBuffers(mTempPos[x].x, mTempPos[x2].x, mTempPos[y].y, mTempPos[y2].y,
+							mTempUVs[x].x, mTempUVs[x2].x, mTempUVs[y].y, mTempUVs[y2].y, col, verts, uvs, cols);
+					}
+				}
+				else if (y == 1) // Left or right
+				{
+					if ((x == 0 && leftType == AdvancedType.Tiled) || (x == 2 && rightType == AdvancedType.Tiled))
+					{
+						float startPositionX = mTempPos[x].x;
+						float endPositionX = mTempPos[x2].x;
+						float startPositionY = mTempPos[y].y;
+						float endPositionY = mTempPos[y2].y;
+						float textureStartX = mTempUVs[x].x;
+						float textureEndX = mTempUVs[x2].x;
+						float textureStartY = mTempUVs[y].y;
+						float tileStartY = startPositionY;
+
+						while (tileStartY < endPositionY)
+						{
+							float textureEndY = mTempUVs[y2].y;
+							float tileEndY = tileStartY + tileSize.y;
+
+							if (tileEndY > endPositionY)
+							{
+								textureEndY = Mathf.Lerp(textureStartY, textureEndY, (endPositionY - tileStartY) / tileSize.y);
+								tileEndY = endPositionY;
+							}
+							
+							FillBuffers(startPositionX, endPositionX, tileStartY, tileEndY, textureStartX,
+								textureEndX, textureStartY, textureEndY, col, verts, uvs, cols);
+
+							tileStartY += tileSize.y;
+						}
+					}
+					else if ((x == 0 && leftType == AdvancedType.Sliced) || (x == 2 && rightType == AdvancedType.Sliced))
+					{
+						FillBuffers(mTempPos[x].x, mTempPos[x2].x, mTempPos[y].y, mTempPos[y2].y,
+							mTempUVs[x].x, mTempUVs[x2].x, mTempUVs[y].y, mTempUVs[y2].y, col, verts, uvs, cols);
+					}
+				}
+				else // Corner
+				{
+					FillBuffers(mTempPos[x].x, mTempPos[x2].x, mTempPos[y].y, mTempPos[y2].y,
+						mTempUVs[x].x, mTempUVs[x2].x, mTempUVs[y].y, mTempUVs[y2].y, col, verts, uvs, cols);
+				}
+			}
+		}
+	}
+
+	/// <summary>
+	/// Helper function used in AdvancedFill, above. Contributed by Nicki Hansen.
+	/// </summary>
+
+	void FillBuffers (float v0x, float v1x, float v0y, float v1y, float u0x, float u1x, float u0y, float u1y, Color col,
+		BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color32> cols)
+	{
+		verts.Add(new Vector3(v0x, v0y));
+		verts.Add(new Vector3(v0x, v1y));
+		verts.Add(new Vector3(v1x, v1y));
+		verts.Add(new Vector3(v1x, v0y));
+
+		uvs.Add(new Vector2(u0x, u0y));
+		uvs.Add(new Vector2(u0x, u1y));
+		uvs.Add(new Vector2(u1x, u1y));
+		uvs.Add(new Vector2(u1x, u0y));
+
+		cols.Add(col);
+		cols.Add(col);
+		cols.Add(col);
+		cols.Add(col);
 	}
 #endregion
 }

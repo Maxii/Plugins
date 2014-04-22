@@ -1,6 +1,6 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -21,11 +21,18 @@ public class TweenScale : UITweener
 
 	public Transform cachedTransform { get { if (mTrans == null) mTrans = transform; return mTrans; } }
 
-	public Vector3 scale { get { return cachedTransform.localScale; } set { cachedTransform.localScale = value; } }
+	public Vector3 value { get { return cachedTransform.localScale; } set { cachedTransform.localScale = value; } }
+
+	[System.Obsolete("Use 'value' instead")]
+	public Vector3 scale { get { return this.value; } set { this.value = value; } }
+
+	/// <summary>
+	/// Tween the value.
+	/// </summary>
 
 	protected override void OnUpdate (float factor, bool isFinished)
 	{
-		cachedTransform.localScale = from * (1f - factor) + to * factor;
+		value = from * (1f - factor) + to * factor;
 
 		if (updateTable)
 		{
@@ -45,7 +52,7 @@ public class TweenScale : UITweener
 	static public TweenScale Begin (GameObject go, float duration, Vector3 scale)
 	{
 		TweenScale comp = UITweener.Begin<TweenScale>(go, duration);
-		comp.from = comp.scale;
+		comp.from = comp.value;
 		comp.to = scale;
 
 		if (duration <= 0f)
@@ -55,4 +62,16 @@ public class TweenScale : UITweener
 		}
 		return comp;
 	}
+
+	[ContextMenu("Set 'From' to current value")]
+	public override void SetStartToCurrentValue () { from = value; }
+
+	[ContextMenu("Set 'To' to current value")]
+	public override void SetEndToCurrentValue () { to = value; }
+
+	[ContextMenu("Assume value of 'From'")]
+	void SetCurrentValueToStart () { value = from; }
+
+	[ContextMenu("Assume value of 'To'")]
+	void SetCurrentValueToEnd () { value = to; }
 }

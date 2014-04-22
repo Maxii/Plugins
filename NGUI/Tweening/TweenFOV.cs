@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -18,26 +18,22 @@ public class TweenFOV : UITweener
 
 	Camera mCam;
 
-	/// <summary>
-	/// Camera that's being tweened.
-	/// </summary>
-
 	public Camera cachedCamera { get { if (mCam == null) mCam = camera; return mCam; } }
 
-	/// <summary>
-	/// Current field of view value.
-	/// </summary>
-
-	public float fov { get { return cachedCamera.fieldOfView; } set { cachedCamera.fieldOfView = value; } }
+	[System.Obsolete("Use 'value' instead")]
+	public float fov { get { return this.value; } set { this.value = value; } }
 
 	/// <summary>
-	/// Perform the tween.
+	/// Tween's current value.
 	/// </summary>
 
-	protected override void OnUpdate (float factor, bool isFinished)
-	{
-		cachedCamera.fieldOfView = from * (1f - factor) + to * factor;
-	}
+	public float value { get { return cachedCamera.fieldOfView; } set { cachedCamera.fieldOfView = value; } }
+
+	/// <summary>
+	/// Tween the value.
+	/// </summary>
+
+	protected override void OnUpdate (float factor, bool isFinished) { value = from * (1f - factor) + to * factor; }
 
 	/// <summary>
 	/// Start the tweening operation.
@@ -46,7 +42,7 @@ public class TweenFOV : UITweener
 	static public TweenFOV Begin (GameObject go, float duration, float to)
 	{
 		TweenFOV comp = UITweener.Begin<TweenFOV>(go, duration);
-		comp.from = comp.fov;
+		comp.from = comp.value;
 		comp.to = to;
 
 		if (duration <= 0f)
@@ -56,4 +52,16 @@ public class TweenFOV : UITweener
 		}
 		return comp;
 	}
+
+	[ContextMenu("Set 'From' to current value")]
+	public override void SetStartToCurrentValue () { from = value; }
+
+	[ContextMenu("Set 'To' to current value")]
+	public override void SetEndToCurrentValue () { to = value; }
+
+	[ContextMenu("Assume value of 'From'")]
+	void SetCurrentValueToStart () { value = from; }
+
+	[ContextMenu("Assume value of 'To'")]
+	void SetCurrentValueToEnd () { value = to; }
 }

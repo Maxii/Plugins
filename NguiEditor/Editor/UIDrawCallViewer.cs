@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEditor;
@@ -41,11 +41,18 @@ public class UIDrawCallViewer : EditorWindow
 	{
 		BetterList<UIDrawCall> dcs = UIDrawCall.activeList;
 
+		dcs.Sort(delegate(UIDrawCall a, UIDrawCall b)
+		{
+			return a.finalRenderQueue.CompareTo(b.finalRenderQueue);
+		});
+
 		if (dcs.size == 0)
 		{
 			EditorGUILayout.HelpBox("No NGUI draw calls present in the scene", MessageType.Info);
 			return;
 		}
+
+		UIPanel selectedPanel = NGUITools.FindInParents<UIPanel>(Selection.activeGameObject);
 
 		GUILayout.Space(12f);
 
@@ -57,11 +64,9 @@ public class UIDrawCallViewer : EditorWindow
 
 		GUILayout.Space(6f);
 
-		UIPanel selectedPanel = NGUITools.FindInParents<UIPanel>(Selection.activeGameObject);
-
-		if (selectedPanel == null)
+		if (selectedPanel == null && !NGUISettings.showAllDCs)
 		{
-			EditorGUILayout.HelpBox("Select any object within the UI hierarchy", MessageType.Info);
+			EditorGUILayout.HelpBox("No panel selected", MessageType.Info);
 			return;
 		}
 
@@ -73,35 +78,47 @@ public class UIDrawCallViewer : EditorWindow
 		for (int i = 0; i < dcs.size; ++i)
 		{
 			UIDrawCall dc = dcs[i];
+			string key = "Draw Call " + (i + 1);
+			bool highlight = (selectedPanel == null || selectedPanel == dc.manager);
 
-			if (dc.manager != selectedPanel)
+			if (!highlight)
 			{
 				if (!NGUISettings.showAllDCs) continue;
-				if (dc.showDetails) GUI.color = new Color(0.85f, 0.85f, 0.85f);
-				else GUI.contentColor = new Color(0.85f, 0.85f, 0.85f);
+				
+				if (UnityEditor.EditorPrefs.GetBool(key, true))
+				{
+					GUI.color = new Color(0.85f, 0.85f, 0.85f);
+				}
+				else
+				{
+					GUI.contentColor = new Color(0.85f, 0.85f, 0.85f);
+				}
 			}
 			else GUI.contentColor = Color.white;
 
 			++dcCount;
-			string key = dc.keyName;
 			string name = key + " of " + dcs.size;
 			if (!dc.isActive) name = name + " (HIDDEN)";
-			else if (dc.manager != selectedPanel) name = name + " (" + dc.manager.name + ")";
+			else if (!highlight) name = name + " (" + dc.manager.name + ")";
 
 			if (NGUIEditorTools.DrawHeader(name, key))
 			{
-				GUI.color = (dc.manager == selectedPanel) ? Color.white : new Color(0.8f, 0.8f, 0.8f);
+				GUI.color = highlight ? Color.white : new Color(0.8f, 0.8f, 0.8f);
 
 				NGUIEditorTools.BeginContents();
-				EditorGUILayout.ObjectField("Material", dc.baseMaterial, typeof(Material), false);
+				EditorGUILayout.ObjectField("Material", dc.dynamicMaterial, typeof(Material), false);
 
 				int count = 0;
 
-				for (int b = 0; b < UIWidget.list.size; ++b)
+				for (int a = 0; a < UIPanel.list.size; ++a)
 				{
-					UIWidget w = UIWidget.list[b];
-					if (w.drawCall == dc)
-						++count;
+					UIPanel p = UIPanel.list.buffer[a];
+
+					for (int b = 0; b < p.widgets.size; ++b)
+					{
+						UIWidget w = p.widgets.buffer[b];
+						if (w.drawCall == dc) ++count;
+					}
 				}
 
 				string myPath = NGUITools.GetHierarchy(dc.manager.cachedGameObject);
@@ -110,14 +127,19 @@ public class UIDrawCallViewer : EditorWindow
 				list[0] = count.ToString();
 				count = 0;
 
-				for (int b = 0; b < UIWidget.list.size; ++b)
+				for (int a = 0; a < UIPanel.list.size; ++a)
 				{
-					UIWidget w = UIWidget.list[b];
+					UIPanel p = UIPanel.list.buffer[a];
 
-					if (w.drawCall == dc)
+					for (int b = 0; b < p.widgets.size; ++b)
 					{
-						string path = NGUITools.GetHierarchy(w.cachedGameObject);
-						list[++count] = count + ". " + (string.Equals(path, myPath) ? w.name : path.Replace(remove, ""));
+						UIWidget w = p.widgets.buffer[b];
+
+						if (w.drawCall == dc)
+						{
+							string path = NGUITools.GetHierarchy(w.cachedGameObject);
+							list[++count] = count + ". " + (string.Equals(path, myPath) ? w.name : path.Replace(remove, ""));
+						}
 					}
 				}
 
@@ -130,14 +152,19 @@ public class UIDrawCallViewer : EditorWindow
 				{
 					count = 0;
 
-					for (int b = 0; b < UIWidget.list.size; ++b)
+					for (int a = 0; a < UIPanel.list.size; ++a)
 					{
-						UIWidget w = UIWidget.list[b];
+						UIPanel p = UIPanel.list.buffer[a];
 
-						if (w.drawCall == dc && ++count == sel)
+						for (int b = 0; b < p.widgets.size; ++b)
 						{
-							Selection.activeGameObject = w.gameObject;
-							break;
+							UIWidget w = p.widgets.buffer[b];
+
+							if (w.drawCall == dc && ++count == sel)
+							{
+								Selection.activeGameObject = w.gameObject;
+								break;
+							}
 						}
 					}
 				}
@@ -151,7 +178,7 @@ public class UIDrawCallViewer : EditorWindow
 				if (dc.isActive != draw)
 				{
 					dc.isActive = draw;
-					UnityEditor.EditorUtility.SetDirty(dc.manager);
+					NGUITools.SetDirty(dc.manager);
 				}
 
 				GUILayout.BeginHorizontal();

@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -139,10 +139,23 @@ public abstract class UITweener : MonoBehaviour
 	public AnimationOrTween.Direction direction { get { return mAmountPerDelta < 0f ? AnimationOrTween.Direction.Reverse : AnimationOrTween.Direction.Forward; } }
 
 	/// <summary>
+	/// This function is called by Unity when you add a component. Automatically set the starting values for convenience.
+	/// </summary>
+
+	void Reset ()
+	{
+		if (!mStarted)
+		{
+			SetStartToCurrentValue();
+			SetEndToCurrentValue();
+		}
+	}
+
+	/// <summary>
 	/// Update as soon as it's started so that there is no delay.
 	/// </summary>
 
-	void Start () { Update(); }
+	protected virtual void Start () { Update(); }
 
 	/// <summary>
 	/// Update the tweening factor and call the virtual update function.
@@ -189,27 +202,74 @@ public abstract class UITweener : MonoBehaviour
 		}
 
 		// If the factor goes out of range and this is a one-time tweening operation, disable the script
-		if ((style == Style.Once) && (mFactor > 1f || mFactor < 0f))
+		if ((style == Style.Once) && (duration == 0f || mFactor > 1f || mFactor < 0f))
 		{
 			mFactor = Mathf.Clamp01(mFactor);
 			Sample(mFactor, true);
 
+			// Disable this script unless the function calls above changed something
+			if (duration == 0f || (mFactor == 1f && mAmountPerDelta > 0f || mFactor == 0f && mAmountPerDelta < 0f))
+				enabled = false;
+
 			current = this;
 
-			// Notify the listener delegates
-			EventDelegate.Execute(onFinished);
+			if (onFinished != null)
+			{
+				mTemp = onFinished;
+				onFinished = new List<EventDelegate>();
+
+				// Notify the listener delegates
+				EventDelegate.Execute(mTemp);
+
+				// Re-add the previous persistent delegates
+				for (int i = 0; i < mTemp.Count; ++i)
+					EventDelegate.Add(onFinished, mTemp[i]);
+				mTemp = null;
+			}
 
 			// Deprecated legacy functionality support
 			if (eventReceiver != null && !string.IsNullOrEmpty(callWhenFinished))
 				eventReceiver.SendMessage(callWhenFinished, this, SendMessageOptions.DontRequireReceiver);
 
 			current = null;
-
-			// Disable this script unless the function calls above changed something
-			if (mFactor == 1f && mAmountPerDelta > 0f || mFactor == 0f && mAmountPerDelta < 0f)
-				enabled = false;
 		}
 		else Sample(mFactor, false);
+	}
+
+	List<EventDelegate> mTemp = null;
+
+	/// <summary>
+	/// Convenience function -- set a new OnFinished event delegate (here for to be consistent with RemoveOnFinished).
+	/// </summary>
+
+	public void SetOnFinished (EventDelegate.Callback del) { EventDelegate.Set(onFinished, del); }
+
+	/// <summary>
+	/// Convenience function -- set a new OnFinished event delegate (here for to be consistent with RemoveOnFinished).
+	/// </summary>
+
+	public void SetOnFinished (EventDelegate del) { EventDelegate.Set(onFinished, del); }
+
+	/// <summary>
+	/// Convenience function -- add a new OnFinished event delegate (here for to be consistent with RemoveOnFinished).
+	/// </summary>
+
+	public void AddOnFinished (EventDelegate.Callback del) { EventDelegate.Add(onFinished, del); }
+
+	/// <summary>
+	/// Convenience function -- add a new OnFinished event delegate (here for to be consistent with RemoveOnFinished).
+	/// </summary>
+
+	public void AddOnFinished (EventDelegate del) { EventDelegate.Add(onFinished, del); }
+
+	/// <summary>
+	/// Remove an OnFinished delegate. Will work even while iterating through the list when the tweener has finished its operation.
+	/// </summary>
+
+	public void RemoveOnFinished (EventDelegate del)
+	{
+		if (onFinished != null) onFinished.Remove(del);
+		if (mTemp != null) mTemp.Remove(del);
 	}
 
 	/// <summary>
@@ -327,9 +387,11 @@ public abstract class UITweener : MonoBehaviour
 
 	/// <summary>
 	/// Manually reset the tweener's state to the beginning.
+	/// If the tween is playing forward, this means the tween's start.
+	/// If the tween is playing in reverse, this means the tween's end.
 	/// </summary>
 
-	public void Reset ()
+	public void ResetToBeginning ()
 	{
 		mStarted = false;
 		mFactor = (mAmountPerDelta < 0f) ? 1f : 0f;
@@ -380,6 +442,24 @@ public abstract class UITweener : MonoBehaviour
 		comp.eventReceiver = null;
 		comp.callWhenFinished = null;
 		comp.enabled = true;
+
+		if (duration <= 0f)
+		{
+			comp.Sample(1f, true);
+			comp.enabled = false;
+		}
 		return comp;
 	}
+
+	/// <summary>
+	/// Set the 'from' value to the current one.
+	/// </summary>
+
+	public virtual void SetStartToCurrentValue () { }
+
+	/// <summary>
+	/// Set the 'to' value to the current one.
+	/// </summary>
+
+	public virtual void SetEndToCurrentValue () { }
 }

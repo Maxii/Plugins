@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -25,6 +25,12 @@ public class UIDragDropItem : MonoBehaviour
 	/// </summary>
 
 	public Restriction restriction = Restriction.None;
+
+	/// <summary>
+	/// Whether a copy of the item will be dragged instead of the item itself.
+	/// </summary>
+
+	public bool cloneOnDrag = false;
 
 #region Common functionality
 
@@ -82,6 +88,56 @@ public class UIDragDropItem : MonoBehaviour
 			}
 		}
 
+		if (cloneOnDrag)
+		{
+			GameObject clone = NGUITools.AddChild(transform.parent.gameObject, gameObject);
+			clone.transform.localPosition = transform.localPosition;
+			clone.transform.localRotation = transform.localRotation;
+			clone.transform.localScale = transform.localScale;
+
+			UIButtonColor bc = clone.GetComponent<UIButtonColor>();
+			if (bc != null) bc.defaultColor = GetComponent<UIButtonColor>().defaultColor;
+
+			UICamera.Notify(UICamera.currentTouch.pressed, "OnPress", false);
+
+			UICamera.currentTouch.pressed = clone;
+			UICamera.currentTouch.dragged = clone;
+
+			UIDragDropItem item = clone.GetComponent<UIDragDropItem>();
+			item.Start();
+			item.OnDragDropStart();
+		}
+		else OnDragDropStart();
+	}
+
+	/// <summary>
+	/// Perform the dragging.
+	/// </summary>
+
+	void OnDrag (Vector2 delta)
+	{
+		if (!enabled || mTouchID != UICamera.currentTouchID) return;
+		OnDragDropMove((Vector3)delta * mRoot.pixelSizeAdjustment);
+	}
+
+	/// <summary>
+	/// Notification sent when the drag event has ended.
+	/// </summary>
+
+	void OnDragEnd ()
+	{
+		if (!enabled || mTouchID != UICamera.currentTouchID) return;
+		OnDragDropRelease(UICamera.hoveredObject);
+	}
+
+#endregion
+
+	/// <summary>
+	/// Perform any logic related to starting the drag & drop operation.
+	/// </summary>
+
+	protected virtual void OnDragDropStart ()
+	{
 		// Automatically disable the scroll view
 		if (mDragScrollView != null) mDragScrollView.enabled = false;
 
@@ -105,57 +161,6 @@ public class UIDragDropItem : MonoBehaviour
 		// Notify the widgets that the parent has changed
 		NGUITools.MarkParentAsChanged(gameObject);
 
-		// Update the parent
-		OnDragDropStart();
-	}
-
-	/// <summary>
-	/// Perform the dragging.
-	/// </summary>
-
-	void OnDrag (Vector2 delta)
-	{
-		if (!enabled || mTouchID != UICamera.currentTouchID) return;
-		OnDragDropMove((Vector3)delta * mRoot.pixelSizeAdjustment);
-	}
-
-	/// <summary>
-	/// Notification sent when the drag event has ended.
-	/// </summary>
-
-	void OnDragEnd ()
-	{
-		if (!enabled || mTouchID != UICamera.currentTouchID) return;
-		mTouchID = int.MinValue;
-
-		// Enable the collider again
-		if (mCollider != null) mCollider.enabled = true;
-
-		// Drop the item
-		OnDragDropRelease(UICamera.hoveredObject);
-
-		// Update the grid and table references
-		mParent = mTrans.parent;
-		mGrid = NGUITools.FindInParents<UIGrid>(mParent);
-		mTable = NGUITools.FindInParents<UITable>(mParent);
-
-		// Re-enable the drag scroll view script
-		if (mDragScrollView != null)
-			mDragScrollView.enabled = true;
-
-		// Notify the widgets that the parent has changed
-		NGUITools.MarkParentAsChanged(gameObject);
-		OnDragDropEnd();
-	}
-
-#endregion
-
-	/// <summary>
-	/// Perform any logic related to starting the drag & drop operation.
-	/// </summary>
-
-	protected virtual void OnDragDropStart ()
-	{
 		if (mTable != null) mTable.repositionNow = true;
 		if (mGrid != null) mGrid.repositionNow = true;
 	}
@@ -175,32 +180,44 @@ public class UIDragDropItem : MonoBehaviour
 
 	protected virtual void OnDragDropRelease (GameObject surface)
 	{
-		// Is there a droppable container?
-		UIDragDropContainer container = surface ? NGUITools.FindInParents<UIDragDropContainer>(surface) : null;
-
-		if (container != null)
+		if (!cloneOnDrag)
 		{
-			// Container found -- parent this object to the container
-			mTrans.parent = (container.reparentTarget != null) ? container.reparentTarget : container.transform;
+			mTouchID = int.MinValue;
+			if (mCollider != null) mCollider.enabled = true;
 
-			Vector3 pos = mTrans.localPosition;
-			pos.z = 0f;
-			mTrans.localPosition = pos;
+			// Is there a droppable container?
+			UIDragDropContainer container = surface ? NGUITools.FindInParents<UIDragDropContainer>(surface) : null;
+
+			if (container != null)
+			{
+				// Container found -- parent this object to the container
+				mTrans.parent = (container.reparentTarget != null) ? container.reparentTarget : container.transform;
+
+				Vector3 pos = mTrans.localPosition;
+				pos.z = 0f;
+				mTrans.localPosition = pos;
+			}
+			else
+			{
+				// No valid container under the mouse -- revert the item's parent
+				mTrans.parent = mParent;
+			}
+
+			// Update the grid and table references
+			mParent = mTrans.parent;
+			mGrid = NGUITools.FindInParents<UIGrid>(mParent);
+			mTable = NGUITools.FindInParents<UITable>(mParent);
+
+			// Re-enable the drag scroll view script
+			if (mDragScrollView != null)
+				mDragScrollView.enabled = true;
+
+			// Notify the widgets that the parent has changed
+			NGUITools.MarkParentAsChanged(gameObject);
+
+			if (mTable != null) mTable.repositionNow = true;
+			if (mGrid != null) mGrid.repositionNow = true;
 		}
-		else
-		{
-			// No valid container under the mouse -- revert the item's parent
-			mTrans.parent = mParent;
-		}
-	}
-
-	/// <summary>
-	/// Perform any logic related to finishing the drag & drop operation.
-	/// </summary>
-
-	protected virtual void OnDragDropEnd ()
-	{
-		if (mTable != null) mTable.repositionNow = true;
-		if (mGrid != null) mGrid.repositionNow = true;
+		else NGUITools.Destroy(gameObject);
 	}
 }

@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2013 Tasharen Entertainment
+// Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -55,7 +55,7 @@ public class NGUIDebug : MonoBehaviour
 	/// Add a new on-screen log entry.
 	/// </summary>
 
-	static public void Log (string text)
+	static void LogString (string text)
 	{
 		if (Application.isPlaying)
 		{
@@ -67,6 +67,28 @@ public class NGUIDebug : MonoBehaviour
 		{
 			Debug.Log(text);
 		}
+	}
+
+	/// <summary>
+	/// Add a new log entry, printing all of the specified parameters.
+	/// </summary>
+
+	static public void Log (params object[] objs)
+	{
+		string text = "";
+
+		for (int i = 0; i < objs.Length; ++i)
+		{
+			if (i == 0)
+			{
+				text += objs[i].ToString();
+			}
+			else
+			{
+				text += ", " + objs[i].ToString();
+			}
+		}
+		LogString(text);
 	}
 
 	/// <summary>
