@@ -5,6 +5,10 @@ using System.Threading;
 namespace Pathfinding.Util {
 	/** Implements a lock free multiple producer - single consumer stack for the Path object.
 	  * Though it probably works for multiple producer - multiple consumer as well.
+	  * 
+	  * On iOS it degrades to using locking since Interlocked.CompareExchange is not available
+	  * on the iOS platform.
+	  * 
 	  * \todo Add SINGLE_THREAD_OPTIMIZE define
 	  */
 	public class LockFreeStack {

@@ -211,27 +211,33 @@ public abstract class UITweener : MonoBehaviour
 			if (duration == 0f || (mFactor == 1f && mAmountPerDelta > 0f || mFactor == 0f && mAmountPerDelta < 0f))
 				enabled = false;
 
-			current = this;
-
-			if (onFinished != null)
+			if (current == null)
 			{
-				mTemp = onFinished;
-				onFinished = new List<EventDelegate>();
+				current = this;
 
-				// Notify the listener delegates
-				EventDelegate.Execute(mTemp);
+				if (onFinished != null)
+				{
+					mTemp = onFinished;
+					onFinished = new List<EventDelegate>();
 
-				// Re-add the previous persistent delegates
-				for (int i = 0; i < mTemp.Count; ++i)
-					EventDelegate.Add(onFinished, mTemp[i]);
-				mTemp = null;
+					// Notify the listener delegates
+					EventDelegate.Execute(mTemp);
+
+					// Re-add the previous persistent delegates
+					for (int i = 0; i < mTemp.Count; ++i)
+					{
+						EventDelegate ed = mTemp[i];
+						if (ed != null) EventDelegate.Add(onFinished, ed, ed.oneShot);
+					}
+					mTemp = null;
+				}
+
+				// Deprecated legacy functionality support
+				if (eventReceiver != null && !string.IsNullOrEmpty(callWhenFinished))
+					eventReceiver.SendMessage(callWhenFinished, this, SendMessageOptions.DontRequireReceiver);
+
+				current = null;
 			}
-
-			// Deprecated legacy functionality support
-			if (eventReceiver != null && !string.IsNullOrEmpty(callWhenFinished))
-				eventReceiver.SendMessage(callWhenFinished, this, SendMessageOptions.DontRequireReceiver);
-
-			current = null;
 		}
 		else Sample(mFactor, false);
 	}
@@ -431,6 +437,19 @@ public abstract class UITweener : MonoBehaviour
 #if UNITY_FLASH
 		if ((object)comp == null) comp = (T)go.AddComponent<T>();
 #else
+		// Find the tween with an unset group ID (group ID of 0).
+		if (comp != null && comp.tweenGroup != 0)
+		{
+			comp = null;
+			T[] comps = go.GetComponents<T>();
+			for (int i = 0, imax = comps.Length; i < imax; ++i)
+			{
+				comp = comps[i];
+				if (comp != null && comp.tweenGroup == 0) break;
+				comp = null;
+			}
+		}
+
 		if (comp == null) comp = go.AddComponent<T>();
 #endif
 		comp.mStarted = false;

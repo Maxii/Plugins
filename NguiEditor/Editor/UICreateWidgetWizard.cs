@@ -145,8 +145,11 @@ public class UICreateWidgetWizard : EditorWindow
 
 	void OnSelectAtlas (Object obj)
 	{
-		NGUISettings.atlas = obj as UIAtlas;
-		Repaint();
+		if (NGUISettings.atlas != obj)
+		{
+			NGUISettings.atlas = obj as UIAtlas;
+			Repaint();
+		}
 	}
 
 	/// <summary>
@@ -155,8 +158,13 @@ public class UICreateWidgetWizard : EditorWindow
 
 	void OnSelectFont (Object obj)
 	{
-		NGUISettings.ambigiousFont = obj as UIFont;
-		Repaint();
+		Object fnt = obj as UIFont;
+
+		if (NGUISettings.ambigiousFont != fnt)
+		{
+			NGUISettings.ambigiousFont = fnt;
+			Repaint();
+		}
 	}
 
 	/// <summary>
@@ -233,7 +241,14 @@ public class UICreateWidgetWizard : EditorWindow
 		}
 	}
 
-	void OnSprite (string val) { NGUISettings.selectedSprite = val; Repaint(); }
+	void OnSprite (string val)
+	{
+		if (NGUISettings.selectedSprite != val)
+		{
+			NGUISettings.selectedSprite = val;
+			Repaint();
+		}
+	}
 
 	/// <summary>
 	/// UI Texture doesn't do anything other than creating the widget.

@@ -79,9 +79,8 @@ public class GFHexGrid : GFLayeredGrid {
 	}
 	#endregion
 	//use these helper values to keep the formulae simple (everything depends on radius)
-	/// <summary>
-	/// 	1.5 times the radius
-	/// </summary>
+
+	/// <summary>1.5 times the radius.</summary>
 	/// <value>Shorthand writing for <c>1.5f * #radius</c> (read-only).</value>
 	public float side {
 		get {
@@ -106,22 +105,30 @@ public class GFHexGrid : GFLayeredGrid {
 	}
 
 	#region Basis Vectors
-	// each basis-vector is orthogonal to its opposite cubic axis
-	private Vector3 cBasis { // the X-basis vector
+	/// <summary>Cubic X-basis vector (column)</summary>
+	/// <value>Gets the column basis.</value>
+	/// 
+	/// Each basis-vector is orthogonal to its opposite cubic axis
+	private Vector3 cubicColumnBasis { // the X-basis vector
 		get {
 			if (hexSideMode == HexOrientation.PointySides) { // right and 30° upwards
-				return side * locUnits [idxS [0]] + 0.5f * h * locUnits [idxS [1]];
+				return side * units [idxS [0]] + 0.5f * h * units [idxS [1]];
 			} else { // straight right
-				return h * locUnits [idxS [1]];
+				return h * units [idxS [1]];
 			}
 		}
 	}
-	private Vector3 rBasis { // the Y -basis vector
+
+	/// <summary>Cubic Y-basis vector (row)</summary>
+	/// <value>Gets the row basis.</value>
+	/// 
+	/// Each basis-vector is orthogonal to its opposite cubic axis
+	private Vector3 cubicRowBasis { // the Y -basis vector
 		get {
 			if (hexSideMode == HexOrientation.PointySides) { // straight up
-				return h * locUnits [idxS [1]];
+				return h * units [idxS [1]];
 			} else { // right and 60° upwards
-				return side * locUnits [idxS [0]] + 0.5f * h * locUnits [idxS [1]];
+				return side * units [idxS [0]] + 0.5f * h * units [idxS [1]];
 			}
 		}
 	}
@@ -135,9 +142,7 @@ public class GFHexGrid : GFLayeredGrid {
 
 	[SerializeField]
 	protected HexOrientation _hexSideMode;
-	/// <summary>
-	/// 	Pointy sides or flat sides.
-	/// </summary>
+	/// <summary>Pointy sides or flat sides.</summary>
 	/// <value>
 	/// 	Whether the grid has pointy sides or flat sides. This affects both the drawing and the calculations.
 	/// </value>
@@ -175,9 +180,7 @@ public class GFHexGrid : GFLayeredGrid {
 	
 	[SerializeField]
 	protected static HexGridShape _gridStyle = HexGridShape.Rectangle;
-	/// <summary>
-	/// 	The shape of the overall grid, affects only drawing and rendering, not the calculations.
-	/// </summary>
+	/// <summary>The shape of the overall grid, affects only drawing and rendering, not the calculations.</summary>
 	/// <value>The shape when drawing or rendering the grid. This only affects the grid’s appearance, but not how it works.</value>
 	public HexGridShape gridStyle {get{return _gridStyle;}set{if(value == _gridStyle){return;} _gridStyle = value; hasChanged = true;}}
 	
@@ -370,13 +373,14 @@ public class GFHexGrid : GFLayeredGrid {
 	/// 
 	/// Takes a point in cubic coordinates and returns its world position.
 	public Vector3 CubicToWorld (Vector4 cubic) {
-		Vector3 loc; // first local space
+		Vector3 local; // first local space
 		if (hexSideMode == HexOrientation.PointySides) {
-			loc = cubic.x * cBasis + cubic.y * rBasis + cubic.w * depth * locUnits[idxS[2]];
+			local = cubic.x * cubicColumnBasis + cubic.y * cubicRowBasis + cubic.w * depth * locUnits[idxS[2]];
 		} else {
-			loc = -cubic.y * cBasis - cubic.z * rBasis + cubic.w * depth * locUnits[idxS[2]];
+			local = -cubic.y * cubicColumnBasis - cubic.z * cubicRowBasis + cubic.w * depth * locUnits[idxS[2]];
 		}
-		return _transform.GFTransformPointFixed (loc) + originOffset; // then world space
+		//Debug.Log (local);
+		return _transform.GFTransformPointFixed (local) + originOffset; // then world space
 	}
 
 	/// <summary>Returns the odd herring coordinates of a point in cubic coordinates.</summary>
@@ -468,7 +472,7 @@ public class GFHexGrid : GFLayeredGrid {
 	/// 
 	/// Returns the world position of the nearest vertex from a given point in world space.
 	/// If <c>doDebug</c> is set a small gizmo sphere will be drawn at that position.
-	public override Vector3 NearestVertexW(Vector3 world, bool doDebug = false){ // documentation taken from parent class
+	public override Vector3 NearestVertexW(Vector3 world, bool doDebug = false) { // documentation taken from parent class
 		Vector3 vertex = CubicToWorld (NearestVertexC (world));
 		
 		if(doDebug){
@@ -484,7 +488,7 @@ public class GFHexGrid : GFLayeredGrid {
 	/// 
 	/// Returns the world position of the nearest vertex from a given point in world space.
 	/// If <c>doDebug</c> is set a small gizmo sphere will be drawn at that position.
-	public override Vector3 NearestFaceW(Vector3 world, bool doDebug = false){
+	public override Vector3 NearestFaceW(Vector3 world, bool doDebug) {
 		Vector3 face = CubicToWorld (NearestFaceC (world));
 		if(doDebug){
 			Gizmos.DrawSphere(face, height / 5);
@@ -500,7 +504,7 @@ public class GFHexGrid : GFLayeredGrid {
 	/// Returns the world position of the nearest box from a given point in world space.
 	/// Since the box is enclosed by several vertices, the returned value is the point in between all of the vertices.
 	/// If <c>doDebug</c> is set a gizmo sphere will be drawn at that position.
-	public override Vector3 NearestBoxW(Vector3 fromPoint, bool doDebug = false){
+	public override Vector3 NearestBoxW(Vector3 fromPoint, bool doDebug) {
 		Vector3 box = CubicToWorld (NearestBoxC (fromPoint));
 		if(doDebug){
 			Gizmos.DrawSphere(box, height / 2);
@@ -787,7 +791,7 @@ public class GFHexGrid : GFLayeredGrid {
 		RenderGridRect(from, to, useSeparateRenderColor ? renderAxisColors : axisColors, width, cam, camTransform);
 	}
 
-	/// <summary>Currently the same as <c>RenderGrid</c>.</summary>
+	/// <summary>Currently the same as <see cref="RenderGrid"/>.</summary>
 	protected void RenderGridRect(int width = 0, Camera cam = null, Transform camTransform = null){
 		RenderGridRect(-size, size, useSeparateRenderColor ? renderAxisColors : axisColors, width, cam, camTransform);
 	}
@@ -1075,12 +1079,19 @@ public class GFHexGrid : GFLayeredGrid {
 
 	#region helper functions
 	#if !DOXYGEN_SHOULD_SKIP_THIS // make doxygen skip the following lines
-	// similar to the base class, except these ones swap quasi-X and quasi-Y when hexes have flat sides.
+	/// <summary>Transforms from quasi-axis to real-ais and swaps if needed.</summary>
+	/// <returns>The real-indices from quasi-indices.</returns>
+	/// <param name="plane">Plane.</param>
+	/// 
+	/// Similar to the base class, except these ones swap quasi-X and quasi-Y when hexes have flat sides.
 	private int[] TransformIndicesS(GridPlane plane){
 		int[] indices = TransformIndices (plane);
 		Swap<int>(ref indices[0], ref indices[1], hexSideMode == HexOrientation.FlatSides);
 		return indices;
 	}
+
+	/// <summary>Get-accessor for the result of TransformIndicesS.</summary>
+	/// <value>The quasi-indices transformed to real indices and swapped.</value>
 	private int[] idxS {get {return TransformIndicesS(gridPlane);}}
 
 	/// <summary>rounds cubic coordinates to the nearest face.</summary>

@@ -8,9 +8,12 @@ namespace Pathfinding.Util {
 	
 		//private byte b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11,b12,b13,b14,b15;
 		
-		private ulong _a, _b;
-		
 		const string hex = "0123456789ABCDEF";
+		
+		public static readonly Guid zero = new Guid(new byte[16]);
+		public static readonly string zeroString = new Guid(new byte[16]).ToString();
+
+		private ulong _a, _b;
 		
 		public Guid (byte[] bytes) {
 			_a =((ulong)bytes[0] << 8*0) | 
@@ -178,7 +181,8 @@ namespace Pathfinding.Util {
 		}
 		
 		public override int GetHashCode () {
-			return (int)_a;
+			ulong ab = _a ^ _b;
+			return (int)(ab >> 32) ^ (int)ab;
 		}
 		
 		/*public static bool operator == (Guid lhs, Guid rhs) {
@@ -221,28 +225,17 @@ namespace Pathfinding.Util {
 					lhs.b15 != rhs.b15;
 		}*/
 		
+		private static System.Text.StringBuilder text;
+		
 		public override string ToString () {
-			System.Text.StringBuilder text = new System.Text.StringBuilder();
-			text.Append (_a.ToString("x16")).Append('-').Append(_b.ToString("x16"));
-			
-			/*text.Append(hex[b0]);
-			text.Append(hex[b1]);
-			text.Append(hex[b2]);
-			text.Append(hex[b3]);
-			text.Append(hex[b4]);
-			text.Append(hex[b5]);
-			text.Append(hex[b6]);
-			text.Append(hex[b7]);
-			text.Append('-');
-			text.Append(hex[b8]);
-			text.Append(hex[b9]);
-			text.Append(hex[b10]);
-			text.Append(hex[b11]);
-			text.Append(hex[b12]);
-			text.Append(hex[b13]);
-			text.Append(hex[b14]);
-			text.Append(hex[b15]);*/
-			return text.ToString();
+			if (text == null) {
+				text = new System.Text.StringBuilder();
+			}
+			lock (text) {
+				text.Length = 0;
+				text.Append (_a.ToString("x16")).Append('-').Append(_b.ToString("x16"));
+				return text.ToString();
+			}
 		}
 	}
 }

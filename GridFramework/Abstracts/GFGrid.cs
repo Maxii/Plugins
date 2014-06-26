@@ -1,33 +1,30 @@
 using UnityEngine;
 using System.Collections;
 using System.Linq;
+using System.Diagnostics;
+using System.Collections.Specialized;
 
-/**
- * @brief Abstract base class for all Grid Framework grids.
- * 
- * This is the standard class all grids are based on.
- * Aside from providing a common set of variables and a template for what methods to use, this class has no practical meaning for end users.
- * Use this as reference for what can be done without having to specify which type of grid you are using.
- * For anything more specific you have to look at the child classes.
- */
+/// <summary>Abstract base class for all Grid Framework grids.</summary>
+/// 
+/// This is the standard class all grids are based on. Aside from providing a common set of variables and a template for what methods to use, this class has no practical
+/// meaning for end users. Use this as reference for what can be done without having to specify which type of grid you are using. For anything more specific you have to
+/// look at the child classes.
 [System.Serializable]
 public abstract class GFGrid : MonoBehaviour {
 	#region nested classes and enums
-	/**
-	 * @brief Enum for one of the three grid planes.
-	 * 
-	 * This enum encapsulates the three grid planes: XY, XZ and YZ.
-	 * You can also get the integer of enum items, where the integer corresponds to the missing axis (X = 0, Y = 1, Z = 2):
-	 * @code
-	 * 	// UnityScrip:
-	 * 	var myPlane: GFGrid.GridPlane = GFGrid.GFGridPlane.XZ;
-	 * 	var planeIndex: int = (int)myPlane; // sets the variable to 1
-	 * 	
-	 * 	// C#
-	 * 	GFGrid.GridPlane myPlane = GFGrid.GFGridPlane.XZ;
-	 * 	int planeIndex = (int)myPlane;
-	 * @endcode
-	 */
+	/// <summary>Enum for one of the three grid planes.</summary>
+	/// 
+	/// This enum encapsulates the three grid planes: XY, XZ and YZ. You can also get the integer of enum items, where the integer
+	/// corresponds to the missing axis (X = 0, Y = 1, Z = 2):
+	/// <code>
+	/// // UnityScript:
+	/// var myPlane: GFGrid.GridPlane = GFGrid.GFGridPlane.XZ;
+	/// var planeIndex: int = (int)myPlane; // sets the variable to 1
+	/// 
+	/// // C#
+	/// GFGrid.GridPlane myPlane = GFGrid.GFGridPlane.XZ;
+	/// int planeIndex = (int)myPlane;
+	/// </code>
 	public enum GridPlane {YZ, XZ, XY};
 
 	// instead of always aligning the centre we can use this to align other regions (WIP)
@@ -72,12 +69,12 @@ public abstract class GFGrid : MonoBehaviour {
 	protected Vector3 _renderTo = 3*Vector3.one; //first one from, second one to 
 	#endregion
 	#region Accessors
-	/**
-	 * @brief Whether the drawing/rendering will scale with spacing.
-	 * 
-	 * Set this to <c>true</c> if you want the drawing to have relative size, i.e. to scale with the spacing/radius or whatever the specific grid uses.
-	 * Otherwise set it to <c>false</c>.
-	 */
+	/// <summary>Whether the drawing/rendering will scale with spacing.</summary>
+	/// 
+	/// Set this to <c>true</c> if you want the drawing to have relative size, i.e. to scale with the spacing/radius or whatever the specific grid uses.
+	/// Otherwise set it to <c>false</c>.
+	/// 
+	/// <value><c>true</c> if the grid's size is in grid coordinates; <c>false</c> if it's in world coordinates.</value>
 	public bool relativeSize {
 		get{return _relativeSize;}
 		set{
@@ -88,14 +85,17 @@ public abstract class GFGrid : MonoBehaviour {
 		}
 	}
 
-	/**
-	 * @brief The size of the visual representation of the grid.
-	 * 
-	 * Defines the size of the drawing and rendering of the grid.
-	 * Keep in mind that the grid is infinitely large, the drawing is just a visual representation, stretching on all three directions from the origin.
-	 * The size is either absolute or relative to the grid's other parameters, depending on the value of @c #relativeSize.
-	 * If you set @c #useCustomRenderRange to @c true that range will override this @c size.
-	 */
+	/// <summary>The size of the visual representation of the grid.</summary>
+	/// 
+	/// <value>The size of the grid's visual representation.</value>
+	/// 
+	/// Defines the size of the drawing and rendering of the grid. Keep in mind that the grid is infinitely large, the drawing is just a visual
+	/// representation, stretching on all three directions from the origin. The size is either absolute or relative to the grid's other parameters,
+	/// depending on the value of <see cref="relativeSize"/>.
+	/// 
+	/// If you set <see cref="useCustomRenderRange"/> to <c>true</c> that range will override this member. The size is either absolute or relative to the grid's other
+	/// parameters, depending on the value of <see cref="relativeSize"/>.
+	/// 
 	public virtual Vector3 size{
 		get{return _size;}
 		set{if(value == _size)// needed because the editor fires the setter even if this wasn't changed
@@ -104,11 +104,10 @@ public abstract class GFGrid : MonoBehaviour {
 			_size = Vector3.Max(value, Vector3.zero);}
 	}
 
-	/**
-	 * @brief Custom lower limit for drawing/rendering.
-	 * 
-	 * When using a custom rendering range this is the lower left backward limit of the rendering/drawing.
-	 */
+	/// <summary>Custom lower limit for drawing and rendering.</summary>
+	/// <value>Custom lower limit for drawing and rendering.</value>
+	/// 
+	/// When using a custom rendering range this is the lower left backward limit of the rendering and drawing.
 	public virtual Vector3 renderFrom{
 		get{return _renderFrom;}
 		set{if(value == _renderFrom)// needed because the editor fires the setter even if this wasn't changed
@@ -117,11 +116,11 @@ public abstract class GFGrid : MonoBehaviour {
 			_renderFrom = Vector3.Min(value, renderTo);}
 	}
 
-	/**
-	 * @brief Custom upper limit for drawing/rendering.
-	 * 
-	 * When using a custom rendering range this is the upper right forward limit of the rendering/drawing.
-	 */
+	/// <summary>Custom upper limit for drawing and rendering.</summary>
+	/// 
+	/// <value>Custom upper limit for drawing and rendering.</value>
+	/// 
+	/// When using a custom rendering range this is the upper right forward limit of the rendering and drawing.
 	public virtual Vector3 renderTo{
 		get{return _renderTo;}
 		set{if(value == _renderTo)// needed because the editor fires the setter even if this wasn't changed
@@ -133,6 +132,9 @@ public abstract class GFGrid : MonoBehaviour {
 	#endregion
 
 	#region Offset
+	[SerializeField]
+	protected Vector3 _originOffset = Vector3.zero;
+
 	/// <summary>Offset to add to the origin</summary>
 	/// 
 	/// By default the origin of grids is at the world position of their gameObject (the position of the Transform), this offset allows you to move the grid's pivot point by adding a value to it.
@@ -140,7 +142,7 @@ public abstract class GFGrid : MonoBehaviour {
 	/// 
 	/// In other words, if a point at grid position (1, 2, 0) is at world position (4, 5, 0) and you add and offset of (1, 1, 0), then point's grid position will still be (1, 2, 0),
 	/// but its world position will be (5, 6, 0). Here is an example:
-	/// @code
+	/// <code>
 	/// GFGrid myGrid;
 	/// Vector3 gPos = new Vector3 (1, 2, 3);
 	/// Vector3 wPos = myGrid.GridToWorld (gPos); 
@@ -149,122 +151,118 @@ public abstract class GFGrid : MonoBehaviour {
 	/// myGrid.pivotOffset = new Vector3 (1, 1, 0);
 	/// wPos = myGrid.GridToWorld (gPos); 
 	/// Debug.Log (wPos); // prints (5, 6, 0)
-	/// @endcode
-	public Vector3 originOffset = Vector3.zero;
+	/// </code>
+	public Vector3 originOffset {
+		get {return _originOffset;}
+		set {
+			if ( value == _originOffset )// needed because the editor fires the setter even if this wasn't changed
+				return;
+			hasChanged = true;
+			_originOffset = value;
+		}
+	}
 	#endregion
 	
 	#region colours
-	/**
-	 * @brief Colours of the axes when drawing and rendering.
-	 * 
-	 * The colours are stored as three separte entries, corresponding to the three separate axes.
-	 * They will be used for both drawing an rendering, unless @c useSeparateRenderColor is set to @c true.
-	 */
+	protected string defaultShader = "Shader \"Lines/Colored Blended\" {" +
+	                                "SubShader { Pass { " +
+	                                "	Blend SrcAlpha OneMinusSrcAlpha " +
+	                                "	ZWrite Off Cull Off Fog { Mode Off } " +
+	                                "	BindChannels {" +
+	                                "	Bind \"vertex\", vertex Bind \"color\", color }" +
+	                                "} } }";
+
+	/// <summary>Colours of the axes when drawing and rendering.</summary>
+	/// 
+	/// The colours are stored as three separte entries, corresponding to the three separate axes. They will be used for both drawing
+	/// an rendering, unless <see cref="useSeparateRenderColor"/> is set to <c>true</c>.
 	public GFColorVector3 axisColors = new GFColorVector3();
 
-	/**
-	 * @brief Whether to use the same colours for rendering as for drawing
-	 * 
-	 * If you set this flag to @c true the rendering will use the colours of @c #renderAxisColors, otherwise it will default to @c #axisColors.
-	 * This is useful if you want to have different colours for rendering and drawing.
-	 * For example, you could have a clearly visible grid in the editor to work with and a barely visible grid in the game while playing.
-	 */
+	/// <summary>Whether to use the same colours for rendering as for drawing.</summary>
+	/// 
+	/// If you set this flag to <c>true</c> the rendering will use the colours of <see cref="renderAxisColors"/>, otherwise it will default to <see cref="axisColors"/>.
+	/// This is useful if you want to have different colours for rendering and drawing. For example, you could have a clearly visible grid in the editor to work with
+	/// and a barely visible grid in the game while playing.
 	public bool useSeparateRenderColor = false;
 
-	/**
-	 * @brief Separate colours of the axes when rendering.
-	 * 
-	 * By default the colours of @c axisColors are used for rendering, however if you set @c #useSeparateRenderColor to @c true these colours will be used instead.
-	 */
+	/// <summary>Separate colours of the axes when rendering.</summary>
+	/// 
+	/// By default the colours of <see cref="axisColors"/> are used for rendering, however if you set <see cref="useSeparateRenderColor"/> to <c>true</c> these colours
+	/// will be used instead. Otherwise this does nothing.
 	public GFColorVector3 renderAxisColors = new GFColorVector3(Color.gray);
 	#endregion
 	
 	#region Draw & Render Flags
-	/**
-	 * @brief Whether to hide the grid completely.
-	 * 
-	 * If set to @c true the grid will be neither drawn nor rendered at all, it then takes precedence over all the other flags.
-	 */
+	/// <summary>Whether to hide the grid completely.</summary>
+	/// 
+	/// <para>If set to <c>true</c> the grid will be neither drawn nor rendered at all, it then takes precedence over all the other flags.</para>
 	public bool hideGrid = false;
 
-	/**
-	 * @brief Whether to hide the grid in play mode.
-	 * 
-	 * This is similar to @c hideGrid, but only active while in play mode.
-	 */
+	/// <summary>Whether to hide the grid in play mode.</summary>
+	/// 
+	/// This is similar to <see cref="hideGrid"/>, but only active while in play mode.
 	public bool hideOnPlay = false;
 
-	/**
-	 * @brief Whether to hide just individual axes
-	 * 
-	 * This hides the individual axes rather than the whole grid.
-	 */
+	/// <summary>Whether to hide just individual axes.</summary>
+	/// 
+	/// This hides the individual axes rather than the whole grid.
 	public GFBoolVector3 hideAxis = new GFBoolVector3();
 
-	/**
-	 * @brief Whether to draw a little sphere at the origin of the grid.
-	 * 
-	 * If set to @c true a small gizmo sphere will be drawn at the origin of the grid.
-	 * This is not a rendering, so it wil not appear in the game, it is intended to make selecting the grid in the editor easier.
-	 */
+	/// <summary>Whether to draw a little sphere at the origin of the grid.</summary>
+	/// 
+	/// If set to <c>true</c> a small gizmo sphere will be drawn at the origin of the grid. This is not a rendering, so it wil not appear in the game, it is intended
+	/// to make selecting the grid in the editor easier.
 	public bool drawOrigin = false;
 
-	/**
-	 * @brief Whether to render the grid at runtime.
-	 * 
-	 * The grid will only be rendered if this flag is set to @c true, otherwise you won't be able to see the grid in the game.
-	 */
+	/// <summary>Whether to render the grid at runtime.</summary>
+	/// 
+	/// The grid will only be rendered if this flag is set to <c>true</c>, otherwise you won't be able to see the grid in the game.
 	public bool renderGrid = true;
 
 	[SerializeField]
 	protected bool _useCustomRenderRange = false;
-	/**
-	 * @brief Use you own values for the range of the rendering.
-	 * 
-	 * If this flagis set to @c true the grid rendering an drawing will use the values of @c #renderFrom and @c #renderTo as limits.
-	 * Otherwise it will use the @c #size instead.
-	 */
+	/// <summary>Use you own values for the range of the rendering.</summary>
+	/// 
+	/// <value><c>true</c> if using a custom range for rendering and drawing; otherwise, <c>false</c>.</value>
+	/// 
+	/// If this flag is set to <c>true</c> the grid rendering an drawing will use the values of <see cref="renderFrom"/> and <see cref="renderTo"/> as limits. Otherwise
+	/// it will use the <see cref="size"/> instead.
 	public bool useCustomRenderRange{get{return _useCustomRenderRange;}set{if(value == _useCustomRenderRange){return;} _useCustomRenderRange = value; hasChanged = true;}}
 
 	[SerializeField]
 	protected int _renderLineWidth = 1;
-	/**
-	 * @brief The width of the lines used when rendering the grid.
-	 * 
-	 * The width of the rendered lines, if it is set to 1 all lines will be one pixel wide, otherwise they will have the specified width in world units.
-	 */
+
+	/// <summary>The width of the lines used when rendering the grid.</summary>
+	/// 
+	/// <value>The width of the render line.</value>
+	/// 
+	/// The width of the rendered lines, if it is set to 1 all lines will be one pixel wide, otherwise they will have the specified width in world units.
 	public int renderLineWidth{
 		get{return _renderLineWidth;}
 		set{_renderLineWidth = Mathf.Max(value, 1);}
 	}
 
-	/**
-	 * @brief The material for rendering, if none is given it uses a default material.
-	 * 
-	 * You can use you own material if you want control over the shader used, otherwise this default material will be used:
-	 * @code
-	 * 	new Material("Shader \"Lines/Colored Blended\" {" +
-	 *		"SubShader { Pass { " +
-	 *		"	Blend SrcAlpha OneMinusSrcAlpha " +
-	 *		"	ZWrite Off Cull Off Fog { Mode Off } " +
-	 *		"	BindChannels {" +
-	 *		"	Bind \"vertex\", vertex Bind \"color\", color }" +
-	 *		"} } }" )
-	 * @endcode
-	 */
+	/// <summary>The material for rendering, if none is given it uses a default material.</summary>
+	/// 
+	/// You can use you own material if you want control over the shader used, otherwise this default material will be used:
+	/// <code>
+	/// new Material("Shader \"Lines/Colored Blended\" {" +
+	/// 	"SubShader { Pass { " +
+	/// 	"	Blend SrcAlpha OneMinusSrcAlpha " +
+	/// 	"	ZWrite Off Cull Off Fog { Mode Off } " +
+	/// 	"	BindChannels {" +
+	/// 	"	Bind \"vertex\", vertex Bind \"color\", color }" +
+	/// 	"} } }"
+	/// )
+	/// </code>
 	public Material renderMaterial = null;
-	protected Material defaultRenderMaterial {get {return new Material("Shader \"Lines/Colored Blended\" {" +
-		"SubShader { Pass { " +
-		"	Blend SrcAlpha OneMinusSrcAlpha " +
-		"	ZWrite Off Cull Off Fog { Mode Off } " +
-		"	BindChannels {" +
-		"	Bind \"vertex\", vertex Bind \"color\", color }" +
-		"} } }" );}}
+	protected Material defaultRenderMaterial {get {return new Material(defaultShader);}}
 	#endregion
 	
 	#region cache members
 	// we store the draw points here for re-use
 	protected Vector3[][][] _drawPoints;
+
 	/// <summary>When requesting draw points we store the last request here.</summary>
 	/// If the request matches the previous one we can reuse points, otherwise we have to calculate them anew.
 	protected Vector3 lastFromPoint, lastToPoint;
@@ -332,9 +330,12 @@ public abstract class GFGrid : MonoBehaviour {
 	#region Events
 	/// <summary>A delegate for handling events when the grid has been changed in such a way that it requires a redraw</summary>
 	/// <param name="grid">The grid that calls the delegate</param>
+	/// 
 	/// This is the delegate type for methods to be called when changes to the grid occur. It is best used together with the #GridChangedEvent event.
 	public delegate void GridChangedDelegate( GFGrid grid );
+
 	/// <summary>An even that gets fired </summary>
+	/// 
 	/// This is the event that gets fired when one of the grid's properties is changed. If the Transform (position or rotation) is changed this event
 	/// will only be fired if there is a camera trying to render the grid or some other method tries to draw the gird (like drawing in the editor or 
 	/// calling #GetVectrosityPoints). You can learn more about events ont he @ref events page of the user manual.
@@ -343,175 +344,150 @@ public abstract class GFGrid : MonoBehaviour {
 	#endregion
 	
 	#region Grid <-> World coordinate transformation
-	/**
-	 * @brief Converts world coordinates to grid coordinates.
-	 * @param worldPoint Point in world space.
-	 * @return Grid coordinates of the world point.
-	 * 
-	 * Takes in a point in world space and converts it to grid space.
-	 * Some grids have several coordinate system, so look into the specific class for conversion methods to other coordinate systems.
-	 */
+	/// <summary>Converts world coordinates to grid coordinates.</summary>
+	/// <returns>Grid coordinates of the world point.</returns>
+	/// <param name="worldPoint">Point in world space.</param>
+	/// 
+	/// Takes in a point in world space and converts it to grid space. Some grids have several coordinate system, so look into the specific class for conversion methods
+	/// to other coordinate systems.
 	public abstract Vector3 WorldToGrid(Vector3 worldPoint);
 
-	/**
-	 * @brief Converts grid coordinates to world coordinates.
-	 * @param gridPoint Point in grid space.
-	 * @return World coordinates of the grid point.
-	 * 
-	 * Takes in a point in grid space and converts it to world space.
-	 * Some grids have several coordinate system, so look into the specific class for conversion methods from other coordinate systems.
-	 */
+	/// <summary>Converts grid coordinates to world coordinates.</summary>
+	/// <returns>World coordinates of the grid point.</returns>
+	/// <param name="gridPoint">Point in grid space.</param>
+	/// 
+	/// Takes in a point in grid space and converts it to world space. Some grids have several coordinate system, so look into the specific class for conversion methods
+	/// from other coordinate systems.
 	public abstract Vector3 GridToWorld(Vector3 gridPoint);
 	#endregion
 	
 	#region nearest in world space
-	/**
-	 * @brief Returns the world position of the nearest vertex.
-	 * @param worldPoint Point in world space.
-	 * @param doDebug If set to @c true draw a sphere at the destination.
-	 * @return World position of the nearest vertex.
-	 * 
-	 * Returns the world position of the nearest vertex from a given point in world space.
-	 * If <c>doDebug</c> is set a small gizmo sphere will be drawn at that position.
-	 * 
-	 * This is just an abstract template for the method, look into the specific class for exact implementation.
-	 */
-	public abstract Vector3 NearestVertexW(Vector3 worldPoint, bool doDebug = false);
+	/// <summary>Returns the world position of the nearest vertex.</summary>
+	/// <returns>World position of the nearest vertex.</returns>
+	/// <param name="worldPoint">Point in world space.</param>
+	/// <param name="doDebug">If set to <c>true</c> draw a sphere at the destination.</param>
+	/// 
+	/// Returns the world position of the nearest vertex from a given point in world space. If <paramref name="doDebug"/> is set a small gizmo sphere will be drawn at
+	/// that position. This is just an abstract template for the method, look into the specific class for exact implementation.
+	/// 
+	/// This is just an abstract template for the method, look into the specific class for exact implementation.
+	public abstract Vector3 NearestVertexW(Vector3 worldPoint, bool doDebug);
 
-	/**
-	 * @brief Returns the world position of the nearest face.
-	 * @return World position of the nearest face.
-	 * @param worldPoint Point in world space.
-	 * @param plane Plane on which the face lies.
-	 * @param doDebug If set to <c>true</c> draw a sphere at the destination.
-	 * 
-	 * Similar to <c>#NearestVertexW</c>, it returns the world coordinates of a face on the grid.
-	 * Since the face is enclosed by several vertices, the returned value is the point in between all of the vertices.
-	 * You also need to specify on which plane the face lies (optional for hex- and polar grids).
-	 * If <c>doDebug</c> is set a small gizmo face will drawn there.
-	 * 
-	 * This is just an abstract template for the method, look into the specific class for exact implementation.
-	 */
-	public abstract Vector3 NearestFaceW(Vector3 worldPoint, GridPlane plane, bool doDebug = false);
+	/// @overload
+	public Vector3 NearestVertexW(Vector3 worldPoint) {
+		return NearestVertexW (worldPoint, false);
+	}
 
-	/**
-	 * @brief Returns the world position of the nearest box.
-	 * @return World position of the nearest box.
-	 * @param worldPoint Point in world space.
-	 * @param doDebug If set to <c>true</c> draw a sphere at the destination.
-	 * 
-	 * Similar to <c>#NearestVertexW</c>, it returns the world coordinates of a box in the grid.
-	 * Since the box is enclosed by several vertices, the returned value is the point in between all of the vertices.
-	 * If <c>doDebug</c> is set a small gizmo box will drawn there.
-	 * 
-	 * This is just an abstract template for the method, look into the specific class for exact implementation.
-	 */
-	public abstract Vector3 NearestBoxW(Vector3 worldPoint, bool doDebug = false);
+	/// <summary>Returns the world position of the nearest face.</summary>
+	/// <returns>World position of the nearest face.</returns>
+	/// <param name="worldPoint">Point in world space.</param>
+	/// <param name="plane">Plane on which the face lies.</param>
+	/// <param name="doDebug">If set to <c>true</c> draw a sphere at the destination.</param>
+	/// 
+	/// Similar to <see cref="NearestVertexW"/>, it returns the world coordinates of a face on the grid. Since the face is enclosed by several vertices, the returned
+	/// value is the point in between all of the vertices. You also need to specify on which plane the face lies (optional for hex- and polar grids). If
+	/// <paramref name="doDebug"/> is set a small gizmo face will drawn there.
+	/// 
+	/// This is just an abstract template for the method, look into the specific class for exact implementation.
+	public abstract Vector3 NearestFaceW(Vector3 worldPoint, GridPlane plane, bool doDebug);
+
+	/// @overload
+	public Vector3 NearestFaceW(Vector3 worldPoint, GridPlane plane) {
+		return NearestFaceW (worldPoint, plane, false);
+	}
+
+	/// <summary>Returns the world position of the nearest box.</summary>
+	/// <returns>World position of the nearest box.</returns>
+	/// <param name="worldPoint">Point in world space.</param>
+	/// <param name="doDebug">If set to <c>true</c> draw a sphere at the destination.</param>
+	/// 
+	/// Similar to <see cref="NearestVertexW"/>, it returns the world coordinates of a box in the grid. Since the box is enclosed by several vertices, the returned value
+	/// is the point in between all of the vertices. If <paramref name="doDebug"/> is set a small gizmo box will drawn there.
+	/// 
+	/// This is just an abstract template for the method, look into the specific class for exact implementation.
+	public abstract Vector3 NearestBoxW(Vector3 worldPoint, bool doDebug);
+
+	/// @overload
+	public Vector3 NearestBoxW(Vector3 worldPoint) {
+		return NearestBoxW (worldPoint, false);
+	}
 	#endregion
 	
 	#region nearest in grid space
-	/**
-	 * @brief Returns the grid position of the nearest vertex.
-	 * @param worldPoint Point in world space.
-	 * @return Grid position of the nearest vertex.
-	 * 
-	 * Returns the position of the nerest vertex in grid coordinates from a given point in world space.
-	 * 
-	 * This is just an abstract template for the method, look into the specific class for exact implementation.
-	 */
+	/// <summary>Returns the grid position of the nearest vertex.</summary>
+	/// <returns>Grid position of the nearest vertex.</returns>
+	/// <param name="worldPoint">Point in world space.</param>
+	/// 
+	/// Returns the position of the nerest vertex in grid coordinates from a given point in world space.
+	/// 
+	/// This is just an abstract template for the method, look into the specific class for exact implementation.
 	public abstract Vector3 NearestVertexG(Vector3 worldPoint);
 
-	/**
-	 * @brief Returns the grid position of the nearest Face.
-	 * @return Grid position of the nearest face.
-	 * @param worldPoint Point in world space.
-	 * @param plane Plane on which the face lies.
-	 * 
-	 * Similar to <c>#NearestVertexG</c>, it returns the grid coordinates of a face on the grid.
-	 * Since the face is enclosed by several vertices, the returned value is the point in between all of the vertices.
-	 * You also need to specify on which plane the face lies (optional for hex- and polar grids).
-	 * 
-	 * This is just an abstract template for the method, look into the specific class for exact implementation.
-	 */
+	/// <summary>Returns the grid position of the nearest Face.</summary>
+	/// <returns>Grid position of the nearest face.</returns>
+	/// <param name="worldPoint">Point in world space.</param>
+	/// <param name="plane">Plane on which the face lies.</param>
+	/// 
+	/// Similar to <see cref="NearestVertexG"/>, it returns the grid coordinates of a face on the grid. Since the face is enclosed by several vertices, the returned
+	/// value is the point in between all of the vertices. You also need to specify on which plane the face lies (optional for hex- and polar grids).
+	/// 
+	/// This is just an abstract template for the method, look into the specific class for exact implementation.
 	public abstract Vector3 NearestFaceG(Vector3 worldPoint, GridPlane plane);
 
-	/**
-	 * @brief Returns the grid position of the nearest box.
-	 * @return Grid position of the nearest box.
-	 * @param worldPoint Point in world space.
-	 * 
-	 * Similar to <c>#NearestVertexG</c>, it returns the grid coordinates of a box in the grid.
-	 * Since the box is enclosed by several vertices, the returned value is the point in between all of the vertices.
-	 * 
-	 * This is just an abstract template for the method, look into the specific class for exact implementation.
-	 */
+	/// <summary>Returns the grid position of the nearest box.</summary>
+	/// <returns>Grid position of the nearest box.</returns>
+	/// <param name="worldPoint">Point in world space.</param>
+	/// 
+	/// Similar to <see cref="NearestVertexG"/>, it returns the grid coordinates of a box in the grid. Since the box is enclosed by several vertices, the returned value
+	/// is the point in between all of the vertices.
+	/// 
+	/// This is just an abstract template for the method, look into the specific class for exact implementation.
 	public abstract Vector3 NearestBoxG(Vector3 worldPoint);
 	#endregion
 	
 	#region Align Methods
-	/**
-	 * @brief Fits a position vector into the grid.
-	 * @param pos The position to align.
-	 * @param scale A simulated scale to decide how exactly to fit the poistion into the grid.
-	 * @param ignoreAxis Which axes should be ignored.
-	 * @return Aligned position vector.
-	 * 
-	 * Fits a position inside the grid by using the object’s transform.
-	 * The exact position depends on whether the components of @c scale are even or odd and the exact implementation can be found in the subclasses.
-	 * The parameter @c lockAxis makes the function not touch the corresponding coordinate.
-	 */
+	/// <summary>Fits a position vector into the grid.</summary>
+	/// <returns>Aligned position vector.</returns>
+	/// <param name="pos">The position to align.</param>
+	/// <param name="scale">A simulated scale to decide how exactly to fit the poistion into the grid.</param>
+	/// <param name="ignoreAxis">Which axes should be ignored.</param>
+	/// 
+	/// Fits a position inside the grid by using the object’s transform. The exact position depends on whether the components of <paramref name="scale"/> are even or odd
+	/// and the exact implementation can be found in the subclasses. The parameter <paramref name="lockAxis"/> makes the function not touch the corresponding coordinate.
 	public abstract Vector3 AlignVector3(Vector3 pos, Vector3 scale, GFBoolVector3 ignoreAxis);
 
 	#region Overload
-	/**
-	 * @overload
-	 * 
-	 * It aligns the position while respecting all axes and uses a default size of 1 x 1 x 1, it is equal to
-	 * @code
-	 * AlignVector3(pos, Vector3.one, new GFBoolVector3(false));
-	 * @endcode
-	 */
+	/// @overload
+	/// It aligns the position while respecting all axes and uses a default size of 1 x 1 x 1, it is equal to
+	/// <code>AlignVector3(pos, Vector3.one, new GFBoolVector3(false));</code>
 	public Vector3 AlignVector3(Vector3 pos){
 		return AlignVector3(pos, Vector3.one, new GFBoolVector3(false));
 	}
 
-	/**
-	 * @overload
-	 * 
-	 * It aligns the position and uses a default size of 1 x 1 x 1 while leaving the axes to the user, it is equal to
-	 * @code
-	 * AlignVector3(pos, Vector3.one, lockAxis);
-	 * @endcode
-	 */
+	/// @overload
+	/// It aligns the position and uses a default size of 1 x 1 x 1 while leaving the axes to the user, it is equal to
+	/// <code>AlignVector3(pos, Vector3.one, lockAxis);</code>
 	public Vector3 AlignVector3(Vector3 pos, GFBoolVector3 lockAxis){
 		return AlignVector3(pos, Vector3.one, lockAxis);
 	}
-
-	/**
-	 * @overload
-	 * 
-	 * It aligns the position and respects the axes while using a default size of 1 x 1 x 1, it is equal to
-	 * @code
-	 * AlignVector3(pos, scale, new GFBoolVector3(false));
-	 * @endcode
-	 */
+		
+	/// @overload
+	/// It aligns the position and respects the axes while using a default size of 1 x 1 x 1, it is equal to
+	/// <code>AlignVector3(pos, scale, new GFBoolVector3(false));</code>
 	public Vector3 AlignVector3(Vector3 pos, Vector3 scale){
 		return AlignVector3(pos, scale, new GFBoolVector3(false));
 	}
 	#endregion
 
-	/**
-	 * @brief Fits a Transform inside the grid (without scaling it).
-	 * @param theTransform The Transform to align.
-	 * @param ignoreAxis Which axes should be ignored.
-	 * @param rotate Whether to rotate to the grid
-	 * 
-	 * Fits an object inside the grid by using the object’s Transform.
-	 * Setting @c doRotate makes the object take on the grid’s rotation.
-	 * The parameter @c lockAxis makes the function not touch the corresponding coordinate.
-	 * 
-	 * The resulting position depends on <c>#AlignVector3</c>, so please look up how that method works.
-	 */
+	/// <summary>Fits a Transform inside the grid (without scaling it).</summary>
+	/// <param name="theTransform">The Transform to align.</param>
+	/// <param name="rotate">Whether to rotate to the grid.</param>
+	/// <param name="ignoreAxis">Which axes should be ignored.</param>
+	/// 
+	/// Fits an object inside the grid by using the object’s Transform. Setting <c>doRotate</c> makes the object take on the grid’s rotation. The parameter <c>lockAxis</c>
+	/// makes the function not touch the corresponding coordinate.
+	/// 
+	/// The resulting position depends on <paramref name="AlignVector3"/>, so please look up how that method works.
 	public void AlignTransform(Transform theTransform, bool rotate, GFBoolVector3 ignoreAxis){
 		Quaternion oldRotation = theTransform.rotation;
 		theTransform.rotation = transform.rotation;
@@ -522,38 +498,23 @@ public abstract class GFGrid : MonoBehaviour {
 	}
 
 	#region overload
-	/**
-	 * @overload
-	 * 
-	 * It aligns and rotates the Transform while respecting all axes, it is equal to
-	 * @code
-	 * AlignTransform(theTransform, true, new GFBoolVector3(false));
-	 * @endcode
-	 */
+	/// @overload
+	/// It aligns and rotates the Transform while respecting all axes, it is equal to
+	/// <code>AlignTransform(theTransform, true, new GFBoolVector3(false));</code>
 	public void AlignTransform(Transform theTransform){
 		AlignTransform(theTransform, true, new GFBoolVector3(false));
 	}
 
-	/**
-	 * @overload
-	 * 
-	 * It aligns and rotates the Transform but leaves the axes to the user, it is equal to
-	 * @code
-	 * AlignTransform(theTransform, true, lockAxis);
-	 * @endcode
-	 */
+	/// @overloads
+	/// It aligns and rotates the Transform but leaves the axes to the user, it is equal to
+	/// <code>AlignTransform(theTransform, true, lockAxis);</code>
 	public void AlignTransform(Transform theTransform, GFBoolVector3 lockAxis){
 		AlignTransform(theTransform, true, lockAxis);
 	}
 
-	/**
-	 * @overload
-	 * 
-	 * It aligns and respects all axes to the user, but leaves the decision of rotation to the user, it is equal to
-	 * @code
-	 * AlignTransform(theTransform, rotate, new GFBoolVector3(false));
-	 * @endcode
-	 */
+	/// @overload
+	/// It aligns and respects all axes to the user, but leaves the decision of rotation to the user, it is equal to
+	/// <code>AlignTransform(theTransform, rotate, new GFBoolVector3(false));</code>
 	public void AlignTransform(Transform theTransform, bool rotate){
 		AlignTransform(theTransform, rotate, new GFBoolVector3(false));
 	}
@@ -561,54 +522,37 @@ public abstract class GFGrid : MonoBehaviour {
 	#endregion
 	
 	#region Scale Methods
-	/**
-	 * @brief Scales a size vector to fit inside a grid.
-	 * @param scl The vector to scale.
-	 * @param lockAxis The axes to ignore.
-	 * @return The re-scaled vector.
-	 * 
-	 * This method takes in a vector representing a size and fits it inside the grid.
-	 * The @c lockAxis parameter lets you ignore individual axes.
-	 */
+	/// <summary>Scales a size vector to fit inside a grid.</summary>
+	/// <returns>The re-scaled vector.</returns>
+	/// <param name="scl">The vector to scale.</param>
+	/// <param name="ignoreAxis">The axes to ignore.</param>
+	/// 
+	/// This method takes in a vector representing a size and fits it inside the grid. The <param name="lockAxis"> parameter lets you ignore individual axes.
 	public abstract Vector3 ScaleVector3(Vector3 scl, GFBoolVector3 ignoreAxis);
 
 	#region overload
-	/**
-	 * @overload
-	 * 
-	 * It scales the size while respecting all axes, it is equal to
-	 * @code
-	 * ScaleVector3(scl, new GFBoolVector3(false));
-	 * @endcode
-	 */
+	/// @overload
+	/// It scales the size while respecting all axes, it is equal to
+	/// <code>ScaleVector3(scl, new GFBoolVector3(false));</code>
 	public Vector3 ScaleVector3(Vector3 scl){
 		return ScaleVector3(scl, new GFBoolVector3(false));
 	}
 	#endregion
-
-	/**
-	 * @brief Scales a Transform to fit the grid (without moving it).
-	 * @param theTransform the Transform to scale.
-	 * @param lockAxis The axes to ignore.
-	 * 
-	 * Scales a Transform to fit inside a grid. 
-	 * The parameter @c lockAxis makes the function not touch the corresponding coordinate.
-	 * 
-	 * The resulting position depends on <c>#ScaleVector3</c>, so please look up how that method works.
-	 */
+	/// <summary>Scales a Transform to fit the grid (without moving it).</summary>
+	/// <param name="theTransform">The Transform to scale.</param>
+	/// <param name="ignoreAxis">The axes to ignore.</param>
+	/// 
+	/// Scales a Transform to fit inside a grid. The parameter <param name="lockAxis"> makes the function not touch the corresponding coordinate.
+	/// 
+	/// The resulting position depends on <see cref="ScaleVector3"/>, so please look up how that method works.
 	public void ScaleTransform(Transform theTransform, GFBoolVector3 ignoreAxis){
 		theTransform.localScale = ScaleVector3(theTransform.localScale, ignoreAxis);
 	}
 
 	#region Overload
-	/**
-	 * @overload
-	 * 
-	 * It scales the Transform while respecting all axes, it is equal to
-	 * @code
-	 * ScaleTransform(theTransform, new GFBoolVector3(false));
-	 * @endcode
-	 */
+	/// @overload
+	/// It scales the Transform while respecting all axes, it is equal to
+	/// <code>ScaleTransform(theTransform, new GFBoolVector3(false));</code>
 	public void ScaleTransform(Transform theTransform){
 		ScaleTransform(theTransform, new GFBoolVector3(false));
 	}
@@ -661,24 +605,16 @@ public abstract class GFGrid : MonoBehaviour {
 	}
 
 	#region overload
-	/**
-	 * @overload
-	 * Renders the grid using @c #size for lower and upper limits, equal to
-	 * @code
-	 * RenderGrid(-size, size, useSeparateRenderColor ? renderAxisColors : axisColors, width, cam, camTransform);
-	 * @endcode
-	 */
+	/// @overload
+	/// Renders the grid using @c #size for lower and upper limits, equal to
+	/// <code>RenderGrid(-size, size, useSeparateRenderColor ? renderAxisColors : axisColors, width, cam, camTransform);</code>
 	public virtual void RenderGrid(int width = 0, Camera cam = null, Transform camTransform = null){
 		RenderGrid(-size, size, useSeparateRenderColor ? renderAxisColors : axisColors, width, cam, camTransform);
 	}
 
-	/**
-	 * @overload
-	 * Renders the grid using @c #axisColors (or @c #renderAxisColors if @c #useSeparateRenderColor is <c>true</c>) as colours, equal to
-	 * @code
-	 * RenderGrid(from, to, useSeparateRenderColor ? renderAxisColors : axisColors, width, cam, camTransform);
-	 * @endcode
-	 */
+	/// @overload
+	/// Renders the grid using @c #axisColors (or @c #renderAxisColors if @c #useSeparateRenderColor is <c>true</c>) as colours, equal to
+	/// <code>RenderGrid(from, to, useSeparateRenderColor ? renderAxisColors : axisColors, width, cam, camTransform);</code>
 	public void RenderGrid(Vector3 from, Vector3 to, int width = 0, Camera cam = null, Transform camTransform = null){
 		RenderGrid(from, to, useSeparateRenderColor ? renderAxisColors : axisColors, width, cam, camTransform);
 	}
@@ -739,15 +675,13 @@ public abstract class GFGrid : MonoBehaviour {
 	#endregion
 	
 	#region Draw Methods
-	/**
-	 * @brief Draws the grid using gizmos.
-	 * @param from Lower limit of the drawing.
-	 * @param to Upper limit s drawing.
-	 * 
-	 * This method draws the grid in the editor using gizmos.
-	 * There is usually no reason to call this method manually, you should instead set the drawing flags of the grid itself.
-	 * However, if you must, call this method from inside <c><a href="http://docs.unity3d.com/Documentation/ScriptReference/MonoBehaviour.OnDrawGizmos.html">OnDrawGizmos</a></c>.
-	 */
+	/// <summary>Draws the grid using gizmos.</summary>
+	/// <param name="from">Lower limit of the drawing.</param>
+	/// <param name="to">Upper limit s drawing.</param>
+	/// 
+	/// This method draws the grid in the editor using gizmos. There is usually no reason to call this method manually, you should instead set the drawing flags of the
+	/// grid itself. However, if you must, call this method from inside
+	/// <c><a href="http://docs.unity3d.com/Documentation/ScriptReference/MonoBehaviour.OnDrawGizmos.html">OnDrawGizmos</a></c>.
 	public virtual void DrawGrid(Vector3 from, Vector3 to){
 		//don't draw if not supposed to
 		if(hideGrid)
@@ -772,13 +706,9 @@ public abstract class GFGrid : MonoBehaviour {
 		}
 	}
 
-	/**
-	 * @overload
-	 * Uses the size as limits, it is equivalent to
-	 * @code
-	 * DrawGrid(-size, size);
-	 * @endcode
-	 */
+	/// @overload
+	/// Uses the size as limits, it is equivalent to
+	/// <code>DrawGrid(-size, size);</code>
 	public virtual void DrawGrid(){
 		DrawGrid(-size, size);
 	}
@@ -798,15 +728,13 @@ public abstract class GFGrid : MonoBehaviour {
 	#endregion
 	
 	#region Vectrosity Methods
-	/**
-	 * @brief Returns an array of Vector3 points ready for use with Vectrosity.
-	 * @param from Lower limit for the points.
-	 * @param to Upper limit for the points.
-	 * @return Array of points in local space.
-	 * 
-	 * Returns an array of Vector3 containing the points for a discrete vector line in Vectrosity.
-	 * One entry is the starting point, the next entry is the end point, the next entry is the starting point of the next line and so on.
-	 */
+	/// <summary>Returns an array of Vector3 points ready for use with Vectrosity.</summary>
+	/// <returns>Array of points in local space.</returns>
+	/// <param name="from">Lower limit for the points.</param>
+	/// <param name="to">Upper limit for the points.</param>
+	/// 
+	/// Returns an array of Vector3 containing the points for a discrete vector line in Vectrosity. One entry is the starting point, the next entry is the end point, the
+	/// next entry is the starting point of the next line and so on.
 	public Vector3[] GetVectrosityPoints(Vector3 from, Vector3 to){
 		Vector3[][] seperatePoints = GetVectrosityPointsSeparate(from, to); 
 		Vector3[] returnedPoints = new Vector3[seperatePoints[0].Length + seperatePoints[1].Length + seperatePoints[2].Length];
@@ -815,27 +743,21 @@ public abstract class GFGrid : MonoBehaviour {
 		seperatePoints[2].CopyTo(returnedPoints, seperatePoints[0].Length + seperatePoints[1].Length);
 		return returnedPoints;
 	}
-
-	/**
-	 * @overload
-	 * Uses the grid's @c #size as limits, equal to
-	 * @code
-	 * GetVectrosityPoints(-size, size);
-	 * @endcode
-	 */
+		
+	/// @overload
+	/// Uses the grid's @c #size as limits, equal to
+	/// <code>GetVectrosityPoints(-size, size);</code>
 	public Vector3[] GetVectrosityPoints(){
 		return GetVectrosityPoints(-size, size);
 	}
 
-	/**
-	 * @brief Returns an array of arrays of Vector3 points ready for use with Vectrosity.
-	 * @param from Lower limit for the points.
-	 * @param to Upper limit for the points.
-	 * @return Jagged array of three arrays, each containing the points of a single axis.
-	 * 
-	 * This method is very similar to @c #GetVectrosityPoints, except that the points are in separate arrays for each axis.
-	 * This is useful if you want to treat the lines of each axis differently, like having different colours.
-	 */
+	/// <summary>Returns an array of arrays of Vector3 points ready for use with Vectrosity.</summary>
+	/// <returns>Jagged array of three arrays, each containing the points of a single axis.</returns>
+	/// <param name="from">Lower limit for the points.</param>
+	/// <param name="to">Upper limit for the points.</param>
+	/// 
+	/// This method is very similar to @c #GetVectrosityPoints, except that the points are in separate arrays for each axis. This is useful if you want to treat the lines
+	/// of each axis differently, like having different colours.
 	public Vector3[][] GetVectrosityPointsSeparate(Vector3 from, Vector3 to){
 		CalculateDrawPoints(from, to);
 		int[] lengths = new int[3];
@@ -846,7 +768,7 @@ public abstract class GFGrid : MonoBehaviour {
 		Vector3[][] returnedPoints = new Vector3[3][];
 		for(int i = 0; i < 3; i++){
 			returnedPoints[i] = new Vector3[lengths[i]];
-//			Debug.Log(lengths[i]);
+			// Debug.Log(lengths[i]);
 		}
 		int iterator = 0;
 		for(int i = 0; i < 3; i++){
@@ -863,14 +785,10 @@ public abstract class GFGrid : MonoBehaviour {
 		
 		return returnedPoints;
 	}
-
-	/**
-	 * @overload
-	 * Uses the grid's @c #size as limits, equal to
-	 * @code
-	 * GetVectrosityPointsSeparate(-size, size);
-	 * @endcode
-	 */
+		
+	/// @overload
+	/// Uses the grid's @c #size as limits, equal to
+	/// <code>GetVectrosityPointsSeparate(-size, size);</code>
 	public Vector3[][] GetVectrosityPointsSeparate(){
 		return GetVectrosityPointsSeparate(-size, size);
 	}
@@ -934,10 +852,8 @@ public abstract class GFGrid : MonoBehaviour {
 	#endregion
 }
 
-/**
- * @brief Radians or degrees.
- * 
- * This is a simple enum for specifying whether an angle is given in radians for degrees.
- * This enum is so far only used in methods of GFPolarGrid, but I decided to make it global in case other grids in the future will use it was well.
- */
-public enum GFAngleMode {radians, degrees};
+/// <summary>Radians or degrees.</summary>
+/// 
+/// This is a simple enum for specifying whether an angle is given in radians for degrees.
+/// This enum is so far only used in methods of GFPolarGrid, but I decided to make it global in case other grids in the future will use it was well.
+public enum GFAngleMode {radians = 0, degrees};

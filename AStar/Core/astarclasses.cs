@@ -5,6 +5,8 @@ using Pathfinding;
 using Pathfinding.Util;
 using Pathfinding.Serialization.JsonFx;
 
+namespace Pathfinding.RVO {}
+
 namespace Pathfinding {
 	
 	/** A class for holding a user placed connection */
@@ -70,11 +72,11 @@ namespace Pathfinding {
 		/** Returns an color for an area, uses both user set ones and calculated.
 		 * If the user has set a color for the area, it is used, but otherwise the color is calculated using Mathfx.IntToColor
 		 * \see #AreaColors */
-		public static Color GetAreaColor (int area) {
+		public static Color GetAreaColor (uint area) {
 			if (AreaColors == null || area >= AreaColors.Length) {
-				return Mathfx.IntToColor (area,1F);
+				return AstarMath.IntToColor ((int)area,1F);
 			}
-			return AreaColors[area];
+			return AreaColors[(int)area];
 		}
 		
 		/** Pushes all local variables out to static ones */
@@ -112,12 +114,16 @@ namespace Pathfinding {
 	
 	/** Returned by graph ray- or linecasts containing info about the hit. This will only be set up if something was hit. */
 	public struct GraphHitInfo {
+		/** Start of the line/ray */
 		public Vector3 origin;
+		/** Hit point */
 		public Vector3 point;
-		public Node node;
+		/** Node which contained the edge which was hit */
+		public GraphNode node;
+		/** Where the tangent starts. tangentOrigin and tangent together actually describes the edge which was hit */
 		public Vector3 tangentOrigin;
+		/** Tangent of the edge which was hit */
 		public Vector3 tangent;
-		public bool success;
 		
 		public float distance {
 			get {
@@ -126,7 +132,6 @@ namespace Pathfinding {
 		}
 		
 		public GraphHitInfo (Vector3 point) {
-			success = false;
 			tangentOrigin  = Vector3.zero;
 			origin = Vector3.zero;
 			this.point = point;
@@ -157,6 +162,8 @@ namespace Pathfinding {
 		public bool constrainWalkability = true; /**< Only treat nodes with the walkable flag set to the same as #walkable as suitable */
 		public bool walkable = true; /**< What must the walkable flag on a node be for it to be suitable. Does not affect anything if #constrainWalkability if false */
 		
+		public bool distanceXZ = false; /**< if available, do an XZ check instead of checking on all axes. The RecastGraph supports this */
+		
 		public bool constrainTags = true; /**< Sets if tags should be constrained */
 		public int tags = -1; /**< Nodes which have any of these tags set are suitable. This is a bitmask, i.e bit 0 indicates that tag 0 is good, bit 3 indicates tag 3 is good etc. */
 		
@@ -174,12 +181,12 @@ namespace Pathfinding {
 		}
 		
 		/** Returns whether or not the node conforms to this NNConstraint's rules */
-		public virtual bool Suitable (Node node) {
-			if (constrainWalkability && node.walkable != walkable) return false;
+		public virtual bool Suitable (GraphNode node) {
+			if (constrainWalkability && node.Walkable != walkable) return false;
 			
-			if (constrainArea && area >= 0 && node.area != area) return false;
+			if (constrainArea && area >= 0 && node.Area != area) return false;
 			
-			if (constrainTags && (tags >> node.tags & 0x1) == 0) return false;
+			if (constrainTags && (tags >> (int)node.Tag & 0x1) == 0) return false;
 			
 			return true;
 		}
@@ -227,9 +234,9 @@ namespace Pathfinding {
 		}
 		
 		/** Called after the start node has been found. This is used to get different search logic for the start and end nodes in a path */
-		public virtual void SetStart (Node node) {
+		public virtual void SetStart (GraphNode node) {
 			if (node != null) {
-				area = node.area;
+				area = (int)node.Area;
 			} else {
 				constrainArea = false;
 			}
@@ -241,11 +248,11 @@ namespace Pathfinding {
 		 * This node is not necessarily accepted by any NNConstraint passed.
 		 * \see constrainedNode
 		 */
-		public Node node;
+		public GraphNode node;
 		
 		/** Optional to be filled in.
 		 * If the search will be able to find the constrained node without any extra effort it can fill it in. */
-		public Node constrainedNode;
+		public GraphNode constrainedNode;
 		
 		/** The position clamped to the closest point on the #node.
 		 */
@@ -253,7 +260,7 @@ namespace Pathfinding {
 		/** Clamped position for the optional constrainedNode */
 		public Vector3 constClampedPosition;
 		
-		public NNInfo (Node node) {
+		public NNInfo (GraphNode node) {
 			this.node = node;
 			constrainedNode = null;
 			constClampedPosition = Vector3.zero;
@@ -266,7 +273,7 @@ namespace Pathfinding {
 		}
 		
 		/** Sets the constrained node */
-		public void SetConstrained (Node constrainedNode, Vector3 clampedPosition) {
+		public void SetConstrained (GraphNode constrainedNode, Vector3 clampedPosition) {
 			this.constrainedNode = constrainedNode;
 			constClampedPosition = clampedPosition;
 		}
@@ -290,11 +297,11 @@ namespace Pathfinding {
 			return ob.clampedPosition;
 		}
 		
-		public static explicit operator Node (NNInfo ob) {
+		public static explicit operator GraphNode (NNInfo ob) {
 			return ob.node;
 		}
 		
-		public static explicit operator NNInfo (Node ob) {
+		public static explicit operator NNInfo (GraphNode ob) {
 			return new NNInfo (ob);
 		}
 	}
@@ -326,6 +333,9 @@ namespace Pathfinding {
 		 * -# Update eventual connectivity info if appropriate (GridGraphs updates connectivity, but most other graphs don't since then the connectivity cannot be recovered later).
 		 */
 		void UpdateArea (GraphUpdateObject o);
+		void UpdateAreaInit (GraphUpdateObject o);
+		
+		GraphUpdateThreading CanUpdateAsync (GraphUpdateObject o);
 	}
 	
 	[System.Serializable]
@@ -381,8 +391,13 @@ namespace Pathfinding {
 		/** Use physics checks to update nodes.
 		 * When updating a grid graph and this is true, the nodes' position and walkability will be updated using physics checks
 		 * with settings from "Collision Testing" and "Height Testing".
-		 * Also when updating a PointGraph, setting this to true will make it re-evaluate all connections in the graph which passes through the #bounds.
-		 * This has no effect when updating GridGraphs if #modifyWalkability is turned on */
+		 * 
+		 * When updating a PointGraph, setting this to true will make it re-evaluate all connections in the graph which passes through the #bounds.
+		 * This has no effect when updating GridGraphs if #modifyWalkability is turned on.
+		 * 
+		 * On RecastGraphs, having this enabled will trigger a complete recalculation of all tiles intersecting the bounds.
+		 * This is quite slow (but powerful). If you only want to update e.g penalty on existing nodes, leave it disabled.
+		 */
 		public bool updatePhysics = true;
 		
 		/** When #updatePhysics is true, GridGraphs will normally reset penalties, with this option you can override it.
@@ -446,7 +461,7 @@ namespace Pathfinding {
 		 */
 		public bool trackChangedNodes = false;
 		
-		private List<Node> changedNodes;
+		private List<GraphNode> changedNodes;
 		private List<ulong> backupData;
 		private List<Int3> backupPositionData;
 		
@@ -456,12 +471,12 @@ namespace Pathfinding {
 		  * \param node The node to save fields for. If null, nothing will be done
 		  * \see #trackChangedNodes
 		  */
-		public virtual void WillUpdateNode (Node node) {
+		public virtual void WillUpdateNode (GraphNode node) {
 			if (trackChangedNodes && node != null) {
-				if (changedNodes == null) { changedNodes = ListPool<Node>.Claim(); backupData = ListPool<ulong>.Claim(); backupPositionData = ListPool<Int3>.Claim(); }
+				if (changedNodes == null) { changedNodes = ListPool<GraphNode>.Claim(); backupData = ListPool<ulong>.Claim(); backupPositionData = ListPool<Int3>.Claim(); }
 				changedNodes.Add (node);
 				backupPositionData.Add (node.position);
-				backupData.Add ((ulong)node.penalty<<32 | (ulong)node.flags);
+				backupData.Add ((ulong)node.Penalty<<32 | (ulong)node.Flags);
 			}
 		}
 		
@@ -470,32 +485,37 @@ namespace Pathfinding {
 		public virtual void RevertFromBackup () {
 			if (trackChangedNodes) {
 				if (changedNodes == null) return;
-				for (int i=0;i<changedNodes.Count;i++) {
-					changedNodes[i].penalty = (uint)(backupData[i]>>32);
-					changedNodes[i].flags = (int)(backupData[i] & 0xFFFFFFFF);
-					changedNodes[i].position = backupPositionData[i];
+				
+				throw new System.NotSupportedException ("Positions not supported yet");
+				
+				/*for (int i=0;i<changedNodes.Count;i++) {
+					changedNodes[i].Penalty = (uint)(backupData[i]>>32);
+					changedNodes[i].Flags = (uint)(backupData[i] & 0xFFFFFFFF);
 					
-					ListPool<Node>.Release (changedNodes);
+					ListPool<GraphNode>.Release (changedNodes);
 					ListPool<ulong>.Release(backupData);
 					ListPool<Int3>.Release(backupPositionData);
-				}
+					
+					
+					//changedNodes[i].Position = backupPositionData[i];
+				}*/
 			} else {
 				throw new System.InvalidOperationException ("Changed nodes have not been tracked, cannot revert from backup");
 			}
 		}
 		
 		/** Updates the specified node using this GUO's settings */
-		public virtual void Apply (Node node) {
+		public virtual void Apply (GraphNode node) {
 			if (shape == null || shape.Contains	(node)) {
 				
 				//Update penalty and walkability
-				node.penalty = (uint)(node.penalty+addPenalty);
+				node.Penalty = (uint)(node.Penalty+addPenalty);
 				if (modifyWalkability) {
-					node.walkable = setWalkability;
+					node.Walkable = setWalkability;
 				}
 				
 				//Update tags
-				if (modifyTag) node.tags = setTag;
+				if (modifyTag) node.Tag = (uint)setTag;
 			}
 		}
 		
@@ -510,8 +530,9 @@ namespace Pathfinding {
 	
 	public interface IRaycastableGraph {
 		bool Linecast (Vector3 start, Vector3 end);
-		bool Linecast (Vector3 start, Vector3 end, Node hint);
-		bool Linecast (Vector3 start, Vector3 end, Node hint, out GraphHitInfo hit);
+		bool Linecast (Vector3 start, Vector3 end, GraphNode hint);
+		bool Linecast (Vector3 start, Vector3 end, GraphNode hint, out GraphHitInfo hit);
+		bool Linecast (Vector3 start, Vector3 end, GraphNode hint, out GraphHitInfo hit, List<GraphNode> trace);
 	}
 	
 	/** Holds info about one pathfinding thread.
@@ -520,12 +541,12 @@ namespace Pathfinding {
 	public struct PathThreadInfo {
 		public int threadIndex;
 		public AstarPath astar;
-		public NodeRunData runData;
+		public PathHandler runData;
 		
 		private System.Object _lock;
 		public System.Object Lock { get {return _lock; }}
 		
-		public PathThreadInfo (int index, AstarPath astar, NodeRunData runData) {
+		public PathThreadInfo (int index, AstarPath astar, PathHandler runData) {
 			this.threadIndex = index;
 			this.astar = astar;
 			this.runData = runData;
@@ -550,11 +571,41 @@ namespace Pathfinding {
 			return !(x < xmin || y < ymin || x > xmax || y > ymax);
 		}
 		
+		public int Width {
+			get {
+				return xmax-xmin+1;
+			}
+		}
+		
+		public int Height {
+			get {
+				return ymax-ymin+1;
+			}
+		}
+		
 		/** Returns if this rectangle is valid.
-		 * An invalid rect could have e.g xmin > xmax
+		 * An invalid rect could have e.g xmin > xmax.
+		 * Rectamgles with a zero area area invalid.
 		 */
 		public bool IsValid () {
 			return xmin <= xmax && ymin <= ymax;
+		}
+		
+		public static bool operator == (IntRect a, IntRect b) {
+			return a.xmin == b.xmin && a.xmax == b.xmax && a.ymin == b.ymin && a.ymax == b.ymax;
+		}
+		
+		public static bool operator != (IntRect a, IntRect b) {
+			return a.xmin != b.xmin || a.xmax != b.xmax || a.ymin != b.ymin || a.ymax != b.ymax;
+		}
+		
+		public override bool Equals (System.Object _b) {
+			IntRect b = (IntRect)_b;
+			return xmin == b.xmin && xmax == b.xmax && ymin == b.ymin && ymax == b.ymax;
+		}
+		
+		public override int GetHashCode () {
+			return xmin*131071 ^ xmax*3571 ^ ymin*3109 ^ ymax*7;
 		}
 		
 		/** Returns the intersection rect between the two rects.
@@ -573,6 +624,12 @@ namespace Pathfinding {
 			return r;
 		}
 		
+		/** Returns if the two rectangles intersect each other
+		 */
+		public static bool Intersects (IntRect a, IntRect b) {
+			return !(a.xmin > b.xmax || a.ymin > b.ymax || a.xmax < b.xmin || a.ymax < b.ymin);
+		}
+		
 		/** Returns a new rect which contains both input rects.
 		 * This rectangle may contain areas outside both input rects as well in some cases.
 		 */
@@ -587,6 +644,17 @@ namespace Pathfinding {
 			return r;
 		}
 		
+		/** Returns a new IntRect which is expanded to contain the point */
+		public IntRect ExpandToContain (int x, int y) {
+			IntRect r = new IntRect(
+			                        System.Math.Min(xmin,x),
+			                        System.Math.Min(ymin,y),
+			                        System.Math.Max(xmax,x),
+			                        System.Math.Max(ymax,y)
+			                        );
+			return r;
+		}
+		
 		/** Returns a new rect which is expanded by \a range in all directions.
 		 * \param range How far to expand. Negative values are permitted.
 		 */
@@ -596,6 +664,68 @@ namespace Pathfinding {
 			                   xmax+range,
 			                   ymax+range
 			                   );
+		}
+		
+		/** Matrices for rotation.
+		 * Each group of 4 elements is a 2x2 matrix.
+		 * The XZ position is multiplied by this.
+		 * So
+		 * \code
+		 * //A rotation by 90 degrees clockwise, second matrix in the array
+		 * (5,2) * ((0, 1), (-1, 0)) = (2,-5)
+		 * \endcode
+		 */
+		private static readonly int[] Rotations = {
+			 1, 0, //Identity matrix
+			 0, 1,
+			
+			 0, 1,
+			-1, 0,
+			
+			-1, 0,
+			 0,-1,
+			
+			 0,-1,
+			 1, 0
+		};
+		
+		/** Returns a new rect rotated around the origin 90*r degrees.
+		 * Ensures that a valid rect is returned.
+		 */
+		public IntRect Rotate ( int r ) {
+			int mx1 = Rotations[r*4+0];
+			int mx2 = Rotations[r*4+1];
+			int my1 = Rotations[r*4+2];
+			int my2 = Rotations[r*4+3];
+			
+			int p1x = mx1*xmin + mx2*ymin;
+			int p1y = my1*xmin + my2*ymin;
+			
+			int p2x = mx1*xmax + mx2*ymax;
+			int p2y = my1*xmax + my2*ymax;
+			
+			return new IntRect (
+				System.Math.Min ( p1x, p2x ),
+				System.Math.Min ( p1y, p2y ),
+				System.Math.Max ( p1x, p2x ),
+				System.Math.Max ( p1y, p2y )
+			);
+		}
+		
+		/** Returns a new rect which is offset by the specified amount.
+		 */
+		public IntRect Offset ( Int2 offset ) {
+			return new IntRect ( xmin+offset.x, ymin + offset.y, xmax + offset.x, ymax + offset.y );
+		}
+		
+		/** Returns a new rect which is offset by the specified amount.
+		 */
+		public IntRect Offset ( int x, int y ) {
+			return new IntRect ( xmin+x, ymin + y, xmax + x, ymax + y );
+		}
+		
+		public override string ToString () {
+			return "[x: "+xmin+"..."+xmax+", y: " + ymin +"..."+ymax+"]";
 		}
 		
 		/** Draws some debug lines representing the rect */
@@ -635,7 +765,7 @@ public delegate void OnPathDelegate (Path p);
 
 public delegate Vector3[] GetNextTargetDelegate (Path p, Vector3 currentPosition);
 
-public delegate void NodeDelegate (Node node);
+public delegate void NodeDelegate (GraphNode node);
 
 public delegate void OnGraphDelegate (NavGraph graph);
 
@@ -643,9 +773,17 @@ public delegate void OnScanDelegate (AstarPath script);
 
 public delegate void OnVoidDelegate ();
 
+public delegate void OnScanStatus (Progress progress);
+
 #endregion
 
 #region Enums
+
+public enum GraphUpdateThreading {
+	UnityThread,
+	SeparateThread,
+	SeparateAndUnityInit
+}
 
 /** How path results are logged by the system */
 public enum PathLog {
@@ -682,7 +820,8 @@ public enum ConnectionType {
 }
 
 public enum ThreadCount {
-	Automatic = -1,
+	AutomaticLowLoad = -1,
+	AutomaticHighLoad = -2,
 	None = 0,
 	One = 1,
 	Two,

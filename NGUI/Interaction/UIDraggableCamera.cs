@@ -116,7 +116,7 @@ public class UIDraggableCamera : MonoBehaviour
 		{
 			Vector3 offset = CalculateConstrainOffset();
 
-			if (offset.magnitude > 0f)
+			if (offset.sqrMagnitude > 0f)
 			{
 				if (immediate)
 				{

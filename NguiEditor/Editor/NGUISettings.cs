@@ -171,10 +171,40 @@ public class NGUISettings
 
 #region Convenience accessor properties
 
+	static public bool showTransformHandles
+	{
+		get { return GetBool("NGUI Transform Handles", false); }
+		set { SetBool("NGUI Transform Handles", value); }
+	}
+
+	static public bool minimalisticLook
+	{
+		get { return GetBool("NGUI Minimalistic", false); }
+		set { SetBool("NGUI Minimalistic", value); }
+	}
+
+	static public bool unifiedTransform
+	{
+		get { return GetBool("NGUI Unified", false); }
+		set { SetBool("NGUI Unified", value); }
+	}
+
 	static public Color color
 	{
 		get { return GetColor("NGUI Color", Color.white); }
 		set { SetColor("NGUI Color", value); }
+	}
+
+	static public Color foregroundColor
+	{
+		get { return GetColor("NGUI FG Color", Color.white); }
+		set { SetColor("NGUI FG Color", value); }
+	}
+
+	static public Color backgroundColor
+	{
+		get { return GetColor("NGUI BG Color", Color.black); }
+		set { SetColor("NGUI BG Color", value); }
 	}
 
 	static public ColorMode colorMode
@@ -223,13 +253,11 @@ public class NGUISettings
 		set { Set("NGUI Texture", value); }
 	}
 
-#if !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2
 	static public Sprite sprite2D
 	{
 		get { return Get<Sprite>("NGUI Sprite2D", null); }
 		set { Set("NGUI Sprite2D", value); }
 	}
-#endif
 
 	static public string selectedSprite
 	{
@@ -324,6 +352,12 @@ public class NGUISettings
 		set { SetBool("NGUI Packing", value); }
 	}
 
+	static public bool trueColorAtlas
+	{
+		get { return GetBool("NGUI Truecolor", true); }
+		set { SetBool("NGUI Truecolor", value); }
+	}
+
 	static public bool forceSquareAtlas
 	{
 		get { return GetBool("NGUI Square", false); }
@@ -356,8 +390,26 @@ public class NGUISettings
 
 	static public string pathToFreeType
 	{
-		get { return GetString("NGUI FreeType", Application.dataPath + "/NGUI/Editor/FreeType.dll"); }
+		get
+		{
+			string path = Application.dataPath;
+			if (Application.platform == RuntimePlatform.WindowsEditor) path += "/NGUI/Editor/FreeType.dll";
+			else path += "/NGUI/Editor/FreeType.dylib";
+			return GetString("NGUI FreeType", path);
+		}
 		set { SetString("NGUI FreeType", value); }
+	}
+
+	static public string searchField
+	{
+		get { return GetString("NGUI Search", null); }
+		set { SetString("NGUI Search", value); }
+	}
+
+	static public string currentPath
+	{
+		get { return GetString("NGUI Path", "Assets/"); }
+		set { SetString("NGUI Path", value); }
 	}
 #endregion
 

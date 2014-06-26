@@ -17,9 +17,25 @@ public class UICameraEditor : Editor
 
 		serializedObject.Update();
 
+		SerializedProperty et = serializedObject.FindProperty("eventType");
+
+		if (et.hasMultipleDifferentValues)
+		{
+			EditorGUILayout.PropertyField(et);
+		}
+		else
+		{
+#if !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2
+			string[] options = new string[] { "3D World", "3D UI", "2D World", "2D UI" };
+#else
+			string[] options = new string[] { "3D World", "3D UI" };
+#endif
+			int val = EditorGUILayout.Popup("Event Type", et.intValue, options);
+			if (val != et.intValue) et.intValue = val;
+		}
+
 		if (UICamera.eventHandler != cam)
 		{
-			EditorGUILayout.PropertyField(serializedObject.FindProperty("eventType"));
 			EditorGUILayout.PropertyField(serializedObject.FindProperty("eventReceiverMask"), new GUIContent("Event Mask"));
 			serializedObject.ApplyModifiedProperties();
 
@@ -37,7 +53,6 @@ public class UICameraEditor : Editor
 			SerializedProperty keyboard = serializedObject.FindProperty("useKeyboard");
 			SerializedProperty controller = serializedObject.FindProperty("useController");
 
-			EditorGUILayout.PropertyField(serializedObject.FindProperty("eventType"));
 			EditorGUILayout.PropertyField(serializedObject.FindProperty("eventReceiverMask"), new GUIContent("Event Mask"));
 			EditorGUILayout.PropertyField(serializedObject.FindProperty("debug"));
 

@@ -51,11 +51,6 @@ public class UIFontMaker : EditorWindow
 		set { NGUISettings.SetInt("NGUI Character Map", (int)value); }
 	}
 
-	void Awake ()
-	{
-		mType = (Application.platform == RuntimePlatform.WindowsEditor) ? FontType.GeneratedBitmap : FontType.ImportedBitmap;
-	}
-
 	/// <summary>
 	/// Update all labels associated with this font.
 	/// </summary>
@@ -83,8 +78,11 @@ public class UIFontMaker : EditorWindow
 
 	void OnSelectAtlas (Object obj)
 	{
-		NGUISettings.atlas = obj as UIAtlas;
-		Repaint();
+		if (NGUISettings.atlas != obj)
+		{
+			NGUISettings.atlas = obj as UIAtlas;
+			Repaint();
+		}
 	}
 
 	/// <summary>
@@ -107,11 +105,11 @@ public class UIFontMaker : EditorWindow
 		GUILayout.Space(3f);
 
 		NGUIEditorTools.DrawHeader("Input", true);
-		NGUIEditorTools.BeginContents();
+		NGUIEditorTools.BeginContents(false);
 
 		GUILayout.BeginHorizontal();
 		mType = (FontType)EditorGUILayout.EnumPopup("Type", mType, GUILayout.MinWidth(200f));
-		GUILayout.Space(18f);
+		NGUIEditorTools.DrawPadding();
 		GUILayout.EndHorizontal();
 		Create create = Create.None;
 
@@ -125,7 +123,7 @@ public class UIFontMaker : EditorWindow
 			EditorGUI.BeginDisabledGroup(NGUISettings.fontData == null || NGUISettings.fontTexture == null);
 			{
 				NGUIEditorTools.DrawHeader("Output", true);
-				NGUIEditorTools.BeginContents();
+				NGUIEditorTools.BeginContents(false);
 				ComponentSelector.Draw<UIAtlas>(NGUISettings.atlas, OnSelectAtlas, false);
 				NGUIEditorTools.EndContents();
 			}
@@ -173,7 +171,7 @@ public class UIFontMaker : EditorWindow
 				if (mType == FontType.Dynamic)
 				{
 					NGUISettings.fontStyle = (FontStyle)EditorGUILayout.EnumPopup(NGUISettings.fontStyle);
-					GUILayout.Space(18f);
+					NGUIEditorTools.DrawPadding();
 				}
 			}
 			GUILayout.EndHorizontal();
@@ -183,33 +181,30 @@ public class UIFontMaker : EditorWindow
 			{
 				if (!FreeType.isPresent)
 				{
-					if (Application.platform != RuntimePlatform.WindowsEditor)
-					{
-						EditorGUILayout.HelpBox("Built-in bitmap font generation is only available on Windows platforms.", MessageType.Error);
-					}
-					else
-					{
-						EditorGUILayout.HelpBox("Assets/Editor/FreeType.dll is missing", MessageType.Error);
+					string filename = (Application.platform == RuntimePlatform.WindowsEditor) ? "FreeType.dll" : "FreeType.dylib";
+					
+					EditorGUILayout.HelpBox("Assets/NGUI/Editor/" + filename + " is missing", MessageType.Error);
 
-						GUILayout.BeginHorizontal();
-						GUILayout.Space(20f);
+					GUILayout.BeginHorizontal();
+					GUILayout.Space(20f);
 
-						if (GUILayout.Button("Find FreeType.dll"))
+					if (GUILayout.Button("Find " + filename))
+					{
+						string path = EditorUtility.OpenFilePanel("Find " + filename, NGUISettings.currentPath,
+							(Application.platform == RuntimePlatform.WindowsEditor) ? "dll" : "dylib");
+
+						if (!string.IsNullOrEmpty(path))
 						{
-							string path = EditorUtility.OpenFilePanel("Find FreeType.dll", "Assets", "dll");
-
-							if (!string.IsNullOrEmpty(path))
+							if (System.IO.Path.GetFileName(path) == filename)
 							{
-								if (Path.GetFileName(path) == "FreeType.dll")
-								{
-									NGUISettings.pathToFreeType = path;
-								}
-								else Debug.LogError("The library must be named 'FreeType'");
+								NGUISettings.currentPath = System.IO.Path.GetDirectoryName(path);
+								NGUISettings.pathToFreeType = path;
 							}
+							else Debug.LogError("The library must be named '" + filename + "'");
 						}
-						GUILayout.Space(20f);
-						GUILayout.EndHorizontal();
 					}
+					GUILayout.Space(20f);
+					GUILayout.EndHorizontal();
 				}
 				else if (ttf != null)
 				{
@@ -346,7 +341,7 @@ public class UIFontMaker : EditorWindow
 				EditorGUI.BeginDisabledGroup(ttf == null || isBuiltIn || !FreeType.isPresent);
 				{
 					NGUIEditorTools.DrawHeader("Output", true);
-					NGUIEditorTools.BeginContents();
+					NGUIEditorTools.BeginContents(false);
 					ComponentSelector.Draw<UIAtlas>(NGUISettings.atlas, OnSelectAtlas, false);
 					NGUIEditorTools.EndContents();
 
@@ -377,8 +372,15 @@ public class UIFontMaker : EditorWindow
 		if (create == Create.None) return;
 
 		// Open the "Save As" file dialog
-		string prefabPath = EditorUtility.SaveFilePanelInProject("Save As", "New Font.prefab", "prefab", "Save font as...");
+#if UNITY_3_5
+		string prefabPath = EditorUtility.SaveFilePanel("Save As",
+			NGUISettings.currentPath, "New Font.prefab", "prefab");
+#else
+		string prefabPath = EditorUtility.SaveFilePanelInProject("Save As",
+			"New Font.prefab", "prefab", "Save font as...", NGUISettings.currentPath);
+#endif
 		if (string.IsNullOrEmpty(prefabPath)) return;
+		NGUISettings.currentPath = System.IO.Path.GetDirectoryName(prefabPath);
 
 		// Load the font's prefab
 		GameObject go = AssetDatabase.LoadAssetAtPath(prefabPath, typeof(GameObject)) as GameObject;
@@ -434,7 +436,7 @@ public class UIFontMaker : EditorWindow
 
 					// Save the material
 					AssetDatabase.CreateAsset(mat, matPath);
-					AssetDatabase.Refresh();
+					AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
 					// Load the material so it's usable
 					mat = AssetDatabase.LoadAssetAtPath(matPath, typeof(Material)) as Material;
@@ -504,12 +506,12 @@ public class UIFontMaker : EditorWindow
 
 						// Save the material
 						AssetDatabase.CreateAsset(mat, matPath);
-						AssetDatabase.Refresh();
+						AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
 						// Load the material so it's usable
 						mat = AssetDatabase.LoadAssetAtPath(matPath, typeof(Material)) as Material;
 					}
-					else AssetDatabase.Refresh();
+					else AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
 					// Re-load the texture
 					tex = AssetDatabase.LoadAssetAtPath(texPath, typeof(Texture2D)) as Texture2D;
@@ -530,7 +532,7 @@ public class UIFontMaker : EditorWindow
 			// Update the prefab
 			PrefabUtility.ReplacePrefab(go, prefab);
 			DestroyImmediate(go);
-			AssetDatabase.Refresh();
+			AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
 			// Select the atlas
 			go = AssetDatabase.LoadAssetAtPath(prefabPath, typeof(GameObject)) as GameObject;

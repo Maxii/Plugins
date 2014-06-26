@@ -64,7 +64,7 @@ public class Seeker : MonoBehaviour {
 	[System.NonSerialized]
 	public List<Vector3> lastCompletedVectorPath;
 	[System.NonSerialized]
-	public List<Node> lastCompletedNodePath;
+	public List<GraphNode> lastCompletedNodePath;
 	
 	//END DEBUG
 	
@@ -80,12 +80,11 @@ public class Seeker : MonoBehaviour {
 		return path;
 	}
 	
-	private Node startHint;
-	private Node endHint;
+	private GraphNode startHint;
+	private GraphNode endHint;
 	
 	private OnPathDelegate onPathDelegate;
-	private OnPathDelegate onPartialPathDelegate;
-	
+
 	/** Temporary callback only called for the current path. This value is set by the StartPath functions */
 	private OnPathDelegate tmpPathCallback;
 	
@@ -162,7 +161,6 @@ public class Seeker : MonoBehaviour {
 	
 	/** Runs modifiers on path \a p */
 	public void RunModifiers (ModifierPass pass, Path p) {
-		
 		
 		//Sort the modifiers based on priority (bubble sort (slow but since it's a small list, it works good))
 		bool changed = true;
@@ -365,9 +363,9 @@ public class Seeker : MonoBehaviour {
 	 * \code Seeker seeker = GetComponent (typeof(Seeker)) as Seeker;
 	 * Path p = seeker.GetNewPath (transform.position, transform.position+transform.forward*100);
 	 * p.nnConstraint = NNConstraint.Default; \endcode */
-	public Path GetNewPath (Vector3 start, Vector3 end) {
+	public ABPath GetNewPath (Vector3 start, Vector3 end) {
 		//Construct a path with start and end points
-		Path p = ABPath.Construct (start, end, null);
+		ABPath p = ABPath.Construct (start, end, null);
 		
 		return p;
 	}
@@ -417,7 +415,12 @@ public class Seeker : MonoBehaviour {
 		
 		//Cancel a previously requested path is it has not been processed yet and also make sure that it has not been recycled and used somewhere else
 		if (path != null && path.GetState() <= PathState.Processing && lastPathID == path.pathID) {
-			path.LogError ("Canceled path because a new one was requested\nGameObject: "+gameObject.name);
+			path.Error();
+			path.LogError ("Canceled path because a new one was requested.\n"+
+				"This happens when a new path is requested from the seeker when one was already being calculated.\n" +
+				"For example if a unit got a new order, you might request a new path directly instead of waiting for the now" +
+				" invalid path to be calculated. Which is probably what you want.\n" +
+				"If you are getting this a lot, you might want to consider how you are scheduling path requests.");
 			//No callback should be sent for the canceled path
 		}
 		
@@ -456,7 +459,7 @@ public class Seeker : MonoBehaviour {
 	
 	
 	public IEnumerator DelayPathStart (Path p) {
-		yield return 0;
+		yield return null;
 		//lastPathCall = Time.frameCount;
 		
 		RunModifiers (ModifierPass.PreProcess, p);

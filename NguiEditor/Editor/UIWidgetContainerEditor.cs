@@ -36,7 +36,7 @@ public class UIWidgetContainerEditor : Editor
 
 	public void OnSceneGUI ()
 	{
-		NGUIEditorTools.HideMoveTool(true);
+		//NGUIEditorTools.HideMoveTool(true);
 		if (!UIWidget.showHandles) return;
 		if (UnityEditor.Tools.current != Tool.Move) return;
 

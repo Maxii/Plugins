@@ -1,4 +1,3 @@
-//#define ASTARDEBUGGING
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
@@ -72,7 +71,7 @@ namespace Pathfinding {
 	/** Base class for path modifiers which are not attached to GameObjects.
 	 * \see MonoModifier */
 	[System.Serializable]
-	public abstract class Modifier : IPathModifier {
+	public abstract class PathModifier : IPathModifier {
 		
 		/** Higher priority modifiers are executed first */
 		public int priority = 0;
@@ -183,7 +182,7 @@ namespace Pathfinding {
 		//This is for the first pass of original data modifiers
 		/** \deprecated */
 		[System.Obsolete]
-		public virtual Vector3[] Apply (Node[] path, Vector3 start, Vector3 end, int startIndex, int endIndex, NavGraph graph) {
+		public virtual Vector3[] Apply (GraphNode[] path, Vector3 start, Vector3 end, int startIndex, int endIndex, NavGraph graph) {
 			
 			Vector3[] p = new Vector3[endIndex-startIndex];
 			

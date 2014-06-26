@@ -1,4 +1,13 @@
 //#define NoTagPenalty		//Enables or disables tag penalties. Can give small performance boost
+
+#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2 || UNITY_3_5 || UNITY_3_4 || UNITY_3_3
+#define UNITY_LE_4_3
+#endif
+
+#if !UNITY_3_5 && !UNITY_3_4 && !UNITY_3_3
+#define UNITY_4
+#endif
+
 using UnityEngine;
 using UnityEditor;
 using System.Collections;
@@ -18,9 +27,13 @@ public class SeekerEditor : Editor {
 		DrawDefaultInspector ();
 		
 		Seeker script = target as Seeker;
-		
-		EditorGUILayoutx.SetTagField (new GUIContent ("Valid Tags","Sets which tags are traversable. Tags can be used to restrict which units can traverse which ground"),ref script.traversableTags);
-		
+
+#if !UNITY_LE_4_3
+		Undo.RecordObject ( script, "modify settings on Seeker");
+#endif
+
+		EditorGUILayoutx.SetTagField (new GUIContent ("Valid Tags"),ref script.traversableTags);
+
 		EditorGUI.indentLevel=0;
 		tagPenaltiesOpen = EditorGUILayout.Foldout (tagPenaltiesOpen,new GUIContent ("Tag Penalties","Penalties for each tag"));
 		if (tagPenaltiesOpen) {
@@ -31,7 +44,7 @@ public class SeekerEditor : Editor {
 				if (tmp < 0) tmp = 0;
 				script.tagPenalties[i] = tmp;
 			}
-			if (GUILayout.Button ("Edit Tags...")) {
+			if (GUILayout.Button ("Edit Tag Names...")) {
 				AstarPathEditor.EditTags ();
 			}
 		}
@@ -49,8 +62,10 @@ public class SeekerEditor : Editor {
 				AstarPathEditor.stylesLoaded = true;
 			}
 		}
+
 		GUIStyle helpBox = GUI.skin.GetStyle ("helpBox");
-		
+
+
 		if (mods == null) {
 			mods = new List<IPathModifier>(script.GetComponents<MonoModifier>() as IPathModifier[]);
 		} else {
@@ -104,19 +119,33 @@ public class SeekerEditor : Editor {
 		
 		EditorGUI.indentLevel = 0;
 		
-		
+#if UNITY_LE_4_3
 		modifiersOpen = EditorGUILayout.Foldout (modifiersOpen, "Modifiers Priorities"+(modifierErrors ? " - Errors in modifiers!" : ""),EditorStyles.foldout);
-		
+#else
+		modifiersOpen = EditorGUILayout.Foldout (modifiersOpen, "Modifiers Priorities"+(modifierErrors ? " - Errors in modifiers!" : ""));
+#endif
+
+#if UNITY_LE_4_3
 		EditorGUI.indentLevel = 1;
-		
+#endif
+
 		if (modifiersOpen) {
+#if UNITY_LE_4_3
 			EditorGUI.indentLevel+= 2;
-			
+#endif
+
 			//GUILayout.BeginHorizontal ();
 			//GUILayout.Space (28);
 			if (GUILayout.Button ("Modifiers attached to this gameObject are listed here.\nModifiers with a higher priority (higher up in the list) will be executed first.\nClick here for more info",helpBox)) {
 				Application.OpenURL (AstarPathEditor.GetURL ("modifiers"));
 			}
+
+
+			EditorGUILayout.HelpBox ("Original or All can be converted to anything\n" +
+			    "NodePath can be converted to VectorPath\n"+
+				"VectorPath can only be used as VectorPath\n"+
+			    "Vector takes both VectorPath and StrictVectorPath\n"+
+			    "Strict... can be converted to the non-strict variant", MessageType.None );
 			//GUILayout.EndHorizontal ();
 			
 			prevMod = mods[0];
@@ -174,8 +203,10 @@ public class SeekerEditor : Editor {
 				
 				GUI.color = prevCol;
 			}
-			
+
+#if UNITY_LE_4_3
 			EditorGUI.indentLevel-= 2;
+#endif
 		}
 	}
 }

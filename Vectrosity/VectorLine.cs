@@ -1,8 +1,8 @@
-// Version 2.3
-// ©2013 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 3.1
+// ©2014 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
-#if UNITY_3_4 || UNITY_3_5
-#define UNITY_3
+#if UNITY_4_0 || UNITY_4_0_1 || UNITY_4_1 || UNITY_4_2
+#define PRE_UNITY_4_3
 #endif
 
 using UnityEngine;
@@ -18,6 +18,10 @@ public enum Brightness {Fog, None}
 
 [System.Serializable]
 public class VectorLine {
+	public static string Version () {
+		return "Vectrosity version 3.1";
+	}
+	
 	GameObject m_vectorObject;
 	public GameObject vectorObject {
 		get {
@@ -37,11 +41,7 @@ public class VectorLine {
 	}
 	Vector3[] m_lineVertices;
 	Vector2[] m_lineUVs;
-#if UNITY_3
-	Color[] m_lineColors;
-#else
 	Color32[] m_lineColors;
-#endif
 	public Color color {
 		get {return m_lineColors[0];}
 	}
@@ -73,14 +73,12 @@ public class VectorLine {
 				}
 			}
 			m_maxWeldDistance = (value*2) * (value*2);
-#if !UNITY_3
 			if (!m_1pixelLine && value == 1.0f) {
 				RedoLine (true);
 			}
 			else if (m_1pixelLine && value != 1.0f) {
 				RedoLine (false);
 			}
-#endif
 		}
 	}
 	float m_maxWeldDistance;
@@ -128,7 +126,20 @@ public class VectorLine {
 		get {return m_depth;}
 		set {m_depth = Mathf.Clamp(value, 0, 100);}
 	}
-	public bool smoothWidth = false;
+	bool m_smoothWidth = false;
+	public bool smoothWidth {
+		get {return m_smoothWidth;}
+		set {
+			m_smoothWidth = m_isPoints? false : value;
+		}
+	}
+	bool m_smoothColor = false;
+	public bool smoothColor {
+		get {return m_smoothColor;}
+		set {
+			m_smoothColor = m_isPoints? false : value;
+		}
+	}
 	int m_layer = -1;
 	public int layer {
 		get {return m_layer;}
@@ -149,8 +160,7 @@ public class VectorLine {
 	public Joins joins {
 		get {return m_joins;}
 		set {
-			if (m_isPoints) return;
-			if (!m_continuous && value == Joins.Fill) return;
+			if (m_isPoints || (!m_continuous && value == Joins.Fill)) return;
 			m_joins = value;
 		}
 	}
@@ -163,19 +173,20 @@ public class VectorLine {
 	public int minDrawIndex {
 		get {return m_minDrawIndex;}
 		set {
-			m_minDrawIndex = value;
-			if (!m_continuous && (m_minDrawIndex & 1) != 0) {	// No odd numbers for discrete lines
-				m_minDrawIndex++;
+			if (!m_continuous && (value & 1) != 0) {	// No odd numbers for discrete lines
+				value++;
 			}
-			m_minDrawIndex = Mathf.Clamp (m_minDrawIndex, 0, pointsLength-1);
+			m_minDrawIndex = Mathf.Clamp (value, 0, pointsLength-1);
 		}
 	}
 	int m_maxDrawIndex = 0;
 	public int maxDrawIndex {
 		get {return m_maxDrawIndex;}
 		set {
-			m_maxDrawIndex = value;
-			m_minDrawIndex = Mathf.Clamp (m_minDrawIndex, 0, pointsLength-1);
+			if (!m_continuous && (value & 1) == 0) {	// No even numbers for discrete lines
+				value++;
+			}
+			m_maxDrawIndex = Mathf.Clamp (value, 0, pointsLength-1);
 		}
 	}
 	int m_drawStart = 0;
@@ -192,7 +203,7 @@ public class VectorLine {
 	public int drawEnd {
 		get {return m_drawEnd;}
 		set {
-			if (!m_continuous && (value & 1) == 0) {	// No odd numbers for discrete lines
+			if (!m_continuous && (value & 1) == 0) {	// No even numbers for discrete lines
 				value++;
 			}
 			m_drawEnd = Mathf.Clamp (value, 0, pointsLength-1);
@@ -240,21 +251,108 @@ public class VectorLine {
 			}
 		}
 	}
-	Transform m_useTransform;
-#if !UNITY_3
 	bool m_1pixelLine = false;
-	static bool m_useMeshQuads = false;
-	public static bool useMeshQuads {
-		get {return m_useMeshQuads;}
+	Transform m_useTransform;
+	public Transform drawTransform {
+		get {return m_useTransform;}
+		set {m_useTransform = value;}
+	}
+	bool m_viewportDraw;
+	public bool useViewportCoords {
+		get {return m_viewportDraw;}
 		set {
-			if (!m_meshRenderMethodSet) {
-				m_useMeshQuads = value;
+			if (m_is2D) {
+				m_viewportDraw = value;
 			}
 			else {
-				Debug.LogWarning ("useMeshQuads not changed, since a VectorLine has already been created");
+				Debug.LogWarning ("Line must be 2D in order to use viewport coords");
+			}
+		}		
+	}
+	float m_textureScale;
+	bool m_useTextureScale = false;
+	public float textureScale {
+		get {return m_textureScale;}
+		set {
+			m_textureScale = value;
+			m_useTextureScale = (m_textureScale != 0.0f);
+		}
+	}
+	float m_textureOffset;
+	public float textureOffset {
+		get {return m_textureOffset;}
+		set {
+			m_textureOffset = value;
+			SetTextureScale();
+		}	
+	}
+	bool m_useMatrix = false;
+	Matrix4x4 m_matrix;
+	public Matrix4x4 matrix {
+		get {return m_matrix;}
+		set {
+			m_matrix = value;
+			m_useMatrix = (m_matrix != Matrix4x4.identity);
+		}
+	}
+	
+#if !PRE_UNITY_4_3
+	public int sortingLayerID {
+		get {return vectorObject.renderer.sortingLayerID;}
+		set {
+			vectorObject.renderer.sortingLayerID = value;
+		}
+	}
+	public int sortingOrder {
+		get {return vectorObject.renderer.sortingOrder;}
+		set {
+			if (value < -32768 || value > 32767) {
+				Debug.LogError ("sortingOrder out of range");
+				return;
+			}
+			vectorObject.renderer.sortingOrder = value;
+		}
+	}
+	
+	bool m_collider = false;
+	public bool collider {
+		get {return m_collider;}
+		set {
+			m_collider = value;
+			AddColliderIfNeeded();
+			vectorObject.GetComponent<Collider2D>().enabled = value;
+		}
+	}
+	bool m_trigger = false;
+	public bool trigger {
+		get {return m_trigger;}
+		set {
+			m_trigger = value;
+			if (vectorObject.GetComponent<Collider2D>() != null) {
+				vectorObject.GetComponent<Collider2D>().isTrigger = value;
 			}
 		}
 	}
+	PhysicsMaterial2D m_physicsMaterial;
+	public PhysicsMaterial2D physicsMaterial {
+		get {return m_physicsMaterial;}
+		set {
+			AddColliderIfNeeded();
+			m_physicsMaterial = value;
+			m_vectorObject.GetComponent<Collider2D>().sharedMaterial = value;
+			m_vectorObject.GetComponent<Collider2D>().enabled = false;	// Work-around for Unity bug where changing collider2D materials won't work
+			m_vectorObject.GetComponent<Collider2D>().enabled = true;
+		}
+	}
+	
+	void AddColliderIfNeeded () {
+		if (vectorObject.GetComponent<Collider2D>() == null) {
+			vectorObject.AddComponent (m_continuous? typeof(EdgeCollider2D) : typeof(PolygonCollider2D));
+			vectorObject.GetComponent<Collider2D>().isTrigger = m_trigger;
+		}
+	}
+#endif
+	
 	static bool m_useMeshLines = false;
 	public static bool useMeshLines {
 		get {return m_useMeshLines;}
@@ -280,7 +378,6 @@ public class VectorLine {
 		}
 	}
 	static bool m_meshRenderMethodSet = false;
-#endif
 	
 	// Vector3 constructors
 	public VectorLine (string lineName, Vector3[] linePoints, Material lineMaterial, float width) {
@@ -453,11 +550,9 @@ public class VectorLine {
 		m_joins = joins;
 		bool useSegmentColors = true;
 		int colorsLength = 0;
-#if !UNITY_3
 		if (width == 1.0f && ( (m_isPoints && m_useMeshPoints) || (!m_isPoints && m_useMeshLines) ) ) {
 			m_1pixelLine = true;
 		}
-#endif
 		
 		if (!usePoints) {
 			if (m_continuous) {
@@ -507,9 +602,7 @@ public class VectorLine {
 		m_meshFilter = (MeshFilter)m_vectorObject.AddComponent(typeof(MeshFilter));
 		m_meshFilter.mesh = m_mesh;		
 		name = lineName;
-#if !UNITY_3
 		m_meshRenderMethodSet = true;
-#endif
 		BuildMesh (colors);
 	}
 	
@@ -560,21 +653,9 @@ public class VectorLine {
 		}
 
 		BuildMesh (colors);
-		m_minDrawIndex = 0;
-		m_maxDrawIndex = 0;
-		m_drawStart = 0;
-		m_drawEnd = m_pointsLength;
 	}
 	
 	private void BuildMesh (Color[] colors) {
-#if UNITY_3
-		if (m_isPoints) {
-			m_vertexCount = m_pointsLength*4;
-		}
-		else {
-			m_vertexCount = m_continuous? (m_pointsLength-1)*4 : m_pointsLength*2;
-		}
-#else
 		if (m_1pixelLine) {
 			m_vertexCount = (!m_continuous || m_isPoints)? m_pointsLength : (m_pointsLength-1)*2;
 		}
@@ -586,7 +667,6 @@ public class VectorLine {
 				m_vertexCount = m_continuous? (m_pointsLength-1)*4 : m_pointsLength*2;
 			}
 		}
-#endif
 		if (m_vertexCount > 65534) {
 			LogError ("VectorLine: exceeded maximum vertex count of 65534 for \"" + name + "\"...use fewer points (maximum is approximately 16000 points for continuous lines and points, and approximately 32000 points for discrete lines)");
 			return;
@@ -594,14 +674,9 @@ public class VectorLine {
 		
 		m_lineVertices = new Vector3[m_vertexCount];
 		m_lineUVs = new Vector2[m_vertexCount];
-#if UNITY_3
-		m_lineColors = new Color[m_vertexCount];
-#else
 		m_lineColors = new Color32[m_vertexCount];
-#endif
 		
 		int idx = 0, end = 0;
-#if !UNITY_3
 		if (m_1pixelLine) {
 			end = colors.Length;
 			if (m_isPoints) {
@@ -618,7 +693,6 @@ public class VectorLine {
 			}
 		}
 		else {
-#endif
 			if (!m_isPoints) {
 				end = m_continuous? m_pointsLength-1 : m_pointsLength/2;
 			}
@@ -641,20 +715,12 @@ public class VectorLine {
 				m_lineColors[idx+3] = colors[i];
 				idx += 4;
 			}
-#if !UNITY_3
 		}
-#endif
 		
-#if !UNITY_3
-		m_mesh.MarkDynamic();
-#endif
+//		m_mesh.MarkDynamic();	// Apparently buggy on some platforms; makes little difference in speed anyway
 		m_mesh.vertices = m_lineVertices;
 		m_mesh.uv = m_lineUVs;
-#if UNITY_3
-		m_mesh.colors = m_lineColors;
-#else
 		m_mesh.colors32 = m_lineColors;
-#endif
 		SetupTriangles();
 						
 		if (!m_is2D) {
@@ -666,16 +732,18 @@ public class VectorLine {
 		if (m_useTangents) {
 			m_tangentsCalculated = false;
 		}
-		
 		if (m_capType != EndCap.None) {
 			AddEndCap();
 		}
+		drawStart = 0;
+		drawEnd = m_pointsLength-1;
+		minDrawIndex = 0;
+		maxDrawIndex = m_pointsLength-1;
 	}
 
 	private void SetupTriangles () {
 		bool addPoint = false;
 		
-#if !UNITY_3	// Lines/points/quads
 		if (m_1pixelLine) {
 			if (m_continuous) {
 				m_triangleCount = m_isPoints? m_pointsLength : (m_pointsLength-1)*2;
@@ -685,31 +753,23 @@ public class VectorLine {
 			}
 		}
 		else {
-			int vertNumber = m_useMeshQuads? 4 : 6;
-#endif
-#if UNITY_3
-			int vertNumber = 6;
-#endif
 			if (m_continuous) {
-				m_triangleCount = m_isPoints? m_triangleCount = (m_pointsLength)*vertNumber : m_triangleCount = (m_pointsLength-1)*vertNumber;
+				m_triangleCount = m_isPoints? m_triangleCount = (m_pointsLength)*6 : m_triangleCount = (m_pointsLength-1)*6;
 				if (m_joins == Joins.Fill) {
-					m_triangleCount += (m_pointsLength-2)*vertNumber;
+					m_triangleCount += (m_pointsLength-2) * 6;
 					// Add another join fill if the first point equals the last point (like with a square)
 					if ( (m_is2D && points2[0] == points2[points2.Length-1]) || (!m_is2D && points3[0] == points3[points3.Length-1]) ) {
-						m_triangleCount += vertNumber;
+						m_triangleCount += 6;
 						addPoint = true;
 					}
 				}
 			}
 			else {
-				m_triangleCount = m_pointsLength/2 * vertNumber;
+				m_triangleCount = m_pointsLength/2 * 6;
 			}
-#if !UNITY_3
 		}
-#endif
 
-		int[] newTriangles = new int[m_triangleCount];
-		
+		int[] newTriangles = new int[m_triangleCount];		
 		int end = 0, i = 0;
 		if (!m_isPoints) {
 			end = m_continuous? (m_pointsLength-1)*4 : m_pointsLength*2;
@@ -718,7 +778,6 @@ public class VectorLine {
 			end = m_pointsLength*4;
 		}
 		
-#if !UNITY_3
 		if (m_1pixelLine) {
 			if (!m_isPoints) {
 				end = m_continuous? (m_pointsLength-1)*2 : m_pointsLength;
@@ -748,72 +807,45 @@ public class VectorLine {
 			m_mesh.SetIndices (newTriangles, m_isPoints? MeshTopology.Points : MeshTopology.Lines, 0);
 		}
 		else {
-			if (m_useMeshQuads) {
-				for (i = 0; i < end; i += 4) {
-					newTriangles[i  ] = i+2;
-					newTriangles[i+1] = i+3;
-					newTriangles[i+2] = i+1;
-					newTriangles[i+3] = i;
-				}
-				if (m_joins == Joins.Fill) {
-					end -= 2;
-					int idx = i;
-					for (i = 2; i < end; i += 4) {
-						newTriangles[idx  ] = i+2;
-						newTriangles[idx+1] = i+3;
-						newTriangles[idx+2] = i+1;
-						newTriangles[idx+3] = i;
-						idx += 4;
-					}
-					if (addPoint) {
-						newTriangles[idx  ] = i;
-						newTriangles[idx+1] = 0;
-						newTriangles[idx+2] = 1;
-						newTriangles[idx+3] = i+1;
-					}
-				}
-				m_mesh.SetIndices (newTriangles, MeshTopology.Quads, 0);
+			int idx = 0;
+			for (i = 0; i < end; i += 4) {
+				newTriangles[idx  ] = i;
+				newTriangles[idx+1] = i+2;
+				newTriangles[idx+2] = i+1;
+			
+				newTriangles[idx+3] = i+2;
+				newTriangles[idx+4] = i+3;
+				newTriangles[idx+5] = i+1;
+				idx += 6;
 			}
-			else {
-#endif
-				int idx = 0;
-				for (i = 0; i < end; i += 4) {
+			if (m_joins == Joins.Fill) {
+				end -= 2;
+				for (i = 2; i < end; i += 4) {
 					newTriangles[idx  ] = i;
 					newTriangles[idx+1] = i+2;
-					newTriangles[idx+2] = i+1;
-				
-					newTriangles[idx+3] = i+2;
-					newTriangles[idx+4] = i+3;
-					newTriangles[idx+5] = i+1;
+					newTriangles[idx+2] = i+3;
+			
+					newTriangles[idx+3] = i+1;
+					newTriangles[idx+4] = i+2;
+					newTriangles[idx+5] = i+3;
 					idx += 6;
 				}
-				if (m_joins == Joins.Fill) {
-					end -= 2;
-					for (i = 2; i < end; i += 4) {
-						newTriangles[idx  ] = i;
-						newTriangles[idx+1] = i+2;
-						newTriangles[idx+2] = i+1;
-				
-						newTriangles[idx+3] = i+2;
-						newTriangles[idx+4] = i+3;
-						newTriangles[idx+5] = i+1;
-						idx += 6;
-					}
-					if (addPoint) {
-						newTriangles[idx  ] = i;
-						newTriangles[idx+1] = 0;
-						newTriangles[idx+2] = i+1;
-				
-						newTriangles[idx+3] = 0;
-						newTriangles[idx+4] = 1;
-						newTriangles[idx+5] = i+1;
-					}
+				if (addPoint) {
+					newTriangles[idx  ] = i;
+					newTriangles[idx+1] = 0;
+					newTriangles[idx+2] = i+1;
+			
+					newTriangles[idx+3] = i;
+					newTriangles[idx+4] = 1;
+					newTriangles[idx+5] = i+1;
 				}
-				m_mesh.triangles = newTriangles;
-#if !UNITY_3
 			}
+			m_mesh.triangles = newTriangles;
 		}
-#endif
+	}
+	
+	int MaxSegmentIndex () {
+		return m_isPoints? pointsLength : (m_continuous? pointsLength-1 : pointsLength/2);
 	}
 	
 	public void AddNormals () {
@@ -889,9 +921,8 @@ public class VectorLine {
 	}
 	
 	private void AddEndCap () {
-#if !UNITY_3
 		if (m_1pixelLine) return;
-#endif
+		
 		int newVertexCount = m_vertexCount + 8;
 		if (newVertexCount > 65534) {
 			LogError ("VectorLine: exceeded maximum vertex count of 65534 for \"" + m_name + "\"...use fewer points");
@@ -903,28 +934,13 @@ public class VectorLine {
 		System.Array.Resize (ref m_lineColors, newVertexCount);
 		var capType = capDictionary[m_endCap].capType;
 		
-		int[] triangles;
-#if !UNITY_3
-		if (m_useMeshQuads) {
-			triangles = new int[8];
-			int idx = 0;
-			for (int i = newVertexCount-8; i < newVertexCount; i += 4) {
-				triangles[idx] = i+2; triangles[idx+1] = i; triangles[idx+2] = i+1; triangles[idx+3] = i+3;
-				idx += 4;
-			}
+		int[] triangles = new int[12];
+		int idx = 0;
+		for (int i = newVertexCount-8; i < newVertexCount; i += 4) {
+			triangles[idx  ] = i+2; triangles[idx+1] = i+1; triangles[idx+2] = i;
+			triangles[idx+3] = i+2; triangles[idx+4] = i+3; triangles[idx+5] = i+1;
+			idx += 6;
 		}
-		else {
-#endif
-			triangles = new int[12];
-			int idx = 0;
-			for (int i = newVertexCount-8; i < newVertexCount; i += 4) {
-				triangles[idx  ] = i+2; triangles[idx+1] = i+1; triangles[idx+2] = i;
-				triangles[idx+3] = i+2; triangles[idx+4] = i+3; triangles[idx+5] = i+1;
-				idx += 6;
-			}
-#if !UNITY_3
-		}
-#endif
 
 		for (int i = newVertexCount-8; i < newVertexCount-4; i++) {
 			m_lineColors[i] = m_lineColors[0];
@@ -950,23 +966,11 @@ public class VectorLine {
 		
 		m_mesh.vertices = m_lineVertices;
 		m_mesh.uv = m_lineUVs;
-#if UNITY_3
-		m_mesh.colors = m_lineColors;
-#else
 		m_mesh.colors32 = m_lineColors;
-#endif
 		
 		m_mesh.subMeshCount = 2;
-#if UNITY_3
 		m_mesh.SetTriangles (triangles, 1);
-#else
-		if (m_useMeshQuads) {
-			m_mesh.SetIndices (triangles, MeshTopology.Quads, 1);
-		}
-		else {
-			m_mesh.SetTriangles (triangles, 1);
-		}
-#endif
+		
 		var materials = new Material[2];
 		materials[0] = m_material;
 		materials[1] = capDictionary[m_endCap].material;
@@ -1037,7 +1041,6 @@ public class VectorLine {
 			return _lineManager;
 		}
 	}
-	static int widthIdxAdd;
 	static int m_screenWidth = 0;
 	static int m_screenHeight = 0;
 	static int screenWidth {
@@ -1064,14 +1067,26 @@ public class VectorLine {
 	}
 	
 	public static Camera SetCameraRenderTexture (RenderTexture renderTexture) {
-		return SetCameraRenderTexture (renderTexture, Color.black, false);
+		return SetCameraRenderTexture (renderTexture, Color.black, CameraClearFlags.SolidColor, false);
 	}
-	
+
+	public static Camera SetCameraRenderTexture (RenderTexture renderTexture, CameraClearFlags clearFlags) {
+		return SetCameraRenderTexture (renderTexture, Color.black, clearFlags, false);
+	}
+
 	public static Camera SetCameraRenderTexture (RenderTexture renderTexture, bool useOrtho) {
-		return SetCameraRenderTexture (renderTexture, Color.black, useOrtho);
+		return SetCameraRenderTexture (renderTexture, Color.black, CameraClearFlags.SolidColor, useOrtho);
 	}
 	
+	public static Camera SetCameraRenderTexture (RenderTexture renderTexture, CameraClearFlags clearFlags, bool useOrtho) {
+		return SetCameraRenderTexture (renderTexture, Color.black, clearFlags, useOrtho);
+	}
+
 	public static Camera SetCameraRenderTexture (RenderTexture renderTexture, Color color, bool useOrtho) {
+		return SetCameraRenderTexture (renderTexture, color, CameraClearFlags.SolidColor, useOrtho);
+	}
+	
+	public static Camera SetCameraRenderTexture (RenderTexture renderTexture, Color color, CameraClearFlags clearFlags, bool useOrtho) {
 		Camera vCam;
 		if (renderTexture == null) {
 			m_screenWidth = 0;
@@ -1086,7 +1101,7 @@ public class VectorLine {
 		int height = renderTexture.height;
 		m_screenWidth = width;
 		m_screenHeight = height;
-		vCam = SetCamera (CameraClearFlags.SolidColor, useOrtho);
+		vCam = SetCamera (clearFlags, useOrtho);
 		vCam.aspect = width/(float)height;
 		vCam.backgroundColor = color;
 		vCam.targetTexture = renderTexture;
@@ -1107,7 +1122,7 @@ public class VectorLine {
 	
 	public static Camera SetCamera (CameraClearFlags clearFlags, bool useOrtho) {
 		if (Camera.main == null) {
-			LogError ("VectorLine.SetCamera: no camera tagged \"Main Camera\" found");
+			LogError ("VectorLine.SetCamera: no camera tagged \"Main Camera\" found. Please call SetCamera with a specific camera instead.");
 			return null;
 		}
 		return SetCamera (Camera.main, clearFlags, useOrtho);
@@ -1148,9 +1163,8 @@ public class VectorLine {
 		cam.transform.eulerAngles = Vector3.zero;
 		cam.cullingMask = 1 << _vectorLayer;	// Turn on only the vector layer on the Vectrosity camera
 		cam.backgroundColor = thisCamera.backgroundColor;
-#if !UNITY_3
+		cam.useOcclusionCulling = false;
 		cam.hdr = thisCamera.hdr;
-#endif
 		
 		thisCamera.cullingMask &= ~(1 << _vectorLayer);	// Turn off the vector layer on the non-Vectrosity camera
 		camTransform = thisCamera.transform;
@@ -1209,8 +1223,8 @@ public class VectorLine {
 		}
 	}
 
-	static string[] functionNames = {"VectorLine.SetColors: Length of color", "VectorLine.SetColorsSmooth: Length of color", "VectorLine.SetWidths: Length of line widths", "MakeCurve", "MakeSpline", "MakeEllipse"};
-	enum FunctionName {SetColors, SetColorsSmooth, SetWidths, MakeCurve, MakeSpline, MakeEllipse}
+	static string[] functionNames = {"VectorLine.SetColors: Length of color", "VectorLine.SetWidths: Length of line widths", "MakeCurve", "MakeSpline", "MakeEllipse"};
+	enum FunctionName {SetColors, SetWidths, MakeCurve, MakeSpline, MakeEllipse}
 	
 	bool WrongArrayLength (int arrayLength, FunctionName functionName) {
 		if (m_continuous) {
@@ -1268,9 +1282,7 @@ public class VectorLine {
 	}
 	
 	private void SetEndCapColors () {
-#if !UNITY_3
 		if (m_1pixelLine) return;
-#endif
 		
 		if (m_capType <= EndCap.Mirror) {
 			int vIndex = m_continuous? m_drawStart * 4 : m_drawStart * 2;
@@ -1297,7 +1309,7 @@ public class VectorLine {
 	}
 	
 	public void SetColor (Color color) {
-		SetColor (color, 0, m_pointsLength);
+		SetColor (color, 0, pointsLength);
 	}
 	
 	public void SetColor (Color color, int index) {
@@ -1313,31 +1325,28 @@ public class VectorLine {
 			max = m_continuous? pointsLength-1 : pointsLength/2;
 		}
 		int linetypeMultiplier;
-#if !UNITY_3
 		if (m_1pixelLine) {
 			linetypeMultiplier = m_isPoints? 1 : 2;
 		}
 		else {
-#endif
 			linetypeMultiplier = 4;
-#if !UNITY_3
 		}
-#endif
-		startIndex = Mathf.Clamp (startIndex, 0, max) * linetypeMultiplier;
-		endIndex = Mathf.Clamp (endIndex + 1, 1, max) * linetypeMultiplier;
-		for (int i = startIndex; i < endIndex; i++) {
+		
+		int startIndex2 = Mathf.Clamp (startIndex*linetypeMultiplier + (smoothColor? linetypeMultiplier/2 : 0), 0, max*linetypeMultiplier);
+		int endIndex2 = Mathf.Clamp ((endIndex + 1)*linetypeMultiplier + (smoothColor? linetypeMultiplier/2 : 0), 0, max*linetypeMultiplier);
+		for (int i = startIndex2; i < endIndex2; i++) {
 			m_lineColors[i] = color;
 		}
-#if UNITY_3
-		m_mesh.colors = m_lineColors;
-#else
+		
+		if (m_capType != EndCap.None && (startIndex <= 0 || endIndex >= max-1)) {
+			SetEndCapColors();
+		}
 		m_mesh.colors32 = m_lineColors;
-#endif
 	}
 
 	public void SetColors (Color[] lineColors) {
 		if (lineColors == null) {
-			LogError ("VectorLine.SetColors: line colors array must not be null");
+			LogError ("VectorLine.SetColors: lineColors array must not be null");
 			return;
 		}
 		if (!m_isPoints) {
@@ -1355,95 +1364,80 @@ public class VectorLine {
 		SetStartAndEnd (ref start, ref end);
 		int idx = start*4;
 		
-#if !UNITY_3
-		if (m_1pixelLine) {
-			if (m_isPoints) {
-				for (int i = start; i < end; i++) {
-					m_lineColors[i] = lineColors[i];
+		if (!smoothColor) {
+			if (m_1pixelLine) {
+				if (m_isPoints) {
+					for (int i = start; i < end; i++) {
+						m_lineColors[i] = lineColors[i];
+					}
+				}
+				else {
+					idx = start*2;
+					for (int i = start; i < end; i++) {
+						m_lineColors[idx  ] = lineColors[i];
+						m_lineColors[idx+1] = lineColors[i];
+						idx += 2;
+					}
 				}
 			}
 			else {
-				idx = start*2;
 				for (int i = start; i < end; i++) {
 					m_lineColors[idx  ] = lineColors[i];
+					m_lineColors[idx+1] = lineColors[i];
+					m_lineColors[idx+2] = lineColors[i];
+					m_lineColors[idx+3] = lineColors[i];
+					idx += 4;
+				}
+			}
+		}
+		else {	// Smooth color
+			if (m_1pixelLine) {
+				idx = start*2;
+				m_lineColors[idx  ] = lineColors[start];
+				m_lineColors[idx+1] = lineColors[start];
+				idx += 2;
+				for (int i = start+1; i < end; i++) {
+					m_lineColors[idx  ] = lineColors[i-1];
 					m_lineColors[idx+1] = lineColors[i];
 					idx += 2;
 				}
 			}
-		}
-		else {
-#endif
-			for (int i = start; i < end; i++) {
-				m_lineColors[idx  ] = lineColors[i];
-				m_lineColors[idx+1] = lineColors[i];
-				m_lineColors[idx+2] = lineColors[i];
-				m_lineColors[idx+3] = lineColors[i];
+			else {
+				m_lineColors[idx  ] = lineColors[start];
+				m_lineColors[idx+1] = lineColors[start];
+				m_lineColors[idx+2] = lineColors[start];
+				m_lineColors[idx+3] = lineColors[start];
 				idx += 4;
+				for (int i = start+1; i < end; i++) {
+					m_lineColors[idx  ] = lineColors[i-1];
+					m_lineColors[idx+1] = lineColors[i-1];
+					m_lineColors[idx+2] = lineColors[i];
+					m_lineColors[idx+3] = lineColors[i];
+					idx += 4;
+				}
 			}
-#if !UNITY_3
 		}
-#endif
-		
+
 		if (m_capType != EndCap.None) {
 			SetEndCapColors();
 		}
-#if UNITY_3
-		m_mesh.colors = m_lineColors;
-#else
 		m_mesh.colors32 = m_lineColors;
-#endif
 	}
 	
-	public void SetColorsSmooth (Color[] lineColors) {
-		if (lineColors == null) {
-			LogError ("VectorLine.SetColors: line colors array must not be null");
-			return;
-		}
-		if (m_isPoints) {
-			LogError ("VectorLine.SetColorsSmooth must be used with a line rather than points");
-			return;
-		}
-		if (WrongArrayLength (lineColors.Length, FunctionName.SetColorsSmooth)) {
-			return;
-		}
-		
-		int start = 0;
-		int end = lineColors.Length;
-		SetStartAndEnd (ref start, ref end);
-		int idx = start*4;
-		
-#if !UNITY_3
+	public Color GetColor (int index) {
+		int linetypeMultiplier;
 		if (m_1pixelLine) {
-			idx = start*2;
-			m_lineColors[idx  ] = lineColors[start];
-			m_lineColors[idx+1] = lineColors[start];
-			idx += 2;
-			for (int i = start+1; i < end; i++) {
-				m_lineColors[idx  ] = lineColors[i-1];
-				m_lineColors[idx+1] = lineColors[i];
-				idx += 2;
-			}
+			linetypeMultiplier = m_isPoints? 1 : 2;
 		}
 		else {
-#endif
-			m_lineColors[idx  ] = lineColors[start];
-			m_lineColors[idx+1] = lineColors[start];
-			m_lineColors[idx+2] = lineColors[start];
-			m_lineColors[idx+3] = lineColors[start];
-			idx += 4;
-			for (int i = start+1; i < end; i++) {
-				m_lineColors[idx  ] = lineColors[i-1];
-				m_lineColors[idx+1] = lineColors[i-1];
-				m_lineColors[idx+2] = lineColors[i];
-				m_lineColors[idx+3] = lineColors[i];
-				idx += 4;
-			}
-#if !UNITY_3
+			linetypeMultiplier = 4;
 		}
-		m_mesh.colors32 = m_lineColors;
-#else
-		m_mesh.colors = m_lineColors;		
-#endif
+		index *= linetypeMultiplier;
+		if (index < 0 || index >= m_lineColors.Length) {
+			LogError ("VectorLine.GetColor: index out of range");
+			return Color.clear;
+		}		
+		return m_lineColors[index];		
 	}
 
 	private void SetStartAndEnd (ref int start, ref int end) {
@@ -1459,6 +1453,24 @@ public class VectorLine {
 				}
 			}
 		}
+	}
+	
+	public void SetWidth (float width, int index) {
+		int max = MaxSegmentIndex();
+		if (index < 0 || index >= max) {
+			LogError ("VectorLine.SetWidth: index out of range...must be >= 0 and < " + max);
+			return;
+		}
+		
+		if (m_lineWidths.Length == 1) {
+			var baseWidth = m_lineWidths[0];
+			m_lineWidths = new float[max];
+			for (int i = 0; i < max; i++) {
+				m_lineWidths[i] = baseWidth;
+			}
+		}
+		
+		m_lineWidths[index] = width * .5f;
 	}
 
 	public void SetWidths (float[] lineWidths) {
@@ -1483,11 +1495,9 @@ public class VectorLine {
 		else if (WrongArrayLength (arrayLength, FunctionName.SetWidths)) {
 			return;
 		}
-#if !UNITY_3
 		if (m_1pixelLine) {
 			RedoLine (false);
 		}
-#endif
 		
 		m_lineWidths = new float[arrayLength];
 		if (doFloat) {
@@ -1501,8 +1511,20 @@ public class VectorLine {
 			}
 		}
 	}
+	
+	public float GetWidth (int index) {
+		int max = MaxSegmentIndex();
+		if (index < 0 || index >= max) {
+			LogError ("VectorLine.GetWidth: index out of range...must be >= 0 and < " + max);
+			return 0;
+		}
+		
+		if (m_lineWidths.Length == 1) {
+			return m_lineWidths[0] * 2;
+		}
+		return m_lineWidths[index] * 2;
+	}
 
-#if !UNITY_3	
 	private void RedoLine (bool use1Pixel) {
 		m_1pixelLine = use1Pixel;
 		int start, add, arraySize;
@@ -1534,7 +1556,6 @@ public class VectorLine {
 		m_mesh.Clear();
 		BuildMesh (cols);
 	}
-#endif
 	
 	static Material defaultLineMaterial;
 	static float defaultLineWidth;
@@ -1544,9 +1565,6 @@ public class VectorLine {
 	static LineType defaultLineType;
 	static Joins defaultJoins;
 	static bool defaultsSet = false;
-	static Vector3 v1;
-	static Vector3 v2;
-	static Vector3 v3;
 	
 	public static void SetLineParameters (Color color, Material material, float width, float capLength, int depth, LineType lineType, Joins joins) {
 		defaultLineColor = color;
@@ -1682,7 +1700,7 @@ public class VectorLine {
 	}
 
 	public static VectorLine SetRay (Color color, float time, Vector3 origin, Vector3 direction) {
-		var line = new VectorLine("SetRay", new Vector3[] {origin, new Ray(origin, direction).GetPoint(direction.magnitude)}, color, null, 1.0f, LineType.Continuous, Joins.None);
+		var line = new VectorLine("SetRay", new Vector3[] {origin, new Ray(origin, direction).GetPoint (direction.magnitude)}, color, null, 1.0f, LineType.Continuous, Joins.None);
 		if (time > 0.0f) {
 			lineManager.DisableLine(line, time);
 		}
@@ -1700,94 +1718,54 @@ public class VectorLine {
 		return line;
 	}
 	
-	private bool CheckLine () {
+	private void RedoFillLine () {
+		if (m_capType != EndCap.None) {
+			RemoveEndCapVertices();
+		}
+		SetupTriangles();
+		if (m_capType != EndCap.None) {
+			AddEndCap();
+		}
+	}
+	
+	private bool CheckLine (bool draw3D) {
 		if (m_mesh == null) {
 			LogError ("VectorLine \"" + m_name + "\" seems to have been destroyed. If you have used ObjectSetup, the way to remove the VectorLine is to destroy the GameObject passed into ObjectSetup.");
 			return false;
 		}
 		
-#if !UNITY_3
 		if (m_1pixelLine) return true;
 		
-		if (m_useMeshQuads) {
-			if (m_joins != Joins.Fill) {
-				if (m_triangleCount != m_vertexCount) {
-					SetupTriangles();
-				}
-			}
-			else {
-				if (m_is2D) {
-					if ( (points2[0] != points2[m_pointsLength-1] && m_triangleCount != m_vertexCount*2 - 4) ||
-						 (points2[0] == points2[m_pointsLength-1] && m_triangleCount != m_vertexCount*2) ) {
-						SetupTriangles();
-					}
-				}
-				else {
-					if ( (points3[0] != points3[m_pointsLength-1] && m_triangleCount != m_vertexCount*2 - 4) ||
-						 (points3[0] == points3[m_pointsLength-1] && m_triangleCount != m_vertexCount*2) ) {
-						SetupTriangles();
-					}
-				}
-				
-				// Prevent extraneous quad with Joins.Fill
-				if (m_drawStart > 0) {
-					m_lineVertices[m_drawStart*4 - 1] = m_lineVertices[m_drawStart*4];
-					m_lineVertices[m_drawStart*4 - 2] = m_lineVertices[m_drawStart*4];
-				}
-				if (m_drawEnd > 0 && m_drawEnd < m_pointsLength - 1) {
-					m_lineVertices[m_drawEnd*4    ] = m_lineVertices[m_drawEnd*4 - 1];
-					m_lineVertices[m_drawEnd*4 + 1] = m_lineVertices[m_drawEnd*4 - 1];
-				}
-				
-				if (m_minDrawIndex > 0) {
-					m_lineVertices[m_minDrawIndex*4 - 1] = m_lineVertices[m_minDrawIndex*4];
-					m_lineVertices[m_minDrawIndex*4 - 2] = m_lineVertices[m_minDrawIndex*4];
-				}
-				if (m_maxDrawIndex > 0 && m_maxDrawIndex < m_pointsLength - 1) {
-					m_lineVertices[m_maxDrawIndex*4    ] = m_lineVertices[m_maxDrawIndex*4 - 1];
-					m_lineVertices[m_maxDrawIndex*4 + 1] = m_lineVertices[m_maxDrawIndex*4 - 1];
-				}
+		if (m_joins != Joins.Fill) {
+			if (m_triangleCount != m_vertexCount + m_vertexCount/2) {
+				SetupTriangles();
 			}
 		}
 		else {
-#endif
-			if (m_joins != Joins.Fill) {
-				if (m_triangleCount != m_vertexCount + m_vertexCount/2) {
-					SetupTriangles();
+			if (m_is2D) {
+				if ( (points2[0] != points2[m_pointsLength-1] && m_triangleCount != m_vertexCount*3 - 6) ||
+					 (points2[0] == points2[m_pointsLength-1] && m_triangleCount != m_vertexCount*3) ) {
+					RedoFillLine();
 				}
 			}
 			else {
-				if (m_is2D) {
-					if ( (points2[0] != points2[m_pointsLength-1] && m_triangleCount != m_vertexCount*3 - 6) ||
-						 (points2[0] == points2[m_pointsLength-1] && m_triangleCount != m_vertexCount*3) ) {
-						SetupTriangles();
-					}
-				}
-				else {
-					if ( (points3[0] != points3[m_pointsLength-1] && m_triangleCount != m_vertexCount*3 - 6) ||
-						 (points3[0] == points3[m_pointsLength-1] && m_triangleCount != m_vertexCount*3) ) {
-						SetupTriangles();
-					}
-				}
-				
-				// Prevent extraneous triangle with Joins.Fill
-				if (m_drawStart > 0) {
-					m_lineVertices[m_drawStart*4 - 1] = m_lineVertices[m_drawStart*4];
-				}
-				if (m_drawEnd > 0 && m_drawEnd < m_pointsLength - 1) {
-					m_lineVertices[m_drawEnd*4] = m_lineVertices[m_drawEnd*4 - 1];
-				}
-				
-				if (m_minDrawIndex > 0) {
-					m_lineVertices[m_minDrawIndex*4 - 1] = m_lineVertices[m_minDrawIndex*4];
-				}
-				if (m_maxDrawIndex > 0 && m_maxDrawIndex < m_pointsLength - 1) {
-					m_lineVertices[m_maxDrawIndex*4] = m_lineVertices[m_maxDrawIndex*4 - 1];
+				if ( (points3[0] != points3[m_pointsLength-1] && m_triangleCount != m_vertexCount*3 - 6) ||
+					 (points3[0] == points3[m_pointsLength-1] && m_triangleCount != m_vertexCount*3) ) {
+					RedoFillLine();
 				}
 			}
-#if !UNITY_3
+			
+			// Prevent extraneous triangles with Joins.Fill
+			if (m_drawStart > 0) {
+				m_lineVertices[m_drawStart*4 - 1] = m_lineVertices[m_drawStart*4];
+				m_lineVertices[m_drawStart*4 - 2] = m_lineVertices[m_drawStart*4];
+			}
+			if (m_minDrawIndex > 0 && m_lineVertices[m_minDrawIndex*4 - 1] == Vector3.zero && m_lineVertices[m_minDrawIndex*4 - 2] == Vector3.zero) {
+				m_lineVertices[m_minDrawIndex*4 - 1] = m_lineVertices[m_minDrawIndex*4];
+				m_lineVertices[m_minDrawIndex*4 - 2] = m_lineVertices[m_minDrawIndex*4];
+			}
 		}
-#endif
+		
 		if (m_capType != EndCap.None) {
 			if (m_capType <= EndCap.Mirror) {
 				int vIndex = m_drawStart * 4;
@@ -1796,18 +1774,25 @@ public class VectorLine {
 					widthIndex /= 2;
 					vIndex /= 2;
 				}
-				if (m_is2D) {
+				if (!draw3D) {
 					var d = (m_lineVertices[vIndex] - m_lineVertices[vIndex+2]).normalized *
 							m_lineWidths[widthIndex] * 2.0f * capDictionary[m_endCap].ratio1;
-					m_lineVertices[m_vertexCount  ] = m_lineVertices[vIndex] + d;
-					m_lineVertices[m_vertexCount+1] = m_lineVertices[vIndex+1] + d;
+					var d2 = d * capDictionary[m_endCap].offset;
+					m_lineVertices[m_vertexCount  ] = m_lineVertices[vIndex] + d + d2;
+					m_lineVertices[m_vertexCount+1] = m_lineVertices[vIndex+1] + d + d2;
+					
+					m_lineVertices[vIndex] += d2;
+					m_lineVertices[vIndex+1] += d2;
 				}
 				else {
-					var v1 = cam3D.WorldToScreenPoint(m_lineVertices[vIndex]);
-					var d = (v1 - cam3D.WorldToScreenPoint(m_lineVertices[vIndex+2])).normalized *
+					var d = (m_screenPoints[vIndex] - m_screenPoints[vIndex+2]).normalized *
 							m_lineWidths[widthIndex] * 2.0f * capDictionary[m_endCap].ratio1;
-					m_lineVertices[m_vertexCount  ] = cam3D.ScreenToWorldPoint (v1 + d);
-					m_lineVertices[m_vertexCount+1] = cam3D.ScreenToWorldPoint (cam3D.WorldToScreenPoint (m_lineVertices[vIndex+1]) + d);
+					var d2 = d * capDictionary[m_endCap].offset;
+					m_lineVertices[m_vertexCount  ] = cam3D.ScreenToWorldPoint (m_screenPoints[vIndex] + d + d2);
+					m_lineVertices[m_vertexCount+1] = cam3D.ScreenToWorldPoint (m_screenPoints[vIndex+1] + d + d2);
+					
+					m_lineVertices[vIndex] = cam3D.ScreenToWorldPoint (m_screenPoints[vIndex] + d2);
+					m_lineVertices[vIndex+1] = cam3D.ScreenToWorldPoint (m_screenPoints[vIndex+1] + d2);
 				}
 				m_lineVertices[m_vertexCount+2] = m_lineVertices[vIndex];
 				m_lineVertices[m_vertexCount+3] = m_lineVertices[vIndex+1];
@@ -1832,30 +1817,33 @@ public class VectorLine {
 				if (vIndex < 4) {
 					vIndex = 4;
 				}
-				m_lineVertices[m_vertexCount+4] = m_lineVertices[vIndex-2];
-				m_lineVertices[m_vertexCount+5] = m_lineVertices[vIndex-1];
-				if (m_is2D) {
+				if (!draw3D) {
 					var d = (m_lineVertices[vIndex-1] - m_lineVertices[vIndex-3]).normalized *
 							m_lineWidths[widthIndex] * 2.0f * capDictionary[m_endCap].ratio2;
-					m_lineVertices[m_vertexCount+6] = m_lineVertices[vIndex-2] + d;
-					m_lineVertices[m_vertexCount+7] = m_lineVertices[vIndex-1] + d;
+					var d2 = d * capDictionary[m_endCap].offset;
+					m_lineVertices[m_vertexCount+6] = m_lineVertices[vIndex-2] + d + d2;
+					m_lineVertices[m_vertexCount+7] = m_lineVertices[vIndex-1] + d + d2;
+					
+					m_lineVertices[vIndex-2] += d2;
+					m_lineVertices[vIndex-1] += d2;
 				}
 				else {
-					var v1 = cam3D.WorldToScreenPoint(m_lineVertices[vIndex-1]);
-					var d = (v1 - cam3D.WorldToScreenPoint(m_lineVertices[vIndex-3])).normalized *
+					var d = (m_screenPoints[vIndex-1] - m_screenPoints[vIndex-3]).normalized *
 							m_lineWidths[widthIndex] * 2.0f * capDictionary[m_endCap].ratio2;
-					m_lineVertices[m_vertexCount+6] = cam3D.ScreenToWorldPoint (cam3D.WorldToScreenPoint (m_lineVertices[vIndex-2]) + d);
-					m_lineVertices[m_vertexCount+7] = cam3D.ScreenToWorldPoint (v1 + d);
+					var d2 = d * capDictionary[m_endCap].offset;
+					m_lineVertices[m_vertexCount+6] = cam3D.ScreenToWorldPoint (m_screenPoints[vIndex-2] + d + d2);
+					m_lineVertices[m_vertexCount+7] = cam3D.ScreenToWorldPoint (m_screenPoints[vIndex-1] + d + d2);
+					
+					m_lineVertices[vIndex-2] = cam3D.ScreenToWorldPoint (m_screenPoints[vIndex-2] + d2);
+					m_lineVertices[vIndex-1] = cam3D.ScreenToWorldPoint (m_screenPoints[vIndex-1] + d2);
 				}
+				m_lineVertices[m_vertexCount+4] = m_lineVertices[vIndex-2];
+				m_lineVertices[m_vertexCount+5] = m_lineVertices[vIndex-1];
 			}
 			
 			if (m_drawStart > 0 || m_drawEnd < m_pointsLength) {
 				SetEndCapColors();
-#if UNITY_3
-				m_mesh.colors = m_lineColors;
-#else
 				m_mesh.colors32 = m_lineColors;
-#endif
 			}
 		}
 
@@ -1892,11 +1880,20 @@ public class VectorLine {
 		}
 	}
 	
-	public void Draw () {
-		Draw (null);
+	private bool UseMatrix (out Matrix4x4 thisMatrix) {
+		if (m_useTransform != null) {
+			thisMatrix = m_useTransform.localToWorldMatrix;
+			return true;
+		}
+		else if (m_useMatrix) {
+			thisMatrix = m_matrix;
+			return true;
+		}
+		thisMatrix = Matrix4x4.identity;
+		return false;
 	}
 	
-	public void Draw (Transform thisTransform) {
+	public void Draw () {
 		if (error || !m_active) return;
 		if (!cam) {
 			SetCamera();
@@ -1905,49 +1902,57 @@ public class VectorLine {
 				return;
 			}
 		}
-		if (thisTransform != null) {
-			m_useTransform = thisTransform;
-		}
 		if (m_isPoints) {
-			DrawPoints (thisTransform);
+			DrawPoints();
 			return;
-		}
-		 
+		}		 
 		if (smoothWidth && m_lineWidths.Length == 1 && pointsLength > 2) {
 			LogError ("VectorLine.Draw called with smooth line widths for \"" + name + "\", but VectorLine.SetWidths has not been used");
 			return;
 		}
-	
-		var useTransformMatrix = (thisTransform == null)? false : true;
-		var thisMatrix = useTransformMatrix? thisTransform.localToWorldMatrix : Matrix4x4.identity;
+		
+		Matrix4x4 thisMatrix;
+		bool useMatrix = UseMatrix (out thisMatrix);
 		zDist = useOrthoCam? 101-m_depth : screenHeight/2 + ((100.0f - m_depth) * .0001f);
 		
 		int start, end = 0;
 		SetupDrawStartEnd (out start, out end);
 		
 		if (m_is2D) {
-			Line2D (start, end, thisMatrix, useTransformMatrix);
+			Line2D (start, end, thisMatrix, useMatrix);
 		}
 		else {
 			if (m_continuous) {
-				Line3DContinuous (start, end, thisMatrix, useTransformMatrix);
+				Line3DContinuous (start, end, thisMatrix, useMatrix);
 			}
 			else {
-				Line3DDiscrete (start, end, thisMatrix, useTransformMatrix);
+				Line3DDiscrete (start, end, thisMatrix, useMatrix);
 			}
 		}
 		
-		if (!CheckLine()) return;
+		if (!CheckLine (false)) return;
 		m_mesh.vertices = m_lineVertices;
 		CheckNormals();
-		if (m_mesh.bounds.center.x != screenWidth/2) {
+		
+		if (m_mesh.bounds.center.x != screenWidth/2 || m_mesh.bounds.center.y != screenHeight/2) {
 			SetLineMeshBounds();
 		}
+		if (m_useTextureScale) {
+			SetTextureScale();
+		}
+#if !PRE_UNITY_4_3
+		if (m_collider) {
+			SetCollider (true);
+		}
+#endif
 	}
 
 	private void Line2D (int start, int end, Matrix4x4 thisMatrix, bool useTransformMatrix) {
 		Vector3 p1, p2;
-#if !UNITY_3
+		var v1 = Vector3.zero;
+		var v2 = Vector3.zero;
+		Vector2 scaleFactor = new Vector2(Screen.width, Screen.height);
+		
 		if (m_1pixelLine) {
 			if (m_continuous) {
 				int index = start*2;
@@ -1959,6 +1964,10 @@ public class VectorLine {
 					else {
 						p1 = points2[i];
 						p2 = points2[i+1];
+					}
+					if (useViewportCoords) {
+						p1.x *= scaleFactor.x; p1.y *= scaleFactor.y;
+						p2.x *= scaleFactor.x; p2.y *= scaleFactor.y;
 					}
 					p1.z = zDist; p2.z = zDist;
 					m_lineVertices[index  ] = p1;
@@ -1974,15 +1983,18 @@ public class VectorLine {
 					else {
 						p1 = points2[i];
 					}
+					if (useViewportCoords) {
+						p1.x *= scaleFactor.x; p1.y *= scaleFactor.y;
+					}
 					p1.z = zDist;
 					m_lineVertices[i] = p1;
 				}
 			}
 			return;
 		}
-#endif
+		
 		int add, idx, widthIdx = 0;
-		widthIdxAdd = 0;
+		int widthIdxAdd = 0;
 		if (m_lineWidths.Length > 1) {
 			widthIdx = start;
 			widthIdxAdd = 1;
@@ -2008,8 +2020,12 @@ public class VectorLine {
 					p1 = points2[i];
 					p2 = points2[i+1];
 				}
+				if (useViewportCoords) {
+					p1.x *= scaleFactor.x; p1.y *= scaleFactor.y;
+					p2.x *= scaleFactor.x; p2.y *= scaleFactor.y;
+				}
 				p1.z = zDist;
-				if (p1.x == p2.x && p1.y == p2.y) {Skip (ref idx, ref widthIdx, ref p1); continue;}
+				if (p1.x == p2.x && p1.y == p2.y) {Skip (ref idx, ref widthIdx, ref p1, ref widthIdxAdd); continue;}
 				p2.z = zDist;
 				
 				v1.x = p2.y; v1.y = p1.x;
@@ -2050,8 +2066,12 @@ public class VectorLine {
 					p1 = points2[i];
 					p2 = points2[i+1];
 				}
+				if (useViewportCoords) {
+					p1.x *= scaleFactor.x; p1.y *= scaleFactor.y;
+					p2.x *= scaleFactor.x; p2.y *= scaleFactor.y;
+				}
 				p1.z = zDist;
-				if (p1.x == p2.x && p1.y == p2.y) {Skip (ref idx, ref widthIdx, ref p1); continue;}
+				if (p1.x == p2.x && p1.y == p2.y) {Skip (ref idx, ref widthIdx, ref p1, ref widthIdxAdd); continue;}
 				p2.z = zDist;
 				
 				thisLine = p2 - p1;
@@ -2079,7 +2099,7 @@ public class VectorLine {
 			LogError ("The 3D camera no longer exists...if you have changed scenes, ensure that SetCamera3D is called in order to set it up.");
 			return;
 		}
-#if !UNITY_3
+		
 		if (m_1pixelLine) {
 			Vector3 p1;
 			Vector3 p2 = useTransformMatrix? cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4 (points3[start])) :
@@ -2098,25 +2118,27 @@ public class VectorLine {
 			}
 			return;
 		}
-#endif
+		
 		Vector3 pos1, perpendicular;
 		Vector3 pos2 = useTransformMatrix? cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4 (points3[start])) :
 										   cam3D.WorldToScreenPoint (points3[start]);
 		pos2.z = pos2.z < cutoff? -zDist : zDist;
 		float normalizedDistance = 0.0f;
 		int widthIdx = 0;
-		widthIdxAdd = 0;
+		int widthIdxAdd = 0;
 		if (m_lineWidths.Length > 1) {
 			widthIdx = start;
 			widthIdxAdd = 1;
 		}
 		int idx = start*4;
+		var v1 = Vector3.zero;
+		var v2 = Vector3.zero;
 		
 		for (int i = start; i < end; i++) {
 			pos1 = pos2;
 			pos2 = useTransformMatrix? cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4 (points3[i+1])) :
 									   cam3D.WorldToScreenPoint (points3[i+1]);
-			if (pos1.x == pos2.x && pos1.y == pos2.y) {Skip (ref idx, ref widthIdx, ref pos1); continue;}
+			if (pos1.x == pos2.x && pos1.y == pos2.y) {Skip (ref idx, ref widthIdx, ref pos1, ref widthIdxAdd); continue;}
 			pos2.z = pos2.z < cutoff? -zDist : zDist;
 			
 			v1.x = pos2.y; v1.y = pos1.x;
@@ -2147,7 +2169,7 @@ public class VectorLine {
 			LogError ("The 3D camera no longer exists...if you have changed scenes, ensure that SetCamera3D is called in order to set it up.");
 			return;
 		}
-#if !UNITY_3
+		
 		if (m_1pixelLine) {
 			Vector3 p1;
 			for (int i = start; i <= end; i++) {
@@ -2158,11 +2180,13 @@ public class VectorLine {
 			}
 			return;
 		}
-#endif
+		
 		Vector3 pos1, pos2, perpendicular;
+		var v1 = Vector3.zero;
+		var v2 = Vector3.zero;
 		float normalizedDistance = 0.0f;
 		int widthIdx = 0;
-		widthIdxAdd = 0;
+		int widthIdxAdd = 0;
 		if (m_lineWidths.Length > 1) {
 			widthIdx = start;
 			widthIdxAdd = 1;
@@ -2179,7 +2203,7 @@ public class VectorLine {
 				pos2 = cam3D.WorldToScreenPoint (points3[i+1]);
 			}
 			pos1.z = pos1.z < cutoff? -zDist : zDist;
-			if (pos1.x == pos2.x && pos1.y == pos2.y) {Skip (ref idx, ref widthIdx, ref pos1); continue;}
+			if (pos1.x == pos2.x && pos1.y == pos2.y) {Skip (ref idx, ref widthIdx, ref pos1, ref widthIdxAdd); continue;}
 			pos2.z = pos2.z < cutoff? -zDist : zDist;
 			
 			v1.x = pos2.y; v1.y = pos1.x;
@@ -2206,10 +2230,6 @@ public class VectorLine {
 	}
 
 	public void Draw3D () {
-		Draw3D (null);
-	}
-
-	public void Draw3D (Transform thisTransform) {
 		if (error || !m_active) return;
 		if (!cam3D) {
 			SetCamera3D();
@@ -2222,14 +2242,10 @@ public class VectorLine {
 			LogError ("VectorLine.Draw3D can only be used with a Vector3 array, which \"" + name + "\" doesn't have");
 			return;
 		}
-		if (thisTransform != null) {
-			m_useTransform = thisTransform;
-		}
 		if (m_isPoints) {
-			DrawPoints3D (thisTransform);
+			DrawPoints3D();
 			return;
 		}
-
 		if (smoothWidth && m_lineWidths.Length == 1 && pointsLength > 2) {
 			LogError ("VectorLine.Draw3D called with smooth line widths for \"" + name + "\", but VectorLine.SetWidths has not been used");
 			return;
@@ -2242,14 +2258,13 @@ public class VectorLine {
 		
 		int start, end, idx, add, widthIdx = 0;
 		SetupDrawStartEnd (out start, out end);
-		var useTransformMatrix = (thisTransform == null)? false : true;
-		var thisMatrix = useTransformMatrix? thisTransform.localToWorldMatrix : Matrix4x4.identity;
+		Matrix4x4 thisMatrix;
+		bool useMatrix = UseMatrix (out thisMatrix);
 		
-#if !UNITY_3
 		if (m_1pixelLine) {
 			if (m_continuous) {
 				int index = start*2;
-				if (useTransformMatrix) {
+				if (useMatrix) {
 					for (int i = start; i < end; i++) {
 						m_lineVertices[index  ] = thisMatrix.MultiplyPoint3x4 (points3[i]);
 						m_lineVertices[index+1] = thisMatrix.MultiplyPoint3x4 (points3[i+1]);
@@ -2265,7 +2280,7 @@ public class VectorLine {
 				}
 			}
 			else {
-				if (useTransformMatrix) {
+				if (useMatrix) {
 					for (int i = start; i <= end; i++) {
 						m_lineVertices[i] = thisMatrix.MultiplyPoint3x4 (points3[i]);
 					}
@@ -2277,14 +2292,13 @@ public class VectorLine {
 				}
 			}
 			
-			if (!CheckLine()) return;
+			if (!CheckLine (true)) return;
 			m_mesh.vertices = m_lineVertices;
 			m_mesh.RecalculateBounds();
 			return;
 		}
-#endif
 		
-		widthIdxAdd = 0;
+		int widthIdxAdd = 0;
 		if (m_lineWidths.Length > 1) {
 			widthIdx = start;
 			widthIdxAdd = 1;
@@ -2299,9 +2313,10 @@ public class VectorLine {
 			add = 2;
 		}
 		Vector3 pos1, pos2, thisLine, perpendicular;
-		
+		var v1 = Vector3.zero;
+		var v2 = Vector3.zero;
 		for (int i = start; i < end; i += add) {
-			if (useTransformMatrix) {
+			if (useMatrix) {
 				pos1 = cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4 (points3[i]));
 				pos2 = cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4 (points3[i+1]));
 			}
@@ -2315,7 +2330,7 @@ public class VectorLine {
 			thisLine = (v1 - v2).normalized;
 			perpendicular = thisLine * m_lineWidths[widthIdx];
 			
-			m_screenPoints[idx  ] = pos1 - perpendicular;	// Used for Joins.Weld
+			m_screenPoints[idx  ] = pos1 - perpendicular;	// Used for Joins.Weld and end caps
 			m_screenPoints[idx+1] = pos1 + perpendicular;
 			m_lineVertices[idx  ] = cam3D.ScreenToWorldPoint (m_screenPoints[idx]);
 			m_lineVertices[idx+1] = cam3D.ScreenToWorldPoint (m_screenPoints[idx+1]);
@@ -2343,211 +2358,34 @@ public class VectorLine {
 			}
 		}
 		
-		if (!CheckLine()) return;
+		if (!CheckLine (true)) return;
+		
 		m_mesh.vertices = m_lineVertices;
 		m_mesh.RecalculateBounds();
 		CheckNormals();
-	}
-
-	public void DrawViewport () {
-		DrawViewport (null);
-	}
-
-	public void DrawViewport (Transform thisTransform) {
-		if (error || !m_active) return;
-		if (!cam) {
-			SetCamera();
-			if (!cam) {	// If that didn't work (no camera tagged "Main Camera")
-				LogError ("VectorLine.DrawViewport: You must call SetCamera before calling DrawViewport for \"" + name + "\"");
-				return;
-			}
+		if (m_useTextureScale) {
+			SetTextureScale();
 		}
-		if (m_isPoints) {
-			LogError ("VectorLine.DrawViewport can't be used with VectorPoints");
-			return;
-		}
-		if (!m_is2D) {
-			LogError ("VectorLine.DrawViewport can only be used with a Vector2 array, which \"" + name + "\" doesn't have");
-			return;
-		}
-		if (smoothWidth && m_lineWidths.Length == 1 && pointsLength > 2) {
-			LogError ("VectorLine.DrawViewport called with smooth line widths for \"" + name + "\", but SetWidths has not been used");
-			return;
-		}
-		
-		var useTransformMatrix = (thisTransform == null)? false : true;
-		var thisMatrix = useTransformMatrix? thisTransform.localToWorldMatrix : Matrix4x4.identity;
-		zDist = useOrthoCam? 101-m_depth : screenHeight/2 + ((100.0f - m_depth) * .0001f);
-		Vector3 p1, p2;
-		int idx, add, start, end, widthIdx = 0;
-		widthIdxAdd = 0;
-		SetupDrawStartEnd (out start, out end);
-		int sWidth = screenWidth;
-		int sHeight = screenHeight;
-		
-#if !UNITY_3
-		if (m_1pixelLine) {
-			if (m_continuous) {
-				int index = start*2;
-				for (int i = start; i < end; i++) {
-					if (useTransformMatrix) {
-						p1 = thisMatrix.MultiplyPoint3x4 (points2[i]);
-						p2 = thisMatrix.MultiplyPoint3x4 (points2[i+1]);
-					}
-					else {
-						p1 = points2[i];
-						p2 = points2[i+1];
-					}
-					p1.z = zDist; p2.z = zDist;
-					p1.x *= sWidth; p1.y *= sHeight;
-					p2.x *= sWidth; p2.y *= sHeight;
-					m_lineVertices[index  ] = p1;
-					m_lineVertices[index+1] = p2;
-					index += 2;
-				}
-			}
-			else {
-				for (int i = start; i <= end; i++) {
-					if (useTransformMatrix) {
-						p1 = thisMatrix.MultiplyPoint3x4 (points2[i]);
-					}
-					else {
-						p1 = points2[i];
-					}
-					p1.x *= sWidth; p1.y *= sHeight;
-					p1.z = zDist;
-					m_lineVertices[i] = p1;
-				}
-			}
-			
-			if (!CheckLine()) return;
-			m_mesh.vertices = m_lineVertices;
-			if (m_mesh.bounds.center.x != sWidth/2) {
-				SetLineMeshBounds();
-			}
-			return;
+#if !PRE_UNITY_4_3
+		if (m_collider) {
+			SetCollider (false);
 		}
 #endif
-		
-		if (m_lineWidths.Length > 1) {
-			widthIdx = start;
-			widthIdxAdd = 1;
-		}
-		if (m_continuous) {
-			idx = start*4;
-			add = 1;
-		}
-		else {
-			idx = start*2;
-			widthIdx /= 2;
-			add = 2;
-		}
-		
-		if (capLength == 0.0f) {
-			Vector3 perpendicular;
-			for (int i = start; i < end; i += add) {
-				if (useTransformMatrix) {
-					p1 = thisMatrix.MultiplyPoint3x4 (points2[i]);
-					p2 = thisMatrix.MultiplyPoint3x4 (points2[i+1]);
-				}
-				else {
-					p1 = points2[i];
-					p2 = points2[i+1];
-				}
-				p1.z = zDist;
-				if (p1.x == p2.x && p1.y == p2.y) {Skip (ref idx, ref widthIdx, ref p1); continue;}
-				p2.z = zDist;
-				p1.x *= sWidth; p1.y *= sHeight;
-				p2.x *= sWidth; p2.y *= sHeight;
-				
-				v1.x = p2.y * sWidth; v1.y = p1.x * sHeight;
-				v2.x = p1.y * sWidth; v2.y = p2.x * sHeight;
-				perpendicular = v1 - v2;
-				float normalizedDistance = ( 1.0f / Mathf.Sqrt ((perpendicular.x * perpendicular.x) + (perpendicular.y * perpendicular.y)) );
-				perpendicular *= normalizedDistance * m_lineWidths[widthIdx];
-				m_lineVertices[idx]   = p1 - perpendicular;
-				m_lineVertices[idx+1] = p1 + perpendicular;
-				if (smoothWidth && i < end-add) {
-					perpendicular = v1 - v2;
-					perpendicular *= normalizedDistance * m_lineWidths[widthIdx+1];
-				}
-				m_lineVertices[idx+2] = p2 - perpendicular;
-				m_lineVertices[idx+3] = p2 + perpendicular;
-				idx += 4;
-				widthIdx += widthIdxAdd;
-			}
-			if (m_joins == Joins.Weld) {
-				if (m_continuous) {
-					WeldJoins (start*4 + 4, end*4, Approximately2 (points2[0], points2[m_pointsLength-1])
-						&& m_minDrawIndex == 0 && (m_maxDrawIndex == points2.Length-1 || m_maxDrawIndex == 0));
-				}
-				else {
-					WeldJoinsDiscrete (start + 1, end, Approximately2 (points2[0], points2[m_pointsLength-1])
-						&& m_minDrawIndex == 0 && (m_maxDrawIndex == points2.Length-1 || m_maxDrawIndex == 0));
-				}
-			}
-		}
-		else {
-			Vector3 thisLine;
-			for (int i = m_minDrawIndex; i < end; i += add) {
-				if (useTransformMatrix) {
-					p1 = thisMatrix.MultiplyPoint3x4(points2[i]);
-					p2 = thisMatrix.MultiplyPoint3x4(points2[i+1]);
-				}
-				else {
-					p1 = points2[i];
-					p2 = points2[i+1];
-				}
-				p1.z = zDist;
-				if (p1.x == p2.x && p1.y == p2.y) {Skip (ref idx, ref widthIdx, ref p1); continue;}
-				p2.z = zDist;
-				p1.x *= sWidth; p1.y *= sHeight;
-				p2.x *= sWidth; p2.y *= sHeight;
-				
-				thisLine = p2 - p1;
-				thisLine *= ( 1.0f / Mathf.Sqrt((thisLine.x * thisLine.x) + (thisLine.y * thisLine.y)) );
-				p1 -= thisLine * capLength;
-				p2 += thisLine * capLength;
-				
-				v1.x = thisLine.y; v1.y = -thisLine.x;
-				thisLine = v1 * m_lineWidths[widthIdx];
-				m_lineVertices[idx]   = p1 - thisLine;
-				m_lineVertices[idx+1] = p1 + thisLine;
-				if (smoothWidth && i < end-add) {
-					thisLine = v1 * m_lineWidths[widthIdx+1];
-				}
-				m_lineVertices[idx+2] = p2 - thisLine;
-				m_lineVertices[idx+3] = p2 + thisLine;
-				idx += 4;
-				widthIdx += widthIdxAdd;
-			}
-		}
-		
-		if (!CheckLine()) return;
-		m_mesh.vertices = m_lineVertices;
-		if (m_mesh.bounds.center.x != sWidth/2) {
-			SetLineMeshBounds();
-		}
 	}
 
 	private void DrawPoints () {
-		DrawPoints (null);
-	}
-	
-	private void DrawPoints (Transform thisTransform) {
-		var useTransformMatrix = (thisTransform == null)? false : true;
-		var thisMatrix = useTransformMatrix? thisTransform.localToWorldMatrix : Matrix4x4.identity;
+		Matrix4x4 thisMatrix;
+		bool useMatrix = UseMatrix (out thisMatrix);
 		zDist = useOrthoCam? 101-m_depth : screenHeight/2 + ((100.0f - m_depth) * .0001f);
-
-		int start, end, widthIdx = 0;
+		
+		int start, end;
 		SetupDrawStartEnd (out start, out end);
-
-#if !UNITY_3
+		Vector2 scaleFactor = new Vector2(Screen.width, Screen.height);
+		
 		if (m_1pixelLine) {
 			if (!m_is2D) {
 				for (int i = start; i <= end; i++) {
-					m_lineVertices[i] = useTransformMatrix? cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4(points3[i])) :
-															cam3D.WorldToScreenPoint (points3[i]);
+					m_lineVertices[i] = useMatrix? cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4(points3[i])) : cam3D.WorldToScreenPoint (points3[i]);
 					if (m_lineVertices[i].z < cutoff) {
 						m_lineVertices[i] = Vector3.zero;
 						continue;
@@ -2557,87 +2395,94 @@ public class VectorLine {
 			}
 			else {
 				for (int i = start; i <= end; i++) {
-					m_lineVertices[i] = useTransformMatrix? thisMatrix.MultiplyPoint3x4 (points2[i]) : (Vector3)points2[i];
+					m_lineVertices[i] = useMatrix? thisMatrix.MultiplyPoint3x4 (points2[i]) : (Vector3)points2[i];
+					if (useViewportCoords) {
+						m_lineVertices[i].x *= scaleFactor.x;
+						m_lineVertices[i].y *= scaleFactor.y;
+					}
 					m_lineVertices[i].z = zDist;
 				}
 			}
 			
 			m_mesh.vertices = m_lineVertices;
-			if (m_mesh.bounds.center.x != screenWidth/2) {
+			if (m_mesh.bounds.center.x != screenWidth/2 || m_mesh.bounds.center.y != screenHeight/2) {
 				SetLineMeshBounds();
 			}
 			return;
 		}
-#endif
 		
 		Vector3 p1;
 		int idx = start*4;
-		widthIdxAdd = 0;
-		if (m_lineWidths.Length > 1) {
-			widthIdx = start;
-			widthIdxAdd = 1;
-		}
+		int widthIdxAdd = (m_lineWidths.Length > 1)? 1 : 0;
+		int widthIdx = start;
+		var v1 = new Vector3(m_lineWidths[0], m_lineWidths[0], 0.0f);
+		var v2 = new Vector3(-m_lineWidths[0], m_lineWidths[0], 0.0f);
 		
 		if (!m_is2D) {
 			for (int i = start; i <= end; i++) {
-				p1 = useTransformMatrix? cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4(points3[i])) :
-										 cam3D.WorldToScreenPoint (points3[i]);
+				p1 = useMatrix? cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4(points3[i])) :
+								cam3D.WorldToScreenPoint (points3[i]);
 				if (p1.z < cutoff) {
-					Skip (ref idx, ref widthIdx, ref p1);
+					Skip (ref idx, ref widthIdx, ref p1, ref widthIdxAdd);
 					continue;
 				}
 				p1.z = zDist;
-				v1.x = v1.y = v2.y = m_lineWidths[widthIdx];
-				v2.x = -m_lineWidths[widthIdx];				
-
+				
+				if (widthIdxAdd != 0) {
+					v1.x = v1.y = v2.y = m_lineWidths[widthIdx];
+					v2.x = -m_lineWidths[widthIdx];
+					widthIdx++;
+				}
+				
 				m_lineVertices[idx  ] = p1 + v2;
 				m_lineVertices[idx+1] = p1 - v1;
 				m_lineVertices[idx+2] = p1 + v1;
 				m_lineVertices[idx+3] = p1 - v2;
 				idx += 4;
-				widthIdx += widthIdxAdd;
 			}
 		}
 		else {
 			for (int i = start; i <= end; i++) {
-				p1 = useTransformMatrix? thisMatrix.MultiplyPoint3x4 (points2[i]) : (Vector3)points2[i];
+				p1 = useMatrix? thisMatrix.MultiplyPoint3x4 (points2[i]) : (Vector3)points2[i];
+				if (useViewportCoords) {
+					p1.x *= scaleFactor.x;
+					p1.y *= scaleFactor.y;
+				}
 				p1.z = zDist;
-				v1.x = v1.y = v2.y = m_lineWidths[widthIdx];
-				v2.x = -m_lineWidths[widthIdx];
-	
+				
+				if (widthIdxAdd != 0) {
+					v1.x = v1.y = v2.y = m_lineWidths[widthIdx];
+					v2.x = -m_lineWidths[widthIdx];
+					widthIdx++;
+				}
+				
 				m_lineVertices[idx  ] = p1 + v2;
 				m_lineVertices[idx+1] = p1 - v1;
 				m_lineVertices[idx+2] = p1 + v1;
 				m_lineVertices[idx+3] = p1 - v2;
 				idx += 4;
-				widthIdx += widthIdxAdd;
 			}
 		}
 		
 		m_mesh.vertices = m_lineVertices;
-		if (m_mesh.bounds.center.x != screenWidth/2) {
+		if (m_mesh.bounds.center.x != screenWidth/2 || m_mesh.bounds.center.y != screenHeight/2) {
 			SetLineMeshBounds();
 		}
 	}
 
 	private void DrawPoints3D () {
-		DrawPoints3D (null);
-	}
-
-	private void DrawPoints3D (Transform thisTransform) {
 		if (layer == -1) {
 			m_vectorObject.layer = _vectorLayer3D;
 			layer = _vectorLayer3D;
 		}
-		var useTransformMatrix = (thisTransform == null)? false : true;
-		var thisMatrix = useTransformMatrix? thisTransform.localToWorldMatrix : Matrix4x4.identity;
+		Matrix4x4 thisMatrix;
+		bool useMatrix = UseMatrix (out thisMatrix);
 		
 		int start, end, widthIdx = 0;
 		SetupDrawStartEnd (out start, out end);
 		
-#if !UNITY_3
 		if (m_1pixelLine) {
-			if (useTransformMatrix) {
+			if (useMatrix) {
 				for (int i = start; i <= end; i++) {
 					m_lineVertices[i] = thisMatrix.MultiplyPoint3x4 (points3[i]);
 				}
@@ -2652,20 +2497,22 @@ public class VectorLine {
 			m_mesh.RecalculateBounds();
 			return;
 		}
-#endif
+		
 		int idx = m_minDrawIndex*4;
-		widthIdxAdd = 0;
+		int widthIdxAdd = 0;
 		if (m_lineWidths.Length > 1) {
 			widthIdx = start;
 			widthIdxAdd = 1;
 		}
 		Vector3 p1;
+		var v1 = Vector3.zero;
+		var v2 = Vector3.zero;
 		for (int i = start; i <= end; i++) {
-			p1 = useTransformMatrix? cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4 (points3[i])) :
-									 cam3D.WorldToScreenPoint (points3[i]);
+			p1 = useMatrix? cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4 (points3[i])) :
+							cam3D.WorldToScreenPoint (points3[i]);
 			if (p1.z < cutoff) {
 				p1 = Vector3.zero;
-				Skip (ref idx, ref widthIdx, ref p1);
+				Skip (ref idx, ref widthIdx, ref p1, ref widthIdxAdd);
 				continue;
 			}
 			v1.x = v1.y = v2.y = m_lineWidths[widthIdx];
@@ -2684,7 +2531,7 @@ public class VectorLine {
 		CheckNormals();
 	}
 
-	private void Skip (ref int idx, ref int widthIdx, ref Vector3 pos) {
+	private void Skip (ref int idx, ref int widthIdx, ref Vector3 pos, ref int widthIdxAdd) {
 		m_lineVertices[idx  ] = pos;
 		m_lineVertices[idx+1] = pos;
 		m_lineVertices[idx+2] = pos;
@@ -2708,14 +2555,14 @@ public class VectorLine {
 	
 	private void SetupDrawStartEnd (out int start, out int end) {
 		start = m_minDrawIndex;
-		end = (m_maxDrawIndex == 0)? m_pointsLength-1 : m_maxDrawIndex;
+		end = m_maxDrawIndex;
 		if (m_drawStart > 0) {
 			start = m_drawStart;
-			ZeroVertices (0, m_drawStart);
+			ZeroVertices (0, start);
 		}
-		if (m_drawEnd < m_pointsLength) {
+		if (m_drawEnd < m_pointsLength - 1) {
 			end = m_drawEnd;
-			ZeroVertices (m_drawEnd, m_pointsLength);
+			ZeroVertices (end, m_pointsLength);
 		}
 	}
 	
@@ -2732,27 +2579,18 @@ public class VectorLine {
 	}
 
 	public void Draw3DAuto () {
-		Draw3DAuto (0.0f, null);
-	}
-
-	public void Draw3DAuto (float time) {
-		Draw3DAuto (time, null);
-	}
-
-	public void Draw3DAuto (Transform thisTransform) {
-		Draw3DAuto (0.0f, thisTransform);
+		Draw3DAuto (0.0f);
 	}
 	
-	public void Draw3DAuto (float time, Transform thisTransform) {
-#if !UNITY_3
+	public void Draw3DAuto (float time) {
 		if (m_1pixelLine) {
 			Debug.LogWarning ("VectorLine: When using a 1 pixel line and useMeshLines=true (or 1 pixel points and useMeshPoints=true), Draw3DAuto is unnecessary. Use Draw3D instead for optimal performance.");
 		}
-#endif
+		
 		if (time < 0.0f) time = 0.0f;
-		lineManager.AddLine (this, thisTransform, time);
+		lineManager.AddLine (this, m_useTransform, time);
 		m_isAutoDrawing = true;
-		Draw3D (thisTransform);
+		Draw3D();
 	}
 	
 	public void StopDrawing3DAuto () {
@@ -2804,9 +2642,7 @@ public class VectorLine {
 		if (d == 0.0f) return;	// Parallel lines
 		float n = ( (l2b.x - l2a.x)*(l1a.y - l2a.y) - (l2b.y - l2a.y)*(l1a.x - l2a.x) ) / d;
 		
-		v3.x = l1a.x + (n * (l1b.x - l1a.x));
-		v3.y = l1a.y + (n * (l1b.y - l1a.y));
-		v3.z = l1a.z;
+		var v3 = new Vector3(l1a.x + (n * (l1b.x - l1a.x)), l1a.y + (n * (l1b.y - l1a.y)), l1a.z);
 		if ((v3 - l1b).sqrMagnitude > m_maxWeldDistance) return;
 		m_lineVertices[p2] = v3;
 		m_lineVertices[p3] = v3;
@@ -2845,62 +2681,70 @@ public class VectorLine {
 		if (d == 0.0f) return;	// Parallel lines
 		float n = ( (l2b.x - l2a.x)*(l1a.y - l2a.y) - (l2b.y - l2a.y)*(l1a.x - l2a.x) ) / d;
 		
-		v3.x = l1a.x + (n * (l1b.x - l1a.x));
-		v3.y = l1a.y + (n * (l1b.y - l1a.y));
-		v3.z = l1a.z;
+		var v3 = new Vector3(l1a.x + (n * (l1b.x - l1a.x)), l1a.y + (n * (l1b.y - l1a.y)), l1a.z);
 		if ((v3 - l1b).sqrMagnitude > m_maxWeldDistance) return;
 		m_lineVertices[p2] = cam3D.ScreenToWorldPoint(v3);
 		m_lineVertices[p3] = m_lineVertices[p2];
 	}
 	
-	public void SetTextureScale (float textureScale) {
-		SetTextureScale (null, textureScale, 0.0f);
-	}
-
-	public void SetTextureScale (Transform thisTransform, float textureScale) {
-		SetTextureScale (thisTransform, textureScale, 0.0f);
-	}
-
-	public void SetTextureScale (float textureScale, float offset) {
-		SetTextureScale (null, textureScale, offset);
-	}
-	
-	public void SetTextureScale (Transform thisTransform, float textureScale, float offset) {
-#if !UNITY_3
+	private void SetTextureScale () {
 		if (m_1pixelLine) return;
-#endif
+		
 		int end = m_continuous? pointsLength-1 : pointsLength;
 		int add = m_continuous? 1 : 2;
 		int idx = 0;
 		int widthIdx = 0;
-		widthIdxAdd = m_lineWidths.Length == 1? 0 : 1;
-		float thisScale = 1.0f / textureScale;
+		int widthIdxAdd = m_lineWidths.Length == 1? 0 : 1;
+		float thisScale = 1.0f / m_textureScale;
+		var useTransformMatrix = (m_useTransform != null);
+		var thisMatrix = useTransformMatrix? m_useTransform.localToWorldMatrix : Matrix4x4.identity;
+		var p1 = Vector2.zero;
+		var p2 = Vector2.zero;
+		float offset = m_textureOffset;
 		
 		if (m_is2D) {
-			for (int i = 0; i < end; i += add) {
-				float xPos = thisScale / (m_lineWidths[widthIdx]*2 / (points2[i] - points2[i+1]).magnitude);
-				m_lineUVs[idx  ].x = offset;
-				m_lineUVs[idx+1].x = offset;
-				m_lineUVs[idx+2].x = xPos + offset;
-				m_lineUVs[idx+3].x = xPos + offset;
-				idx += 4;
-				offset = (offset + xPos) % 1;
-				widthIdx += widthIdxAdd;
-			}
-		}
-		else {
-			if (!cam3D) {
-				SetCamera3D();
-				if (!cam3D) {
-					LogError ("VectorLine.SetTextureScale: You must call SetCamera3D before calling SetTextureScale");
-					return;
+			if (!m_viewportDraw) {
+				for (int i = 0; i < end; i += add) {
+					if (useTransformMatrix) {
+						p1 = thisMatrix.MultiplyPoint3x4 (points2[i]);
+						p2 = thisMatrix.MultiplyPoint3x4 (points2[i+1]);
+					}
+					else {
+						p1 = points2[i];
+						p2 = points2[i+1];
+					}
+					float xPos = thisScale / (m_lineWidths[widthIdx]*2 / (p1 - p2).magnitude);
+					m_lineUVs[idx  ].x = offset;
+					m_lineUVs[idx+1].x = offset;
+					m_lineUVs[idx+2].x = xPos + offset;
+					m_lineUVs[idx+3].x = xPos + offset;
+					idx += 4;
+					offset = (offset + xPos) % 1;
+					widthIdx += widthIdxAdd;
 				}
 			}
-			
-			var useTransformMatrix = (thisTransform == null)? false : true;
-			var thisMatrix = useTransformMatrix? thisTransform.localToWorldMatrix : Matrix4x4.identity;
-			var p1 = Vector2.zero;
-			var p2 = Vector2.zero;
+			else {
+				for (int i = 0; i < end; i += add) {
+					if (useTransformMatrix) {
+						p1 = thisMatrix.MultiplyPoint3x4 (new Vector2(points2[i].x * Screen.width, points2[i].y * Screen.height));
+						p2 = thisMatrix.MultiplyPoint3x4 (new Vector2(points2[i+1].x * Screen.width, points2[i+1].y * Screen.height));
+					}
+					else {
+						p1 = new Vector2(points2[i].x * Screen.width, points2[i].y * Screen.height);
+						p2 = new Vector2(points2[i+1].x * Screen.width, points2[i+1].y * Screen.height);
+					}
+					float xPos = thisScale / (m_lineWidths[widthIdx]*2 / (p1 - p2).magnitude);
+					m_lineUVs[idx  ].x = offset;
+					m_lineUVs[idx+1].x = offset;
+					m_lineUVs[idx+2].x = xPos + offset;
+					m_lineUVs[idx+3].x = xPos + offset;
+					idx += 4;
+					offset = (offset + xPos) % 1;
+					widthIdx += widthIdxAdd;
+				}
+			}
+		}
+		else {			
 			for (int i = 0; i < end; i += add) {
 				if (useTransformMatrix) {
 					p1 = cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4 (points3[i]));
@@ -2925,9 +2769,8 @@ public class VectorLine {
 	}
 
 	public void ResetTextureScale () {
-#if !UNITY_3
 		if (m_1pixelLine) return;
-#endif
+		
 		int end = m_lineUVs.Length;
 		
 		for (int i = 0; i < end; i += 4) {
@@ -2939,6 +2782,82 @@ public class VectorLine {
 		
 		m_mesh.uv = m_lineUVs;
 	}
+	
+#if !PRE_UNITY_4_3
+	private void SetCollider (bool convertToWorldSpace) {
+		if (cam3D.transform.rotation != Quaternion.identity) {
+			Debug.LogWarning ("The line collider will not be correct if the camera is rotated");
+		}
+		
+		var v3 = new Vector3(0.0f, 0.0f, -cam3D.transform.position.z);
+		int min = (drawStart > minDrawIndex)? minDrawIndex : drawStart;
+		int max = (drawEnd > maxDrawIndex)? drawEnd : maxDrawIndex;
+		
+		if (m_continuous) {
+			var collider = m_vectorObject.GetComponent (typeof(EdgeCollider2D)) as EdgeCollider2D;
+			var path = new Vector2[(max - min) * 4 + 1];
+			
+			int startIdx = 0;
+			int endIdx = path.Length - 2;
+			if (convertToWorldSpace) {
+				for (int i = min*4; i < max*4; i += 4) {
+					v3.x = m_lineVertices[i  ].x; v3.y = m_lineVertices[i  ].y;
+					path[startIdx  ] = cam3D.ScreenToWorldPoint (v3);
+					v3.x = m_lineVertices[i+2].x; v3.y = m_lineVertices[i+2].y;
+					path[startIdx+1] = cam3D.ScreenToWorldPoint (v3);
+					v3.x = m_lineVertices[i+1].x; v3.y = m_lineVertices[i+1].y;
+					path[endIdx  ] = cam3D.ScreenToWorldPoint (v3);
+					v3.x = m_lineVertices[i+3].x; v3.y = m_lineVertices[i+3].y;
+					path[endIdx-1] = cam3D.ScreenToWorldPoint (v3);
+					startIdx += 2;
+					endIdx -= 2;
+				}
+			}
+			else {
+				for (int i = min*4; i < max*4; i += 4) {
+					path[startIdx  ].x = m_lineVertices[i  ].x;	path[startIdx  ].y = m_lineVertices[i  ].y;
+					path[startIdx+1].x = m_lineVertices[i+2].x;	path[startIdx+1].y = m_lineVertices[i+2].y;
+					path[endIdx  ].x = m_lineVertices[i+1].x; 	path[endIdx  ].y = m_lineVertices[i+1].y;
+					path[endIdx-1].x = m_lineVertices[i+3].x;	path[endIdx-1].y = m_lineVertices[i+3].y;
+					startIdx += 2;
+					endIdx -= 2;
+				}
+			}
+			path[path.Length - 1] = path[0];
+			collider.points = path;
+		}
+		else {
+			var collider = m_vectorObject.GetComponent (typeof(PolygonCollider2D)) as PolygonCollider2D;
+			var path = new Vector2[4];
+			collider.pathCount = ((max - min) + 1) / 2;
+
+			int end = (max + 1) / 2 * 4;
+			int pIdx = 0;
+			if (convertToWorldSpace) {
+				for (int i = min / 2 * 4; i < end; i += 4) {
+					v3.x = m_lineVertices[i  ].x; v3.y = m_lineVertices[i  ].y;
+					path[0] = cam3D.ScreenToWorldPoint (v3);
+					v3.x = m_lineVertices[i+1].x; v3.y = m_lineVertices[i+1].y;
+					path[1] = cam3D.ScreenToWorldPoint (v3);
+					v3.x = m_lineVertices[i+3].x; v3.y = m_lineVertices[i+3].y;
+					path[2] = cam3D.ScreenToWorldPoint (v3);
+					v3.x = m_lineVertices[i+2].x; v3.y = m_lineVertices[i+2].y;
+					path[3] = cam3D.ScreenToWorldPoint (v3);
+					collider.SetPath (pIdx++, path);
+				}
+			}
+			else {
+				for (int i = min / 2 * 4; i < end; i += 4) {					
+					path[0].x = m_lineVertices[i  ].x; path[0].y = m_lineVertices[i  ].y;
+					path[1].x = m_lineVertices[i+1].x; path[1].y = m_lineVertices[i+1].y;
+					path[2].x = m_lineVertices[i+3].x; path[2].y = m_lineVertices[i+3].y;
+					path[3].x = m_lineVertices[i+2].x; path[3].y = m_lineVertices[i+2].y;
+					collider.SetPath (pIdx++, path);
+				}
+			}
+		}
+	}
+#endif
 	
 	public static void SetDepth (Transform thisTransform, int depth) {
 		depth = Mathf.Clamp(depth, 0, 100);
@@ -3000,6 +2919,23 @@ public class VectorLine {
 	}
 	
 	public static void Destroy (ref VectorLine line) {
+		DestroyLine (ref line);
+	}
+
+	public static void Destroy (VectorLine[] lines) {
+		for (int i = 0; i < lines.Length; i++) {
+			DestroyLine (ref lines[i]);
+		}
+	}
+
+	public static void Destroy (List<VectorLine> lines) {
+		for (int i = 0; i < lines.Count; i++) {
+			var line = lines[i];
+			DestroyLine (ref line);
+		}
+	}
+	
+	private static void DestroyLine (ref VectorLine line) {
 		if (line != null) {
 			Object.Destroy (line.m_mesh);
 			Object.Destroy (line.m_meshFilter);
@@ -3012,6 +2948,23 @@ public class VectorLine {
 	}
 
 	public static void Destroy (ref VectorPoints line) {
+		DestroyPoints (ref line);
+	}
+
+	public static void Destroy (VectorPoints[] lines) {
+		for (int i = 0; i < lines.Length; i++) {
+			DestroyPoints (ref lines[i]);
+		}
+	}
+
+	public static void Destroy (List<VectorPoints> lines) {
+		for (int i = 0; i < lines.Count; i++) {
+			var line = lines[i];
+			DestroyPoints (ref line);
+		}
+	}
+
+	private static void DestroyPoints (ref VectorPoints line) {
 		if (line != null) {
 			Object.Destroy (line.m_mesh);
 			Object.Destroy (line.m_meshFilter);
@@ -3473,18 +3426,67 @@ public class VectorLine {
 	}
 
 	private static Vector2 GetSplinePoint (ref Vector2 p0, ref Vector2 p1, ref Vector2 p2, ref Vector2 p3, float t) {
-		float t2 = t*t;
-		float t3 = t2*t;
-		return new Vector2 (0.5f * ((2.0f*p1.x) + (-p0.x + p2.x)*t + (2.0f*p0.x - 5.0f*p1.x + 4.0f*p2.x - p3.x)*t2 + (-p0.x + 3.0f*p1.x- 3.0f*p2.x + p3.x)*t3),
-							0.5f * ((2.0f*p1.y) + (-p0.y + p2.y)*t + (2.0f*p0.y - 5.0f*p1.y + 4.0f*p2.y - p3.y)*t2 + (-p0.y + 3.0f*p1.y- 3.0f*p2.y + p3.y)*t3));
+		var px = Vector4.zero;
+		var py = Vector4.zero;
+		float dt0 = Mathf.Pow (VectorDistanceSquared (ref p0, ref p1), 0.25f);
+		float dt1 = Mathf.Pow (VectorDistanceSquared (ref p1, ref p2), 0.25f);
+		float dt2 = Mathf.Pow (VectorDistanceSquared (ref p2, ref p3), 0.25f);
+		
+		if (dt1 < 0.0001f) dt1 = 1.0f;
+		if (dt0 < 0.0001f) dt0 = dt1;
+		if (dt2 < 0.0001f) dt2 = dt1;
+		
+		InitNonuniformCatmullRom (p0.x, p1.x, p2.x, p3.x, dt0, dt1, dt2, ref px);
+		InitNonuniformCatmullRom (p0.y, p1.y, p2.y, p3.y, dt0, dt1, dt2, ref py);
+		
+		return new Vector2(EvalCubicPoly (ref px, t), EvalCubicPoly (ref py, t));
+	}
+
+	private static Vector3 GetSplinePoint3D (ref Vector3 p0, ref Vector3 p1, ref Vector3 p2, ref Vector3 p3, float t) {
+		var px = Vector4.zero;
+		var py = Vector4.zero;
+		var pz = Vector4.zero;
+		float dt0 = Mathf.Pow (VectorDistanceSquared (ref p0, ref p1), 0.25f);
+		float dt1 = Mathf.Pow (VectorDistanceSquared (ref p1, ref p2), 0.25f);
+		float dt2 = Mathf.Pow (VectorDistanceSquared (ref p2, ref p3), 0.25f);
+		
+		if (dt1 < 0.0001f) dt1 = 1.0f;
+		if (dt0 < 0.0001f) dt0 = dt1;
+		if (dt2 < 0.0001f) dt2 = dt1;
+		
+		InitNonuniformCatmullRom (p0.x, p1.x, p2.x, p3.x, dt0, dt1, dt2, ref px);
+		InitNonuniformCatmullRom (p0.y, p1.y, p2.y, p3.y, dt0, dt1, dt2, ref py);
+		InitNonuniformCatmullRom (p0.z, p1.z, p2.z, p3.z, dt0, dt1, dt2, ref pz);
+		
+		return new Vector3(EvalCubicPoly (ref px, t), EvalCubicPoly (ref py, t), EvalCubicPoly (ref pz, t));
 	}
 	
-	private static Vector3 GetSplinePoint3D (ref Vector3 p0, ref Vector3 p1, ref Vector3 p2, ref Vector3 p3, float t) {
-		float t2 = t*t;
-		float t3 = t2*t;
-		return new Vector3 (0.5f * ((2.0f*p1.x) + (-p0.x + p2.x)*t + (2.0f*p0.x - 5.0f*p1.x + 4.0f*p2.x - p3.x)*t2 + (-p0.x + 3.0f*p1.x- 3.0f*p2.x + p3.x)*t3),
-							0.5f * ((2.0f*p1.y) + (-p0.y + p2.y)*t + (2.0f*p0.y - 5.0f*p1.y + 4.0f*p2.y - p3.y)*t2 + (-p0.y + 3.0f*p1.y- 3.0f*p2.y + p3.y)*t3),
-							0.5f * ((2.0f*p1.z) + (-p0.z + p2.z)*t + (2.0f*p0.z - 5.0f*p1.z + 4.0f*p2.z - p3.z)*t2 + (-p0.z + 3.0f*p1.z- 3.0f*p2.z + p3.z)*t3));
+	private static float VectorDistanceSquared (ref Vector2 p, ref Vector2 q) {
+		float dx = q.x - p.x;
+		float dy = q.y - p.y;
+		return dx*dx + dy*dy;
+	}
+
+	private static float VectorDistanceSquared (ref Vector3 p, ref Vector3 q) {
+		float dx = q.x - p.x;
+		float dy = q.y - p.y;
+		float dz = q.z - p.z;
+		return dx*dx + dy*dy + dz*dz;
+	}
+	
+	private static void InitNonuniformCatmullRom (float x0, float x1, float x2, float x3, float dt0, float dt1, float dt2, ref Vector4 p) {
+		float t1 = ((x1 - x0) / dt0 - (x2 - x0) / (dt0 + dt1) + (x2 - x1) / dt1) * dt1;
+		float t2 = ((x2 - x1) / dt1 - (x3 - x1) / (dt1 + dt2) + (x3 - x2) / dt2) * dt1;
+		
+		// Initialize cubic poly
+		p.x = x1;
+		p.y = t1;
+		p.z = -3*x1 + 3*x2 - 2*t1 - t2;
+		p.w = 2*x1 - 2*x2 + t1 + t2;
+	}
+	
+	private static float EvalCubicPoly (ref Vector4 p, float t) {
+		return p.x + p.y*t + p.z*(t*t) + p.w*(t*t*t);
 	}
 	
 	public void MakeText (string text, Vector3 startPos, float size) {
@@ -3501,7 +3503,7 @@ public class VectorLine {
 	
 	public void MakeText (string text, Vector3 startPos, float size, float charSpacing, float lineSpacing, bool uppercaseOnly) {
 		if (m_continuous) {
-			LogError ("VectorLine.MakeText can only be used with a discrete line");
+			LogError ("VectorLine.MakeText only works with a discrete line");
 			return;
 		}
 		int charPointsLength = 0;
@@ -3721,78 +3723,116 @@ public class VectorLine {
 	}
 
 	public Vector2 GetPoint01 (float distance) {
-		return GetPoint (Mathf.Lerp(0.0f, GetLength(), distance) );
+		int index;
+		return GetPoint (Mathf.Lerp(0.0f, GetLength(), distance), out index);
+	}
+
+	public Vector2 GetPoint01 (float distance, out int index) {
+		return GetPoint (Mathf.Lerp(0.0f, GetLength(), distance), out index);
 	}
 
 	public Vector2 GetPoint (float distance) {
+		int index;
+		return GetPoint (distance, out index);
+	}
+
+	public Vector2 GetPoint (float distance, out int index) {
 		if (!m_is2D) {
 			LogError ("VectorLine.GetPoint only works with Vector2 points");
+			index = 0;
 			return Vector2.zero;
 		}
 		if (points2.Length < 2) {
 			LogError ("VectorLine.GetPoint needs at least 2 points in the points2 array");
+			index = 0;
 			return Vector2.zero;
 		}
-		if (m_distances == null) {
-			SetDistances();
-		}
-		int i = m_drawStart + 1;
-		if (!m_continuous) {
-			i++;
-			i /= 2;
-		}
-		if (i >= m_distances.Length) {
-			i = m_distances.Length - 1;
-		}
-		int end = m_continuous? m_drawEnd : (m_drawEnd + 1) / 2;
-		while (distance > m_distances[i] && i < end) {
-			i++;
-		}
+		
+		SetDistanceIndex (out index, distance);
+		Vector2 point;
 		if (m_continuous) {
-			return Vector2.Lerp(points2[i-1], points2[i], Mathf.InverseLerp(m_distances[i-1], m_distances[i], distance));
+			point = Vector2.Lerp(points2[index-1], points2[index], Mathf.InverseLerp(m_distances[index-1], m_distances[index], distance));
 		}
-		return Vector2.Lerp(points2[(i-1)*2], points2[(i-1)*2+1], Mathf.InverseLerp(m_distances[i-1], m_distances[i], distance));
+		else {
+			point = Vector2.Lerp(points2[(index-1)*2], points2[(index-1)*2+1], Mathf.InverseLerp(m_distances[index-1], m_distances[index], distance));
+		}
+		if (m_useTransform) {
+			point += new Vector2(m_useTransform.position.x, m_useTransform.position.y);
+		}
+		index--;
+		return point;
 	}
 
 	public Vector3 GetPoint3D01 (float distance) {
-		return GetPoint3D (Mathf.Lerp(0.0f, GetLength(), distance) );
+		int index;
+		return GetPoint3D (Mathf.Lerp(0.0f, GetLength(), distance), out index);
+	}
+
+	public Vector3 GetPoint3D01 (float distance, out int index) {
+		return GetPoint3D (Mathf.Lerp(0.0f, GetLength(), distance), out index);
+	}
+
+	public Vector3 GetPoint3D (float distance) {
+		int index;
+		return GetPoint3D (distance, out index);
 	}
 	
-	public Vector3 GetPoint3D (float distance) {
+	public Vector3 GetPoint3D (float distance, out int index) {
 		if (m_is2D) {
 			LogError ("VectorLine.GetPoint3D only works with Vector3 points");
+			index = 0;
 			return Vector3.zero;
 		}
 		if (points3.Length < 2) {
 			LogError ("VectorLine.GetPoint3D needs at least 2 points in the points3 array");
+			index = 0;
 			return Vector3.zero;
 		}
+		
+		SetDistanceIndex (out index, distance);
+		Vector3 point;
+		if (m_continuous) {
+			point = Vector3.Lerp (points3[index-1], points3[index], Mathf.InverseLerp (m_distances[index-1], m_distances[index], distance));			
+		}
+		else {
+			point = Vector3.Lerp (points3[(index-1)*2], points3[(index-1)*2+1], Mathf.InverseLerp (m_distances[index-1], m_distances[index], distance));
+		}
+		if (m_useTransform) {
+			point += m_useTransform.position;
+		}
+		index--;
+		return point;
+	}
+	
+	void SetDistanceIndex (out int i, float distance) {
 		if (m_distances == null) {
 			SetDistances();
 		}
-		int i = m_drawStart + 1;
+		i = (m_minDrawIndex > m_drawStart)? m_minDrawIndex + 1 : m_drawStart + 1;
 		if (!m_continuous) {
-			i++;
-			i /= 2;
+			i = (i + 1) / 2;
 		}
 		if (i >= m_distances.Length) {
 			i = m_distances.Length - 1;
 		}
-		int end = m_continuous? m_drawEnd : (m_drawEnd + 1) / 2;
+		int end = (m_maxDrawIndex < m_drawEnd)? m_maxDrawIndex : m_drawEnd;
+		if (!m_continuous) {
+			end = (end + 1) / 2;
+		}
 		while (distance > m_distances[i] && i < end) {
 			i++;
 		}
-		if (m_continuous) {
-			return Vector3.Lerp (points3[i-1], points3[i], Mathf.InverseLerp (m_distances[i-1], m_distances[i], distance));			
-		}
-		return Vector3.Lerp (points3[(i-1)*2], points3[(i-1)*2+1], Mathf.InverseLerp (m_distances[i-1], m_distances[i], distance));
 	}
 
 	public static void SetEndCap (string name, EndCap capType) {
-		SetEndCap (name, capType, null, null);
+		SetEndCap (name, capType, null, 0.0f, null);
+	}
+
+	public static void SetEndCap (string name, EndCap capType, Material material, params Texture2D[] textures) {
+		SetEndCap (name, capType, material, 0.0f, textures);
 	}
 	
-	public static void SetEndCap (string name, EndCap capType, Material material, params Texture2D[] textures) {
+	public static void SetEndCap (string name, EndCap capType, Material material, float offset, params Texture2D[] textures) {
 		if (capDictionary == null) {
 			capDictionary = new Dictionary<string, CapInfo>();
 		}
@@ -3874,7 +3914,7 @@ public class VectorLine {
 		capMaterial.name = material.name + " EndCap";
 		capMaterial.mainTexture = tex;
 		
-		capDictionary.Add (name, new CapInfo(capType, capMaterial, tex, ratio1, ratio2));
+		capDictionary.Add (name, new CapInfo(capType, capMaterial, tex, ratio1, ratio2, offset));
 	}
 	
 	public static void RemoveEndCap (string name) {
@@ -3917,14 +3957,14 @@ public class VectorLine {
 	
 	private void ZeroVertices (int startIndex, int endIndex) {
 		var v3zero = Vector3.zero;
-#if !UNITY_3
+		
 		if (m_1pixelLine) {
 			for (int i = startIndex; i < endIndex; i++) {
 				m_lineVertices[i] = v3zero;
 			}
 			return;
 		}
-#endif
+		
 		if (m_continuous) {
 			startIndex *= 4;
 			endIndex *= 4;
@@ -3960,9 +4000,17 @@ public class VectorLine {
 	public bool Selected (Vector2 p, int extraDistance, out int index) {
 		int wAdd = m_lineWidths.Length == 1? 0 : 1;
 		int wIdx = m_continuous? m_drawStart - wAdd : m_drawStart/2 - wAdd;
+		if (m_lineWidths.Length == 1) {
+			wAdd = 0;
+			wIdx = 0;
+		}
+		else {
+			wAdd = 1;
+		}
 		int end = m_drawEnd;
-		var useTransformMatrix = (m_useTransform == null)? false : true;
+		var useTransformMatrix = (m_useTransform != null);
 		var thisMatrix = useTransformMatrix? m_useTransform.localToWorldMatrix : Matrix4x4.identity;
+		var scaleFactor = new Vector2(Screen.width, Screen.height);
 		
 		if (m_isPoints) {
 			if (end == pointsLength) {
@@ -3974,11 +4022,10 @@ public class VectorLine {
 				for (int i = m_drawStart; i <= end; i++) {
 					wIdx += wAdd;
 					float size = m_lineWidths[wIdx] + extraDistance;
-					if (useTransformMatrix) {
-						thisPoint = thisMatrix.MultiplyPoint3x4 (points2[i]);
-					}
-					else {
-						thisPoint = points2[i];
+					thisPoint = useTransformMatrix? (Vector2)thisMatrix.MultiplyPoint3x4 (points2[i]) : points2[i];
+					if (useViewportCoords) {
+						thisPoint.x *= scaleFactor.x;
+						thisPoint.y *= scaleFactor.y;
 					}
 					if (p.x >= thisPoint.x - size && p.x <= thisPoint.x + size && p.y >= thisPoint.y - size && p.y <= thisPoint.y + size) {
 						index = i;
@@ -4022,6 +4069,12 @@ public class VectorLine {
 				else {
 					p1 = points2[i];
 					p2 = points2[i+1];
+				}
+				if (useViewportCoords) {
+					p1.x *= scaleFactor.x;
+					p1.y *= scaleFactor.y;
+					p2.x *= scaleFactor.x;
+					p2.y *= scaleFactor.y;
 				}
 				
 				// Do nothing if the point is beyond the line segment end points
@@ -4080,19 +4133,15 @@ public class VectorLine {
 	}
 	
 	bool Approximately2 (Vector2 p1, Vector2 p2) {
-		return Approximately(p1.x, p2.x) && Approximately(p1.y, p2.y);
+		return Approximately (p1.x, p2.x) && Approximately (p1.y, p2.y);
 	}
 
 	bool Approximately3 (Vector3 p1, Vector3 p2) {
-		return Approximately(p1.x, p2.x) && Approximately(p1.y, p2.y) && Approximately(p1.z, p2.z);
+		return Approximately (p1.x, p2.x) && Approximately (p1.y, p2.y) && Approximately (p1.z, p2.z);
 	}
 	
 	bool Approximately (float a, float b) {
-		return Mathf.Round(a*100)/100 == Mathf.Round(b*100)/100;
-	}
-	
-	public static string Version () {
-		return "Vectrosity version 2.3";
+		return Mathf.Round (a*100)/100 == Mathf.Round (b*100)/100;
 	}
 }
 
@@ -4121,13 +4170,15 @@ public class CapInfo {
 	public Texture2D texture;
 	public float ratio1;
 	public float ratio2;
+	public float offset;
 	
-	public CapInfo (EndCap capType, Material material, Texture2D texture, float ratio1, float ratio2) {
+	public CapInfo (EndCap capType, Material material, Texture2D texture, float ratio1, float ratio2, float offset) {
 		this.capType = capType;
 		this.material = material;
 		this.texture = texture;
 		this.ratio1 = ratio1;
 		this.ratio2 = ratio2;
+		this.offset = offset;
 	}
 }
 

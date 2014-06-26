@@ -1,20 +1,37 @@
+#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2 || UNITY_3_5 || UNITY_3_4 || UNITY_3_3
+#define UNITY_LE_4_3
+#endif
+
+#if !UNITY_3_5 && !UNITY_3_4 && !UNITY_3_3
+#define UNITY_4
+#endif
+
 using UnityEngine;
 using UnityEditor;
 using System.Collections;
+using Pathfinding;
 
 [CustomEditor(typeof(SimpleSmoothModifier))]
 public class SmoothModifierEditor : Editor {
 
 	public override void OnInspectorGUI () {
-		
+
+#if UNITY_LE_4_3
 		EditorGUI.indentLevel = 1;
-		
+#else
+		EditorGUI.indentLevel = 0;
+#endif
+
 		SimpleSmoothModifier ob = target as SimpleSmoothModifier;
 		
 		ob.smoothType = (SimpleSmoothModifier.SmoothType)EditorGUILayout.EnumPopup (new GUIContent ("Smooth Type"),ob.smoothType);
-		
+
+#if UNITY_LE_4_3
 		EditorGUIUtility.LookLikeInspector ();
-		
+#else
+		Undo.RecordObject (ob, "changed settings on Simple Smooth Modifier");
+#endif
+
 		if (ob.smoothType == SimpleSmoothModifier.SmoothType.Simple) {
 			
 			ob.uniformLength = EditorGUILayout.Toggle (new GUIContent ("Uniform Segment Length","Toggle to divide all lines in equal length segments"),ob.uniformLength);
@@ -61,5 +78,9 @@ public class SmoothModifierEditor : Editor {
 		GUI.color *= new Color (1,1,1,0.5F);
 		ob.Priority = EditorGUILayout.IntField (new GUIContent ("Priority","Higher priority modifiers are executed first\nAdjust this in Seeker-->Modifier Priorities"),ob.Priority);
 		GUI.color = preCol;
+
+		if ( ob.gameObject.GetComponent<Seeker> () == null ) {
+			EditorGUILayout.HelpBox ("No seeker found, modifiers are usually used together with a Seeker component", MessageType.Warning );
+		}
 	}
 }

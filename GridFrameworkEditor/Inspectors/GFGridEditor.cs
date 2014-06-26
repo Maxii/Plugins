@@ -65,6 +65,7 @@ public abstract class GFGridEditor : Editor {
 		
 		grid.useSeparateRenderColor = EditorGUILayout.Foldout(grid.useSeparateRenderColor, "Use Separate Render Color");
 		if(grid.useSeparateRenderColor){
+			GUILayout.Label("Render Axis Colors");
 			EditorGUILayout.BeginHorizontal();
 			++EditorGUI.indentLevel;
 			grid.renderAxisColors.x = EditorGUILayout.ColorField(grid.renderAxisColors.x);
@@ -81,17 +82,17 @@ public abstract class GFGridEditor : Editor {
 		if(showDrawSettings){
 			grid.renderGrid = EditorGUILayout.Toggle("Render Grid", grid.renderGrid);
 			
-			grid.useCustomRenderRange = EditorGUILayout.Foldout(grid.useCustomRenderRange, "Custom Rendering Range");
+			grid.useCustomRenderRange = EditorGUILayout.Foldout(grid.useCustomRenderRange, "Use Custom Render Range");
 			if(grid.useCustomRenderRange){
 				grid.renderFrom = EditorGUILayout.Vector3Field("Render From", grid.renderFrom);
 				grid.renderTo = EditorGUILayout.Vector3Field("Render To", grid.renderTo);
 			}
 			
 			grid.renderMaterial = (Material) EditorGUILayout.ObjectField("Render Material", grid.renderMaterial, typeof(Material), false);
-			grid.renderLineWidth = EditorGUILayout.IntField("Rendered Line Width", grid.renderLineWidth);
+			grid.renderLineWidth = EditorGUILayout.IntField("Render Line Width", grid.renderLineWidth);
 			
-			grid.hideGrid = EditorGUILayout.Toggle("Hide Drawing", grid.hideGrid);
-			grid.hideOnPlay = EditorGUILayout.Toggle("Hide While playing", grid.hideOnPlay);
+			grid.hideGrid = EditorGUILayout.Toggle("Hide Grid", grid.hideGrid);
+			grid.hideOnPlay = EditorGUILayout.Toggle("Hide On Play", grid.hideOnPlay);
 			++EditorGUI.indentLevel;
 			GUILayout.Label("Hide Axis (Render & Draw)");
 			grid.hideAxis.x = EditorGUILayout.Toggle("X", grid.hideAxis.x);

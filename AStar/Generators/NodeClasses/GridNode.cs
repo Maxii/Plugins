@@ -1,342 +1,311 @@
 //#define ASTAR_NoTagPenalty
+#define ASTAR_GRID_CUSTOM_CONNECTIONS //Disabling this will reduce memory usage and improve performance slightly but you will not be able to add custom connections to grid nodes using e.g the NodeLink component.
+
 using System;
 using Pathfinding;
 using System.Collections.Generic;
+using Pathfinding.Serialization;
+using UnityEngine;
 
-namespace Pathfinding.Nodes
-{
-	public class GridNode : Node {
+namespace Pathfinding {
+	public class GridNode : GraphNode
+	{
+
+		public GridNode (AstarPath astar) : base (astar) {
+		}
+
+		private static GridGraph[] _gridGraphs = new GridGraph[0];
+		public static GridGraph GetGridGraph (uint graphIndex) { return _gridGraphs[(int)graphIndex]; }
+
 		
-		//Flags used
-		//last 8 bits - see Node class
-		//First 8 bits for connectivity info inside this grid
-		
-		//Size = [Node, 28 bytes] + 4 = 32 bytes
-		
-		/** First 24 bits used for the index value of this node in the graph specified by the last 8 bits. \see #gridGraphs */
-		protected int indices;
-		
-		/** Internal list of grid graphs.
-		 * Used for fast typesafe lookup of graphs.
-		 */
-		public static GridGraph[] gridGraphs;
-		
-		/** Returns if this node has any valid grid connections */
-		public bool HasAnyGridConnections () {
-			return (flags & 0xFF) != 0;
+		public static void SetGridGraph (int graphIndex, GridGraph graph) {
+			if (_gridGraphs.Length <= graphIndex) {
+				GridGraph[] gg = new GridGraph[graphIndex+1];
+				for (int i=0;i<_gridGraphs.Length;i++) gg[i] = _gridGraphs[i];
+				_gridGraphs = gg;
+			}
+			
+			_gridGraphs[graphIndex] = graph;
 		}
 		
-		/** Has connection to neighbour \a i.
-		 * The neighbours are the up to 8 grid neighbours of this node.
-		 * \see SetConnection
-		 */
-		public bool GetConnection (int i) {
-			return ((flags >> i) & 1) == 1;
+		// Fallback
+		
+		[System.ObsoleteAttribute ("This method has been deprecated. Please use NodeInGridIndex instead.", true)]
+		public int GetIndex () { return 0; }
+		
+		// end fallback
+		
+		protected int nodeInGridIndex;
+		protected ushort gridFlags;
+		
+		const int GridFlagsConnectionOffset = 0;
+		const int GridFlagsConnectionBit0 = 1 << GridFlagsConnectionOffset;
+		const int GridFlagsConnectionMask = 0xFF << GridFlagsConnectionOffset;
+		
+		const int GridFlagsWalkableErosionOffset = 8;
+		const int GridFlagsWalkableErosionMask = 1 << GridFlagsWalkableErosionOffset;
+		
+		const int GridFlagsWalkableTmpOffset = 9;
+		const int GridFlagsWalkableTmpMask = 1 << GridFlagsWalkableTmpOffset;
+		
+		const int GridFlagsEdgeNodeOffset = 10;
+		const int GridFlagsEdgeNodeMask = 1 << GridFlagsEdgeNodeOffset;
+		
+		/** Returns true if the node has a connection in the specified direction.
+		 * The dir parameter corresponds to directions in the grid as:
+		 \code
+[0] = -Y
+[1] = +X
+[2] = +Y
+[3] = -X
+[4] = -Y+X
+[5] = +Y+X
+[6] = +Y-X
+[7] = -Y-X
+		\endcode
+
+		* \see SetConnectionInternal
+		*/
+		public bool GetConnectionInternal (int dir) {
+			return (gridFlags >> dir & GridFlagsConnectionBit0) != 0;
 		}
 		
-		/** Set connection to neighbour \a i.
-		 * \param i Connection to set [0...7]
-		 * \param value 1 or 0 (true/false)
-		 * The neighbours are the up to 8 grid neighbours of this node
-		 * \see GetConnection
-		 */
-		public void SetConnection (int i, int value) {
-			flags = flags & ~(1 << i) | (value << i);
+		/** Enables or disables a connection in a specified direction on the graph.
+		 *	\see GetConnectionInternal
+		*/
+		public void SetConnectionInternal (int dir, bool value) {
+			unchecked { gridFlags = (ushort)(gridFlags & ~((ushort)1 << GridFlagsConnectionOffset << dir) | (value ? (ushort)1 : (ushort)0) << GridFlagsConnectionOffset << dir); }
 		}
 		
-		/** Sets a connection without clearing the previous value.
-		 * Faster if you are setting all connections at once and have cleared the value before calling this function
-		 * \see SetConnection */
-		public void SetConnectionRaw (int i, int value) {
-			flags = flags | (value << i);
+		/** Disables all grid connections from this node.
+		 * \note Other nodes might still be able to get to this node. Therefore it is recommended to also disable the relevant connections on adjacent nodes.
+		*/
+		public void ResetConnectionsInternal () {
+			unchecked {
+				gridFlags = (ushort)(gridFlags & ~GridFlagsConnectionMask);
+			}
 		}
 		
-		/** Returns index of which GridGraph this node is contained in */
-		public int GetGridIndex () {
-			return indices >> 24;
+		public bool EdgeNode {
+			get {
+				return (gridFlags & GridFlagsEdgeNodeMask) != 0;
+			}
+			set {
+				unchecked { gridFlags = (ushort)(gridFlags & ~GridFlagsEdgeNodeMask | (value ? GridFlagsEdgeNodeMask : 0)); }
+			}
 		}
 		
-		/** Returns the grid index in the graph */
-		public int GetIndex () {
-			return indices & 0xFFFFFF;
-		}
-		
-		/** Set the grid index in the graph */
-		public void SetIndex (int i) {
-			indices &= ~0xFFFFFF;
-			indices |= i;
-		}
-		
-		/** Sets the index of which GridGraph this node is contained in.
-		 * Only changes lookup variables, does not actually move the node to another graph.
-		 */
-		public void SetGridIndex (int gridIndex) {
-			indices &= 0xFFFFFF;
-			indices |= gridIndex << 24;
-		}
-		
-		/** Returns if walkable before erosion.
-		  * Identical to Pathfinding.Node.Bit15 but should be used when possible to make the code more readable */
+		/** Stores walkability before erosion is applied.
+		  * Used by graph updating.
+		*/
 		public bool WalkableErosion {
-			get { return Bit15; }//return ((flags >> 15) & 1) != 0 ? true : false; }
-			set { Bit15 = value; }//flags = (flags & ~(1 << 15)) | (value?1:0 << 15); }
+			get {
+				return (gridFlags & GridFlagsWalkableErosionMask) != 0;
+			}
+			set {
+				unchecked { gridFlags = (ushort)(gridFlags & ~GridFlagsWalkableErosionMask | (value ? (ushort)GridFlagsWalkableErosionMask : (ushort)0)); }
+			}
 		}
 		
-		/*public override bool ContainsConnection (Node node, Path p) {
-			if (!node.IsWalkable (p)) {
-				return false;
+		/** Temporary variable used by graph updating */
+		public bool TmpWalkable {
+			get {
+				return (gridFlags & GridFlagsWalkableTmpMask) != 0;
 			}
-			
-			if (connections != null) {
-				for (int i=0;i<connections.Length;i++) {
-					if (connections[i] == node) {
-						return true;
-					}
-				}
+			set {
+				unchecked { gridFlags = (ushort)(gridFlags & ~GridFlagsWalkableTmpMask | (value ? (ushort)GridFlagsWalkableTmpMask : (ushort)0)); }
 			}
-			
-			int index = indices & 0xFFFFFF;
-			
-			int[] neighbourOffsets = gridGraphs[indices >> 24].neighbourOffsets;
-			GridNode[] nodes = gridGraphs[indices >> 24].nodes;
-			
-			for (int i=0;i<8;i++) {
-				if (((flags >> i) & 1) == 1) {
-					
-					Node other = nodes[index+neighbourOffsets[i]];
-					if (other == node) {
-						return true;
-					}
-				}
-			}
-			return false;
-		}*/
+		}
 		
-		/** Updates the grid connections of this node and it's neighbour nodes to reflect walkability of this node */
-		public void UpdateGridConnections () {
-			
-			GridGraph graph = gridGraphs[indices >> 24];
-			
-			int index = GetIndex();
-			
-			int x = index % graph.width;
-			int z = index/graph.width;
-			graph.CalculateConnections (graph.nodes, x, z, this);
-			
-			int[] neighbourOffsets = graph.neighbourOffsets;
-			int[] neighbourOffsetsX = graph.neighbourXOffsets;
-			int[] neighbourOffsetsZ = graph.neighbourZOffsets;
-			
-			//Loop through neighbours
-			for (int i=0;i<8;i++) {
-				//Find the coordinates for the neighbour
-				int nx = x+neighbourOffsetsX[i];
-				int nz = z+neighbourOffsetsZ[i];
-				
-				//Make sure it is not out of bounds
-				if (nx < 0 || nz < 0 || nx >= graph.width || nz >= graph.depth) {
-					continue;
+		/** The index of the node in the grid.
+		 * This is z*graphWidth + x.
+		 * So you can get the X and Z indices using
+		 * \begincode
+		 * int index = node.NodeInGridIndex;
+		 * int x = index % graph.width;
+		 * int z = index / graph.width;
+		 * // where graph is GridNode.GetGridGraph (node.graphIndex), i.e the graph the nodes are contained in.
+		 * \endcode
+		 */
+		public int NodeInGridIndex { get { return nodeInGridIndex;} set { nodeInGridIndex = value; }}
+		
+		public override void ClearConnections (bool alsoReverse) {
+			if (alsoReverse) {
+				GridGraph gg = GetGridGraph (GraphIndex);
+				for (int i=0;i<8;i++) {
+					GridNode other = gg.GetNodeConnection (this,i);
+					if (other != null) {
+						//Remove reverse connection
+						other.SetConnectionInternal(i < 4 ? ((i + 2) % 4) : (((5-2) % 4) + 4),false);
+					}
 				}
 				
-				GridNode node = (GridNode)graph.nodes[index+neighbourOffsets[i]];
-				
-				//Calculate connections for neighbour
-				graph.CalculateConnections (graph.nodes, nx, nz, node);
 			}
 			
-		}	
-
-		/** Removes a connection from the node.
-		 * This can be a standard connection or a grid connection
-		 * \returns True if a connection was removed, false otherwsie */
-		public override bool RemoveConnection (Node node) {
+			ResetConnectionsInternal ();
 			
-			bool standard = base.RemoveConnection (node);
+		}
+		
+		public override void GetConnections (GraphNodeDelegate del)
+		{
 			
-			GridGraph graph = gridGraphs[indices >> 24];
-			
-			int index = indices & 0xFFFFFF;
-			
-			int x = index % graph.width;
-			int z = index/graph.width;
-			graph.CalculateConnections (graph.nodes, x, z, this);
-			
-			int[] neighbourOffsets = graph.neighbourOffsets;
-			int[] neighbourOffsetsX = graph.neighbourXOffsets;
-			int[] neighbourOffsetsZ = graph.neighbourZOffsets;
+			GridGraph gg = GetGridGraph (GraphIndex);
+			int[] neighbourOffsets = gg.neighbourOffsets;
+			GridNode[] nodes = gg.nodes;
 			
 			for (int i=0;i<8;i++) {
-				
-				int nx = x+neighbourOffsetsX[i];
-				int nz = z+neighbourOffsetsZ[i];
-				
-				if (nx < 0 || nz < 0 || nx >= graph.width || nz >= graph.depth) {
-					continue;
+				if (GetConnectionInternal(i)) {
+					GridNode other = nodes[nodeInGridIndex + neighbourOffsets[i]];
+					if (other != null) del (other);
 				}
-				
-				GridNode gNode = (GridNode)graph.nodes[index+neighbourOffsets[i]];
-				if (gNode == node) {
-					SetConnection (i,0);
+			}
+			
+		}
+		
+		public override bool GetPortal (GraphNode other, List<Vector3> left, List<Vector3> right, bool backwards)
+		{
+			if (backwards) return true;
+			
+			GridGraph gg = GetGridGraph (GraphIndex);
+			int[] neighbourOffsets = gg.neighbourOffsets;
+			GridNode[] nodes = gg.nodes;
+			
+			for (int i=0;i<4;i++) {
+				if (GetConnectionInternal(i) && other == nodes[nodeInGridIndex + neighbourOffsets[i]]) {
+					Vector3 middle = ((Vector3)(position + other.position))*0.5f;
+					Vector3 cross = Vector3.Cross (gg.collision.up, (Vector3)(other.position-position));
+					cross.Normalize();
+					cross *= gg.nodeSize*0.5f;
+					left.Add (middle - cross);
+					right.Add (middle + cross);
 					return true;
 				}
 			}
-			return standard;
+			
+			for (int i=4;i<8;i++) {
+				if (GetConnectionInternal(i) && other == nodes[nodeInGridIndex + neighbourOffsets[i]]) {
+					bool rClear = false;
+					bool lClear = false;
+					if (GetConnectionInternal(i-4)) {
+						GridNode n2 = nodes[nodeInGridIndex + neighbourOffsets[i-4]];
+						if (n2.Walkable && n2.GetConnectionInternal((i-4+1)%4)) {
+							rClear = true;
+						}
+					}
+					
+					if (GetConnectionInternal((i-4+1)%4)) {
+						GridNode n2 = nodes[nodeInGridIndex + neighbourOffsets[(i-4+1)%4]];
+						if (n2.Walkable && n2.GetConnectionInternal(i-4)) {
+							lClear = true;
+						}
+					}
+					
+					Vector3 middle = ((Vector3)(position + other.position))*0.5f;
+					Vector3 cross = Vector3.Cross (gg.collision.up, (Vector3)(other.position-position));
+					cross.Normalize();
+					cross *= gg.nodeSize*1.4142f;
+					left.Add (middle - (lClear ? cross : Vector3.zero));
+					right.Add (middle + (rClear ? cross : Vector3.zero));
+					return true;
+				}
+			}
+			
+			return false;
 		}
 		
-		public override void UpdateConnections () {
-			base.UpdateConnections ();
-			UpdateGridConnections ();
-		}
-		
-		public override	void UpdateAllG (NodeRun nodeR, NodeRunData nodeRunData) {
-			BaseUpdateAllG (nodeR, nodeRunData);
-			
-			int index = GetIndex ();
-			
-			int[] neighbourOffsets = gridGraphs[indices >> 24].neighbourOffsets;
-			Node[] nodes = gridGraphs[indices >> 24].nodes;
+		public override void FloodFill (Stack<GraphNode> stack, uint region) {
+			GridGraph gg = GetGridGraph (GraphIndex);
+			int[] neighbourOffsets = gg.neighbourOffsets;
+			GridNode[] nodes = gg.nodes;
 			
 			for (int i=0;i<8;i++) {
-				if (GetConnection (i)) {
-				//if (((flags >> i) & 1) == 1) {
-					
-					Node node = nodes[index+neighbourOffsets[i]];
-					NodeRun nodeR2 = node.GetNodeRun (nodeRunData);
-					
-					if (nodeR2.parent == nodeR && nodeR2.pathID == nodeRunData.pathID) {
-						node.UpdateAllG (nodeR2,nodeRunData);
+				if (GetConnectionInternal(i)) {
+					GridNode other = nodes[nodeInGridIndex + neighbourOffsets[i]];
+					if (other != null && other.Area != region) {
+						other.Area = region;
+						stack.Push (other);
 					}
 				}
 			}
+			
 		}
 		
-		public override void GetConnections (NodeDelegate callback) {
+		public override void AddConnection (GraphNode node, uint cost) {
+			throw new System.NotImplementedException("GridNodes do not have support for adding manual connections");
+		}
+
+		public override void RemoveConnection (GraphNode node) {
+			throw new System.NotImplementedException("GridNodes do not have support for adding manual connections");
+		}
+		
+		public override void UpdateRecursiveG (Path path, PathNode pathNode, PathHandler handler) {
+			GridGraph gg = GetGridGraph (GraphIndex);
+			int[] neighbourOffsets = gg.neighbourOffsets;
+			GridNode[] nodes = gg.nodes;
 			
-			GetConnectionsBase (callback);
+			UpdateG (path,pathNode);
+			handler.PushNode (pathNode);
 			
-			GridGraph graph = gridGraphs[indices >> 24];
+			ushort pid = handler.PathID;
 			
-			int index = GetIndex ();
-			
-			int[] neighbourOffsets = graph.neighbourOffsets;
-			Node[] nodes = graph.nodes;
-			
-			for (int i=0;i<8;i++) {
-				if (((flags >> i) & 1) == 1) {
-					
-					Node node = nodes[index+neighbourOffsets[i]];
-					
-					callback (node);
+			for (int i=0;i<8;i++) {				
+				if (GetConnectionInternal(i)) {
+					GridNode other = nodes[nodeInGridIndex + neighbourOffsets[i]];
+					PathNode otherPN = handler.GetPathNode (other);
+					if (otherPN.parent == pathNode && otherPN.pathID == pid) other.UpdateRecursiveG (path, otherPN,handler);
 				}
 			}
+			
 		}
 		
-		public override void FloodFill (Stack<Node> stack, int area) {
+		public override void Open (Path path, PathNode pathNode, PathHandler handler) {
 			
-			base.FloodFill (stack,area);
-			
-			GridGraph graph = gridGraphs[indices >> 24];
-			
-			int index = indices & 0xFFFFFF;
-			
-			int[] neighbourOffsets = graph.neighbourOffsets;
-			//int[] neighbourCosts = graph.neighbourCosts;
-			Node[] nodes = graph.nodes;
-			
+			GridGraph gg = GetGridGraph (GraphIndex);
+			int[] neighbourOffsets = gg.neighbourOffsets;
+			uint[] neighbourCosts = gg.neighbourCosts;
+			GridNode[] nodes = gg.nodes;
+			ushort pid = handler.PathID;
+			 
 			for (int i=0;i<8;i++) {
-				if (((flags >> i) & 1) == 1) {
+				if (GetConnectionInternal(i)) {
 					
-					Node node = nodes[index+neighbourOffsets[i]];
+					GridNode other = nodes[nodeInGridIndex + neighbourOffsets[i]];
+					if (!path.CanTraverse (other)) continue;
 					
-					if (node.walkable && node.area != area) {
-						stack.Push (node);
-						node.area = area;
-					}
-				}
-			}
-		}
-		
-		public override int[] InitialOpen (BinaryHeapM open, Int3 targetPosition, Int3 position, Path path, bool doOpen) {
-			
-			if (doOpen) {
-				//Open (open,targetPosition,path);
-			}
-			
-			return base.InitialOpen (open,targetPosition,position,path,doOpen);
-		}
-		
-		
-		public override void Open (NodeRunData nodeRunData, NodeRun nodeR, Int3 targetPosition, Path path) {
-			
-			BaseOpen (nodeRunData, nodeR, targetPosition, path);
-			
-			GridGraph graph = gridGraphs[indices >> 24];
-			
-			int[] neighbourOffsets = graph.neighbourOffsets;
-			int[] neighbourCosts = graph.neighbourCosts;
-			Node[] nodes = graph.nodes;
-			
-			int index = GetIndex ();//indices & 0xFFFFFF;
-			
-			for (int i=0;i<8;i++) {
-				if (GetConnection (i)) {
-				//if (((flags >> i) & 1) == 1) {
+					PathNode otherPN = handler.GetPathNode (other);
 					
-					Node node = nodes[index+neighbourOffsets[i]];
-					
-					if (!path.CanTraverse (node)) continue;
-					
-					NodeRun nodeR2 = node.GetNodeRun (nodeRunData);
-					
-					
-					if (nodeR2.pathID != nodeRunData.pathID) {
+					if (otherPN.pathID != pid) {
+						otherPN.parent = pathNode;
+						otherPN.pathID = pid;
 						
-						nodeR2.parent = nodeR;
-						nodeR2.pathID = nodeRunData.pathID;
+						otherPN.cost = neighbourCosts[i];
 						
-						nodeR2.cost = (uint)neighbourCosts[i];
+						otherPN.H = path.CalculateHScore (other);
+						other.UpdateG (path, otherPN);
 						
-						node.UpdateH (targetPosition,path.heuristic,path.heuristicScale, nodeR2);
-						node.UpdateG (nodeR2,nodeRunData);
-						
-						nodeRunData.open.Add (nodeR2);
-					
+						//Debug.Log ("G " + otherPN.G + " F " + otherPN.F);
+						handler.PushNode (otherPN);
+						//Debug.DrawRay ((Vector3)otherPN.node.Position, Vector3.up,Color.blue);
 					} else {
+						
 						//If not we can test if the path from the current node to this one is a better one then the one already used
-						uint tmpCost = (uint)neighbourCosts[i];//(current.costs == null || current.costs.Length == 0 ? costs[current.neighboursKeys[i]] : current.costs[current.neighboursKeys[i]]);
+						uint tmpCost = neighbourCosts[i];
 						
-						if (nodeR.g+tmpCost+node.penalty
-				+ path.GetTagPenalty(node.tags)
-						  		< nodeR2.g) {
-							nodeR2.cost = tmpCost;
+						if (pathNode.G+tmpCost+path.GetTraversalCost(other) < otherPN.G) {
+							//Debug.Log ("Path better from " + NodeIndex + " to " + otherPN.node.NodeIndex + " " + (pathNode.G+tmpCost+path.GetTraversalCost(other)) + " < " + otherPN.G);
+							otherPN.cost = tmpCost;
 							
-							nodeR2.parent = nodeR;
+							otherPN.parent = pathNode;
 							
-							node.UpdateAllG (nodeR2,nodeRunData);
+							other.UpdateRecursiveG (path,otherPN, handler);
 							
-						}
-						
-						 else if (nodeR2.g+tmpCost+penalty
-				+ path.GetTagPenalty(tags)
-						         < nodeR.g) {//Or if the path from this node ("node") to the current ("current") is better
-							/*bool contains = false;
+						//Or if the path from this node ("other") to the current ("current") is better
+						} else if (otherPN.G+tmpCost+path.GetTraversalCost (this) < pathNode.G) {
+							//Debug.Log ("Path better from " + otherPN.node.NodeIndex + " to " + NodeIndex + " " + (otherPN.G+tmpCost+path.GetTraversalCost (this)) + " < " + pathNode.G);
+							pathNode.parent = otherPN;
+							pathNode.cost = tmpCost;
 							
-							//[Edit, no one-way links between nodes in a single grid] Make sure we don't travel along the wrong direction of a one way link now, make sure the Current node can be accesed from the Node.
-							/*for (int y=0;y<node.connections.Length;y++) {
-								if (node.connections[y].endNode == this) {
-									contains = true;
-									break;
-								}
-							}
-							
-							if (!contains) {
-								continue;
-							}*/
-							
-							nodeR.parent = nodeR2;
-							nodeR.cost = tmpCost;
-							
-							UpdateAllG (nodeR,nodeRunData);
+							UpdateRecursiveG(path, pathNode, handler);
 						}
 					}
 				}
@@ -344,64 +313,19 @@ namespace Pathfinding.Nodes
 			
 		}
 		
-		public static void RemoveGridGraph (GridGraph graph) {
-			if (gridGraphs == null) {
-				return;
-			}
-			
-			for (int i=0;i<gridGraphs.Length;i++) {
-				if (gridGraphs[i] == graph) {
-					if (gridGraphs.Length == 1) {
-						gridGraphs = null;
-						return;
-					}
-					
-						
-					for (int j=i+1;j<gridGraphs.Length;j++) {
-						
-						GridGraph gg = gridGraphs[j];
-						
-						if (gg.nodes != null) {
-							for (int n=0;n<gg.nodes.Length;n++) {
-								if (gg.nodes[n] != null)
-									((GridNode)gg.nodes[n]).SetGridIndex (j-1);
-							}
-						}
-					}
-					
-					GridGraph[] tmp = new GridGraph[gridGraphs.Length-1];
-					for (int j=0;j<i;j++) {
-						tmp[j] = gridGraphs[j];
-					}
-					for (int j=i+1;j<gridGraphs.Length;j++) {
-						tmp[j-1] = gridGraphs[j];
-					}
-					return;
-				}
-			}
+		public override void SerializeNode (GraphSerializationContext ctx) {
+			base.SerializeNode (ctx);
+			ctx.writer.Write (position.x);
+			ctx.writer.Write (position.y);
+			ctx.writer.Write (position.z);
+			ctx.writer.Write (gridFlags);
 		}
 		
-		public static int SetGridGraph (GridGraph graph) {
-			if (gridGraphs == null) {
-				gridGraphs = new GridGraph[1];
-			} else {
-				
-				for (int i=0;i<gridGraphs.Length;i++) {
-					if (gridGraphs[i] == graph) {
-						return i;
-					}
-				}
-				
-				GridGraph[] tmp = new GridGraph[gridGraphs.Length+1];
-				for (int i=0;i<gridGraphs.Length;i++) {
-					tmp[i] = gridGraphs[i];
-				}
-				gridGraphs = tmp;
-			}
-			
-			gridGraphs[gridGraphs.Length-1] = graph;
-			return gridGraphs.Length-1;
+		public override void DeserializeNode (GraphSerializationContext ctx)
+		{
+			base.DeserializeNode (ctx);
+			position = new Int3(ctx.reader.ReadInt32(), ctx.reader.ReadInt32(), ctx.reader.ReadInt32());
+			gridFlags = ctx.reader.ReadUInt16();
 		}
 	}
 }
-

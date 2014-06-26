@@ -23,6 +23,15 @@ public class UITable : UIWidgetContainer
 		Up,
 	}
 
+	public enum Sorting
+	{
+		None,
+		Alphabetic,
+		Horizontal,
+		Vertical,
+		Custom,
+	}
+
 	/// <summary>
 	/// How many columns there will be before a new line is started. 0 means unlimited.
 	/// </summary>
@@ -36,10 +45,10 @@ public class UITable : UIWidgetContainer
 	public Direction direction = Direction.Down;
 
 	/// <summary>
-	/// Whether the table's contents will be sorted alphabetically.
+	/// How to sort the grid's elements.
 	/// </summary>
 
-	public bool sorted = false;
+	public Sorting sorting = Sorting.None;
 
 	/// <summary>
 	/// Whether inactive children will be discarded from the table's calculations.
@@ -70,6 +79,9 @@ public class UITable : UIWidgetContainer
 	protected bool mReposition = false;
 	protected List<Transform> mChildren = new List<Transform>();
 
+	// Use the 'sorting' property instead
+	[HideInInspector][SerializeField] bool sorted = false;
+
 	/// <summary>
 	/// Reposition the children on the next Update().
 	/// </summary>
@@ -92,26 +104,27 @@ public class UITable : UIWidgetContainer
 				for (int i = 0; i < myTrans.childCount; ++i)
 				{
 					Transform child = myTrans.GetChild(i);
-
-					if (child && child.gameObject && (!hideInactive || NGUITools.GetActive(child.gameObject))) mChildren.Add(child);
+					if (child && child.gameObject && (!hideInactive || NGUITools.GetActive(child.gameObject)))
+						mChildren.Add(child);
 				}
-				if (sorted) Sort(mChildren);
+				
+				if (sorting != Sorting.None || sorted)
+				{
+					if (sorting == Sorting.Alphabetic) mChildren.Sort(UIGrid.SortByName);
+					else if (sorting == Sorting.Horizontal) mChildren.Sort(UIGrid.SortHorizontal);
+					else if (sorting == Sorting.Vertical) mChildren.Sort(UIGrid.SortVertical);
+					else Sort(mChildren);
+				}
 			}
 			return mChildren;
 		}
 	}
 
 	/// <summary>
-	/// Function that sorts items by name.
-	/// </summary>
-
-	static protected int SortByName (Transform a, Transform b) { return string.Compare(a.name, b.name); }
-
-	/// <summary>
 	/// Want your own custom sorting logic? Override this function.
 	/// </summary>
 
-	protected virtual void Sort (List<Transform> list) { list.Sort(SortByName); }
+	protected virtual void Sort (List<Transform> list) { list.Sort(UIGrid.SortByName); }
 
 	/// <summary>
 	/// Positions the grid items, taking their own size into consideration.

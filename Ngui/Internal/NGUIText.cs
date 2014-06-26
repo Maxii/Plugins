@@ -9,6 +9,7 @@
 
 using UnityEngine;
 using System.Text;
+using System.Diagnostics;
 
 /// <summary>
 /// Helper class containing functionality related to using dynamic fonts.
@@ -28,7 +29,7 @@ static public class NGUIText
 	public enum SymbolStyle
 	{
 		None,
-		Uncolored,
+		Normal,
 		Colored,
 	}
 
@@ -162,7 +163,7 @@ static public class NGUIText
 		else if (dynamicFont != null)
 		{
 			if (dynamicFont.GetCharacterInfo((char)ch, out mTempChar, finalSize, fontStyle))
-				return Mathf.Round(mTempChar.width * fontScale * pixelDensity);
+				return mTempChar.width * fontScale * pixelDensity;
 		}
 #endif
 		return 0f;
@@ -227,6 +228,11 @@ static public class NGUIText
 				glyph.channel = 0;
 				glyph.rotatedUVs = mTempChar.flipped;
 
+				glyph.v0.x = Mathf.Round(glyph.v0.x);
+				glyph.v0.y = Mathf.Round(glyph.v0.y);
+				glyph.v1.x = Mathf.Round(glyph.v1.x);
+				glyph.v1.y = Mathf.Round(glyph.v1.y);
+
 				float pd = fontScale * pixelDensity;
 
 				if (pd != 1f)
@@ -235,8 +241,6 @@ static public class NGUIText
 					glyph.v1 *= pd;
 					glyph.advance *= pd;
 				}
-
-				glyph.advance = Mathf.Round(glyph.advance);
 				return glyph;
 			}
 		}
@@ -246,15 +250,38 @@ static public class NGUIText
 
 	static Color mInvisible = new Color(0f, 0f, 0f, 0f);
 	static BetterList<Color> mColors = new BetterList<Color>();
+	static float mAlpha = 1f;
 #if DYNAMIC_FONT
 	static CharacterInfo mTempChar;
 #endif
 
 	/// <summary>
+	/// Parse Aa syntax alpha encoded in the string.
+	/// </summary>
+
+	[System.Diagnostics.DebuggerHidden]
+	[System.Diagnostics.DebuggerStepThrough]
+	static public float ParseAlpha (string text, int index)
+	{
+		int a = (NGUIMath.HexToDecimal(text[index + 1]) << 4) | NGUIMath.HexToDecimal(text[index + 2]);
+		return Mathf.Clamp01(a / 255f);
+	}
+
+	/// <summary>
 	/// Parse a RrGgBb color encoded in the string.
 	/// </summary>
 
-	static public Color ParseColor (string text, int offset)
+	[System.Diagnostics.DebuggerHidden]
+	[System.Diagnostics.DebuggerStepThrough]
+	static public Color ParseColor (string text, int offset) { return ParseColor24(text, offset); }
+
+	/// <summary>
+	/// Parse a RrGgBb color encoded in the string.
+	/// </summary>
+
+	[System.Diagnostics.DebuggerHidden]
+	[System.Diagnostics.DebuggerStepThrough]
+	static public Color ParseColor24 (string text, int offset)
 	{
 		int r = (NGUIMath.HexToDecimal(text[offset])     << 4) | NGUIMath.HexToDecimal(text[offset + 1]);
 		int g = (NGUIMath.HexToDecimal(text[offset + 2]) << 4) | NGUIMath.HexToDecimal(text[offset + 3]);
@@ -264,13 +291,63 @@ static public class NGUIText
 	}
 
 	/// <summary>
+	/// Parse a RrGgBbAa color encoded in the string.
+	/// </summary>
+
+	[System.Diagnostics.DebuggerHidden]
+	[System.Diagnostics.DebuggerStepThrough]
+	static public Color ParseColor32 (string text, int offset)
+	{
+		int r = (NGUIMath.HexToDecimal(text[offset]) << 4) | NGUIMath.HexToDecimal(text[offset + 1]);
+		int g = (NGUIMath.HexToDecimal(text[offset + 2]) << 4) | NGUIMath.HexToDecimal(text[offset + 3]);
+		int b = (NGUIMath.HexToDecimal(text[offset + 4]) << 4) | NGUIMath.HexToDecimal(text[offset + 5]);
+		int a = (NGUIMath.HexToDecimal(text[offset + 6]) << 4) | NGUIMath.HexToDecimal(text[offset + 7]);
+		float f = 1f / 255f;
+		return new Color(f * r, f * g, f * b, f * a);
+	}
+
+	/// <summary>
 	/// The reverse of ParseColor -- encodes a color in RrGgBb format.
 	/// </summary>
 
-	static public string EncodeColor (Color c)
+	[System.Diagnostics.DebuggerHidden]
+	[System.Diagnostics.DebuggerStepThrough]
+	static public string EncodeColor (Color c) { return EncodeColor24(c); }
+
+	/// <summary>
+	/// The reverse of ParseAlpha -- encodes a color in Aa format.
+	/// </summary>
+
+	[System.Diagnostics.DebuggerHidden]
+	[System.Diagnostics.DebuggerStepThrough]
+	static public string EncodeAlpha (float a)
+	{
+		int i = Mathf.Clamp(Mathf.RoundToInt(a * 255f), 0, 255);
+		return NGUIMath.DecimalToHex8(i);
+	}
+
+	/// <summary>
+	/// The reverse of ParseColor24 -- encodes a color in RrGgBb format.
+	/// </summary>
+
+	[System.Diagnostics.DebuggerHidden]
+	[System.Diagnostics.DebuggerStepThrough]
+	static public string EncodeColor24 (Color c)
 	{
 		int i = 0xFFFFFF & (NGUIMath.ColorToInt(c) >> 8);
-		return NGUIMath.DecimalToHex(i);
+		return NGUIMath.DecimalToHex24(i);
+	}
+
+	/// <summary>
+	/// The reverse of ParseColor32 -- encodes a color in RrGgBb format.
+	/// </summary>
+
+	[System.Diagnostics.DebuggerHidden]
+	[System.Diagnostics.DebuggerStepThrough]
+	static public string EncodeColor32 (Color c)
+	{
+		int i = NGUIMath.ColorToInt(c);
+		return NGUIMath.DecimalToHex32(i);
 	}
 
 	/// <summary>
@@ -361,6 +438,12 @@ static public class NGUIText
 				strike = false;
 				index += 4;
 				return true;
+
+				default:
+				int a = (NGUIMath.HexToDecimal(text[index + 1]) << 4) | NGUIMath.HexToDecimal(text[index + 2]);
+				mAlpha = a / 255f;
+				index += 4;
+				return true;
 			}
 		}
 
@@ -411,10 +494,15 @@ static public class NGUIText
 		if (text[index + 1] == 'u' && text[index + 2] == 'r' && text[index + 3] == 'l' && text[index + 4] == '=')
 		{
 			int closingBracket = text.IndexOf(']', index + 4);
-			
+
 			if (closingBracket != -1)
 			{
 				index = closingBracket + 1;
+				return true;
+			}
+			else
+			{
+				index = text.Length;
 				return true;
 			}
 		}
@@ -423,9 +511,9 @@ static public class NGUIText
 
 		if (text[index + 7] == ']')
 		{
-			Color c = ParseColor(text, index + 1);
+			Color c = ParseColor24(text, index + 1);
 
-			if (EncodeColor(c) != text.Substring(index + 1, 6).ToUpper())
+			if (EncodeColor24(c) != text.Substring(index + 1, 6).ToUpper())
 				return false;
 
 			if (colors != null)
@@ -436,6 +524,24 @@ static public class NGUIText
 				colors.Add(c);
 			}
 			index += 8;
+			return true;
+		}
+
+		if (index + 10 > length) return false;
+
+		if (text[index + 9] == ']')
+		{
+			Color c = ParseColor32(text, index + 1);
+			if (EncodeColor32(c) != text.Substring(index + 1, 8).ToUpper())
+				return false;
+
+			if (colors != null)
+			{
+				if (premultiply && c.a != 1f)
+					c = Color.Lerp(mInvisible, c, c.a);
+				colors.Add(c);
+			}
+			index += 10;
 			return true;
 		}
 		return false;
@@ -539,7 +645,7 @@ static public class NGUIText
 				for (int i = indexOffset + 4, charIndex = 1; i < verts.size; ++charIndex)
 				{
 					float x0 = verts.buffer[i].x;
-					float x1 = verts.buffer[i+2].x;
+					float x1 = verts.buffer[i + 2].x;
 					float w = x1 - x0;
 					float x0a = x0 * scale;
 					float x1a = x0a + w;
@@ -604,13 +710,23 @@ static public class NGUIText
 	}
 
 	/// <summary>
+	/// Whether the specified character is a space.
+	/// </summary>
+
+	[DebuggerHidden]
+	[DebuggerStepThrough]
+	static bool IsSpace (int ch) { return (ch == ' ' || ch == 0x200a || ch == 0x200b); }
+
+	/// <summary>
 	/// Convenience function that ends the line by either appending a new line character or replacing a space with one.
 	/// </summary>
 
+	[DebuggerHidden]
+	[DebuggerStepThrough]
 	static public void EndLine (ref StringBuilder s)
 	{
 		int i = s.Length - 1;
-		if (i > 0 && s[i] == ' ') s[i] = '\n';
+		if (i > 0 && IsSpace(s[i])) s[i] = '\n';
 		else s.Append('\n');
 	}
 
@@ -618,10 +734,12 @@ static public class NGUIText
 	/// Convenience function that ends the line by replacing a space with a newline character.
 	/// </summary>
 
+	[DebuggerHidden]
+	[DebuggerStepThrough]
 	static void ReplaceSpaceWithNewline (ref StringBuilder s)
 	{
 		int i = s.Length - 1;
-		if (i > 0 && s[i] == ' ') s[i] = '\n';
+		if (i > 0 && IsSpace(s[i])) s[i] = '\n';
 	}
 
 	/// <summary>
@@ -665,7 +783,7 @@ static public class NGUIText
 				if (symbol == null)
 				{
 					float w = GetGlyphWidth(ch, prev);
-					
+
 					if (w != 0f)
 					{
 						w += finalSpacingX;
@@ -801,11 +919,14 @@ static public class NGUIText
 		float remainingWidth = rectWidth;
 		int start = 0, offset = 0, lineCount = 1, prev = 0;
 		bool lineIsEmpty = true;
+		bool fits = true;
+		bool eastern = false;
 
 		// Run through all characters
 		for (; offset < textLength; ++offset)
 		{
 			char ch = text[offset];
+			if (ch > 12287) eastern = true;
 
 			// New line character -- start a new line
 			if (ch == '\n')
@@ -846,12 +967,16 @@ static public class NGUIText
 			remainingWidth -= glyphWidth;
 
 			// If this marks the end of a word, add it to the final string.
-			if (ch == ' ' && prev != ' ' && start < offset)
+			if (IsSpace(ch) && !eastern && start < offset)
 			{
 				int end = offset - start + 1;
 
 				// Last word on the last line should not include an invisible character
-				if (lineCount == maxLineCount && remainingWidth <= 0f && offset < textLength && text[offset] <= ' ') --end;
+				if (lineCount == maxLineCount && remainingWidth <= 0f && offset < textLength)
+				{
+					char cho = text[offset];
+					if (cho < ' ' || IsSpace(cho)) --end;
+				}
 
 				sb.Append(text.Substring(start, end));
 				lineIsEmpty = false;
@@ -860,13 +985,15 @@ static public class NGUIText
 			}
 
 			// Doesn't fit?
-			if (remainingWidth < 0f)
+			if (Mathf.RoundToInt(remainingWidth) < 0)
 			{
 				// Can't start a new line
 				if (lineIsEmpty || lineCount == maxLineCount)
 				{
 					// This is the first word on the line -- add it up to the character that fits
 					sb.Append(text.Substring(start, Mathf.Max(0, offset - start)));
+					bool space = IsSpace(ch);
+					if (!space && !eastern) fits = false;
 
 					if (lineCount++ == maxLineCount)
 					{
@@ -880,7 +1007,7 @@ static public class NGUIText
 					// Start a brand-new line
 					lineIsEmpty = true;
 
-					if (ch == ' ')
+					if (space)
 					{
 						start = offset + 1;
 						remainingWidth = rectWidth;
@@ -894,9 +1021,6 @@ static public class NGUIText
 				}
 				else
 				{
-					// Skip all spaces before the word
-					while (start < textLength && text[start] == ' ') ++start;
-
 					// Revert the position to the beginning of the word and reset the line
 					lineIsEmpty = true;
 					remainingWidth = rectWidth;
@@ -921,7 +1045,7 @@ static public class NGUIText
 
 		if (start < offset) sb.Append(text.Substring(start, offset - start));
 		finalText = sb.ToString();
-		return (offset == textLength) || (lineCount <= Mathf.Min(maxLines, maxLineCount));
+		return fits && ((offset == textLength) || (lineCount <= Mathf.Min(maxLines, maxLineCount)));
 	}
 
 	static Color32 s_c0, s_c1;
@@ -939,6 +1063,7 @@ static public class NGUIText
 
 		// Start with the white tint
 		mColors.Add(Color.white);
+		mAlpha = 1f;
 
 		int ch = 0, prev = 0;
 		float x = 0f, y = 0f, maxX = 0f;
@@ -1009,7 +1134,11 @@ static public class NGUIText
 			if (encoding && ParseSymbol(text, ref i, mColors, premultiply, ref subscriptMode, ref bold, ref italic, ref underline, ref strikethrough))
 			{
 				Color fc = tint * mColors[mColors.size - 1];
+				fc.a *= mAlpha;
 				uc = fc;
+
+				for (int b = 0, bmax = mColors.size - 2; b < bmax; ++b)
+					fc.a *= mColors[b].a;
 
 				if (gradient)
 				{
@@ -1146,7 +1275,7 @@ static public class NGUIText
 					prevX = 0;
 				}
 
-				if (ch == ' ')
+				if (IsSpace(ch))
 				{
 					if (underline)
 					{
@@ -1163,7 +1292,7 @@ static public class NGUIText
 					(finalSpacingX + glyph.advance) * sizeShrinkage;
 
 				// No need to continue if this is a space character
-				if (ch == ' ') continue;
+				if (IsSpace(ch)) continue;
 
 				// Texture coordinates
 				if (uvs != null)
@@ -1611,7 +1740,6 @@ static public class NGUIText
 						// Align the highlight
 						if (alignment != Alignment.Left && highlightOffset < highlight.size)
 						{
-							Debug.Log("Aligning");
 							Align(highlight, highlightOffset, x - finalSpacingX);
 							highlightOffset = highlight.size;
 						}

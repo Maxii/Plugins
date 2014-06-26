@@ -9,7 +9,7 @@ public class GridDebugger : MonoBehaviour {
 	public enum GridFunction {NearestVertexW, NearestFaceW, NearestBoxW, WorldToGrid, GridToWorld};
 	public GridFunction debuggedFunction = GridFunction.NearestBoxW;
 	public Color debugColor = Color.red;
-	public int[] index = new int[3];
+	//public int[] index = new int[3];
 	
 	private Transform cachedTransform;
 	Transform _transform{get{if(!cachedTransform) cachedTransform = transform; return cachedTransform;}}
@@ -58,9 +58,10 @@ public class GridDebugger : MonoBehaviour {
 	}
 	
 	protected void DebugGridToWorld(){
+		Vector3 converted = theGrid.GridToWorld(theGrid.WorldToGrid(_transform.position));
 		if(printLogs)
-			Debug.Log("Descrepancy between true world and calculated world: " + (_transform.position - theGrid.GridToWorld(theGrid.WorldToGrid(_transform.position))) +" = " + 
-				_transform.position + " - " + theGrid.GridToWorld(theGrid.WorldToGrid(_transform.position)));
+			Debug.Log(Mathf.Abs(_transform.position.x - converted.x) <= Mathf.Epsilon && Mathf.Abs(_transform.position.y - converted.y) <= Mathf.Epsilon && Mathf.Abs(_transform.position.z - converted.z) <= Mathf.Epsilon ? "No descrepancy." : "Descrepancy between true world and calculated world: " + (_transform.position - converted) +" = " + 
+				_transform.position + " - " + converted);
 	}
 	
 	protected void DrawSphere (Vector3 pos){

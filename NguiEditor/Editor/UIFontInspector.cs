@@ -40,6 +40,7 @@ public class UIFontInspector : Editor
 	string mSymbolSequence = "";
 	string mSymbolSprite = "";
 	BMSymbol mSelectedSymbol = null;
+	AnimationCurve mCurve = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(1f, 1f));
 
 	public override bool HasPreviewGUI () { return mView != View.Nothing; }
 
@@ -56,7 +57,7 @@ public class UIFontInspector : Editor
 
 	void OnSelectAtlas (Object obj)
 	{
-		if (mFont != null)
+		if (mFont != null && mFont.atlas != obj)
 		{
 			NGUIEditorTools.RegisterUndo("Font Atlas", mFont);
 			mFont.atlas = obj as UIAtlas;
@@ -98,7 +99,7 @@ public class UIFontInspector : Editor
 		GUI.changed = false;
 		GUILayout.BeginHorizontal();
 		mType = (FontType)EditorGUILayout.EnumPopup("Font Type", mType);
-		GUILayout.Space(18f);
+		NGUIEditorTools.DrawPadding();
 		GUILayout.EndHorizontal();
 
 		if (GUI.changed)
@@ -156,7 +157,7 @@ public class UIFontInspector : Editor
 			GUILayout.BeginHorizontal();
 			int size = EditorGUILayout.IntField("Default Size", mFont.defaultSize, GUILayout.Width(120f));
 			FontStyle style = (FontStyle)EditorGUILayout.EnumPopup(mFont.dynamicFontStyle);
-			GUILayout.Space(18f);
+			NGUIEditorTools.DrawPadding();
 			GUILayout.EndHorizontal();
 
 			if (size != mFont.defaultSize)
@@ -246,29 +247,6 @@ public class UIFontInspector : Editor
 			}
 		}
 
-		// The font must be valid at this point for the rest of the options to show up
-		if (mFont.isDynamic || mFont.bmFont.isValid)
-		{
-			if (mFont.atlas == null)
-			{
-				mView = View.Font;
-				mUseShader = false;
-			}
-			EditorGUILayout.Space();
-		}
-
-		// Preview option
-		if (!mFont.isDynamic && mFont.atlas != null)
-		{
-			GUILayout.BeginHorizontal();
-			{
-				mView = (View)EditorGUILayout.EnumPopup("Preview", mView);
-				GUILayout.Label("Shader", GUILayout.Width(45f));
-				mUseShader = EditorGUILayout.Toggle(mUseShader, GUILayout.Width(20f));
-			}
-			GUILayout.EndHorizontal();
-		}
-
 		// Dynamic fonts don't support emoticons
 		if (!mFont.isDynamic && mFont.bmFont.isValid)
 		{
@@ -348,6 +326,79 @@ public class UIFontInspector : Editor
 				}
 			}
 		}
+
+		if (mFont.bmFont != null && mFont.bmFont.isValid)
+		{
+			if (NGUIEditorTools.DrawHeader("Modify"))
+			{
+				NGUIEditorTools.BeginContents();
+
+				UISpriteData sd = mFont.sprite;
+
+				bool disable = (sd != null && (sd.paddingLeft != 0 || sd.paddingBottom != 0));
+				EditorGUI.BeginDisabledGroup(disable || mFont.packedFontShader);
+
+				EditorGUILayout.BeginHorizontal();
+				GUILayout.Space(20f);
+				EditorGUILayout.BeginVertical();
+
+				GUILayout.BeginHorizontal();
+				GUILayout.BeginVertical();
+				NGUISettings.foregroundColor = EditorGUILayout.ColorField("Foreground", NGUISettings.foregroundColor);
+				NGUISettings.backgroundColor = EditorGUILayout.ColorField("Background", NGUISettings.backgroundColor);
+				GUILayout.EndVertical();
+				mCurve = EditorGUILayout.CurveField("", mCurve, GUILayout.Width(40f), GUILayout.Height(40f));
+				GUILayout.EndHorizontal();
+
+				if (GUILayout.Button("Add a Shadow")) ApplyEffect(Effect.Shadow, NGUISettings.foregroundColor, NGUISettings.backgroundColor);
+				if (GUILayout.Button("Add a Soft Outline")) ApplyEffect(Effect.Outline, NGUISettings.foregroundColor, NGUISettings.backgroundColor);
+				if (GUILayout.Button("Rebalance Colors")) ApplyEffect(Effect.Rebalance, NGUISettings.foregroundColor, NGUISettings.backgroundColor);
+				if (GUILayout.Button("Apply Curve to Alpha")) ApplyEffect(Effect.AlphaCurve, NGUISettings.foregroundColor, NGUISettings.backgroundColor);
+				if (GUILayout.Button("Apply Curve to Foreground")) ApplyEffect(Effect.ForegroundCurve, NGUISettings.foregroundColor, NGUISettings.backgroundColor);
+				if (GUILayout.Button("Apply Curve to Background")) ApplyEffect(Effect.BackgroundCurve, NGUISettings.foregroundColor, NGUISettings.backgroundColor);
+
+				GUILayout.Space(10f);
+				if (GUILayout.Button("Add Transparent Border (+1)")) ApplyEffect(Effect.Border, NGUISettings.foregroundColor, NGUISettings.backgroundColor);
+				if (GUILayout.Button("Remove Border (-1)")) ApplyEffect(Effect.Crop, NGUISettings.foregroundColor, NGUISettings.backgroundColor);
+
+				EditorGUILayout.EndVertical();
+				GUILayout.Space(20f);
+				EditorGUILayout.EndHorizontal();
+
+				EditorGUI.EndDisabledGroup();
+
+				if (disable)
+				{
+					GUILayout.Space(3f);
+					EditorGUILayout.HelpBox("The sprite used by this font has been trimmed and is not suitable for modification. " +
+						"Try re-adding this sprite with 'Trim Alpha' disabled.", MessageType.Warning);
+				}
+
+				NGUIEditorTools.EndContents();
+			}
+		}
+
+		// The font must be valid at this point for the rest of the options to show up
+		if (mFont.isDynamic || mFont.bmFont.isValid)
+		{
+			if (mFont.atlas == null)
+			{
+				mView = View.Font;
+				mUseShader = false;
+			}
+		}
+
+		// Preview option
+		if (!mFont.isDynamic && mFont.atlas != null)
+		{
+			GUILayout.BeginHorizontal();
+			{
+				mView = (View)EditorGUILayout.EnumPopup("Preview", mView);
+				GUILayout.Label("Shader", GUILayout.Width(45f));
+				mUseShader = EditorGUILayout.Toggle(mUseShader, GUILayout.Width(20f));
+			}
+			GUILayout.EndHorizontal();
+		}
 	}
 
 	/// <summary>
@@ -389,7 +440,7 @@ public class UIFontInspector : Editor
 		{
 			Material m = (mUseShader ? mFont.material : null);
 
-			if (mView == View.Font && mFont.sprite != null)
+			if (mView == View.Font && mFont.atlas != null && mFont.sprite != null)
 			{
 				NGUIEditorTools.DrawSprite(tex, rect, mFont.sprite, Color.white, m);
 			}
@@ -409,5 +460,205 @@ public class UIFontInspector : Editor
 		NGUIEditorTools.RegisterUndo("Font Sprite", mFont);
 		mFont.spriteName = spriteName;
 		Repaint();
+	}
+
+	enum Effect
+	{
+		Rebalance,
+		ForegroundCurve,
+		BackgroundCurve,
+		AlphaCurve,
+		Border,
+		Shadow,
+		Outline,
+		Crop,
+	}
+
+	/// <summary>
+	/// Apply an effect to the font.
+	/// </summary>
+
+	void ApplyEffect (Effect effect, Color foreground, Color background)
+	{
+		BMFont bf = mFont.bmFont;
+		int offsetX = 0;
+		int offsetY = 0;
+
+		if (mFont.atlas != null)
+		{
+			UISpriteData sd = mFont.atlas.GetSprite(bf.spriteName);
+			if (sd == null) return;
+			offsetX = sd.x;
+			offsetY = sd.y + mFont.texHeight - sd.paddingTop;
+		}
+
+		string path = AssetDatabase.GetAssetPath(mFont.texture);
+		Texture2D bfTex = NGUIEditorTools.ImportTexture(path, true, true, false);
+		Color32[] atlas = bfTex.GetPixels32();
+
+		// First we need to extract textures for all the glyphs, making them bigger in the process
+		List<BMGlyph> glyphs = bf.glyphs;
+		List<Texture2D> glyphTextures = new List<Texture2D>(glyphs.Count);
+
+		for (int i = 0, imax = glyphs.Count; i < imax; ++i)
+		{
+			BMGlyph glyph = glyphs[i];
+			if (glyph.width < 1 || glyph.height < 1) continue;
+
+			int width = glyph.width;
+			int height = glyph.height;
+
+			if (effect == Effect.Outline || effect == Effect.Shadow || effect == Effect.Border)
+			{
+				width += 2;
+				height += 2;
+				--glyph.offsetX;
+				--glyph.offsetY;
+			}
+			else if (effect == Effect.Crop && width > 2 && height > 2)
+			{
+				width -= 2;
+				height -= 2;
+				++glyph.offsetX;
+				++glyph.offsetY;
+			}
+
+			int size = width * height;
+			Color32[] colors = new Color32[size];
+			Color32 clear = background;
+			clear.a = 0;
+			for (int b = 0; b < size; ++b) colors[b] = clear;
+
+			if (effect == Effect.Crop)
+			{
+				for (int y = 0; y < height; ++y)
+				{
+					for (int x = 0; x < width; ++x)
+					{
+						int fx = x + glyph.x + offsetX + 1;
+						int fy = y + (mFont.texHeight - glyph.y - glyph.height) + 1;
+						if (mFont.atlas != null) fy += bfTex.height - offsetY;
+						colors[x + y * width] = atlas[fx + fy * bfTex.width];
+					}
+				}
+			}
+			else
+			{
+				for (int y = 0; y < glyph.height; ++y)
+				{
+					for (int x = 0; x < glyph.width; ++x)
+					{
+						int fx = x + glyph.x + offsetX;
+						int fy = y + (mFont.texHeight - glyph.y - glyph.height);
+						if (mFont.atlas != null) fy += bfTex.height - offsetY;
+
+						Color c = atlas[fx + fy * bfTex.width];
+
+						if (effect == Effect.Border)
+						{
+							colors[x + 1 + (y + 1) * width] = c;
+						}
+						else
+						{
+							if (effect == Effect.AlphaCurve) c.a = Mathf.Clamp01(mCurve.Evaluate(c.a));
+
+							Color bg = background;
+							bg.a = (effect == Effect.BackgroundCurve) ? Mathf.Clamp01(mCurve.Evaluate(c.a)) : c.a;
+
+							Color fg = foreground;
+							fg.a = (effect == Effect.ForegroundCurve) ? Mathf.Clamp01(mCurve.Evaluate(c.a)) : c.a;
+
+							if (effect == Effect.Outline || effect == Effect.Shadow)
+							{
+								colors[x + 1 + (y + 1) * width] = Color.Lerp(bg, c, c.a);
+							}
+							else
+							{
+								colors[x + y * width] = Color.Lerp(bg, fg, c.a);
+							}
+						}
+					}
+				}
+
+				// Apply the appropriate affect
+				if (effect == Effect.Shadow) NGUIEditorTools.AddShadow(colors, width, height, NGUISettings.backgroundColor);
+				else if (effect == Effect.Outline) NGUIEditorTools.AddDepth(colors, width, height, NGUISettings.backgroundColor);
+			}
+
+			Texture2D tex = new Texture2D(width, height, TextureFormat.ARGB32, false);
+			tex.SetPixels32(colors);
+			tex.Apply();
+			glyphTextures.Add(tex);
+		}
+
+		// Pack all glyphs into a new texture
+		Texture2D final = new Texture2D(bfTex.width, bfTex.height, TextureFormat.ARGB32, false);
+		Rect[] rects = final.PackTextures(glyphTextures.ToArray(), 1);
+		final.Apply();
+
+		// Make RGB channel use the background color (Unity makes it black by default)
+		Color32[] fcs = final.GetPixels32();
+		Color32 bc = background;
+
+		for (int i = 0, imax = fcs.Length; i < imax; ++i)
+		{
+			if (fcs[i].a == 0)
+			{
+				fcs[i].r = bc.r;
+				fcs[i].g = bc.g;
+				fcs[i].b = bc.b;
+			}
+		}
+
+		final.SetPixels32(fcs);
+		final.Apply();
+
+		// Update the glyph rectangles
+		int index = 0;
+		int tw = final.width;
+		int th = final.height;
+
+		for (int i = 0, imax = glyphs.Count; i < imax; ++i)
+		{
+			BMGlyph glyph = glyphs[i];
+			if (glyph.width < 1 || glyph.height < 1) continue;
+
+			Rect rect = rects[index++];
+			glyph.x = Mathf.RoundToInt(rect.x * tw);
+			glyph.y = Mathf.RoundToInt(rect.y * th);
+			glyph.width = Mathf.RoundToInt(rect.width * tw);
+			glyph.height = Mathf.RoundToInt(rect.height * th);
+			glyph.y = th - glyph.y - glyph.height;
+		}
+
+		// Update the font's texture dimensions
+		mFont.texWidth = final.width;
+		mFont.texHeight = final.height;
+
+		if (mFont.atlas == null)
+		{
+			// Save the final texture
+			byte[] bytes = final.EncodeToPNG();
+			NGUITools.DestroyImmediate(final);
+			System.IO.File.WriteAllBytes(path, bytes);
+			AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+		}
+		else
+		{
+			// Update the atlas
+			final.name = mFont.spriteName;
+			bool val = NGUISettings.atlasTrimming;
+			NGUISettings.atlasTrimming = false;
+			UIAtlasMaker.AddOrUpdate(mFont.atlas, final);
+			NGUISettings.atlasTrimming = val;
+			NGUITools.DestroyImmediate(final);
+		}
+
+		// Cleanup
+		for (int i = 0; i < glyphTextures.Count; ++i)
+			NGUITools.DestroyImmediate(glyphTextures[i]);
+
+		// Refresh all labels
+		mFont.MarkAsChanged();
 	}
 }

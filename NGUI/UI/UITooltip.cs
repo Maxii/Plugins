@@ -96,24 +96,24 @@ public class UITooltip : MonoBehaviour
 		if (text != null && !string.IsNullOrEmpty(tooltipText))
 		{
 			mTarget = 1f;
-			if (text != null) text.text = tooltipText;
+			text.text = tooltipText;
 
 			// Orthographic camera positioning is trivial
 			mPos = Input.mousePosition;
 
-			if (background != null && !background.isAnchored)
+			Transform textTrans = text.transform;
+			Vector3 offset = textTrans.localPosition;
+			Vector3 textScale = textTrans.localScale;
+
+			// Calculate the dimensions of the printed text
+			mSize = text.printedSize;
+
+			// Scale by the transform and adjust by the padding offset
+			mSize.x *= textScale.x;
+			mSize.y *= textScale.y;
+
+			if (background != null)
 			{
-				Transform textTrans = text.transform;
-				Vector3 offset = textTrans.localPosition;
-				Vector3 textScale = textTrans.localScale;
-
-				// Calculate the dimensions of the printed text
-				mSize = text.printedSize;
-
-				// Scale by the transform and adjust by the padding offset
-				mSize.x *= textScale.x;
-				mSize.y *= textScale.y;
-
 				Vector4 border = background.border;
 				mSize.x += border.x + border.z + ( offset.x - border.x) * 2f;
 				mSize.y += border.y + border.w + (-offset.y - border.y) * 2f;

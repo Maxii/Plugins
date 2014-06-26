@@ -1,4 +1,4 @@
-//#define NoPooling //Disable pooling for some reason. Could be debugging or just for measuring the difference.
+//#define ASTAR_NO_POOLING //Disable pooling for some reason. Could be debugging or just for measuring the difference.
 
 using System;
 using System.Collections.Generic;
@@ -15,6 +15,8 @@ namespace Pathfinding.Util
 	 * 
 	 * You do not need to clear the stack before releasing it.
 	 * After you have released a stack, you should never use it again.
+	 * 
+	 * \warning This class is not thread safe
 	 * 
 	 * \since Version 3.2
 	 * \see Pathfinding.Util.ListPool

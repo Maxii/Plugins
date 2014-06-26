@@ -35,6 +35,16 @@ public class UIPlaySound : MonoBehaviour
 	[Range(0f, 2f)] public float pitch = 1f;
 #endif
 
+	bool canPlay
+	{
+		get
+		{
+			if (!enabled) return false;
+			UIButton btn = GetComponent<UIButton>();
+			return (btn == null || btn.isEnabled);
+		}
+	}
+
 	void OnHover (bool isOver)
 	{
 		if (trigger == Trigger.OnMouseOver)
@@ -43,7 +53,7 @@ public class UIPlaySound : MonoBehaviour
 			mIsOver = isOver;
 		}
 
-		if (enabled && ((isOver && trigger == Trigger.OnMouseOver) || (!isOver && trigger == Trigger.OnMouseOut)))
+		if (canPlay && ((isOver && trigger == Trigger.OnMouseOver) || (!isOver && trigger == Trigger.OnMouseOut)))
 			NGUITools.PlaySound(audioClip, volume, pitch);
 	}
 
@@ -55,19 +65,19 @@ public class UIPlaySound : MonoBehaviour
 			mIsOver = isPressed;
 		}
 
-		if (enabled && ((isPressed && trigger == Trigger.OnPress) || (!isPressed && trigger == Trigger.OnRelease)))
+		if (canPlay && ((isPressed && trigger == Trigger.OnPress) || (!isPressed && trigger == Trigger.OnRelease)))
 			NGUITools.PlaySound(audioClip, volume, pitch);
 	}
 
 	void OnClick ()
 	{
-		if (enabled && trigger == Trigger.OnClick)
+		if (canPlay && trigger == Trigger.OnClick)
 			NGUITools.PlaySound(audioClip, volume, pitch);
 	}
 
 	void OnSelect (bool isSelected)
 	{
-		if (enabled && (!isSelected || UICamera.currentScheme == UICamera.ControlScheme.Controller))
+		if (canPlay && (!isSelected || UICamera.currentScheme == UICamera.ControlScheme.Controller))
 			OnHover(isSelected);
 	}
 

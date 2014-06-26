@@ -145,7 +145,7 @@ public class UIDrawCallViewer : EditorWindow
 
 				GUILayout.BeginHorizontal();
 				int sel = EditorGUILayout.Popup("Widgets", 0, list);
-				GUILayout.Space(18f);
+				NGUIEditorTools.DrawPadding();
 				GUILayout.EndHorizontal();
 
 				if (sel != 0)
@@ -172,7 +172,7 @@ public class UIDrawCallViewer : EditorWindow
 				GUILayout.BeginHorizontal();
 				EditorGUILayout.LabelField("Render Q", dc.finalRenderQueue.ToString(), GUILayout.Width(120f));
 				bool draw = (Visibility)EditorGUILayout.EnumPopup(dc.isActive ? Visibility.Visible : Visibility.Hidden) == Visibility.Visible;
-				GUILayout.Space(18f);
+				NGUIEditorTools.DrawPadding();
 				GUILayout.EndHorizontal();
 
 				if (dc.isActive != draw)
@@ -190,7 +190,7 @@ public class UIDrawCallViewer : EditorWindow
 					{
 						Selection.activeGameObject = dc.manager.gameObject;
 					}
-					GUILayout.Space(18f);
+					NGUIEditorTools.DrawPadding();
 				}
 				GUILayout.EndHorizontal();
 

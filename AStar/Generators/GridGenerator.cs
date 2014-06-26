@@ -1,14 +1,14 @@
 //#define ASTAR_NoTagPenalty		//Enables or disables tag penalties. Can give small performance boost
 //#define ASTARDEBUG
-
+#define ASTAR_GRID_CUSTOM_CONNECTIONS	
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using Pathfinding.Nodes;
 using Pathfinding.Serialization.JsonFx;
+using Pathfinding.Serialization;
 
 namespace Pathfinding {
-	[System.Serializable]
 	[JsonOptIn]
 	/** Generates a grid of nodes.
 The GridGraph does exactly what the name implies, generates nodes in a grid pattern.\n
@@ -36,30 +36,38 @@ Where \a ob is the obstacle you just instantiated (a GameObject).\n
 As you can see, the UpdateGraphs function takes a Bounds parameter and it will send an update call to all updateable graphs.\n
 A grid graph will update that area and a small margin around it equal to \link Pathfinding.GraphCollision.diameter collision testing diameter/2 \endlink
 \see graph-updates for more info about updating graphs during runtime
+
+
+<b>Configure using script</b>
+\code
+// This holds all graph data
+AstarData data = AstarPath.active.astarData;
+
+// This creates a Grid Graph
+GridGraph gg = data.AddGraph(typeof(GridGraph)) as GridGraph;
+
+// Setup a grid graph with some values
+gg.width = 50;
+gg.depth = 50;
+gg.nodeSize = 1;
+gg.center = new Vector3 (10,0,0);
+
+// Updates internal size from the above values
+gg.UpdateSizeFromWidthDepth();
+
+// Scans all graphs, do not call gg.Scan(), that is an internal method
+AstarPath.active.Scan();
+\endcode
+
 \ingroup graphs
 \nosubgrouping
 	 */
-	public class GridGraph : NavGraph, ISerializableGraph, IUpdatableGraph, IFunnelGraph
+	public class GridGraph : NavGraph, IUpdatableGraph
 	{
-		
-		public override Node[] CreateNodes (int number) {
-			
-			/*if (nodes != null && graphNodes != null && nodes.Length == number && graphNodes.Length == number) {
-				Debug.Log ("Caching");
-				return nodes;
-			}*/
-			
-			GridNode[] tmp = new GridNode[number];
-			for (int i=0;i<number;i++) {
-				tmp[i] = new GridNode ();
-				tmp[i].penalty = initialPenalty;
-			}
-			nodes = tmp;
-			return tmp as Node[];
-		}
 		
 		/** This function will be called when this graph is destroyed */
 		public override void OnDestroy () {
+			
 			base.OnDestroy ();
 			
 			//Clean up a reference in a static variable which otherwise should point to this graph forever and stop the GC from collecting it
@@ -67,23 +75,28 @@ A grid graph will update that area and a small margin around it equal to \link P
 		}
 		
 		public void RemoveGridGraphFromStatic () {
-			GridNode.RemoveGridGraph (this);
+			GridNode.SetGridGraph (AstarPath.active.astarData.GetGraphIndex(this),null);
 		}
 		
 		/** This is placed here so generators inheriting from this one can override it and set it to false.
 		If it is true, it means that the nodes array's length will always be equal to width*depth
 		It is used mainly in the editor to do auto-scanning calls, setting it to false for a non-uniform grid will reduce the number of scans */
-		public virtual bool uniformWidhtDepthGrid {
+		public virtual bool uniformWidthDepthGrid {
 			get {
 				return true;
 			}
 		}
 		
+		public override void GetNodes (GraphNodeDelegateCancelable del) {
+			if (nodes == null) return;
+			for (int i=0;i<nodes.Length && del (nodes[i]);i++) {}
+		}
+		
 		/** \name Inspector - Settings
 		 * \{ */
 		
-		public int width; /**< Width of the grid in nodes */
-		public int depth; /**< Depth (height) of the grid in nodes */
+		public int width; /**< Width of the grid in nodes. \see UpdateSizeFromWidthDepth */
+		public int depth; /**< Depth (height) of the grid in nodes. \see UpdateSizeFromWidthDepth */
 		
 		[JsonMember]
 		public float aspectRatio = 1F; /**< Scaling of the graph along the X axis. This should be used if you want different scales on the X and Y axis of the grid */
@@ -100,7 +113,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 		public Vector2 unclampedSize; 	/**< Size of the grid. Might be negative or smaller than #nodeSize */
 		
 		[JsonMember]
-		public float nodeSize = 1; /**< Size of one node in world units */
+		public float nodeSize = 1; /**< Size of one node in world units. \see UpdateSizeFromWidthDepth */
 		
 		/* Collision and stuff */
 		
@@ -200,19 +213,19 @@ A grid graph will update that area and a small margin around it equal to \link P
 		
 		/** Index offset to get neighbour nodes. Added to a node's index to get a neighbour node index */
 		[System.NonSerialized]
-		public int[] neighbourOffsets;
+		public readonly int[] neighbourOffsets = new int[8];
 		
 		/** Costs to neighbour nodes */
 		[System.NonSerialized]
-		public int[] neighbourCosts;
+		public readonly uint[] neighbourCosts = new uint[8];
 		
 		/** Offsets in the X direction for neighbour nodes. Only 1, 0 or -1 */
 		[System.NonSerialized]
-		public int[] neighbourXOffsets;
+		public readonly int[] neighbourXOffsets = new int[8];
 		
 		/** Offsets in the Z direction for neighbour nodes. Only 1, 0 or -1 */
 		[System.NonSerialized]
-		public int[] neighbourZOffsets;
+		public readonly int[] neighbourZOffsets = new int[8];
 		
 		/* Same as #nodes, but already in the correct type (GridNode instead of Node) */
 		//public GridNode[] graphNodes;
@@ -220,19 +233,147 @@ A grid graph will update that area and a small margin around it equal to \link P
 		/* If a walkable node wasn't found, then it will search (max) in a square with the side of 2*getNearestForceLimit+1 for a close walkable node */
 		//public int getNearestForceLimit = 40;
 		/** In GetNearestForce, determines how far to search after a valid node has been found */
-		public int getNearestForceOverlap = 2;
-		
+		public const int getNearestForceOverlap = 2;
 		
 		public Matrix4x4 boundsMatrix;
 		public Matrix4x4 boundsMatrix2;
 		
 		public int scans = 0;
 		
+		/** All nodes in this graph */
+		public GridNode[] nodes;
+		
 		
 		public GridGraph () {
 			unclampedSize = new Vector2 (10,10);
 			nodeSize = 1F;
 			collision = new GraphCollision ();
+		}
+		
+		public Int3 GetNodePosition (int index, int yOffset) {
+			//int z = Math.DivRem (index,Width, out x);
+			int z = index/Width;
+			int x = index - z*Width;
+			return (Int3)matrix.MultiplyPoint3x4(new Vector3(x+0.5f,yOffset*Int3.PrecisionFactor,z+0.5f));//return Int3.zero;}
+		}
+		
+		public int Width {
+			get {
+				return width; 
+			}
+			set {
+				width = value;
+			}
+		}
+		public int Depth {
+			get {
+				return depth; 
+			}
+			set {
+				depth = value;
+			}
+		}
+		
+		public uint GetConnectionCost (int dir) {
+			return neighbourCosts[dir];
+		}
+		
+		public GridNode GetNodeConnection (GridNode node, int dir) {
+			if (!node.GetConnectionInternal(dir)) return null;
+			else if (!node.EdgeNode) {
+				return nodes[node.NodeInGridIndex + neighbourOffsets[dir]];
+			} else {
+				int index = node.NodeInGridIndex;
+				//int z = Math.DivRem (index,Width, out x);
+				int z = index/Width;
+				int x = index - z*Width;
+				
+				return GetNodeConnection (index, x, z, dir);
+			}
+		}
+		
+		public bool HasNodeConnection (GridNode node, int dir) {
+			if (!node.GetConnectionInternal(dir)) return false;
+			else if (!node.EdgeNode) {
+				return true;
+			} else {
+				int index = node.NodeInGridIndex;
+				//int z = Math.DivRem (index,Width, out x);
+				int z = index/Width;
+				int x = index - z*Width;
+				
+				return HasNodeConnection (index, x, z, dir);
+			}
+		}
+		
+		public void SetNodeConnection (GridNode node, int dir, bool value) {
+			int index = node.NodeInGridIndex;
+			//int z = Math.DivRem (index,Width, out x);
+			int z = index/Width;
+			int x = index - z*Width;
+			
+			SetNodeConnection (index, x, z, dir, value);
+		}
+		
+		/** Get the connecting node from the node at (x,z) in the specified direction.
+		 * \returns A GridNode if the node has a connection to that node. Null if no connection in that direction exists
+		 * 
+		 * \see GridNode
+		 */
+		private GridNode GetNodeConnection (int index, int x, int z, int dir) {
+			if (!nodes[index].GetConnectionInternal (dir)) return null;
+			
+			/** \todo Mark edge nodes and only do bounds checking for them */
+			int nx = x + neighbourXOffsets[dir];
+			if (nx < 0 || nx >= Width) return null; /** \todo Modify to get adjacent grid graph here */
+			int nz = z + neighbourZOffsets[dir];
+			if (nz < 0 || nz >= Depth) return null;
+			int nindex = index + neighbourOffsets[dir];
+			
+			//if (dir < 8) return nodes[index].GetConnectionInternal (dir) ? nodes[nindex] : null;
+			return nodes[nindex];
+		}
+		
+		/** Set if connection in the specified direction should be enabled.
+		 * Note that bounds checking will still be done when getting the connection value again,
+		 * so it is not necessarily true that HasNodeConnection will return true just because you used
+		 * SetNodeConnection on a node to set a connection to true.
+		 * 
+		 * \param index Index of the node
+		 * \param x X coordinate of the node
+		 * \param z Z coordinate of the node
+		 * \param value Enable or disable the connection
+		 * 
+		 * \note This is identical to Pathfinding.Node.SetConnectionInternal
+		 * 
+		 * \deprecated
+		 */
+		public void SetNodeConnection (int index, int x, int z, int dir, bool value) {
+			nodes[index].SetConnectionInternal (dir, value);
+			
+			/*
+			/* \todo Mark edge nodes and only do bounds checking for them /
+			int nx = x + neighbourXOffsets[dir];
+			if (nx < 0 || nx >= Width) return; /** \todo Modify to get adjacent grid graph here 
+			int nz = z + neighbourZOffsets[dir];
+			if (nz < 0 || nz >= Depth) return;
+			int nindex = index + neighbourOffsets[dir];
+			
+			if (dir < 8) nodes[index].SetConnectionInternal (dir, value);
+			else nodes[nindex].SetConnectionInternal (dir, value);*/
+		}
+		
+		public bool HasNodeConnection (int index, int x, int z, int dir) {
+			if (!nodes[index].GetConnectionInternal (dir)) return false;
+			
+			/** \todo Mark edge nodes and only do bounds checking for them */
+			int nx = x + neighbourXOffsets[dir];
+			if (nx < 0 || nx >= Width) return false; /** \todo Modify to get adjacent grid graph here */
+			int nz = z + neighbourZOffsets[dir];
+			if (nz < 0 || nz >= Depth) return false;
+			//int nindex = index + neighbourOffsets[dir];
+			
+			return true;
 		}
 		
 		/** Updates #size from #width, #depth and #nodeSize values. Also \link GenerateMatrix generates a new matrix \endlink.
@@ -278,8 +419,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 			
 			//height = size.y;
 			
-			matrix.SetTRS (boundsMatrix.MultiplyPoint3x4 (-new Vector3 (size.x,0,size.y)*0.5F),Quaternion.Euler(rotation), new Vector3 (nodeSize*aspectRatio,1,nodeSize));
-			
+			SetMatrix (Matrix4x4.TRS (boundsMatrix.MultiplyPoint3x4 (-new Vector3 (size.x,0,size.y)*0.5F),Quaternion.Euler(rotation), new Vector3 (nodeSize*aspectRatio,1,nodeSize)));
 		}
 		
 		//public void GenerateBounds () {
@@ -288,10 +428,9 @@ A grid graph will update that area and a small margin around it equal to \link P
 		//}
 		
 		/** \todo Set clamped position for Grid Graph */
-		public override NNInfo GetNearest (Vector3 position, NNConstraint constraint, Node hint) {
+		public override NNInfo GetNearest (Vector3 position, NNConstraint constraint, GraphNode hint) {
 			
 			if (nodes == null || depth*width != nodes.Length) {
-				//Debug.LogError ("NavGraph hasn't been generated yet");
 				return new NNInfo ();
 			}
 			
@@ -303,6 +442,10 @@ A grid graph will update that area and a small margin around it equal to \link P
 			int z = Mathf.Clamp (Mathf.RoundToInt (zf)  , 0, depth-1);
 			
 			NNInfo nn = new NNInfo(nodes[z*width+x]);
+			
+			float y = inverseMatrix.MultiplyPoint3x4((Vector3)nodes[z*width+x].position).y;
+			nn.clampedPosition = matrix.MultiplyPoint3x4 (new Vector3(Mathf.Clamp(xf,x-0.5f,x+0.5f)+0.5f,y,Mathf.Clamp(zf,z-0.5f,z+0.5f)+0.5f));
+			
 			//Set clamped position
 			//nn.clampedPosition = new Vector3(Mathf.Clamp (xf,x-0.5f,x+0.5f),position.y,Mathf.Clamp (zf,z-0.5f,z+0.5f));
 			//nn.clampedPosition = matrix.MultiplyPoint3x4 (nn.clampedPosition);
@@ -321,22 +464,32 @@ A grid graph will update that area and a small margin around it equal to \link P
 			
 			position = inverseMatrix.MultiplyPoint3x4 (position);
 			
-			int x = Mathf.Clamp (Mathf.RoundToInt (position.x-0.5F)  , 0, width-1);
-			int z = Mathf.Clamp (Mathf.RoundToInt (position.z-0.5F)  , 0, depth-1);
+			float xf = position.x-0.5F;
+			float zf = position.z-0.5f;
+			int x = Mathf.Clamp (Mathf.RoundToInt (xf)  , 0, width-1);
+			int z = Mathf.Clamp (Mathf.RoundToInt (zf)  , 0, depth-1);
 			
-			Node node = nodes[x+z*width];
+			GridNode node = nodes[x+z*width];
 			
-			Node minNode = null;
+			GridNode minNode = null;
 			float minDist = float.PositiveInfinity;
 			int overlap = getNearestForceOverlap;
+			
+			Vector3 clampedPosition = Vector3.zero;
+			NNInfo nn = new NNInfo(null);
 			
 			if (constraint.Suitable (node)) {
 				minNode = node;
 				minDist = ((Vector3)minNode.position-globalPosition).sqrMagnitude;
+				float y = inverseMatrix.MultiplyPoint3x4((Vector3)node.position).y;
+				clampedPosition = matrix.MultiplyPoint3x4 (new Vector3(Mathf.Clamp(xf,x-0.5f,x+0.5f)+0.5f, y, Mathf.Clamp(zf,z-0.5f,z+0.5f)+0.5f));
 			}
 			
 			if (minNode != null) {
-				if (overlap == 0) return new NNInfo(minNode);
+				nn.node = minNode;
+				nn.clampedPosition = clampedPosition;
+				
+				if (overlap == 0) return nn;
 				else overlap--;
 			}
 			
@@ -347,19 +500,23 @@ A grid graph will update that area and a small margin around it equal to \link P
 			float maxDist = constraint.constrainDistance ? AstarPath.active.maxNearestNodeDistance : float.PositiveInfinity;
 			float maxDistSqr = maxDist*maxDist;
 			
+			
 			//for (int w = 1; w < getNearestForceLimit;w++) {
 			for (int w = 1;;w++) {
+				
+				//Check if the nodes are within distance limit
+				if (nodeSize*w > maxDist) {
+					nn.node = minNode;
+					nn.clampedPosition = clampedPosition;
+					return nn;
+				}
+				
+				bool anyInside = false;
+				
 				int nx = x;
 				int nz = z+w;
 				
 				int nz2 = nz*width;
-				
-				//Check if the nodes are within distance limit
-				if (nodeSize*w > maxDist) {
-					return new NNInfo(minNode);
-				}
-				
-				bool anyInside = false;
 				
 				for (nx = x-w;nx <= x+w;nx++) {
 					if (nx < 0 || nz < 0 || nx >= width || nz >= depth) continue;
@@ -367,7 +524,11 @@ A grid graph will update that area and a small margin around it equal to \link P
 					if (constraint.Suitable (nodes[nx+nz2])) {
 						float dist = ((Vector3)nodes[nx+nz2].position-globalPosition).sqrMagnitude;
 						//Debug.DrawRay (nodes[nx+nz2].position,Vector3.up*dist,Color.cyan);counter++;
-						if (dist < minDist && dist < maxDistSqr) { minDist = dist; minNode = nodes[nx+nz2]; }
+						if (dist < minDist && dist < maxDistSqr) {
+							minDist = dist;
+							minNode = nodes[nx+nz2];
+							clampedPosition = matrix.MultiplyPoint3x4 (new Vector3 (Mathf.Clamp(xf,nx-0.5f,nx+0.5f)+0.5f, inverseMatrix.MultiplyPoint3x4((Vector3)minNode.position).y, Mathf.Clamp(zf,nz-0.5f,nz+0.5f)+0.5f));
+						}
 					}
 				}
 				
@@ -380,7 +541,11 @@ A grid graph will update that area and a small margin around it equal to \link P
 					if (constraint.Suitable (nodes[nx+nz2])) {
 						float dist = ((Vector3)nodes[nx+nz2].position-globalPosition).sqrMagnitude;
 						//Debug.DrawRay (nodes[nx+nz2].position,Vector3.up*dist,Color.cyan);counter++;
-						if (dist < minDist && dist < maxDistSqr) { minDist = dist; minNode = nodes[nx+nz2]; }
+						if (dist < minDist && dist < maxDistSqr) {
+							minDist = dist;
+							minNode = nodes[nx+nz2];
+							clampedPosition = matrix.MultiplyPoint3x4 (new Vector3 (Mathf.Clamp(xf,nx-0.5f,nx+0.5f)+0.5f, inverseMatrix.MultiplyPoint3x4((Vector3)minNode.position).y, Mathf.Clamp(zf,nz-0.5f,nz+0.5f)+0.5f));
+						}
 					}
 				}
 				
@@ -393,7 +558,11 @@ A grid graph will update that area and a small margin around it equal to \link P
 					if (constraint.Suitable (nodes[nx+nz*width])) {
 						float dist = ((Vector3)nodes[nx+nz*width].position-globalPosition).sqrMagnitude;
 						//Debug.DrawRay (nodes[nx+nz*width].position,Vector3.up*dist,Color.cyan);counter++;
-						if (dist < minDist && dist < maxDistSqr) { minDist = dist; minNode = nodes[nx+nz*width]; }
+						if (dist < minDist && dist < maxDistSqr) {
+							minDist = dist;
+							minNode = nodes[nx+nz*width];
+							clampedPosition = matrix.MultiplyPoint3x4 (new Vector3 (Mathf.Clamp(xf,nx-0.5f,nx+0.5f)+0.5f, inverseMatrix.MultiplyPoint3x4((Vector3)minNode.position).y, Mathf.Clamp(zf,nz-0.5f,nz+0.5f)+0.5f));
+						}
 					}
 				}
 				
@@ -405,18 +574,28 @@ A grid graph will update that area and a small margin around it equal to \link P
 					if (constraint.Suitable (nodes[nx+nz*width])) {
 						float dist = ((Vector3)nodes[nx+nz*width].position-globalPosition).sqrMagnitude;
 						//Debug.DrawRay (nodes[nx+nz*width].position,Vector3.up*dist,Color.cyan);counter++;
-						if (dist < minDist && dist < maxDistSqr) { minDist = dist; minNode = nodes[nx+nz*width]; }
+						if (dist < minDist && dist < maxDistSqr) {
+							minDist = dist;
+							minNode = nodes[nx+nz*width];
+							clampedPosition = matrix.MultiplyPoint3x4 (new Vector3 (Mathf.Clamp(xf,nx-0.5f,nx+0.5f)+0.5f, inverseMatrix.MultiplyPoint3x4((Vector3)minNode.position).y, Mathf.Clamp(zf,nz-0.5f,nz+0.5f)+0.5f));
+						}
 					}
 				}
 				
 				if (minNode != null) {
-					if (overlap == 0) return new NNInfo(minNode);
+					if (overlap == 0) {
+						nn.node = minNode;
+						nn.clampedPosition = clampedPosition;
+						return nn;
+					}
 					else overlap--;
 				}
 				
 				//No nodes were inside grid bounds
 				if (!anyInside) {
-					return new NNInfo(minNode);
+					nn.node = minNode;
+					nn.clampedPosition = clampedPosition;
+					return nn;
 				}
 			}
 			//return new NNInfo ();
@@ -426,32 +605,51 @@ A grid graph will update that area and a small margin around it equal to \link P
 		 * The cost for a non-diagonal movement between two adjacent nodes is RoundToInt (#nodeSize * Int3.Precision)\n
 		 * The cost for a diagonal movement between two adjacent nodes is RoundToInt (#nodeSize * Sqrt (2) * Int3.Precision) */
 		public virtual void SetUpOffsetsAndCosts () {
-			neighbourOffsets = new int[8] {
-				-width, 1 , width , -1,
-				-width+1, width+1 , width-1, -width-1
-			};
 			
-			int straightCost = Mathf.RoundToInt (nodeSize*Int3.Precision);
-			int diagonalCost = Mathf.RoundToInt (nodeSize*Mathf.Sqrt (2F)*Int3.Precision);
+			//First 4 are for the four directly adjacent nodes the last 4 are for the diagonals
+			neighbourOffsets[0] = -width;
+			neighbourOffsets[1] = 1;
+			neighbourOffsets[2] = width;
+			neighbourOffsets[3] = -1;
+			neighbourOffsets[4] = -width+1;
+			neighbourOffsets[5] = width+1;
+			neighbourOffsets[6] = width-1;
+			neighbourOffsets[7] = -width-1;
 			
-			neighbourCosts = new int[8] {
-				straightCost,straightCost,straightCost,straightCost,
-				diagonalCost,diagonalCost,diagonalCost,diagonalCost
-			};
+			uint straightCost = (uint)Mathf.RoundToInt (nodeSize*Int3.Precision);
+			uint diagonalCost = (uint)Mathf.RoundToInt (nodeSize*Mathf.Sqrt (2F)*Int3.Precision);
 			
-			//Not for diagonal nodes, first 4 is for the four cross neighbours the last 4 is for the diagonals
-			neighbourXOffsets = new int[8] {
-				0, 1, 0, -1,
-				1, 1, -1, -1
-			};
+			//Diagonals cost more (sqrt(2) times more)
+			neighbourCosts[0] = straightCost;
+			neighbourCosts[1] = straightCost;
+			neighbourCosts[2] = straightCost;
+			neighbourCosts[3] = straightCost;
+			neighbourCosts[4] = diagonalCost;
+			neighbourCosts[5] = diagonalCost;
+			neighbourCosts[6] = diagonalCost;
+			neighbourCosts[7] = diagonalCost;
 			
-			neighbourZOffsets = new int[8] {
-				-1, 0, 1, 0,
-				-1, 1, 1, -1
-			};
+			
+			neighbourXOffsets[0] = 0;
+			neighbourXOffsets[1] = 1;
+			neighbourXOffsets[2] = 0;
+			neighbourXOffsets[3] = -1;
+			neighbourXOffsets[4] = 1;
+			neighbourXOffsets[5] = 1;
+			neighbourXOffsets[6] = -1;
+			neighbourXOffsets[7] = -1;
+			
+			neighbourZOffsets[0] = -1;
+			neighbourZOffsets[1] =  0;
+			neighbourZOffsets[2] =  1;
+			neighbourZOffsets[3] =  0;
+			neighbourZOffsets[4] = -1;
+			neighbourZOffsets[5] =  1;
+			neighbourZOffsets[6] =  1;
+			neighbourZOffsets[7] = -1;
 		}
 		
-		public override void Scan () {
+		public override void ScanInternal (OnScanStatus statusCallback) {
 			
 			AstarPath.OnPostScan += new OnScanDelegate (OnPostScan);
 			
@@ -480,12 +678,17 @@ A grid graph will update that area and a small margin around it equal to \link P
 			
 			//GridNode.RemoveGridGraph (this);
 			
-			int gridIndex = GridNode.SetGridGraph (this);
+			int graphIndex = AstarPath.active.astarData.GetGraphIndex(this);
+			GridNode.SetGridGraph (graphIndex,this);
 			
 			//graphNodes = new GridNode[width*depth];
 			
-			nodes = CreateNodes (width*depth);
-			GridNode[] graphNodes = nodes as GridNode[];
+			//nodes = CreateNodes (width*depth);
+			nodes = new GridNode[width*depth];
+			for (int i=0;i<nodes.Length;i++) {
+				nodes[i] = new GridNode(active);
+				nodes[i].GraphIndex = (uint)graphIndex;
+			}
 			
 			if (collision == null) {
 				collision = new GraphCollision ();
@@ -499,9 +702,9 @@ A grid graph will update that area and a small margin around it equal to \link P
 			for (int z = 0; z < depth; z ++) {
 				for (int x = 0; x < width; x++) {
 					
-					GridNode node = graphNodes[z*width+x];//new GridNode ();
+					GridNode node = nodes[z*width+x];//new GridNode ();
 					
-					node.SetIndex (z*width+x);
+					node.NodeInGridIndex = z*width+x;
 					
 					UpdateNodePositionCollision (node,x,z);
 					
@@ -536,7 +739,6 @@ A grid graph will update that area and a small margin around it equal to \link P
 						node.walkable = walkable;
 					}*/
 					
-					node.SetGridIndex (gridIndex);
 				}
 			}
 			
@@ -544,7 +746,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 			for (int z = 0; z < depth; z ++) {
 				for (int x = 0; x < width; x++) {
 				
-					GridNode node = graphNodes[z*width+x];
+					GridNode node = nodes[z*width+x];
 						
 					CalculateConnections (nodes,x,z,node);
 					
@@ -561,21 +763,23 @@ A grid graph will update that area and a small margin around it equal to \link P
 		
 		/** Updates position, walkability and penalty for the node.
 		 * Assumes that collision.Initialize (...) has been called before this function */
-		public void UpdateNodePositionCollision (Node node, int x, int z, bool resetPenalty = true) {
+		public virtual void UpdateNodePositionCollision (GridNode node, int x, int z, bool resetPenalty = true) {
 			
-			node.position = (Int3)matrix.MultiplyPoint3x4 (new Vector3 (x+0.5F,0,z+0.5F));
+			node.position = GetNodePosition ( node.NodeInGridIndex, 0 );//0;// = (Int3)matrix.MultiplyPoint3x4 (new Vector3 (x+0.5F,0,z+0.5F));
 			
 			RaycastHit hit;
 			
 			bool walkable = true;
-			
-			node.position = (Int3)collision.CheckHeight ((Vector3)node.position, out hit, out walkable);
+
+			Vector3 position = collision.CheckHeight ((Vector3)node.position, out hit, out walkable);
+			//if (walkable)
+				node.position = (Int3)position;//GetNodePosition ( node.NodeInGridIndex, (int)((collision.fromHeight - hit.distance)*Int3.Precision) );
 			
 			if (resetPenalty)
-				node.penalty = initialPenalty;//Mathf.RoundToInt (Random.value*100);
+				node.Penalty = initialPenalty;//Mathf.RoundToInt (Random.value*100);
 			
 			if (penaltyPosition && resetPenalty) {
-				node.penalty += (uint)Mathf.RoundToInt ((node.position.y-penaltyPositionOffset)*penaltyPositionFactor);
+				node.Penalty += (uint)Mathf.RoundToInt ((node.position.y-penaltyPositionOffset)*penaltyPositionFactor);
 			}
 			
 			/*if (textureData && textureSourceData != null && x < textureSource.width && z < textureSource.height) {
@@ -592,7 +796,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 					
 					//Add penalty based on normal
 					if (penaltyAngle && resetPenalty) {
-						node.penalty += (uint)Mathf.RoundToInt ((1F-angle)*penaltyAngleFactor);
+						node.Penalty += (uint)Mathf.RoundToInt ((1F-angle)*penaltyAngleFactor);
 					}
 					
 					//Max slope in cosinus
@@ -607,18 +811,18 @@ A grid graph will update that area and a small margin around it equal to \link P
 			
 			//If the walkable flag has already been set to false, there is no point in checking for it again
 			if (walkable)
-				node.walkable = collision.Check ((Vector3)node.position);
+				node.Walkable = collision.Check ((Vector3)node.position);
 			else
-				node.walkable = walkable;
+				node.Walkable = walkable;
 			
-			node.Bit15 = node.walkable;
+			node.WalkableErosion = node.Walkable;
 			//Equal to (node as GridNode).WalkableErosion = node.walkable, but this is faster
 			
 		}
 		
 		/** Erodes the walkable area. \see #erodeIterations */
 		public virtual void ErodeWalkableArea () {
-			ErodeWalkableArea (0,0,width,depth);
+			ErodeWalkableArea (0,0,Width,Depth);
 		}
 		
 		/** Erodes the walkable area.
@@ -629,18 +833,18 @@ A grid graph will update that area and a small margin around it equal to \link P
 		 * \see #erodeIterations */
 		public virtual void ErodeWalkableArea (int xmin, int zmin, int xmax, int zmax) {
 			//Clamp values to grid
-			xmin = xmin < 0 ? 0 : (xmin > width ? width : xmin);
-			xmax = xmax < 0 ? 0 : (xmax > width ? width : xmax);
-			zmin = zmin < 0 ? 0 : (zmin > depth ? depth : zmin);
-			zmax = zmax < 0 ? 0 : (zmax > depth ? depth : zmax);
+			xmin = xmin < 0 ? 0 : (xmin > Width ? Width : xmin);
+			xmax = xmax < 0 ? 0 : (xmax > Width ? Width : xmax);
+			zmin = zmin < 0 ? 0 : (zmin > Depth ? Depth : zmin);
+			zmax = zmax < 0 ? 0 : (zmax > Depth ? Depth : zmax);
 			
 			if (!erosionUseTags) {
 				for (int it=0;it < erodeIterations;it++) {
 					for (int z = zmin; z < zmax; z ++) {
 						for (int x = xmin; x < xmax; x++) {
-							GridNode node = nodes[z*width+x] as GridNode;
+							GridNode node = nodes[z*Width+x];
 							
-							if (!node.walkable) {
+							if (!node.Walkable) {
 								
 								/*int index = node.GetIndex ();
 								
@@ -653,14 +857,14 @@ A grid graph will update that area and a small margin around it equal to \link P
 								bool anyFalseConnections = false;
 							
 								for (int i=0;i<4;i++) {
-									if (!node.GetConnection (i)) {
+									if (!this.HasNodeConnection (node,i)) {
 										anyFalseConnections = true;
 										break;
 									}
 								}
 								
 								if (anyFalseConnections) {
-									node.walkable = false;
+									node.Walkable = false;
 								}
 							}
 						}
@@ -669,7 +873,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 					//Recalculate connections
 					for (int z = zmin; z < zmax; z ++) {
 						for (int x = xmin; x < xmax; x++) {
-							GridNode node = nodes[z*width+x] as GridNode;
+							GridNode node = nodes[z*Width+x];
 							CalculateConnections (nodes,x,z,node);
 						}
 					}
@@ -689,30 +893,29 @@ A grid graph will update that area and a small margin around it equal to \link P
 						for (int x = xmin; x < xmax; x++) {
 							GridNode node = nodes[z*width+x] as GridNode;
 							
-							if (node.walkable && node.tags >= erosionFirstTag && node.tags < erosionFirstTag + it) {
-								
-								int index = node.GetIndex ();
+							if (node.Walkable && node.Tag >= erosionFirstTag && node.Tag < erosionFirstTag + it) {
 								
 								for (int i=0;i<4;i++) {
-									if (node.GetConnection (i) ) {
-										int tag = nodes[index+neighbourOffsets[i]].tags;
+									GridNode other = GetNodeConnection (node,i);
+									if (other != null) {
+										uint tag = other.Tag;
 										if (tag > erosionFirstTag + it || tag < erosionFirstTag) {
-											nodes[index+neighbourOffsets[i]].tags = erosionFirstTag+it;
+											other.Tag = (uint)(erosionFirstTag+it);
 										}
 									}
 								}
-							} else if (node.walkable && it == 0) {
+							} else if (node.Walkable && it == 0) {
 								bool anyFalseConnections = false;
 								
 								for (int i=0;i<4;i++) {
-									if (!node.GetConnection (i)) {
+									if (!HasNodeConnection (node, i)) {
 										anyFalseConnections = true;
 										break;
 									}
 								}
 								
 								if (anyFalseConnections) {
-									node.tags = erosionFirstTag + it;
+									node.Tag = (uint)(erosionFirstTag+it);
 								}
 							}
 						}
@@ -723,7 +926,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 		
 		/** Returns true if a connection between the adjacent nodes \a n1 and \a n2 is valid. Also takes into account if the nodes are walkable */
 		public virtual bool IsValidConnection (GridNode n1, GridNode n2) {
-			if (!n1.walkable || !n2.walkable) {
+			if (!n1.Walkable || !n2.Walkable) {
 				return false;
 			}
 			
@@ -746,7 +949,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 			GridGraph gg = AstarData.GetGraph (node) as GridGraph;
 			
 			if (gg != null) {
-				int index = node.GetIndex ();
+				int index = node.NodeInGridIndex;
 				int x = index % gg.width;
 				int z = index / gg.width;
 				gg.CalculateConnections (gg.nodes,x,z,node);
@@ -754,17 +957,19 @@ A grid graph will update that area and a small margin around it equal to \link P
 		}
 		
 		/** Calculates the grid connections for a single node */
-		public virtual void CalculateConnections (Node[] nodes, int x, int z, GridNode node) {
+		public virtual void CalculateConnections (GridNode[] nodes, int x, int z, GridNode node) {
 			
 			//Reset all connections
-			node.flags = node.flags & -256;
+			//node.flags = node.lags & -256;
+			
+			node.ResetConnectionsInternal ();
 			
 			//All connections are disabled if the node is not walkable
-			if (!node.walkable) {
+			if (!node.Walkable) {
 				return;
 			}
 			
-			int index = node.GetIndex ();
+			int index = node.NodeInGridIndex;
 			
 			if (corners == null) {
 				corners = new int[4];
@@ -786,10 +991,13 @@ A grid graph will update that area and a small margin around it equal to \link P
 				GridNode other = nodes[index+neighbourOffsets[i]] as GridNode;
 				
 				if (IsValidConnection (node, other)) {
-					node.SetConnectionRaw (i,1);
-					
+					node.SetConnectionInternal (i, true);
+					//SetNodeConnection (node, i, true);
 					corners[i]++;
 					corners[j]++;
+				} else {
+					node.SetConnectionInternal (i, false);
+					//SetNodeConnection (node, i, false);
 				}
 			}
 			
@@ -805,11 +1013,10 @@ A grid graph will update that area and a small margin around it equal to \link P
 								continue;
 							}
 					
-							GridNode other = nodes[index+neighbourOffsets[i+4]] as GridNode;
+							GridNode other = nodes[index+neighbourOffsets[i+4]];
 							
-							if (IsValidConnection (node,other)) {
-								node.SetConnectionRaw (i+4,1);
-							}
+							node.SetConnectionInternal (i+4, IsValidConnection (node,other));
+							//SetNodeConnection (node, i+4, IsValidConnection (node,other));
 						}
 					}
 				} else {
@@ -817,11 +1024,10 @@ A grid graph will update that area and a small margin around it equal to \link P
 						
 						//We don't need to check if it is out of bounds because if both of the other neighbours are inside the bounds this one must be too
 						if (corners[i] == 2) {
-							GridNode other = nodes[index+neighbourOffsets[i+4]] as GridNode;
+							GridNode other = nodes[index+neighbourOffsets[i+4]];
 							
-							if (IsValidConnection (node,other)) {
-								node.SetConnectionRaw (i+4,1);
-							}
+							node.SetConnectionInternal (i+4, IsValidConnection (node,other));
+							//SetNodeConnection (node, i+4, IsValidConnection (node,other));
 						}
 					}
 				}
@@ -842,108 +1048,8 @@ A grid graph will update that area and a small margin around it equal to \link P
 			
 			//Link to other grids
 			
-			int maxCost = Mathf.RoundToInt (autoLinkDistLimit * Int3.Precision);
+			throw new System.NotSupportedException ();
 			
-			//Loop through all GridGraphs
-			foreach (GridGraph gg in script.astarData.FindGraphsOfType (typeof (GridGraph))) {
-				
-				if (gg == this || gg.nodes == null || nodes == null) {
-					continue;
-				}
-				
-				//Int3 prevPos = gg.GetNearest (nodes[0]).position;
-				
-				//Z = 0
-				for (int x = 0; x < width;x++) {
-					
-					Node node1 = nodes[x];
-					Node node2 = gg.GetNearest ((Vector3)node1.position).node;
-					
-					Vector3 pos = inverseMatrix.MultiplyPoint3x4 ((Vector3)node2.position);
-					
-					if (pos.z > 0) {
-						continue;
-					}
-					
-					int cost = (node1.position-node2.position).costMagnitude;
-					
-					if (cost > maxCost) {
-						continue;
-					}
-					
-					node1.AddConnection (node2,cost);
-					node2.AddConnection (node1,cost);
-				}
-				
-				//X = 0
-				for (int z = 0; z < depth;z++) {
-					
-					Node node1 = nodes[z*width];
-					Node node2 = gg.GetNearest ((Vector3)node1.position).node;
-					
-					Vector3 pos = inverseMatrix.MultiplyPoint3x4 ((Vector3)node2.position);
-					
-					if (pos.x > 0) {
-						continue;
-					}
-					
-					int cost = (node1.position-node2.position).costMagnitude;
-					
-					if (cost > maxCost) {
-						continue;
-					}
-					
-					node1.AddConnection (node2,cost);
-					node2.AddConnection (node1,cost);
-				}
-				
-				//Z = max
-				for (int x = 0; x < width;x++) {
-					
-					Node node1 = nodes[(depth-1)*width+x];
-					Node node2 = gg.GetNearest ((Vector3)node1.position).node;
-					
-					Vector3 pos = inverseMatrix.MultiplyPoint3x4 ((Vector3)node2.position);
-					
-					if (pos.z < depth-1) {
-						continue;
-					}
-					
-					//Debug.DrawLine (node1.position,node2.position,Color.red);
-					int cost = (node1.position-node2.position).costMagnitude;
-					
-					if (cost > maxCost) {
-						continue;
-					}
-					
-					node1.AddConnection (node2,cost);
-					node2.AddConnection (node1,cost);
-				}
-				
-				//X = max
-				for (int z = 0; z < depth;z++) {
-					
-					Node node1 = nodes[z*width+width-1];
-					Node node2 = gg.GetNearest ((Vector3)node1.position).node;
-					
-					Vector3 pos = inverseMatrix.MultiplyPoint3x4 ((Vector3)node2.position);
-					
-					if (pos.x < width-1) {
-						continue;
-					}
-					
-					int cost = (node1.position-node2.position).costMagnitude;
-					
-					if (cost > maxCost) {
-						continue;
-					}
-					
-					
-					
-					node1.AddConnection (node2,cost);
-					node2.AddConnection (node1,cost);
-				}
-			}
 	
 		}
 		
@@ -966,12 +1072,21 @@ A grid graph will update that area and a small margin around it equal to \link P
 				return;
 			}
 			
-			base.OnDrawGizmos (drawNodes);
+			//base.OnDrawGizmos (drawNodes);
+			
+			PathHandler debugData = AstarPath.active.debugPathData;
+			
+			GridNode node = null;
+			
+			/*GraphNodeDelegate del = delegate (GraphNode other) {
+				Gizmos.DrawLine ((Vector3)node.Position, (Vector3)other.Position);
+			};*/
+			
 			for (int z = 0; z < depth; z ++) {
 				for (int x = 0; x < width; x++) {
-					GridNode node = nodes[z*width+x] as GridNode;
+					node = nodes[z*width+x] as GridNode;
 					
-					if (!node.walkable) {// || node.activePath != AstarPath.active.debugPath)  
+					if (!node.Walkable) {// || node.activePath != AstarPath.active.debugPath)  
 						continue;
 					}
 					//Gizmos.color = node.walkable ? Color.green : Color.red;
@@ -985,17 +1100,15 @@ A grid graph will update that area and a small margin around it equal to \link P
 					//else 
 					if (AstarPath.active.showSearchTree && AstarPath.active.debugPathData != null) {
 						if (InSearchTree(node,AstarPath.active.debugPath)) {
-							NodeRun nodeR = node.GetNodeRun (AstarPath.active.debugPathData);
-							NodeRun parentR = nodeR.parent;
-							if (parentR != null)
-								Gizmos.DrawLine ((Vector3)node.position, (Vector3)parentR.node.position);
+							PathNode nodeR = debugData.GetPathNode (node);
+							if (nodeR != null && nodeR.parent != null) {
+								Gizmos.DrawLine ((Vector3)node.position, (Vector3)nodeR.parent.node.position);
+							}
 						}
 					} else {
-						
 						for (int i=0;i<8;i++) {
-							
-							if (node.GetConnection (i)) {
-								GridNode other = nodes[node.GetIndex ()+neighbourOffsets[i]] as GridNode;
+							GridNode other = GetNodeConnection (node, i);
+							if (other != null) {
 								Gizmos.DrawLine ((Vector3)node.position, (Vector3)other.position);
 							}
 						}
@@ -1032,7 +1145,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 		  * 
 		  * \see GetNodesInArea(GraphUpdateShape)
 		  */
-		public List<Node> GetNodesInArea (Bounds b) {
+		public List<GraphNode> GetNodesInArea (Bounds b) {
 			return GetNodesInArea (b, null);
 		}
 		
@@ -1042,7 +1155,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 		  * 
 		  * \see GetNodesInArea(Bounds)
 		  */
-		public List<Node> GetNodesInArea (GraphUpdateShape shape) {
+		public List<GraphNode> GetNodesInArea (GraphUpdateShape shape) {
 			return GetNodesInArea (shape.GetBounds (), shape);
 		}
 		
@@ -1050,13 +1163,13 @@ A grid graph will update that area and a small margin around it equal to \link P
 		 * If a shape is supplied, it is assumed to be contained inside the bounding box.
 		 * \see GraphUpdateShape.GetBounds
 		 */
-		private List<Node> GetNodesInArea (Bounds b, GraphUpdateShape shape) {
+		private List<GraphNode> GetNodesInArea (Bounds b, GraphUpdateShape shape) {
 			
 			if (nodes == null || width*depth != nodes.Length) {
 				return null;
 			}
 			
-			List<Node> inArea = Pathfinding.Util.ListPool<Node>.Claim ();
+			List<GraphNode> inArea = Pathfinding.Util.ListPool<GraphNode>.Claim ();
 			
 			Vector3 min, max;
 			GetBoundsMinMax (b,inverseMatrix,out min, out max);
@@ -1077,7 +1190,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 					
 					int index = z*width+x;
 					
-					Node node = nodes[index];
+					GraphNode node = nodes[index];
 					
 					if (b.Contains ((Vector3)node.position) && (shape == null || shape.Contains ((Vector3)node.position))) {
 						inArea.Add (node);
@@ -1087,6 +1200,12 @@ A grid graph will update that area and a small margin around it equal to \link P
 			
 			return inArea;
 		}
+		
+		public GraphUpdateThreading CanUpdateAsync (GraphUpdateObject o) {
+			return GraphUpdateThreading.UnityThread;
+		}
+		
+		public void UpdateAreaInit (GraphUpdateObject o) {}
 		
 		/** Internal function to update an area of the graph.
 		  */
@@ -1146,7 +1265,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 			
 			if (willChangeWalkability || erosion > 0) {
 				//Add affect radius for erosion. +1 for updating connectivity info at the border
-				affectRect = affectRect.Expand (erosion +1);
+				affectRect = affectRect.Expand (erosion + 1);
 			}
 			
 			IntRect clampedRect = IntRect.Intersection (affectRect,gridRect);
@@ -1170,7 +1289,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 						
 						int index = z*width+x;
 						
-						GridNode node = nodes[index] as GridNode;
+						GridNode node = nodes[index];
 						
 						UpdateNodePositionCollision (node,x,z, o.resetPenaltyOnPhysics);
 					}
@@ -1184,14 +1303,14 @@ A grid graph will update that area and a small margin around it equal to \link P
 				for (int z = clampedRect.ymin;z <= clampedRect.ymax;z++) {
 					int index = z*width+x;
 					
-					GridNode node = nodes[index] as GridNode;
+					GridNode node = nodes[index];
 					
 					if (willChangeWalkability) {
-						node.walkable = node.WalkableErosion;
-						o.Apply (node);
-						node.WalkableErosion = node.walkable;
+						node.Walkable = node.WalkableErosion;
+						if (o.bounds.Contains ((Vector3)node.position)) o.Apply (node);
+						node.WalkableErosion = node.Walkable;
 					} else {
-						o.Apply (node);
+						if (o.bounds.Contains ((Vector3)node.position)) o.Apply (node);
 					}
 				}
 			}
@@ -1205,7 +1324,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 					for (int z = clampedRect.ymin;z <= clampedRect.ymax;z++) {
 						int index = z*width+x;
 						
-						GridNode node = nodes[index] as GridNode;
+						GridNode node = nodes[index];
 						
 						CalculateConnections (nodes,x,z,node);
 					}
@@ -1234,14 +1353,14 @@ A grid graph will update that area and a small margin around it equal to \link P
 						
 						int index = z*width+x;
 						
-						GridNode node = nodes[index] as GridNode;
+						GridNode node = nodes[index];
 						
-						bool tmp = node.walkable;
-						node.walkable = node.WalkableErosion;
+						bool tmp = node.Walkable;
+						node.Walkable = node.WalkableErosion;
 						
 						if (!erosionRect1.Contains (x,z)) {
-							//Save the border's walkabilty data in bit 16 (will be reset later)
-							node.Bit16 = tmp;
+							//Save the border's walkabilty data (will be reset later)
+							node.TmpWalkable = tmp;
 						}
 					}
 				}
@@ -1250,7 +1369,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 					for (int z = erosionRect2.ymin;z <= erosionRect2.ymax;z++) {
 						int index = z*width+x;
 						
-						GridNode node = nodes[index] as GridNode;
+						GridNode node = nodes[index];
 						
 						
 						CalculateConnections (nodes,x,z,node);
@@ -1266,10 +1385,10 @@ A grid graph will update that area and a small margin around it equal to \link P
 						
 						int index = z*width+x;
 						
-						GridNode node = nodes[index] as GridNode;
+						GridNode node = nodes[index];
 						
 						//Restore temporarily stored data
-						node.walkable = node.Bit16;
+						node.Walkable = node.TmpWalkable;
 					}
 				}
 				
@@ -1278,7 +1397,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 					for (int z = erosionRect2.ymin;z <= erosionRect2.ymax;z++) {
 						int index = z*width+x;
 						
-						GridNode node = nodes[index] as GridNode;
+						GridNode node = nodes[index];
 						CalculateConnections (nodes,x,z,node);
 					}
 				}
@@ -1287,7 +1406,8 @@ A grid graph will update that area and a small margin around it equal to \link P
 		
 		//IFunnelGraph Implementation
 		
-		public void BuildFunnelCorridor (List<Node> path, int sIndex, int eIndex, List<Vector3> left, List<Vector3> right) {
+		/*
+		public void BuildFunnelCorridor (List<GraphNode> path, int sIndex, int eIndex, List<Vector3> left, List<Vector3> right) {
 			
 			for (int n=sIndex;n<eIndex;n++) {
 				
@@ -1298,7 +1418,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 			}
 		}
 		
-		public void AddPortal (Node n1, Node n2, List<Vector3> left, List<Vector3> right) {
+		public void AddPortal (GraphNode n1, GraphNode n2, List<Vector3> left, List<Vector3> right) {
 			//Not implemented
 		}
 		
@@ -1308,15 +1428,16 @@ A grid graph will update that area and a small margin around it equal to \link P
 				return;
 			}
 			
-			int i1 = n1.GetIndex ();
-			int i2 = n2.GetIndex ();
+			int i1 = n1.NodeInGridIndex;
+			int i2 = n2.NodeInGridIndex;
+			/** \todo Use System.Math.DivRem *
 			int x1 = i1 % width;
 			int x2 = i2 % width;
 			int z1 = i1 / width;
 			int z2 = i2 / width;
 			
-			Vector3 n1p = (Vector3)n1.position;
-			Vector3 n2p = (Vector3)n2.position;
+			Vector3 n1p = (Vector3)n1.Position;
+			Vector3 n2p = (Vector3)n2.Position;
 			
 			int diffx = Mathf.Abs (x1-x2);
 			int diffz = Mathf.Abs (z1-z2);
@@ -1341,13 +1462,13 @@ A grid graph will update that area and a small margin around it equal to \link P
 			} else {
 				//Diagonal move
 				
-				Node t1 = nodes[z1 * width + x2];
-				Node t2 = nodes[z2 * width + x1];
-				Node target = null;
+				GraphNode t1 = nodes[z1 * width + x2];
+				GraphNode t2 = nodes[z2 * width + x1];
+				GraphNode target = null;
 				
-				if (t1.walkable) {
+				if (t1.Walkable) {
 					target = t1;
-				} else if (t2.walkable) {
+				} else if (t2.Walkable) {
 					target = t2;
 				}
 				
@@ -1361,7 +1482,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 					AddPortal ((GridNode)target,n2,left,right);
 				}
 			}
-		}
+		}*/
 		
 		//END IFunnelGraph Implementation
 		
@@ -1372,22 +1493,22 @@ A grid graph will update that area and a small margin around it equal to \link P
 		  */
 		public bool CheckConnection (GridNode node, int dir) {
 			if (neighbours == NumNeighbours.Eight) {
-				return node.GetConnection (dir);
+				return HasNodeConnection (node, dir);
 			} else {
 				int dir1 = (dir-4-1) & 0x3;
 				int dir2 = (dir-4+1) & 0x3;
 				
-				if (!node.GetConnection (dir1) || !node.GetConnection (dir2)) {
+				if (!HasNodeConnection (node, dir1) || !HasNodeConnection (node, dir2)) {
 					return false;
 				} else {
-					GridNode n1 = nodes[node.GetIndex ()+neighbourOffsets[dir1]] as GridNode;
-					GridNode n2 = nodes[node.GetIndex ()+neighbourOffsets[dir2]] as GridNode;
+					GridNode n1 = nodes[node.NodeInGridIndex+neighbourOffsets[dir1]];
+					GridNode n2 = nodes[node.NodeInGridIndex+neighbourOffsets[dir2]];
 					
-					if (!n1.walkable || !n2.walkable) {
+					if (!n1.Walkable || !n2.Walkable) {
 						return false;
 					}
 					
-					if (!n2.GetConnection (dir1) || !n1.GetConnection (dir2)) {
+					if (!HasNodeConnection (n2, dir1) || !HasNodeConnection (n1, dir2)) {
 						return false;
 					}
 				}
@@ -1395,28 +1516,36 @@ A grid graph will update that area and a small margin around it equal to \link P
 			}
 		}
 		
-		/*
-		function line(x0, y0, x1, y1)
-   dx := abs(x1-x0)
-   dy := abs(y1-y0) 
-   if x0 < x1 then sx := 1 else sx := -1
-   if y0 < y1 then sy := 1 else sy := -1
-   err := dx-dy
- 
-   loop
-     setPixel(x0,y0)
-     if x0 = x1 and y0 = y1 exit loop
-     e2 := 2*err
-     if e2 > -dy then 
-       err := err - dy
-       x0 := x0 + sx
-     end if
-     if e2 <  dx then 
-       err := err + dx
-       y0 := y0 + sy 
-     end if
-   end loop
-   */
+		public override void SerializeExtraInfo (GraphSerializationContext ctx)
+		{
+			if (nodes == null) {
+				ctx.writer.Write(-1);
+				return;
+			}
+			
+			ctx.writer.Write (nodes.Length);
+			
+			for (int i=0;i<nodes.Length;i++) {
+				nodes[i].SerializeNode(ctx);
+			}
+		}
+		
+		public override void DeserializeExtraInfo (GraphSerializationContext ctx)
+		{
+			
+			int count = ctx.reader.ReadInt32();
+			if (count == -1) {
+				nodes = null;
+				return;
+			}
+			
+			nodes = new GridNode[count];
+			
+			for (int i=0;i<nodes.Length;i++) {
+				nodes[i] = new GridNode (active);
+				nodes[i].DeserializeNode(ctx);
+			}
+		}
 		
 		public override void PostDeserialization () {
 			
@@ -1435,7 +1564,7 @@ A grid graph will update that area and a small margin around it equal to \link P
 			
 			//graphNodes = new GridNode[nodes.Length];
 			
-			int gridIndex = GridNode.SetGridGraph (this);
+			GridNode.SetGridGraph (AstarPath.active.astarData.GetGraphIndex(this),this);
 			
 			for (int z = 0; z < depth; z ++) {
 				for (int x = 0; x < width; x++) {
@@ -1447,208 +1576,9 @@ A grid graph will update that area and a small margin around it equal to \link P
 						return;
 					}
 					
-					node.SetIndex  (z*width+x);
-					node.SetGridIndex (gridIndex);
+					node.NodeInGridIndex = z*width+x;
 				}
 			}
-		}
-		
-		/** Serializes grid graph specific node stuff to the serializer.
-		 * \deprecated This function is obsolete. New serialization functions exist
-		 * \astarpro */
-		[System.Obsolete]
-		public void SerializeNodes (Node[] nodes, AstarSerializer serializer) {
-
-			/** \todo Add check for mask == Save Node Positions. Can't use normal mask since it is changed by SerializeSettings */
-			
-			GenerateMatrix ();
-			
-			int maxValue = 0;
-			int minValue = 0;
-			
-			for (int i=0;i<nodes.Length;i++) {
-				int val = nodes[i].position.y;
-				maxValue = val > maxValue ? val : maxValue;
-				minValue = val < minValue ? val : minValue;
-			}
-			
-			int maxRange = maxValue > -minValue ? maxValue : -minValue;
-			
-			if (maxRange <= System.Int16.MaxValue) {
-				//Int16
-				serializer.writerStream.Write ((byte)0);
-				for (int i=0;i<nodes.Length;i++) {
-					serializer.writerStream.Write ((System.Int16)(inverseMatrix.MultiplyPoint3x4 ((Vector3)nodes[i].position).y));
-				}
-			} else {
-				//Int32
-				serializer.writerStream.Write ((byte)1);
-				for (int i=0;i<nodes.Length;i++) {
-					serializer.writerStream.Write (inverseMatrix.MultiplyPoint3x4 ((Vector3)nodes[i].position).y);
-				}
-			}
-			/*for (int i=0;i<nodes.Length;i++) {
-				GridNode node = nodes[i] as GridNode;
-				
-				if (node == null) {
-					Debug.LogError ("Serialization Error : Couldn't cast the node to the appropriate type - GridGenerator");
-					return;
-				}
-				
-				serializer.writerStream.Write (node.index);
-			}*/
-
-		}
-		
-		/** Deserializes grid graph specific node stuff from the serializer.
-		 * \deprecated This function is obsolete. New serialization functions exist
-		 * \astarpro */
-		[System.Obsolete]
-		public void DeSerializeNodes (Node[] nodes, AstarSerializer serializer) {
-			
-
-			/*for (int i=0;i<nodes.Length;i++) {
-				GridNode node = nodes[i] as GridNode;
-				
-				if (node == null) {
-					Debug.LogError ("DeSerialization Error : Couldn't cast the node to the appropriate type - GridGenerator");
-					return;
-				}*/
-			
-			GenerateMatrix ();
-			
-			SetUpOffsetsAndCosts ();
-			
-			if (nodes == null || nodes.Length == 0) {
-				return;
-			}
-			
-			nodes = new GridNode[nodes.Length];
-			
-			int gridIndex = GridNode.SetGridGraph (this);
-			
-			int numberSize = (int)serializer.readerStream.ReadByte ();
-			
-			for (int z = 0; z < depth; z ++) {
-				for (int x = 0; x < width; x++) {
-					
-					GridNode node = nodes[z*width+x] as GridNode;
-				
-					nodes[z*width+x] = node;
-					
-					if (node == null) {
-						Debug.LogError ("DeSerialization Error : Couldn't cast the node to the appropriate type - GridGenerator");
-						return;
-					}
-					
-					node.SetIndex  (z*width+x);
-					node.SetGridIndex (gridIndex);
-					
-					
-					float yPos = 0;
-					
-					//if (serializer.mask == AstarSerializer.SMask.SaveNodePositions) {
-						//Needs to multiply with precision factor because the position will be scaled by Int3.Precision later (Vector3 --> Int3 conversion)
-					if (numberSize == 0) {
-						yPos = serializer.readerStream.ReadInt16 ();
-					} else {
-						yPos = serializer.readerStream.ReadInt32 ();
-					}
-					//}
-					
-					node.position = (Int3)matrix.MultiplyPoint3x4 (new Vector3 (x+0.5F,yPos,z+0.5F));
-				}
-			}
-
-			
-		}
-		
-		/** Serialize Settings.
-		 * \deprecated This function is obsolete. New serialization functions exist */
-		public void SerializeSettings (AstarSerializer serializer) {
-			serializer.mask -= AstarSerializer.SMask.SaveNodePositions;
-			
-			//serializer.AddValue ("Width",width);
-			//serializer.AddValue ("Depth",depth);
-			//serializer.AddValue ("Height",height);
-			
-			serializer.AddValue ("unclampedSize",unclampedSize);
-			
-			serializer.AddValue ("cutCorners",cutCorners);
-			serializer.AddValue ("neighbours",(int)neighbours);
-			
-			serializer.AddValue ("center",center);
-			serializer.AddValue ("rotation",rotation);
-			serializer.AddValue ("nodeSize",nodeSize);
-			serializer.AddValue ("collision",collision == null ? new GraphCollision () : collision);
-			
-			serializer.AddValue ("maxClimb",maxClimb);
-			serializer.AddValue ("maxClimbAxis",maxClimbAxis);
-			serializer.AddValue ("maxSlope",maxSlope);
-			
-			serializer.AddValue ("erodeIterations",erodeIterations);
-			
-			serializer.AddValue ("penaltyAngle",penaltyAngle);
-			serializer.AddValue ("penaltyAngleFactor",penaltyAngleFactor);
-			serializer.AddValue ("penaltyPosition",penaltyPosition);
-			serializer.AddValue ("penaltyPositionOffset",penaltyPositionOffset);
-			serializer.AddValue ("penaltyPositionFactor",penaltyPositionFactor);
-			
-			serializer.AddValue ("aspectRatio",aspectRatio);
-			
-		}
-		
-		public void DeSerializeSettings (AstarSerializer serializer) {
-			
-			//width = (int)serializer.GetValue ("Width",typeof(int));
-			//depth = (int)serializer.GetValue ("Depth",typeof(int));
-			//height = (float)serializer.GetValue ("Height",typeof(float));
-			
-			unclampedSize = (Vector2)serializer.GetValue ("unclampedSize",typeof(Vector2));
-			
-			cutCorners = (bool)serializer.GetValue ("cutCorners",typeof(bool));
-			neighbours = (NumNeighbours)serializer.GetValue ("neighbours",typeof(int));
-			
-			rotation = (Vector3)serializer.GetValue ("rotation",typeof(Vector3));
-			
-			nodeSize = (float)serializer.GetValue ("nodeSize",typeof(float));
-			
-			collision = (GraphCollision)serializer.GetValue ("collision",typeof(GraphCollision));
-			
-			center = (Vector3)serializer.GetValue ("center",typeof(Vector3));
-			
-			maxClimb = (float)serializer.GetValue ("maxClimb",typeof(float));
-			maxClimbAxis = (int)serializer.GetValue ("maxClimbAxis",typeof(int),1);
-			maxSlope = (float)serializer.GetValue ("maxSlope",typeof(float),90.0F);
-			
-			erodeIterations = (int)serializer.GetValue ("erodeIterations",typeof(int));
-			
-			penaltyAngle = 			(bool)serializer.GetValue ("penaltyAngle",typeof(bool));
-			penaltyAngleFactor = 	(float)serializer.GetValue ("penaltyAngleFactor",typeof(float));
-			penaltyPosition = 		(bool)serializer.GetValue ("penaltyPosition",typeof(bool));
-			penaltyPositionOffset = (float)serializer.GetValue ("penaltyPositionOffset",typeof(float));
-			penaltyPositionFactor = (float)serializer.GetValue ("penaltyPositionFactor",typeof(float));
-			
-			aspectRatio = (float)serializer.GetValue ("aspectRatio",typeof(float),1F);
-			
-			
-#if UNITY_EDITOR
-			Matrix4x4 oldMatrix = matrix;
-#endif
-			
-			GenerateMatrix ();
-			SetUpOffsetsAndCosts ();
-			
-#if UNITY_EDITOR
-			if (serializer.onlySaveSettings) {
-				if (oldMatrix != matrix && nodes != null) {
-					AstarPath.active.AutoScan ();
-				}
-			}
-#endif
-			
-			//Debug.Log ((string)serializer.GetValue ("SomeString",typeof(string)));
-			//Debug.Log ((Bounds)serializer.GetValue ("SomeBounds",typeof(Bounds)));
 		}
 	}
 	

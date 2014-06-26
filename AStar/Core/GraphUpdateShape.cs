@@ -63,7 +63,7 @@ namespace Pathfinding {
 			return new Bounds ((min+max)*0.5F,max-min);
 		}
 		
-		public bool Contains (Node node) {
+		public bool Contains (GraphNode node) {
 			
 			Vector3 point = (Vector3)node.position;
 			

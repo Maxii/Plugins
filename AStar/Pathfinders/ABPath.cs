@@ -1,6 +1,7 @@
 //#define ASTAR_MORE_PATH_IDS
 //#define ASTAR_NO_LOGGING //Disables path error logging totally. This also reduces memory allocations because the logging strings will not be allocated. It does not affect normal logging calls, only error calls since they are allocated even though they are not logged
 //#define ASTAR_LOCK_FREE_PATH_STATE
+//#define ASTARDEBUG
 
 using UnityEngine;
 using System.Collections;
@@ -27,13 +28,13 @@ namespace Pathfinding {
 		 */
 		public bool recalcStartEndCosts = true;
 		
-		public Node startNode; /**< Start node of the path */
-		public Node endNode;   /**< End node of the path */
+		public GraphNode startNode; /**< Start node of the path */
+		public GraphNode endNode;   /**< End node of the path */
 		
 		/** Hints can be set to enable faster Get Nearest Node queries. Only applies to some graph types */
-		public Node startHint;
+		public GraphNode startHint;
 		/** Hints can be set to enable faster Get Nearest Node queries. Only applies to some graph types */
-		public Node endHint;
+		public GraphNode endHint;
 		
 		/** Start Point exactly as in the path request */
 		public Vector3 originalStartPoint;
@@ -53,7 +54,6 @@ namespace Pathfinding {
 		protected bool hasEndPoint = true;
 		
 		public Int3 startIntPoint; /**< Start point in integer coordinates */
-		public Int3 hTarget; /**< Target to use for H score calculations. \see Pathfinding.Node.h */
 		
 		/** Calculate partial path if the target node cannot be reached.
 		 * If the target node cannot be reached, the node which was closest (given by heuristic) will be chosen as target node
@@ -67,7 +67,7 @@ namespace Pathfinding {
 		
 		/** Current best target for the partial path.
 		 * This is the node with the lowest H score */
-		protected NodeRun partialBestTarget = null;
+		protected PathNode partialBestTarget = null;
 		
 		/** Saved original costs for the end node. \see ResetCosts */
 		protected int[] endNodeCosts;
@@ -129,6 +129,32 @@ namespace Pathfinding {
 			hTarget = (Int3)end;
 		}
 		
+		public override uint GetConnectionSpecialCost (GraphNode a, GraphNode b, uint currentCost) {
+			if (startNode != null && endNode != null) {
+				
+				if (a == startNode) {
+					// hTarget is the endpoint
+					return (uint)((startIntPoint - (b == endNode ? hTarget : b.position)).costMagnitude * (currentCost*1.0/(a.position-b.position).costMagnitude));
+				} else if (b == startNode) {
+					// hTarget is the endpoint
+					return (uint)((startIntPoint - (a == endNode ? hTarget : a.position)).costMagnitude * (currentCost*1.0/(a.position-b.position).costMagnitude));
+				} else if (a == endNode) {
+					return (uint)((hTarget - b.position).costMagnitude * (currentCost*1.0/(a.position-b.position).costMagnitude));
+				} else if (b == endNode) {
+					return (uint)((hTarget - a.position).costMagnitude * (currentCost*1.0/(a.position-b.position).costMagnitude));
+				}
+			} else {
+				// endNode is null, startNode should never be null for an ABPath
+				if (a == startNode) {
+					return (uint)((startIntPoint - b.position).costMagnitude * (currentCost*1.0/(a.position-b.position).costMagnitude));
+				} else if (b == startNode) {
+					return (uint)((startIntPoint - a.position).costMagnitude * (currentCost*1.0/(a.position-b.position).costMagnitude));
+				}
+			}
+			
+			return currentCost;
+		}
+		
 		/** Reset all values to their default values.
 		 * All inheriting path types must implement this function, resetting ALL their variables to enable recycling of paths.
 		 * Call this base function in inheriting types with base.Reset ();
@@ -169,14 +195,17 @@ namespace Pathfinding {
 			}
 			
 			startPoint = startNNInfo.clampedPosition;
+			
 			startIntPoint = (Int3)startPoint;
 			startNode = startNNInfo.node;
 			
 			//If it is declared that this path type has an end point
-			//Some path types might want to use most of the ABPath code, but will not have an explicit end point at start
+			//Some path types might want to use most of the ABPath code, but will not have an explicit end point at this stage
 			if (hasEndPoint) {
 				NNInfo endNNInfo = AstarPath.active.GetNearest (endPoint,nnConstraint, endHint);
 				endPoint = endNNInfo.clampedPosition;
+				
+				// Note, other methods assume hTarget is (Int3)endPoint
 				hTarget = (Int3)endPoint;
 				endNode = endNNInfo.node;
 			}
@@ -189,43 +218,51 @@ namespace Pathfinding {
 				LogError ("Couldn't find close nodes to the start point or the end point");
 				return;
 			}
+			
 			if (startNode == null) {
 				Error ();
 				LogError ("Couldn't find a close node to the start point");
 				return;
 			}
+			
 			if (endNode == null && hasEndPoint) {
 				Error ();
 				LogError ("Couldn't find a close node to the end point");
 				return;
 			}
 			
-			if (!startNode.walkable) {
+			if (!startNode.Walkable) {
 				Error ();
 				LogError ("The node closest to the start point is not walkable");
 				return;
 			}
 			
-			if (hasEndPoint && !endNode.walkable) {
+			if (hasEndPoint && !endNode.Walkable) {
 				Error ();
 				LogError ("The node closest to the end point is not walkable");
 				return;
 			}
 			
-			if (hasEndPoint && startNode.area != endNode.area) {
+			if (hasEndPoint && startNode.Area != endNode.Area) {
 				Error ();
-				LogError ("There is no valid path to the target (start area: "+startNode.area+", target area: "+endNode.area+")");
+				LogError ("There is no valid path to the target (start area: "+startNode.Area+", target area: "+endNode.Area+")");
 				return;
 			}
 		}
 		
 		public override void Initialize () {
 			
+			// Mark nodes to enable special connection costs for start and end nodes
+			// See GetConnectionSpecialCost
+			if (startNode != null) pathHandler.GetPathNode (startNode).flag2 = true;
+			if (endNode != null) pathHandler.GetPathNode (endNode).flag2 = true;
+			
 			if (hasEndPoint && startNode == endNode) {
-				NodeRun endNodeR = endNode.GetNodeRun(runData);
+				PathNode endNodeR = pathHandler.GetPathNode (endNode);
+				endNodeR.node = endNode;
 				endNodeR.parent = null;
-				endNodeR.h = 0;
-				endNodeR.g = 0;
+				endNodeR.H = 0;
+				endNodeR.G = 0;
 				Trace (endNodeR);
 				CompleteState = PathCompleteState.Complete;
 				return;
@@ -237,17 +274,18 @@ namespace Pathfinding {
 				callback += ResetCosts; /* \todo Might interfere with other paths since other paths might be calculated before #callback is called *
 			}*/
 			
-			NodeRun startRNode = startNode.GetNodeRun (runData);
-			startRNode.pathID = pathID;
+			PathNode startRNode = pathHandler.GetPathNode (startNode);
+			startRNode.node = startNode;
+			startRNode.pathID = pathHandler.PathID;
 			startRNode.parent = null;
 			startRNode.cost = 0;
-			startRNode.g = startNode.penalty;
-			startNode.UpdateH (hTarget,heuristic,heuristicScale, startRNode);
+			startRNode.G = GetTraversalCost (startNode);
+			startRNode.H = CalculateHScore (startNode);
 			
 			/*if (recalcStartEndCosts) {
 				startNode.InitialOpen (open,hTarget,startIntPoint,this,true);
 			} else {*/
-				startNode.Open (runData,startRNode,hTarget,this);
+				startNode.Open (this,startRNode,pathHandler);
 			//}
 			
 			searchedNodes++;
@@ -255,7 +293,7 @@ namespace Pathfinding {
 			partialBestTarget = startRNode;
 			
 			//any nodes left to search?
-			if (runData.open.numberOfItems <= 1) {
+			if (pathHandler.HeapEmpty ()) {
 				if (calculatePartial) {
 					CompleteState = PathCompleteState.Partial;
 					Trace (partialBestTarget);
@@ -266,7 +304,12 @@ namespace Pathfinding {
 				}
 			}
 			
-			currentR = runData.open.Remove ();
+			currentR = pathHandler.PopNode ();
+		}
+		
+		public override void Cleanup () {
+			if (startNode != null) pathHandler.GetPathNode (startNode).flag2 = false;
+			if (endNode != null) pathHandler.GetPathNode (endNode).flag2 = false;
 		}
 		
 		/** Calculates the path until completed or until the time has passed \a targetTick.
@@ -305,38 +348,49 @@ while the end has not been found and no error has ocurred
 					break;
 				}
 				
-				if (currentR.h < partialBestTarget.h) {
+				if (currentR.H < partialBestTarget.H) {
 					partialBestTarget = currentR;
 				}
 				
+				AstarProfiler.StartFastProfile (4);
+				//Debug.DrawRay ((Vector3)currentR.node.Position, Vector3.up*2,Color.red);
+				
 				//Loop through all walkable neighbours of the node and add them to the open list.
-				currentR.node.Open (runData,currentR, hTarget,this);
+				currentR.node.Open (this,currentR,pathHandler);
+				
+				AstarProfiler.EndFastProfile (4);
 				
 				//any nodes left to search?
-				if (runData.open.numberOfItems <= 1) {
+				if (pathHandler.HeapEmpty()) {
 					Error ();
 					LogError ("No open points, whole area searched");
 					return;
 				}
 				
+				
 				//Select the node with the lowest F score and remove it from the open list
-				currentR = runData.open.Remove ();
+				AstarProfiler.StartFastProfile (7);
+				currentR = pathHandler.PopNode ();
+				AstarProfiler.EndFastProfile (7);
 				
 				//Check for time every 500 nodes, roughly every 0.5 ms usually
 				if (counter > 500) {
 					
 					//Have we exceded the maxFrameTime, if so we should wait one frame before continuing the search since we don't want the game to lag
 					if (System.DateTime.UtcNow.Ticks >= targetTick) {
-						
 						//Return instead of yield'ing, a separate function handles the yield (CalculatePaths)
 						return;
 					}
 					counter = 0;
+					
+					if (searchedNodes > 1000000) {
+						throw new System.Exception ("Probable infinite loop. Over 1,000,000 nodes searched");
+					}
 				}
 				
 				counter++;
-			
 			}
+			
 			
 			AstarProfiler.StartProfile ("Trace");
 			
@@ -353,9 +407,6 @@ while the end has not been found and no error has ocurred
 		
 		/** Resets End Node Costs. Costs are updated on the end node at the start of the search to better reflect the end point passed to the path, the previous ones are saved in #endNodeCosts and are reset in this function which is called after the path search is complete */
 		public void ResetCosts (Path p) {
-			if (!hasEndPoint) return;
-			
-			endNode.ResetCosts (endNodeCosts);
 		}
 		
 		/* String builder used for all debug logging */
@@ -388,29 +439,30 @@ while the end has not been found and no error has ocurred
 					text.Append ("\nSearch Iterations "+searchIterations);
 					
 					if (hasEndPoint && endNode != null) {
-						NodeRun nodeR = endNode.GetNodeRun (runData);
+						PathNode nodeR = pathHandler.GetPathNode(endNode);
 						text.Append ("\nEnd Node\n	G: ");
-						text.Append (nodeR.g);
+						text.Append (nodeR.G);
 						text.Append ("\n	H: ");
-						text.Append (nodeR.h);
+						text.Append (nodeR.H);
 						text.Append ("\n	F: ");
-						text.Append (nodeR.f);
+						text.Append (nodeR.F);
 						text.Append ("\n	Point: ");
 						text.Append (((Vector3)endPoint).ToString ());
 						text.Append ("\n	Graph: ");
-						text.Append (endNode.graphIndex);
+						text.Append (endNode.GraphIndex);
 					}
-				
+					
 					text.Append ("\nStart Node");
 					text.Append ("\n	Point: ");
 					text.Append (((Vector3)startPoint).ToString ());
 					text.Append ("\n	Graph: ");
-					text.Append (startNode.graphIndex);
-					text.Append ("\nBinary Heap size at completion: ");
-					text.Append (runData.open == null ? "Null" : (runData.open.numberOfItems-2).ToString ());// -2 because numberOfItems includes the next item to be added and item zero is not used
+					if (startNode != null) text.Append (startNode.GraphIndex);
+					else text.Append ("< null startNode >");
+					//text.Append ("\nBinary Heap size at completion: ");
+					//text.Append (pathHandler.open == null ? "Null" : (pathHandler.open.numberOfItems-2).ToString ());// -2 because numberOfItems includes the next item to be added and item zero is not used
 				}
 				
-				/*"\nEnd node\n	G = "+p.endNode.g+"\n	H = "+p.endNode.h+"\n	F = "+p.endNode.f+"\n	Point	"+p.endPoint
+				/*"\nEnd node\n	G = "+p.endNode.g+"\n	H = "+p.endNode.H+"\n	F = "+p.endNode.f+"\n	Point	"+p.endPoint
 				+"\nStart Point = "+p.startPoint+"\n"+"Start Node graph: "+p.startNode.graphIndex+" End Node graph: "+p.endNode.graphIndex+
 				"\nBinary Heap size at completion: "+(p.open == null ? "Null" : p.open.numberOfItems.ToString ())*/
 			}
@@ -418,6 +470,12 @@ while the end has not been found and no error has ocurred
 			if (error) {
 				text.Append ("\nError: ");
 				text.Append (errorLog);
+			}
+			
+			if (logMode == PathLog.Heavy && !AstarPath.IsUsingMultithreading ) {
+				text.Append ("\nCallback references ");
+				if (callback != null) text.Append(callback.Target.GetType().FullName).AppendLine();
+				else text.AppendLine ("NULL");
 			}
 			
 			text.Append ("\nPath Number ");
@@ -451,7 +509,7 @@ while the end has not been found and no error has ocurred
 			
 			for (int i=0;i<vectorPath.Count-1;i++) {
 				
-				Vector3 closest = Mathfx.NearestPointStrict (vectorPath[i],vectorPath[i+1],point);
+				Vector3 closest = AstarMath.NearestPointStrict (vectorPath[i],vectorPath[i+1],point);
 				float dist = (closest-point).sqrMagnitude;
 				if (dist < minDist) {
 					minDist = dist;

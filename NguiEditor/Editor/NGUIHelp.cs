@@ -41,6 +41,10 @@ static public class NGUIHelp
 		if (type == typeof(UIKeyBinding))	return "http://www.tasharen.com/forum/index.php?topic=6753";
 		if (type == typeof(UIGrid))			return "http://www.tasharen.com/forum/index.php?topic=6756";
 		if (type == typeof(UITable))		return "http://www.tasharen.com/forum/index.php?topic=6758";
+		if (type == typeof(UIKeyNavigation)) return "http://www.tasharen.com/forum/index.php?topic=8747";
+
+		if (type == typeof(PropertyBinding) || type == typeof(PropertyReference))
+			return "http://www.tasharen.com/forum/index.php?topic=8808";
 		
 		if (type == typeof(ActiveAnimation) || type == typeof(UIPlayAnimation))
 			return "http://www.tasharen.com/forum/index.php?topic=6762";

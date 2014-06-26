@@ -13,76 +13,84 @@ namespace Pathfinding {
 	public abstract class GraphModifier : MonoBehaviour {
 		
 		/** All active graph modifiers */
-		static List<GraphModifier> activeModifiers = new List<GraphModifier>();
+		private static GraphModifier root;
 		
-		/** Last frame a late scan event was triggered */
-		static int lastLateScanEvent = -9999;
-		/** Last frame a post cache event was triggered */
-		static int lastPostCacheEvent = -9999;
+		private GraphModifier prev;
+		private GraphModifier next;
 		
-		/** Returns all active graph modifiers in the scene */
-		private static List<GraphModifier> GetActiveModifiers () {
-			if (Application.isPlaying)
-				return activeModifiers;
-			else
-				return new List<GraphModifier> (FindObjectsOfType(typeof(GraphModifier)) as GraphModifier[]);
+		public static void FindAllModifiers () {
+			GraphModifier[] arr = FindObjectsOfType(typeof(GraphModifier)) as GraphModifier[];
+			for (int i=0;i<arr.Length;i++) {
+				arr[i].OnEnable();
+			}
 		}
 		
 		/** GraphModifier event type.
 		 * \see GraphModifier */
 		public enum EventType {
-			PostScan,
-			PreScan,
-			LatePostScan,
-			PreUpdate,
-			PostUpdate,
-			PostCacheLoad
+			PostScan = 1 << 0,
+			PreScan = 1 << 1,
+			LatePostScan = 1 << 2,
+			PreUpdate = 1 << 3,
+			PostUpdate = 1 << 4,
+			PostCacheLoad = 1 << 5
 		}
 		
 		/** Triggers an event for all active graph modifiers */
 		public static void TriggerEvent (GraphModifier.EventType type) {
-			List<GraphModifier> mods = GetActiveModifiers();
 			
+			if (!Application.isPlaying) {
+				FindAllModifiers ();
+			}
+			
+			GraphModifier c = root;
 			switch (type){
 			case EventType.PreScan:
-					for (int i=0;i<mods.Count;i++) mods[i].OnPreScan();
+					while (c != null) { c.OnPreScan(); c = c.next; }
 					break;
 			case EventType.PostScan:
-					for (int i=0;i<mods.Count;i++) mods[i].OnPostScan();
+					while (c != null) { c.OnPostScan(); c = c.next; }
 					break;
 			case EventType.LatePostScan:
-					lastLateScanEvent = Time.frameCount;
-					for (int i=0;i<mods.Count;i++) mods[i].OnLatePostScan();
+					while (c != null) { c.OnLatePostScan(); c = c.next; }
 					break;
 			case EventType.PreUpdate:
-					for (int i=0;i<mods.Count;i++) mods[i].OnGraphsPreUpdate();
+					while (c != null) { c.OnGraphsPreUpdate(); c = c.next; }
 					break;
 			case EventType.PostUpdate:
-					for (int i=0;i<mods.Count;i++) mods[i].OnGraphsPostUpdate();
+					while (c != null) { c.OnGraphsPostUpdate(); c = c.next; }
 					break;
 			case EventType.PostCacheLoad:
-					lastPostCacheEvent = Time.frameCount;
-					for (int i=0;i<mods.Count;i++) mods[i].OnPostCacheLoad ();
+					while (c != null) { c.OnPostCacheLoad(); c = c.next; }
 					break;
 			}
 		}
 		
 		/** Adds this modifier to list of active modifiers.
-		 * Calls OnLatePostScan if the last late post scan event was triggered during this frame.
 		 */
-		public virtual void OnEnable () {
-			activeModifiers.Add (this);
-			if (lastLateScanEvent == Time.frameCount) {
-				OnLatePostScan ();
-			}
-			if (lastPostCacheEvent == Time.frameCount) {
-				OnPostCacheLoad ();
+		protected virtual void OnEnable () {
+			OnDisable();
+
+			if (root == null) {
+				root = this;
+			} else {
+				this.next = root;
+				root.prev = this;
+				root = this;
 			}
 		}
 		
 		/** Removes this modifier from list of active modifiers */
-		public virtual void OnDisable () {
-			activeModifiers.Remove (this);
+		protected virtual void OnDisable () {
+			if (root == this) {
+				root = this.next;
+				if (root != null) root.prev = null;
+			} else {
+				if (prev != null) prev.next = next;
+				if (next != null) next.prev = prev;
+			}
+			prev = null;
+			next = null;
 		}
 		
 		/* Called just before a graph is scanned.

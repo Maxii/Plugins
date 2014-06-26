@@ -67,13 +67,23 @@ public class BetterList<T>
 	/// Insert an item at the specified index, pushing the entries back.
 	/// </summary>
 
-	public void Insert (int index, T item) { mList.Insert(index, item); }
+	public void Insert (int index, T item)
+	{
+		if (index > -1 && index < mList.Count) mList.Insert(index, item);
+		else mList.Add(item);
+	}
 
 	/// <summary>
 	/// Returns 'true' if the specified item is within the list.
 	/// </summary>
 
 	public bool Contains (T item) { return mList.Contains(item); }
+
+	/// <summary>
+	/// Return the index of the specified item.
+	/// </summary>
+
+	public int IndexOf (T item) { return mList.IndexOf(item); }
 
 	/// <summary>
 	/// Remove the specified item from the list. Note that RemoveAt() is faster and is advisable if you already know the index.
@@ -216,7 +226,7 @@ public class BetterList<T>
 	{
 		if (buffer == null || size == buffer.Length) AllocateMore();
 
-		if (index < size)
+		if (index > -1 && index < size)
 		{
 			for (int i = size; i > index; --i) buffer[i] = buffer[i - 1];
 			buffer[index] = item;
@@ -234,6 +244,17 @@ public class BetterList<T>
 		if (buffer == null) return false;
 		for (int i = 0; i < size; ++i) if (buffer[i].Equals(item)) return true;
 		return false;
+	}
+
+	/// <summary>
+	/// Return the index of the specified item.
+	/// </summary>
+
+	public int IndexOf (T item)
+	{
+		if (buffer == null) return -1;
+		for (int i = 0; i < size; ++i) if (buffer[i].Equals(item)) return i;
+		return -1;
 	}
 
 	/// <summary>
@@ -267,7 +288,7 @@ public class BetterList<T>
 
 	public void RemoveAt (int index)
 	{
-		if (buffer != null && index < size)
+		if (buffer != null && index > -1 && index < size)
 		{
 			--size;
 			buffer[index] = default(T);

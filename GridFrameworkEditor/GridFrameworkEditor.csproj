@@ -55,6 +55,7 @@
     </Compile>
     <Compile Include="GFGridAlignPanel.cs" />
     <Compile Include="GFMenuItems.cs" />
+    <Compile Include="GFPlayMakerPresenceCheck.cs" />
     <Compile Include="Inspectors\GFGridEditor.cs" />
     <Compile Include="Inspectors\GFHexGridEditor.cs" />
     <Compile Include="Inspectors\GFPolarGridEditor.cs" />

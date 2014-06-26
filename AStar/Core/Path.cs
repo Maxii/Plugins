@@ -1,4 +1,3 @@
-//#define ASTAR_FAST_BUT_NO_EXCEPTIONS //Less try-catch blocks and error checking will be used. Only use this if you have tested the game/application thoroughly and no pathfinding exceptions are thrown. Barely improves performance. It seems try-catch was fast.
 //#define ASTAR_POOL_DEBUG //Enables debugging of path pooling. Will log warnings and info messages about paths not beeing pooled correctly.
 
 using UnityEngine;
@@ -12,7 +11,7 @@ namespace Pathfinding {
 	
 		
 		/** Data for the thread calculating this path */
-		public NodeRunData runData;
+		public PathHandler pathHandler;
 		
 		/** Callback to call when the path is complete.
 		 * This is usually sent to the Seeker component which post processes the path and then calls a callback to the script which requested the path 
@@ -47,11 +46,11 @@ namespace Pathfinding {
 			get { return _errorLog; }
 		}
 		
-		private Node[] _path;
+		private GraphNode[] _path;
 		private Vector3[] _vectorPath;
 		
 		/** Holds the path as a Node array. All nodes the path traverses. This might not be the same as all nodes the smoothed path traverses. */
-		public List<Node> path;
+		public List<GraphNode> path;
 		
 		/** Holds the (perhaps post processed) path as a Vector3 array */
 		public List<Vector3> vectorPath;
@@ -60,7 +59,7 @@ namespace Pathfinding {
 		protected float maxFrameTime;
 		
 		/** The node currently being processed */
-		protected NodeRun currentR;
+		protected PathNode currentR;
 		
 		public float duration;			/**< The duration of this path in ms. How long it took to calculate the path */
 		
@@ -137,6 +136,8 @@ namespace Pathfinding {
 		/** ID of this path. Used to distinguish between different paths */
 		public ushort pathID;
 		
+		protected Int3 hTarget; /**< Target to use for H score calculations. \see Pathfinding.Node.H */
+		
 		/** Which graph tags are traversable.
 		 * This is a bitmask so -1 = all bits set = all tags traversable.
 		 * For example, to set bit 5 to true, you would do
@@ -194,7 +195,7 @@ namespace Pathfinding {
 //In an IEnumerator function
 
 Path p = Seeker.StartPath (transform.position, transform.position + Vector3.forward * 10);
-yield return p.WaitForPath ();
+yield return StartCoroutine (p.WaitForPath ());
 
 //The path is calculated at this stage
 \endcode
@@ -208,7 +209,26 @@ yield return p.WaitForPath ();
 		public IEnumerator WaitForPath () {
 			if (GetState () == PathState.Created) throw new System.InvalidOperationException ("This path has not been started yet");
 			
-			while (GetState () != PathState.Returned) yield return 0;
+			while (GetState () != PathState.Returned) yield return null;
+		}
+		
+		public uint CalculateHScore (GraphNode node) {
+			switch (heuristic) {
+			case Heuristic.Euclidean:
+				return (uint)(((GetHTarget () - node.position).costMagnitude)*heuristicScale);
+			case Heuristic.Manhattan:
+				Int3 p2 = node.position;
+				return (uint)((System.Math.Abs (hTarget.x-p2.x) + System.Math.Abs (hTarget.y-p2.y) + System.Math.Abs (hTarget.z-p2.z))*heuristicScale);
+			case Heuristic.DiagonalManhattan:
+				Int3 p = GetHTarget () - node.position;
+				p.x = System.Math.Abs (p.x);
+				p.y = System.Math.Abs (p.y);
+				p.z = System.Math.Abs (p.z);
+				int diag = System.Math.Min (p.x,p.z);
+				int diag2 = System.Math.Max (p.x,p.z);
+				return (uint)((((14*diag)/10) + (diag2-diag) + p.y) * heuristicScale);
+			}
+			return 0U;
 		}
 		
 		/** Returns penalty for the given tag.
@@ -218,10 +238,39 @@ yield return p.WaitForPath ();
 			return tag < _tagPenalties.Length ? (uint)_tagPenalties[tag] : 0;
 		}
 		
+		public Int3 GetHTarget () {
+			return hTarget;
+		}
+		
 		/** Returns if the node can be traversed.
 		  * This per default equals to if the node is walkable and if the node's tag is included in #enabledTags */
-		public bool CanTraverse (Node node) {
-			return node.walkable && (enabledTags >> node.tags & 0x1) != 0;
+		public bool CanTraverse (GraphNode node) {
+			unchecked { return node.Walkable && (enabledTags >> (int)node.Tag & 0x1) != 0; }
+		}
+		
+		public uint GetTraversalCost (GraphNode node) {
+			unchecked { return GetTagPenalty ((int)node.Tag ) + node.Penalty; }
+		}
+		
+		/** May be called by graph nodes to get a special cost for some connections.
+		 * Nodes may call it when PathNode.flag2 is set to true, for example mesh nodes, which have 
+		 * a very large area can be marked on the start and end nodes, this method will be called
+		 * to get the actual cost for moving from the start position to its neighbours instead
+		 * of as would otherwise be the case, from the start node's position to its neighbours.
+		 * The position of a node and the actual start point on the node can vary quite a lot.
+		 * 
+		 * The default behaviour of this method is to return the previous cost of the connection,
+		 * essentiall making no change at all.
+		 * 
+		 * This method should return the same regardless of the order of a and b.
+		 * That is f(a,b) == f(b,a) should hold.
+		 * 
+		 * \param a Moving from this node
+		 * \param b Moving to this node
+		 * \param currentCost The cost of moving between the nodes. Return this value if there is no meaningful special cost to return.
+		 */
+		public virtual uint GetConnectionSpecialCost (GraphNode a, GraphNode b, uint currentCost) {
+			return currentCost;
 		}
 		
 		/** Returns if this path is done calculating.
@@ -259,7 +308,10 @@ yield return p.WaitForPath ();
 // since the DISABLED define will never be enabled
 // Ugly way of writing Conditional("!ASTAR_NO_LOGGING")
 		public void LogError (string msg) {
-			_errorLog += msg;
+			// Optimize for release builds
+			if (!(!AstarPath.isEditor && AstarPath.active.logPathResults == PathLog.None)) {
+				_errorLog += msg;
+			}
 			
 			if (AstarPath.active.logPathResults != PathLog.None && AstarPath.active.logPathResults != PathLog.InGame) {
 				Debug.LogWarning (msg);
@@ -271,6 +323,7 @@ yield return p.WaitForPath ();
 		 */
 		public void ForceLogError (string msg) {
 			Error();
+			
 			_errorLog += msg;
 			
 			Debug.LogError (msg);
@@ -278,9 +331,14 @@ yield return p.WaitForPath ();
 		
 		/** Appends a message to the #errorLog.
 		  * Nothing is logged to the console.
+		  * 
+		  * \note If AstarPath.logPathResults is PathLog.None and this is a standalone player, nothing will be logged as an optimization.
 		  */
 		public void Log (string msg) {
-			_errorLog += msg;
+			// Optimize for release builds
+			if (!(!AstarPath.isEditor && AstarPath.active.logPathResults == PathLog.None)) {
+				_errorLog += msg;
+			}
 		}
 		
 		/** Aborts the path because of an error.
@@ -300,7 +358,7 @@ yield return p.WaitForPath ();
 		private void ErrorCheck () {
 			if (!hasBeenReset) throw new System.Exception ("The path has never been reset. Use pooling API or call Reset() after creating the path with the default constructor.");
 			if (recycled) throw new System.Exception ("The path is currently in a path pool. Are you sending the path for calculation twice?");
-			if (runData == null) throw new System.Exception ("Field runData is not set. Please report this bug.");
+			if (pathHandler == null) throw new System.Exception ("Field pathHandler is not set. Please report this bug.");
 			if (GetState() > PathState.Processing) throw new System.Exception ("This path has already been processed. Do not request a path with the same path object twice.");
 		}
 		
@@ -312,7 +370,7 @@ yield return p.WaitForPath ();
 		 */
 		public virtual void OnEnterPool () {
 			if (vectorPath != null) Pathfinding.Util.ListPool<Vector3>.Release (vectorPath);
-			if (path != null) Pathfinding.Util.ListPool<Node>.Release (path);
+			if (path != null) Pathfinding.Util.ListPool<GraphNode>.Release (path);
 			vectorPath = null;
 			path = null;
 		}
@@ -337,12 +395,12 @@ yield return p.WaitForPath ();
 			state = (int)PathState.Created;
 			releasedNotSilent = false;
 			
-			runData = null;
+			pathHandler = null;
 			callback = null;
 			_errorLog = "";
 			pathCompleteState = PathCompleteState.NotCalculated;
 			
-			path = Pathfinding.Util.ListPool<Node>.Claim();
+			path = Pathfinding.Util.ListPool<GraphNode>.Claim();
 			vectorPath = Pathfinding.Util.ListPool<Vector3>.Claim();
 			
 			currentR = null;
@@ -372,6 +430,8 @@ yield return p.WaitForPath ();
 			
 			callTime = System.DateTime.UtcNow;
 			pathID = AstarPath.active.GetNextPathID ();
+			
+			hTarget = Int3.zero;
 		}
 		
 		protected bool HasExceededTime (int searchedNodes, long targetTime) {
@@ -400,7 +460,7 @@ public override void Recycle () {
 		//}
 		
 		/** List of claims on this path with reference objects */
-		private List<System.Object> claimed = new List<object>();
+		private List<System.Object> claimed = new List<System.Object>();
 		
 		/** True if the path has been released with a non-silent call yet.
 		 * 
@@ -487,11 +547,11 @@ public override void Recycle () {
 		 * This will build an array (#path) of the nodes this path will pass through and also set the #vectorPath array to the #path arrays positions.
 		 * Assumes the #vectorPath and #path are empty and not null (which will be the case for a correctly initialized path).
 		 */
-		protected virtual void Trace (NodeRun from) {
+		protected virtual void Trace (PathNode from) {
 			
 			int count = 0;
 			
-			NodeRun c = from;
+			PathNode c = from;
 			while (c != null) {
 				c = c.parent;
 				count++;
@@ -518,7 +578,7 @@ public override void Recycle () {
 			
 			int half = count/2;
 			for (int i=0;i<half;i++) {
-				Node tmp = path[i];
+				GraphNode tmp = path[i];
 				path[i] = path[count-i-1];
 				path[count - i - 1] = tmp;
 			}
@@ -538,7 +598,7 @@ public override void Recycle () {
 			
 			//debugStringBuilder.Length = 0;
 			
-			System.Text.StringBuilder text = runData.DebugStringBuilder;
+			System.Text.StringBuilder text = pathHandler.DebugStringBuilder;
 			text.Length = 0;
 			
 			text.Append (error ? "Path Failed : " : "Path Completed : ");
@@ -555,10 +615,10 @@ public override void Recycle () {
 				if (logMode == PathLog.Heavy) {
 					text.Append ("\nSearch Iterations "+searchIterations);
 					
-					text.Append ("\nBinary Heap size at complete: ");
+					//text.Append ("\nBinary Heap size at complete: ");
 					
 					// -2 because numberOfItems includes the next item to be added and item zero is not used
-					text.Append (runData.open == null ? "null" : (runData.open.numberOfItems-2).ToString ());
+					//text.Append (pathHandler.open == null ? "null" : (pathHandler.open.numberOfItems-2).ToString ());
 				}
 				
 				/*"\nEnd node\n	G = "+p.endNode.g+"\n	H = "+p.endNode.h+"\n	F = "+p.endNode.f+"\n	Point	"+p.endPoint
@@ -569,6 +629,12 @@ public override void Recycle () {
 			if (error) {
 				text.Append ("\nError: ");
 				text.Append (errorLog);
+			}
+			
+			if (logMode == PathLog.Heavy && !AstarPath.IsUsingMultithreading ) {
+				text.Append ("\nCallback references ");
+				if (callback != null) text.Append(callback.Target.GetType().FullName).AppendLine();
+				else text.AppendLine ("NULL");
 			}
 			
 			text.Append ("\nPath Number ");
@@ -588,18 +654,18 @@ public override void Recycle () {
 		  * Called before a path search will take place.
 		  * Always called before the Prepare, Initialize and CalculateStep functions
 		  */
-		public void PrepareBase (NodeRunData runData) {
+		public void PrepareBase (PathHandler pathHandler) {
 			
 			//Path IDs have overflowed 65K, cleanup is needed
 			//Since pathIDs are handed out sequentially, we can do this
-			if (runData.pathID > pathID) {
-				runData.ClearPathIDs ();
+			if (pathHandler.PathID > pathID) {
+				pathHandler.ClearPathIDs ();
 			}
 			
-			//Make sure the path has a reference to the runData
-			this.runData = runData;
-			//Assign relevant path data to the runData
-			runData.Initialize (this);
+			//Make sure the path has a reference to the pathHandler
+			this.pathHandler = pathHandler;
+			//Assign relevant path data to the pathHandler
+			pathHandler.InitializeForPath (this);
 
 			try {
 				ErrorCheck ();
@@ -610,11 +676,19 @@ public override void Recycle () {
 		
 		public abstract void Prepare ();
 		
+		/** Always called after the path has been calculated.
+		 * Guaranteed to be called before other paths have been calculated on
+		 * the same thread.
+		 * Use for cleaning up things like node tagging and similar.
+		 */
+		public virtual void Cleanup () {}
+		
 		/** Initializes the path.
 		 * Sets up the open list and adds the first node to it
 		 */
 		public abstract void Initialize ();
 		
+		/** Calculates the path until time has gone past \a targetTick */
 		public abstract void CalculateStep (long targetTick);
 	}
 }

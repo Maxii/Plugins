@@ -97,6 +97,28 @@ public class ActiveAnimation : MonoBehaviour
 	}
 
 	/// <summary>
+	/// Immediately finish playing the animation.
+	/// </summary>
+
+	public void Finish ()
+	{
+		if (mAnim != null)
+		{
+			foreach (AnimationState state in mAnim)
+			{
+				if (mLastDirection == Direction.Forward) state.time = state.length;
+				else if (mLastDirection == Direction.Reverse) state.time = 0f;
+			}
+		}
+#if USE_MECANIM
+		else if (mAnimator != null)
+		{
+			mAnimator.Play(mClip, 0, (mLastDirection == Direction.Forward) ? 1f : 0f);
+		}
+#endif
+	}
+
+	/// <summary>
 	/// Manually reset the active animation to the beginning.
 	/// </summary>
 
@@ -187,15 +209,17 @@ public class ActiveAnimation : MonoBehaviour
 		{
 			mNotify = false;
 
-			current = this;
-			EventDelegate.Execute(onFinished);
+			if (current == null)
+			{
+				current = this;
+				EventDelegate.Execute(onFinished);
 
-			// Deprecated functionality, kept for backwards compatibility
-			if (eventReceiver != null && !string.IsNullOrEmpty(callWhenFinished))
-				eventReceiver.SendMessage(callWhenFinished, SendMessageOptions.DontRequireReceiver);
+				// Deprecated functionality, kept for backwards compatibility
+				if (eventReceiver != null && !string.IsNullOrEmpty(callWhenFinished))
+					eventReceiver.SendMessage(callWhenFinished, SendMessageOptions.DontRequireReceiver);
 
-			current = null;
-
+				current = null;
+			}
 			if (mDisableDirection != Direction.Toggle && mLastDirection == mDisableDirection)
 				NGUITools.SetActive(gameObject, false);
 		}
@@ -298,6 +322,11 @@ public class ActiveAnimation : MonoBehaviour
 		aa.mDisableDirection = (Direction)(int)disableCondition;
 		aa.onFinished.Clear();
 		aa.Play(clipName, playDirection);
+
+		if (aa.mAnim != null) aa.mAnim.Sample();
+#if USE_MECANIM
+		else if (aa.mAnimator != null) aa.mAnimator.Update(0f);
+#endif
 		return aa;
 	}
 
@@ -346,6 +375,11 @@ public class ActiveAnimation : MonoBehaviour
 		aa.mDisableDirection = (Direction)(int)disableCondition;
 		aa.onFinished.Clear();
 		aa.Play(clipName, playDirection);
+
+		if (aa.mAnim != null) aa.mAnim.Sample();
+#if USE_MECANIM
+		else if (aa.mAnimator != null) aa.mAnimator.Update(0f);
+#endif
 		return aa;
 	}
 #endif

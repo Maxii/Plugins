@@ -44,6 +44,24 @@ public class UIButton : UIButtonColor
 	public string disabledSprite;
 
 	/// <summary>
+	/// Name of the hover state sprite.
+	/// </summary>
+
+	public UnityEngine.Sprite hoverSprite2D;
+
+	/// <summary>
+	/// Name of the pressed sprite.
+	/// </summary>
+
+	public UnityEngine.Sprite pressedSprite2D;
+
+	/// <summary>
+	/// Name of the disabled sprite.
+	/// </summary>
+
+	public UnityEngine.Sprite disabledSprite2D;
+
+	/// <summary>
 	/// Whether the sprite changes will elicit a call to MakePixelPerfect() or not.
 	/// </summary>
 
@@ -56,8 +74,10 @@ public class UIButton : UIButtonColor
 	public List<EventDelegate> onClick = new List<EventDelegate>();
 
 	// Cached value
-	string mNormalSprite;
-	UISprite mSprite;
+	[System.NonSerialized] UISprite mSprite;
+	[System.NonSerialized] UI2DSprite mSprite2D;
+	[System.NonSerialized] string mNormalSprite;
+	[System.NonSerialized] UnityEngine.Sprite mNormalSprite2D;
 
 	/// <summary>
 	/// Whether the button should be enabled.
@@ -69,18 +89,33 @@ public class UIButton : UIButtonColor
 		{
 			if (!enabled) return false;
 			Collider col = collider;
-			return col && col.enabled;
+			if (col && col.enabled) return true;
+			Collider2D c2d = GetComponent<Collider2D>();
+			return (c2d && c2d.enabled);
 		}
 		set
 		{
-			Collider col = collider;
-
-			if (col != null)
+			if (isEnabled != value)
 			{
-				col.enabled = value;
-				SetState(value ? State.Normal : State.Disabled, false);
+				Collider col = collider;
+
+				if (col != null)
+				{
+					col.enabled = value;
+					SetState(value ? State.Normal : State.Disabled, false);
+				}
+				else
+				{
+					Collider2D c2d = GetComponent<Collider2D>();
+
+					if (c2d != null)
+					{
+						c2d.enabled = value;
+						SetState(value ? State.Normal : State.Disabled, false);
+					}
+					else enabled = value;
+				}
 			}
-			else enabled = value;
 		}
 	}
 
@@ -97,11 +132,46 @@ public class UIButton : UIButtonColor
 		}
 		set
 		{
-			mNormalSprite = value;
-			if (mState == State.Normal) SetSprite(value);
+			if (mSprite != null && !string.IsNullOrEmpty(mNormalSprite) && mNormalSprite == mSprite.spriteName)
+			{
+				mNormalSprite = value;
+				SetSprite(value);
+				NGUITools.SetDirty(mSprite);
+			}
+			else
+			{
+				mNormalSprite = value;
+				if (mState == State.Normal) SetSprite(value);
+			}
 		}
 	}
 
+	/// <summary>
+	/// Convenience function that changes the normal sprite.
+	/// </summary>
+
+	public UnityEngine.Sprite normalSprite2D
+	{
+		get
+		{
+			if (!mInitDone) OnInit();
+			return mNormalSprite2D;
+		}
+		set
+		{
+			if (mSprite2D != null && mNormalSprite2D == mSprite2D.sprite2D)
+			{
+				mNormalSprite2D = value;
+				SetSprite(value);
+				NGUITools.SetDirty(mSprite);
+			}
+			else
+			{
+				mNormalSprite2D = value;
+				if (mState == State.Normal) SetSprite(value);
+			}
+		}
+	}
 	/// <summary>
 	/// Cache the sprite we'll be working with.
 	/// </summary>
@@ -110,7 +180,9 @@ public class UIButton : UIButtonColor
 	{
 		base.OnInit();
 		mSprite = (mWidget as UISprite);
+		mSprite2D = (mWidget as UI2DSprite);
 		if (mSprite != null) mNormalSprite = mSprite.spriteName;
+		if (mSprite2D != null) mNormalSprite2D = mSprite2D.sprite2D;
 	}
 
 	/// <summary>
@@ -119,6 +191,13 @@ public class UIButton : UIButtonColor
 
 	protected override void OnEnable ()
 	{
+#if UNITY_EDITOR
+		if (!Application.isPlaying)
+		{
+			mInitDone = false;
+			return;
+		}
+#endif
 		if (isEnabled)
 		{
 			if (mInitDone)
@@ -140,7 +219,7 @@ public class UIButton : UIButtonColor
 	/// <summary>
 	/// Drag over state logic is a bit different for the button.
 	/// </summary>
-	
+
 	protected override void OnDragOver ()
 	{
 		if (isEnabled && (dragHighlight || UICamera.currentTouch.pressed == gameObject))
@@ -150,7 +229,7 @@ public class UIButton : UIButtonColor
 	/// <summary>
 	/// Drag out state logic is a bit different for the button.
 	/// </summary>
-	
+
 	protected override void OnDragOut ()
 	{
 		if (isEnabled && (dragHighlight || UICamera.currentTouch.pressed == gameObject))
@@ -163,7 +242,7 @@ public class UIButton : UIButtonColor
 
 	protected virtual void OnClick ()
 	{
-		if (isEnabled)
+		if (current == null && isEnabled)
 		{
 			current = this;
 			EventDelegate.Execute(onClick);
@@ -175,16 +254,29 @@ public class UIButton : UIButtonColor
 	/// Change the visual state.
 	/// </summary>
 
-	protected override void SetState (State state, bool immediate)
+	public override void SetState (State state, bool immediate)
 	{
 		base.SetState(state, immediate);
 
-		switch (state)
+		if (mSprite != null)
 		{
-			case State.Normal: SetSprite(mNormalSprite); break;
-			case State.Hover: SetSprite(hoverSprite); break;
-			case State.Pressed: SetSprite(pressedSprite); break;
-			case State.Disabled: SetSprite(disabledSprite); break;
+			switch (state)
+			{
+				case State.Normal: SetSprite(mNormalSprite); break;
+				case State.Hover: SetSprite(hoverSprite); break;
+				case State.Pressed: SetSprite(pressedSprite); break;
+				case State.Disabled: SetSprite(disabledSprite); break;
+			}
+		}
+		else if (mSprite2D != null)
+		{
+			switch (state)
+			{
+				case State.Normal: SetSprite(mNormalSprite2D); break;
+				case State.Hover: SetSprite(hoverSprite2D); break;
+				case State.Pressed: SetSprite(pressedSprite2D); break;
+				case State.Disabled: SetSprite(disabledSprite2D); break;
+			}
 		}
 	}
 
@@ -198,6 +290,19 @@ public class UIButton : UIButtonColor
 		{
 			mSprite.spriteName = sp;
 			if (pixelSnap) mSprite.MakePixelPerfect();
+		}
+	}
+
+	/// <summary>
+	/// Convenience function that changes the sprite.
+	/// </summary>
+
+	protected void SetSprite (UnityEngine.Sprite sp)
+	{
+		if (sp != null && mSprite2D != null && mSprite2D.sprite2D != sp)
+		{
+			mSprite2D.sprite2D = sp;
+			if (pixelSnap) mSprite2D.MakePixelPerfect();
 		}
 	}
 }

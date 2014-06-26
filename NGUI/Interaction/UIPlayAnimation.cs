@@ -19,6 +19,8 @@ using AnimationOrTween;
 [AddComponentMenu("NGUI/Interaction/Play Animation")]
 public class UIPlayAnimation : MonoBehaviour
 {
+	static public UIPlayAnimation current = null;
+
 	/// <summary>
 	/// Target animation to activate.
 	/// </summary>
@@ -161,6 +163,18 @@ public class UIPlayAnimation : MonoBehaviour
 			if (trigger == Trigger.OnHover || trigger == Trigger.OnHoverTrue)
 				mActivated = (UICamera.currentTouch.current == gameObject);
 		}
+
+		UIToggle toggle = GetComponent<UIToggle>();
+		if (toggle != null) EventDelegate.Add(toggle.onChange, OnToggle);
+	}
+
+	void OnDisable ()
+	{
+#if UNITY_EDITOR
+		if (!Application.isPlaying) return;
+#endif
+		UIToggle toggle = GetComponent<UIToggle>();
+		if (toggle != null) EventDelegate.Remove(toggle.onChange, OnToggle);
 	}
 
 	void OnHover (bool isOver)
@@ -194,13 +208,13 @@ public class UIPlayAnimation : MonoBehaviour
 			Play(isSelected, dualState);
 	}
 
-	void OnActivate (bool isActive)
+	void OnToggle ()
 	{
-		if (!enabled) return;
+		if (!enabled || UIToggle.current == null) return;
 		if (trigger == Trigger.OnActivate ||
-			(trigger == Trigger.OnActivateTrue && isActive) ||
-			(trigger == Trigger.OnActivateFalse && !isActive))
-			Play(isActive, dualState);
+			(trigger == Trigger.OnActivateTrue && UIToggle.current.value) ||
+			(trigger == Trigger.OnActivateFalse && !UIToggle.current.value))
+			Play(UIToggle.current.value, dualState);
 	}
 
 	void OnDragOver ()
@@ -276,12 +290,17 @@ public class UIPlayAnimation : MonoBehaviour
 
 	void OnFinished ()
 	{
-		EventDelegate.Execute(onFinished);
+		if (current == null)
+		{
+			current = this;
+			EventDelegate.Execute(onFinished);
 
-		// Legacy functionality
-		if (eventReceiver != null && !string.IsNullOrEmpty(callWhenFinished))
-			eventReceiver.SendMessage(callWhenFinished, SendMessageOptions.DontRequireReceiver);
+			// Legacy functionality
+			if (eventReceiver != null && !string.IsNullOrEmpty(callWhenFinished))
+				eventReceiver.SendMessage(callWhenFinished, SendMessageOptions.DontRequireReceiver);
 
-		eventReceiver = null;
+			eventReceiver = null;
+			current = null;
+		}
 	}
 }

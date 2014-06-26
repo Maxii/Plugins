@@ -23,9 +23,12 @@ public class UIEventTrigger : MonoBehaviour
 	public List<EventDelegate> onDeselect = new List<EventDelegate>();
 	public List<EventDelegate> onClick = new List<EventDelegate>();
 	public List<EventDelegate> onDoubleClick = new List<EventDelegate>();
+	public List<EventDelegate> onDragOver = new List<EventDelegate>();
+	public List<EventDelegate> onDragOut = new List<EventDelegate>();
 
 	void OnHover (bool isOver)
 	{
+		if (current != null) return;
 		current = this;
 		if (isOver) EventDelegate.Execute(onHoverOver);
 		else EventDelegate.Execute(onHoverOut);
@@ -34,6 +37,7 @@ public class UIEventTrigger : MonoBehaviour
 
 	void OnPress (bool pressed)
 	{
+		if (current != null) return;
 		current = this;
 		if (pressed) EventDelegate.Execute(onPress);
 		else EventDelegate.Execute(onRelease);
@@ -42,6 +46,7 @@ public class UIEventTrigger : MonoBehaviour
 
 	void OnSelect (bool selected)
 	{
+		if (current != null) return;
 		current = this;
 		if (selected) EventDelegate.Execute(onSelect);
 		else EventDelegate.Execute(onDeselect);
@@ -50,6 +55,7 @@ public class UIEventTrigger : MonoBehaviour
 
 	void OnClick ()
 	{
+		if (current != null) return;
 		current = this;
 		EventDelegate.Execute(onClick);
 		current = null;
@@ -57,8 +63,25 @@ public class UIEventTrigger : MonoBehaviour
 
 	void OnDoubleClick ()
 	{
+		if (current != null) return;
 		current = this;
 		EventDelegate.Execute(onDoubleClick);
+		current = null;
+	}
+
+	void OnDragOver (GameObject go)
+	{
+		if (current != null) return;
+		current = this;
+		EventDelegate.Execute(onDragOver);
+		current = null;
+	}
+
+	void OnDragOut (GameObject go)
+	{
+		if (current != null) return;
+		current = this;
+		EventDelegate.Execute(onDragOut);
 		current = null;
 	}
 }

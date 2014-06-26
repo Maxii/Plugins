@@ -1,8 +1,15 @@
+#if UNITY_4_2 || UNITY_4_1 || UNITY_4_0 || UNITY_3_5 || UNITY_3_4 || UNITY_3_3
+	#define UNITY_LE_4_3
+#endif
+
+//#define ASTAR_NO_JSON
+
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using Pathfinding.Util;
 using Pathfinding.Serialization.JsonFx;
+using Pathfinding.Serialization;
 
 namespace Pathfinding {
 	/// <summary>
@@ -46,6 +53,9 @@ namespace Pathfinding {
 		[JsonMember]
 		public bool open;
 		
+		/** Index of the graph, used for identification purposes */
+		public uint graphIndex;
+		
 		[JsonMember]
 		public string name;
 		
@@ -61,55 +71,82 @@ namespace Pathfinding {
 		public bool infoScreenOpen;
 //#endif
 		
-		/** All nodes this graph contains. This can be iterated to search for a specific node.
-		 * This should be set if the graph does contain any nodes.
-		 * \note Entries are permitted to be NULL, make sure you account for that when iterating a graph's nodes
+		/** Count nodes in the graph.
+		 * Note that this is, unless the graph type has overriden it, an O(n) operation.
+		 * 
+		 * \todo GridGraph should override this
 		 */
-		public Node[] nodes;
+		public virtual int CountNodes () {
+			int count = 0;
+			GraphNodeDelegateCancelable del = delegate (GraphNode node) {
+				count++;
+				return true;
+			};
+			GetNodes (del);
+			return count;
+		}
 		
+		/** Calls a delegate with all nodes in the graph.
+		 * This is the primary way of "looping" through all nodes in a graph.
+		 * 
+		 * This function should not change anything in the graph structure.
+		 */
+		public abstract void GetNodes (GraphNodeDelegateCancelable del);
 		
 		/** A matrix for translating/rotating/scaling the graph.
 		 * Not all graph generators sets this variable though.
+		 * 
+		 * \note Do not set directly, use SetMatrix
 		 */
+		[JsonMember]
 		public Matrix4x4 matrix;
 		
-		public Matrix4x4 inverseMatrix {
-			get { return matrix.inverse; }
+		/** Inverse of \a matrix.
+		 * 
+		 * \note Do not set directly, use SetMatrix
+		 */
+		public Matrix4x4 inverseMatrix;
+		
+		/** Use to set both matrix and inverseMatrix at the same time */
+		public void SetMatrix (Matrix4x4 m) {
+			matrix = m;
+			inverseMatrix = m.inverse;
 		}
-			
+		
 		/** Creates a number of nodes with the correct type for the graph.
 		This should not set the #nodes array, only return the nodes.
 		Called by graph generators and when deserializing a graph with nodes.
 		Override this function if you do not use the default Pathfinding.Node class.
 		*/
-		public virtual Node[] CreateNodes (int number) {
-			Node[] tmp = new Node[number];
+		public virtual void CreateNodes (int number) {
+			throw new System.NotSupportedException ();
+			/*GraphNode[] tmp = new GraphNode[number];
 			for (int i=0;i<number;i++) {
-				tmp[i] = new Node ();
-				tmp[i].penalty = initialPenalty;
+				tmp[i] = new PointNode ();
+				tmp[i].Penalty = initialPenalty;
 			}
-			return tmp;
+			return tmp;*/
 		}
 		
 		/** Relocates the nodes in this graph.
 		 * Assumes the nodes are translated using the "oldMatrix", then translates them according to the "newMatrix".
 		 * The "oldMatrix" is not required by all implementations of this function though (e.g the NavMesh generator).
 		 * \bug Does not always work for Grid Graphs, see http://www.arongranberg.com/forums/topic/relocate-nodes-fix/
+		 * 
+		 * \warning The default implementation assumes the graph is using nodes which implement the IPositionedNode interface
+		 * Custom graphs which do not use such a node type must implement an override to this function (possibly throwing a NotSupportedException)
 		 */
 		public virtual void RelocateNodes (Matrix4x4 oldMatrix, Matrix4x4 newMatrix) {
-			
-			if (nodes == null || nodes.Length == 0) {
-				return;
-			}
 			
 			Matrix4x4 inv = oldMatrix.inverse;
 			Matrix4x4 m = inv * newMatrix;
 			
-			for (int i=0;i<nodes.Length;i++) {
+			GetNodes (delegate (GraphNode node) {
 				//Vector3 tmp = inv.MultiplyPoint3x4 ((Vector3)nodes[i].position);
-				nodes[i].position = (Int3)m.MultiplyPoint ((Vector3)nodes[i].position);
-			}
-			this.matrix = newMatrix;
+				node.position = ((Int3)m.MultiplyPoint ((Vector3)node.position));
+				return true;
+			});
+			SetMatrix (newMatrix);
 		}
 		
 		/** Returns the nearest node to a position using the default NNConstraint.
@@ -131,24 +168,18 @@ namespace Pathfinding {
 		  * \param position The position to try to find a close node to
 		  * \param hint Can be passed to enable some graph generators to find the nearest node faster.
 		  * \param constraint Can for example tell the function to try to return a walkable node. If you do not get a good node back, consider calling GetNearestForce. */
-		public virtual NNInfo GetNearest (Vector3 position, NNConstraint constraint, Node hint) {
+		public virtual NNInfo GetNearest (Vector3 position, NNConstraint constraint, GraphNode hint) {
 			//Debug.LogError ("This function (GetNearest) is not implemented in the navigation graph generator : Type "+this.GetType ().Name);
-			
-			if (nodes == null) {
-				return new NNInfo ();
-			}
 			
 			float maxDistSqr = constraint.constrainDistance ? AstarPath.active.maxNearestNodeDistanceSqr : float.PositiveInfinity;
 			
 			float minDist = float.PositiveInfinity;
-			Node minNode = null;
+			GraphNode minNode = null;
 			
 			float minConstDist = float.PositiveInfinity;
-			Node minConstNode = null;
+			GraphNode minConstNode = null;
 			
-			for (int i=0;i<nodes.Length;i++) {
-				
-				Node node = nodes[i];
+			GetNodes (delegate (GraphNode node) {
 				float dist = (position-(Vector3)node.position).sqrMagnitude;
 				
 				if (dist < minDist) {
@@ -160,7 +191,8 @@ namespace Pathfinding {
 					minConstDist = dist;
 					minConstNode = node;
 				}
-			}
+				return true;
+			});
 			
 			NNInfo nnInfo = new NNInfo (minNode);
 			
@@ -201,22 +233,26 @@ namespace Pathfinding {
 		public virtual void Awake () {
 		}
 		
-		/// <summary>
-		/// SafeOnDestroy should be used when there is a risk that the pathfinding is searching through this graph when called
-		/// </summary>
+		/**
+		  * SafeOnDestroy should be used when there is a risk that the pathfinding is searching through this graph when called
+		  */
 		public void SafeOnDestroy () {
 			AstarPath.RegisterSafeUpdate (OnDestroy,false);
 		}
 		
-		/// <summary>
-		/// Function for cleaning up references.
-		/// </summary>
-		/// <remarks>This will be called on the same time as OnDisable on the gameObject which the AstarPath script is attached to (remember, not in the editor)
-		/// Use for any cleanup code such as cleaning up static variables which otherwise might prevent resources from being collected
-		/// Use by creating a function overriding this one in a graph class, but always call base.OnDestroy () in that function.</remarks>
+		
+		/** Function for cleaning up references.
+		 * This will be called on the same time as OnDisable on the gameObject which the AstarPath script is attached to (remember, not in the editor).
+		 * Use for any cleanup code such as cleaning up static variables which otherwise might prevent resources from being collected.
+		 * Use by creating a function overriding this one in a graph class, but always call base.OnDestroy () in that function.
+		 * All nodes should be destroyed in this function otherwise a memory leak will arise.
+		 */
 		public virtual void OnDestroy () {
-			//Clean up a refence to the node array so it can get collected even if a reference to this graph still exists somewhere
-			nodes = null;
+			//Destroy all nodes
+			GetNodes(delegate(GraphNode node) {
+				node.Destroy();
+				return true;
+			});
 		}
 		
 		/// <summary>
@@ -236,7 +272,7 @@ namespace Pathfinding {
 				AstarPath.OnGraphPreScan (this);
 			}
 			
-			Scan ();
+			ScanInternal ();
 			
 			if (AstarPath.OnGraphPostScan != null) {
 				AstarPath.OnGraphPostScan (this);
@@ -246,17 +282,27 @@ namespace Pathfinding {
 				AstarPath.OnPostScan (AstarPath.active);
 			}
 		}
+
+		[System.Obsolete("Please use AstarPath.active.Scan or if you really want this.ScanInternal which has the same functionality as this method had")]
+		public void Scan () {
+			throw new System.Exception ("This method is deprecated. Please use AstarPath.active.Scan or if you really want this.ScanInternal which has the same functionality as this method had.");
+		}
+
+		public void ScanInternal () {
+			ScanInternal (null);
+		}
 		
 		/// <summary>
-		/// Scans the graph, called from <see cref="AstarPath.Scan"/>
+		/// Scans the graph, called from <see cref="AstarPath.ScanInternal"/>
 		/// Override this function to implement custom scanning logic
+		/// The statusCallback may be optionally called to show progress info in the editor
 		/// </summary>
-		public abstract void Scan ();
+		public abstract void ScanInternal (OnScanStatus statusCallback);
 		
 		/* Color to use for gizmos.
 		 * Returns a color to be used for the specified node with the current debug settings (editor only)
 		 */
-		public virtual Color NodeColor (Node node, NodeRunData data) {
+		public virtual Color NodeColor (GraphNode node, PathHandler data) {
 			
 			Color c = AstarColor.NodeConnection;
 			bool colSet = false;
@@ -265,15 +311,15 @@ namespace Pathfinding {
 			
 			switch (AstarPath.active.debugMode) {
 				case GraphDebugMode.Areas:
-					c = AstarColor.GetAreaColor (node.area);
+					c = AstarColor.GetAreaColor (node.Area);
 					colSet = true;
 					break;
 				case GraphDebugMode.Penalty:
-					c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)node.penalty / (float)AstarPath.active.debugRoof);
+					c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)node.Penalty / (float)AstarPath.active.debugRoof);
 					colSet = true;
 					break;
 				case GraphDebugMode.Tags:
-					c = Mathfx.IntToColor (node.tags,0.5F);
+					c = AstarMath.IntToColor ((int)node.Tag,0.5F);
 					colSet = true;
 					break;
 				
@@ -292,20 +338,18 @@ namespace Pathfinding {
 			if (!colSet) {
 				if (data == null) return AstarColor.NodeConnection;
 				
-				NodeRun nodeR = node.GetNodeRun (data);
-				
-				if (nodeR == null) return AstarColor.NodeConnection;
+				PathNode nodeR = data.GetPathNode (node);
 				
 				switch (AstarPath.active.debugMode) {
 					case GraphDebugMode.G:
 						//c = Mathfx.IntToColor (node.g,0.5F);
-						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)nodeR.g / (float)AstarPath.active.debugRoof);
+						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)nodeR.G / (float)AstarPath.active.debugRoof);
 						break;
 					case GraphDebugMode.H:
-						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)nodeR.h / (float)AstarPath.active.debugRoof);
+						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)nodeR.H / (float)AstarPath.active.debugRoof);
 						break;
 					case GraphDebugMode.F:
-						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)nodeR.f / (float)AstarPath.active.debugRoof);
+						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)nodeR.F / (float)AstarPath.active.debugRoof);
 						break;
 				}
 			}
@@ -320,16 +364,14 @@ namespace Pathfinding {
 		 * Serialize the data in any way you want and return a byte array.
 		 * When loading, the exact same byte array will be passed to the DeserializeExtraInfo function.\n
 		 * These functions will only be called if node serialization is enabled.\n
-		 * If null is returned from this function, the DeserializeExtraInfo function will not be called on load.
 		 */
-		public virtual byte[] SerializeExtraInfo () {
-			return null;
+		public virtual void SerializeExtraInfo (GraphSerializationContext ctx) {
 		}
 		
 		/** Deserializes graph type specific node data.
 		 * \see SerializeExtraInfo
 		 */
-		public virtual void DeserializeExtraInfo (byte[] bytes) {
+		public virtual void DeserializeExtraInfo (GraphSerializationContext ctx) {
 		}
 		
 		/** Called after all deserialization has been done for all graphs.
@@ -337,43 +379,47 @@ namespace Pathfinding {
 		 */
 		public virtual void PostDeserialization () {
 		}
-		
+
+
 		/** Returns if the node is in the search tree of the path.
 		 * Only guaranteed to be correct if \a path is the latest path calculated.
 		 * Use for gizmo drawing only.
 		 */
-		public bool InSearchTree (Node node, Path path) {
-			if (path == null || path.runData == null) return true;
-			NodeRun nodeR = node.GetNodeRun (path.runData);
+		public bool InSearchTree (GraphNode node, Path path) {
+			if (path == null || path.pathHandler == null) return true;
+			PathNode nodeR = path.pathHandler.GetPathNode (node);
 			return nodeR.pathID == path.pathID;
 		}
 		
 		public virtual void OnDrawGizmos (bool drawNodes) {
 			
-			if (nodes == null || !drawNodes) {
-				if (!Application.isPlaying) {
-					//Scan (0);
-				}
+			if (!drawNodes) {
 				return;
 			}
 			
-			for (int i=0;i<nodes.Length;i++) {
-				Node node = nodes[i];
+			PathHandler data = AstarPath.active.debugPathData;
+			
+			GraphNode node = null;
+			
+			GraphNodeDelegate del = delegate (GraphNode o) {
+				Gizmos.DrawLine ((Vector3)node.position,(Vector3)o.position);
+			};
+			
+			GetNodes (delegate (GraphNode _node) {
+				node = _node;
 				
-				if (node.connections != null) {
-					
-					Gizmos.color = NodeColor (node, AstarPath.active.debugPathData);
-					if (AstarPath.active.showSearchTree && !InSearchTree(node,AstarPath.active.debugPath)) return;
-					
-					if (AstarPath.active.showSearchTree && AstarPath.active.debugPathData != null && node.GetNodeRun(AstarPath.active.debugPathData).parent != null) {
-						Gizmos.DrawLine ((Vector3)node.position,(Vector3)node.GetNodeRun(AstarPath.active.debugPathData).parent.node.position);
-					} else {
-						for (int q=0;q<node.connections.Length;q++) {
-							Gizmos.DrawLine ((Vector3)node.position,(Vector3)node.connections[q].position);
-						}
-					}
+				Gizmos.color = NodeColor (node, AstarPath.active.debugPathData);
+				if (AstarPath.active.showSearchTree && !InSearchTree(node,AstarPath.active.debugPath)) return true;
+				
+				
+				PathNode nodeR = data != null ? data.GetPathNode (node) : null;
+				if (AstarPath.active.showSearchTree && nodeR != null && nodeR.parent != null) {
+					Gizmos.DrawLine ((Vector3)node.position,(Vector3)nodeR.parent.node.position);
+				} else {
+					node.GetConnections (del);
 				}
-			}
+				return true;
+			});
 		}
 	}
 	
@@ -381,7 +427,7 @@ namespace Pathfinding {
 	[System.Serializable]
 	/** Handles collision checking for graphs.
 	  * Mostly used by grid based graphs */
-	public class GraphCollision : ISerializableObject {
+	public class GraphCollision {
 		
 		/** Collision shape to use.
 		  * Pathfinding.ColliderType */
@@ -445,7 +491,10 @@ namespace Pathfinding {
 	
 		/** Make nodes unwalkable when no ground was found with the height raycast. If height raycast is turned off, this doesn't affect anything. */
 		public bool unwalkableWhenNoGround = true;
-
+		
+		/** Use Unity 2D API */
+		public bool use2D = false;
+		
 //#if !PhotonImplementation
 		
 		/** Sets up several variables using the specified matrix and scale.
@@ -468,22 +517,35 @@ namespace Pathfinding {
 				return true;
 			}
 			
-			position += up*collisionOffset;
-			
-			switch (type) {
-				case ColliderType.Capsule:
-					return !Physics.CheckCapsule (position, position+upheight,finalRadius,mask);
-				case ColliderType.Sphere:
-					return !Physics.CheckSphere (position, finalRadius,mask);
-				default:
-					switch (rayDirection) {
-						case RayDirection.Both:
-							return !Physics.Raycast (position, up, height, mask) && !Physics.Raycast (position+upheight, -up, height, mask);
-						case RayDirection.Up:
-							return !Physics.Raycast (position, up, height, mask);
-						default:
-							return !Physics.Raycast (position+upheight, -up, height, mask);
-					}
+#if !UNITY_LE_4_3
+			if ( use2D ) {
+				switch (type) {
+					case ColliderType.Capsule:
+						throw new System.Exception ("Capsule mode cannot be used with 2D since capsules don't exist in 2D");
+					case ColliderType.Sphere:
+						return Physics2D.OverlapCircle (position, finalRadius, mask) == null;
+					default:
+						return Physics2D.OverlapPoint ( position, mask ) == null;
+				}
+			} else
+#endif
+			{
+				position += up*collisionOffset;
+				switch (type) {
+					case ColliderType.Capsule:
+						return !Physics.CheckCapsule (position, position+upheight,finalRadius,mask);
+					case ColliderType.Sphere:
+						return !Physics.CheckSphere (position, finalRadius,mask);
+					default:
+						switch (rayDirection) {
+							case RayDirection.Both:
+								return !Physics.Raycast (position, up, height, mask) && !Physics.Raycast (position+upheight, -up, height, mask);
+							case RayDirection.Up:
+								return !Physics.Raycast (position, up, height, mask);
+							default:
+								return !Physics.Raycast (position+upheight, -up, height, mask);
+						}
+				}
 			}
 		}
 		
@@ -499,7 +561,7 @@ namespace Pathfinding {
 		public Vector3 CheckHeight (Vector3 position, out RaycastHit hit, out bool walkable) {
 			walkable = true;
 			
-			if (!heightCheck) {
+			if (!heightCheck || use2D ) {
 				hit = new RaycastHit ();
 				return position;
 			}
@@ -508,7 +570,7 @@ namespace Pathfinding {
 				Ray ray = new Ray (position+up*fromHeight,-up);
 				if (Physics.SphereCast (ray, finalRaycastRadius,out hit, fromHeight+0.005F, heightMask)) {
 					
-					return Mathfx.NearestPoint (ray.origin,ray.origin+ray.direction,hit.point);
+					return AstarMath.NearestPoint (ray.origin,ray.origin+ray.direction,hit.point);
 					//position+up*(fromHeight-hit.distance);
 				} else {
 					if (unwalkableWhenNoGround) {
@@ -532,7 +594,7 @@ namespace Pathfinding {
 		public Vector3 Raycast (Vector3 origin, out RaycastHit hit, out bool walkable) {
 			walkable = true;
 			
-			if (!heightCheck) {
+			if (!heightCheck || use2D ) {
 				hit = new RaycastHit ();
 				return origin -up*fromHeight;
 			}
@@ -541,7 +603,7 @@ namespace Pathfinding {
 				Ray ray = new Ray (origin,-up);
 				if (Physics.SphereCast (ray, finalRaycastRadius,out hit, fromHeight+0.005F, heightMask)) {
 					
-					return Mathfx.NearestPoint (ray.origin,ray.origin+ray.direction,hit.point);
+					return AstarMath.NearestPoint (ray.origin,ray.origin+ray.direction,hit.point);
 					//position+up*(fromHeight-hit.distance);
 				} else {
 					if (unwalkableWhenNoGround) {
@@ -589,7 +651,7 @@ namespace Pathfinding {
 			}
 			return hits;*/
 			
-			if (!heightCheck) {
+			if (!heightCheck || use2D) {
 				RaycastHit hit = new RaycastHit ();
 				hit.point = position;
 				hit.distance = 0;
@@ -634,52 +696,6 @@ namespace Pathfinding {
 				}
 			}
 			return hits.ToArray ();
-		}
-		
-		/** \copydoc Pathfinding.ISerializableObject.SerializeSettings \copybrief Pathfinding.ISerializableObject.SerializeSettings */
-		public void SerializeSettings (AstarSerializer serializer) {
-			serializer.AddValue ("Mask",(int)mask);
-			serializer.AddValue ("Diameter",diameter);
-			serializer.AddValue ("Height",height);
-			serializer.AddValue ("Type",(int)type);
-			serializer.AddValue ("RayDirection",(int)rayDirection);
-			
-			serializer.AddValue ("heightMask",(int)heightMask);
-			serializer.AddValue ("fromHeight",fromHeight);
-			serializer.AddValue ("thickRaycastDiameter",thickRaycastDiameter);
-			serializer.AddValue ("thickRaycast",thickRaycast);
-			
-			serializer.AddValue ("collisionCheck",collisionCheck);
-			serializer.AddValue ("heightCheck",heightCheck);
-			
-			serializer.AddValue ("unwalkableWhenNoGround",unwalkableWhenNoGround);
-			
-			serializer.AddValue ("collisionOffset",collisionOffset);
-		}
-		
-		/** \copydoc Pathfinding.ISerializableObject.DeSerializeSettings */
-		public void DeSerializeSettings (AstarSerializer serializer) {
-			mask.value = (int)serializer.GetValue ("Mask",typeof (int));
-			diameter = (float)serializer.GetValue ("Diameter",typeof (float));
-			height = (float)serializer.GetValue ("Height",typeof (float));
-			type = (ColliderType)serializer.GetValue ("Type",typeof(int));
-			rayDirection = (RayDirection)serializer.GetValue ("RayDirection",typeof(int));
-			
-			heightMask.value = (int)serializer.GetValue ("heightMask",typeof (int),-1);
-			fromHeight = (float)serializer.GetValue ("fromHeight",typeof (float), 100.0F);
-			thickRaycastDiameter = (float)serializer.GetValue ("thickRaycastDiameter",typeof (float));
-			thickRaycast = (bool)serializer.GetValue ("thickRaycast",typeof (bool));
-			
-			collisionCheck = (bool)serializer.GetValue ("collisionCheck",typeof(bool),true);
-			heightCheck = (bool)serializer.GetValue ("heightCheck",typeof(bool),true);
-			
-			unwalkableWhenNoGround = (bool)serializer.GetValue ("unwalkableWhenNoGround",typeof(bool),true);
-			
-			collisionOffset = (float)serializer.GetValue ("collisionOffset",typeof(float),0.0F);
-			
-			if (fromHeight == 0) fromHeight = 100;
-			
-			
 		}
 	}
 

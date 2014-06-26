@@ -34,8 +34,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="JsonFx.Json">
-      <HintPath>..\AStarPlugins\JsonFx\JsonFx.Json.dll</HintPath>
+    <Reference Include="Pathfinding.JsonFx">
+      <HintPath>..\AStarPlugins\JsonFx\Pathfinding.JsonFx.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -56,7 +56,9 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="AnimationLinkEditor.cs" />
     <Compile Include="AstarPathEditor.cs" />
+    <Compile Include="AstarUpdateWindow.cs" />
     <Compile Include="EditorGUIx.cs" />
     <Compile Include="EditorUtilities.cs" />
     <Compile Include="GraphEditors\GraphEditor.cs" />
@@ -64,6 +66,7 @@
     <Compile Include="GraphEditors\NavMeshGeneratorEditor.cs" />
     <Compile Include="GraphEditors\PointGeneratorEditor.cs" />
     <Compile Include="GraphUpdateSceneEditor.cs" />
+    <Compile Include="Misc\AstarEnumFlagDrawer.cs" />
     <Compile Include="ModifierEditors\RaycastModifierEditor.cs" />
     <Compile Include="ModifierEditors\SmoothModifierEditor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

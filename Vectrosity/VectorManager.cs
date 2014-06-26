@@ -1,5 +1,5 @@
-// Version 2.3
-// ©2013 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 3.1
+// ©2014 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using System.Collections.Generic;
@@ -53,7 +53,7 @@ public class VectorManager {
 				vc = go.AddComponent (typeof(VisibilityControl)) as VisibilityControl;
 				vc.Setup (line, makeBounds);
 				if (bc != null) {
-					bc.SetUseLine(false);
+					bc.SetUseLine (false);
 				}
 			}
 		}
@@ -62,7 +62,7 @@ public class VectorManager {
 				vcs = go.AddComponent (typeof(VisibilityControlStatic)) as VisibilityControlStatic;
 				vcs.Setup (line, makeBounds);
 				if (bc != null) {
-					bc.SetUseLine(false);
+					bc.SetUseLine (false);
 				}
 			}
 		}
@@ -71,7 +71,7 @@ public class VectorManager {
 				vca = go.AddComponent (typeof(VisibilityControlAlways)) as VisibilityControlAlways;
 				vca.Setup (line);
 				if (bc != null) {
-					bc.SetUseLine(false);
+					bc.SetUseLine (false);
 				}
 			}
 		}
@@ -108,9 +108,9 @@ public class VectorManager {
 			vectorLines = new List<VectorLine>();
 			objectNumbers = new List<RefInt>();
 		}
-		vectorLines.Add(line);
+		vectorLines.Add (line);
 		objectNum = new RefInt(_arrayCount++); 
-		objectNumbers.Add(objectNum);
+		objectNumbers.Add (objectNum);
 		VectorLine.LineManagerEnable();
 	}
 	
@@ -123,8 +123,8 @@ public class VectorManager {
 		for (int i = objectNumber+1; i < _arrayCount; i++) {
 			objectNumbers[i].i--;
 		}
-		vectorLines.RemoveAt(objectNumber);
-		objectNumbers.RemoveAt(objectNumber);
+		vectorLines.RemoveAt (objectNumber);
+		objectNumbers.RemoveAt (objectNumber);
 		_arrayCount--;
 		VectorLine.LineManagerDisable();
 	}
@@ -132,7 +132,6 @@ public class VectorManager {
 	// Same as above, but for VisibilityControl
 	static List<VectorLine> vectorLines2;
 	static List<RefInt> objectNumbers2;
-	static List<Transform> transforms;
 	static int _arrayCount2 = 0;
 	public static int arrayCount2 {
 		get {return _arrayCount2;}
@@ -142,12 +141,11 @@ public class VectorManager {
 		if (vectorLines2 == null) {
 			vectorLines2 = new List<VectorLine>();
 			objectNumbers2 = new List<RefInt>();
-			transforms = new List<Transform>();
 		}
-		vectorLines2.Add(line);
-		transforms.Add(thisTransform);
+		line.drawTransform = thisTransform;
+		vectorLines2.Add (line);
 		objectNum = new RefInt(_arrayCount2++); 
-		objectNumbers2.Add(objectNum);
+		objectNumbers2.Add (objectNum);
 		VectorLine.LineManagerEnable();
 	}
 	
@@ -159,9 +157,8 @@ public class VectorManager {
 		for (int i = objectNumber+1; i < _arrayCount2; i++) {
 			objectNumbers2[i].i--;
 		}
-		transforms.RemoveAt(objectNumber);
-		vectorLines2.RemoveAt(objectNumber);
-		objectNumbers2.RemoveAt(objectNumber);
+		vectorLines2.RemoveAt (objectNumber);
+		objectNumbers2.RemoveAt (objectNumber);
 		_arrayCount2--;
 		VectorLine.LineManagerDisable();
 	}
@@ -184,12 +181,12 @@ public class VectorManager {
 			objectNumbers3 = new List<RefInt>();
 			VectorLine.LineManagerCheckDistance();
 		}
-		transforms3.Add(thisTransform);
-		vectorLines3.Add(line);
-		oldDistances.Add(-1);
-		colors.Add(color);
+		transforms3.Add (thisTransform);
+		vectorLines3.Add (line);
+		oldDistances.Add (-1);
+		colors.Add (color);
 		objectNum.i = _arrayCount3++;
-		objectNumbers3.Add(objectNum);
+		objectNumbers3.Add (objectNum);
 	}
 	
 	public static void DistanceRemove (int objectNumber) {
@@ -201,11 +198,11 @@ public class VectorManager {
 		for (int i = objectNumber+1; i < _arrayCount3; i++) {
 			objectNumbers3[i].i--;
 		}
-		transforms3.RemoveAt(objectNumber);
-		vectorLines3.RemoveAt(objectNumber);
-		oldDistances.RemoveAt(objectNumber);
-		colors.RemoveAt(objectNumber);
-		objectNumbers3.RemoveAt(objectNumber);
+		transforms3.RemoveAt (objectNumber);
+		vectorLines3.RemoveAt (objectNumber);
+		oldDistances.RemoveAt (objectNumber);
+		colors.RemoveAt (objectNumber);
+		objectNumbers3.RemoveAt (objectNumber);
 		_arrayCount3--;
 	}
 	
@@ -247,10 +244,10 @@ public class VectorManager {
 
 	public static void DrawArrayLine2 (int i) {
 		if (useDraw3D) {
-			vectorLines2[i].Draw3D (transforms[i]);
+			vectorLines2[i].Draw3D();
 		}
 		else {
-			vectorLines2[i].Draw (transforms[i]);
+			vectorLines2[i].Draw();
 		}
 	}
 
@@ -270,12 +267,12 @@ public class VectorManager {
 	public static void DrawArrayLines2 () {
 		if (useDraw3D) {
 			for (int i = 0; i < _arrayCount2; i++) {
-				vectorLines2[i].Draw3D (transforms[i]);
+				vectorLines2[i].Draw3D();
 			}
 		}
 		else {
 			for (int i = 0; i < _arrayCount2; i++) {
-				vectorLines2[i].Draw (transforms[i]);
+				vectorLines2[i].Draw();
 			}
 		}
 	}
@@ -338,7 +335,7 @@ public class VectorManager {
 			meshTable = new Dictionary<string, Mesh>();
 		}
 		if (!meshTable.ContainsKey(line.vectorObject.name)) {
-			meshTable.Add(line.vectorObject.name, MakeBoundsMesh (GetBounds (line)));
+			meshTable.Add (line.vectorObject.name, MakeBoundsMesh (GetBounds (line)));
 			meshTable[line.vectorObject.name].name = line.vectorObject.name + " Bounds";
 		}
 		meshFilter.mesh = meshTable[line.vectorObject.name];

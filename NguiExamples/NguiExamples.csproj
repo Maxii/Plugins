@@ -70,6 +70,7 @@
     <Compile Include="Examples\InventorySystem\System\InvStat.cs" />
     <Compile Include="Examples\Other\ChatInput.cs" />
     <Compile Include="Examples\Other\DownloadTexture.cs" />
+    <Compile Include="Examples\Other\EnvelopContent.cs" />
     <Compile Include="Examples\Other\ExampleDragDropItem.cs" />
     <Compile Include="Examples\Other\ExampleDragDropSurface.cs" />
     <Compile Include="Examples\Other\LagPosition.cs" />
@@ -83,7 +84,7 @@
     <Compile Include="Examples\Other\ShaderQuality.cs" />
     <Compile Include="Examples\Other\Spin.cs" />
     <Compile Include="Examples\Other\SpinWithMouse.cs" />
-    <Compile Include="Examples\Other\TypewriterEffect.cs" />
+    <Compile Include="Examples\Other\Tutorial5.cs" />
     <Compile Include="Examples\Other\UISliderColors.cs" />
     <Compile Include="Examples\Other\WindowAutoYaw.cs" />
     <Compile Include="Examples\Other\WindowDragTilt.cs" />

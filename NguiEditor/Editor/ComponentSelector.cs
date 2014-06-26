@@ -157,13 +157,13 @@ public class ComponentSelector : ScriptableWizard
 				if (!isComponent)
 				{
 					System.Type t = obj.GetType();
-					if (t == mType || t.IsSubclassOf(mType))
+					if (t == mType || t.IsSubclassOf(mType) && !list.Contains(obj))
 						list.Add(obj);
 				}
 				else if (PrefabUtility.GetPrefabType(obj) == PrefabType.Prefab)
 				{
 					Object t = (obj as GameObject).GetComponent(mType);
-					if (t != null) list.Add(t);
+					if (t != null && !list.Contains(t)) list.Add(t);
 				}
 			}
 			list.Sort(delegate(Object a, Object b) { return a.name.CompareTo(b.name); });
@@ -196,7 +196,7 @@ public class ComponentSelector : ScriptableWizard
 			{
 				if (GUILayout.Button("Open the Font Maker", GUILayout.Width(150f)))
 				{
-					EditorWindow.GetWindow<UIFontMaker>(false, "Font Maker", true);
+					EditorWindow.GetWindow<UIFontMaker>(false, "Font Maker", true).Show();
 					isDone = true;
 				}
 			}
@@ -204,7 +204,7 @@ public class ComponentSelector : ScriptableWizard
 			{
 				if (GUILayout.Button("Open the Atlas Maker", GUILayout.Width(150f)))
 				{
-					EditorWindow.GetWindow<UIAtlasMaker>(false, "Atlas Maker", true);
+					EditorWindow.GetWindow<UIAtlasMaker>(false, "Atlas Maker", true).Show();
 					isDone = true;
 				}
 			}

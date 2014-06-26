@@ -26,7 +26,6 @@ public class UIAtlasInspector : Editor
 	UIAtlas mAtlas;
 	AtlasType mType = AtlasType.Normal;
 	UIAtlas mReplacement = null;
-	float mAlpha = 1f;
 
 	void OnEnable () { instance = this; }
 	void OnDisable () { instance = null; }
@@ -107,7 +106,7 @@ public class UIAtlasInspector : Editor
 
 		GUILayout.BeginHorizontal();
 		AtlasType after = (AtlasType)EditorGUILayout.EnumPopup("Atlas Type", mType);
-		GUILayout.Space(18f);
+		NGUIEditorTools.DrawPadding();
 		GUILayout.EndHorizontal();
 
 		if (mType != after)
@@ -256,27 +255,24 @@ public class UIAtlasInspector : Editor
 
 					if (GUILayout.Button("Duplicate"))
 					{
-						UIAtlasMaker.SpriteEntry se = UIAtlasMaker.ExtractSprite(mAtlas, sprite.name);
-						
-						if (se != null)
-						{
-							se.name = se.name + " (Copy)";
-
-							List<UIAtlasMaker.SpriteEntry> sprites = new List<UIAtlasMaker.SpriteEntry>();
-							UIAtlasMaker.ExtractSprites(mAtlas, sprites);
-							sprites.Add(se);
-							UIAtlasMaker.UpdateAtlas(mAtlas, sprites);
-							if (se.temporaryTexture) DestroyImmediate(se.tex);
-							NGUISettings.selectedSprite = se.name;
-						}
+						UIAtlasMaker.SpriteEntry se = UIAtlasMaker.DuplicateSprite(mAtlas, sprite.name);
+						if (se != null) NGUISettings.selectedSprite = se.name;
 					}
 
 					if (GUILayout.Button("Save As..."))
 					{
-						string path = EditorUtility.SaveFilePanelInProject("Save As", sprite.name + ".png", "png", "Extract sprite into which file?");
+#if UNITY_3_5
+						string path = EditorUtility.SaveFilePanel("Save As",
+							NGUISettings.currentPath, sprite.name + ".png", "png");
+#else
+						string path = EditorUtility.SaveFilePanelInProject("Save As",
+							sprite.name + ".png", "png",
+							"Extract sprite into which file?", NGUISettings.currentPath);
+#endif
 
 						if (!string.IsNullOrEmpty(path))
 						{
+							NGUISettings.currentPath = System.IO.Path.GetDirectoryName(path);
 							UIAtlasMaker.SpriteEntry se = UIAtlasMaker.ExtractSprite(mAtlas, sprite.name);
 
 							if (se != null)
@@ -300,21 +296,17 @@ public class UIAtlasInspector : Editor
 					GUILayout.Space(20f);
 					EditorGUILayout.BeginVertical();
 
+					NGUISettings.backgroundColor = EditorGUILayout.ColorField("Background", NGUISettings.backgroundColor);
+
+					if (GUILayout.Button("Add a Shadow")) AddShadow(sprite);
+					if (GUILayout.Button("Add a Soft Outline")) AddOutline(sprite);
+
 					if (GUILayout.Button("Add a Transparent Border")) AddTransparentBorder(sprite);
 					if (GUILayout.Button("Add a Clamped Border")) AddClampedBorder(sprite);
 					if (GUILayout.Button("Add a Tiled Border")) AddTiledBorder(sprite);
 					EditorGUI.BeginDisabledGroup(!sprite.hasBorder);
 					if (GUILayout.Button("Crop Border")) CropBorder(sprite);
 					EditorGUI.EndDisabledGroup();
-
-					//GUILayout.BeginHorizontal();
-					mAlpha = GUILayout.HorizontalSlider(mAlpha, 0f, 1f);
-					string cap = Mathf.RoundToInt(mAlpha * 100f) + "%";
-					//GUILayout.Label(cap, GUILayout.Width(40f));
-					//GUILayout.EndHorizontal();
-
-					if (GUILayout.Button("Add a Shadow (" + cap + ")")) AddShadow(sprite);
-					if (GUILayout.Button("Add Visual Depth (" + cap + ")")) AddDepth(sprite);
 
 					EditorGUILayout.EndVertical();
 					GUILayout.Space(20f);
@@ -344,8 +336,11 @@ public class UIAtlasInspector : Editor
 
 	void SelectSprite (string spriteName)
 	{
-		NGUISettings.selectedSprite = spriteName;
-		Repaint();
+		if (NGUISettings.selectedSprite != spriteName)
+		{
+			NGUISettings.selectedSprite = spriteName;
+			Repaint();
+		}
 	}
 
 	/// <summary>
@@ -394,23 +389,7 @@ public class UIAtlasInspector : Editor
 			int w2 = w1 + 2;
 			int h2 = h1 + 2;
 
-			Color32[] c1 = se.tex.GetPixels32();
-			Color32[] c2 = new Color32[w2 * h2];
-
-			for (int y2 = 0; y2 < h2; ++y2)
-			{
-				int y1 = NGUIMath.ClampIndex(y2 - 1, h1);
-
-				for (int x2 = 0; x2 < w2; ++x2)
-				{
-					int x1 = NGUIMath.ClampIndex(x2 - 1, w1);
-					int i2 = x2 + y2 * w2;
-					c2[i2] = c1[x1 + y1 * w1];
-
-					if (x2 == 0 || x2 + 1 == w2 || y2 == 0 || y2 + 1 == h2)
-						c2[i2].a = 0;
-				}
-			}
+			Color32[] c2 = NGUIEditorTools.AddBorder(se.tex.GetPixels32(), w1, h1);
 
 			if (se.temporaryTexture) DestroyImmediate(se.tex);
 
@@ -642,102 +621,18 @@ public class UIAtlasInspector : Editor
 			int w2 = w1 + 2;
 			int h2 = h1 + 2;
 
-			Color32[] c1 = se.tex.GetPixels32();
-			Color32[] c2 = new Color32[w2 * h2];
-
-			for (int y2 = 0; y2 < h2; ++y2)
-			{
-				int y1 = NGUIMath.ClampIndex(y2 - 1, h1);
-
-				for (int x2 = 0; x2 < w2; ++x2)
-				{
-					int x1 = NGUIMath.ClampIndex(x2 - 1, w1);
-					int i2 = x2 + y2 * w2;
-					c2[i2] = c1[x1 + y1 * w1];
-
-					if (x2 == 0 || x2 + 1 == w2 || y2 == 0 || y2 + 1 == h2)
-						c2[i2].a = 0;
-				}
-			}
-
-			for (int y2 = 0; y2 < h2; ++y2)
-			{
-				for (int x2 = 0; x2 < w2; ++x2)
-				{
-					int index = x2 + y2 * w2;
-					Color32 uc = c2[index];
-					if (uc.a == 255) continue;
-
-					Color original = uc;
-					float val = original.a * 2f;
-					int count = 2;
-					float div1 = 1f / 255f;
-					float div2 = 2f / 255f;
-					float div4 = 4f / 255f;
-
-					// Left
-					if (x2 != 0)
-					{
-						val += c2[x2 - 1 + y2 * w2].a * div2;
-						count += 2;
-					}
-
-					// Right
-					if (x2 + 1 != w2)
-					{
-						val += c2[x2 + 1 + y2 * w2].a * div1;
-						++count;
-					}
-
-					// Bottom
-					if (y2 != 0)
-					{
-						val += c2[x2 + (y2 - 1) * w2].a * div1;
-						++count;
-					}
-
-					// Top
-					if (y2 + 1 != h2)
-					{
-						val += c2[x2 + (y2 + 1) * w2].a * div2;
-						count += 2;
-					}
-
-					// Bottom-left
-					if (x2 != 0 && y2 != 0)
-					{
-						val += c2[x2 - 1 + (y2 - 1) * w2].a * div1;
-						++count;
-					}
-
-					// Top-left
-					if (x2 != 0 && y2 + 1 != h2)
-					{
-						val += c2[x2 - 1 + (y2 + 1) * w2].a * div4;
-						count += 4;
-					}
-
-					// Top-right
-					if (x2 + 1 != w2 && y2 + 1 != h2)
-					{
-						val += c2[x2 + 1 + (y2 + 1) * w2].a * div1;
-						++count;
-					}
-
-					val /= count;
-
-					Color shadow = new Color(0f, 0f, 0f, val);
-					shadow = Color.Lerp(original, shadow, mAlpha);
-					c2[index] = Color.Lerp(shadow, original, original.a);
-				}
-			}
+			Color32[] c2 = NGUIEditorTools.AddBorder(se.tex.GetPixels32(), w1, h1);
+			NGUIEditorTools.AddShadow(c2, w2, h2, NGUISettings.backgroundColor);
 
 			if (se.temporaryTexture) DestroyImmediate(se.tex);
 
-			++se.borderLeft;
-			++se.borderRight;
-			++se.borderTop;
-			++se.borderBottom;
+			if ((se.borderLeft | se.borderRight | se.borderBottom | se.borderTop) != 0)
+			{
+				++se.borderLeft;
+				++se.borderRight;
+				++se.borderTop;
+				++se.borderBottom;
+			}
 
 			se.tex = new Texture2D(w2, h2);
 			se.tex.name = sprite.name;
@@ -756,7 +651,7 @@ public class UIAtlasInspector : Editor
 	/// Add a dark shadowy outline around the sprite, giving it some visual depth.
 	/// </summary>
 
-	void AddDepth (UISpriteData sprite)
+	void AddOutline (UISpriteData sprite)
 	{
 		List<UIAtlasMaker.SpriteEntry> sprites = new List<UIAtlasMaker.SpriteEntry>();
 		UIAtlasMaker.ExtractSprites(mAtlas, sprites);
@@ -779,100 +674,18 @@ public class UIAtlasInspector : Editor
 			int w2 = w1 + 2;
 			int h2 = h1 + 2;
 
-			Color32[] c1 = se.tex.GetPixels32();
-			Color32[] c2 = new Color32[w2 * h2];
-
-			for (int y2 = 0; y2 < h2; ++y2)
-			{
-				int y1 = NGUIMath.ClampIndex(y2 - 1, h1);
-
-				for (int x2 = 0; x2 < w2; ++x2)
-				{
-					int x1 = NGUIMath.ClampIndex(x2 - 1, w1);
-					int i2 = x2 + y2 * w2;
-					c2[i2] = c1[x1 + y1 * w1];
-
-					if (x2 == 0 || x2 + 1 == w2 || y2 == 0 || y2 + 1 == h2)
-						c2[i2].a = 0;
-				}
-			}
-
-			for (int y2 = 0; y2 < h2; ++y2)
-			{
-				for (int x2 = 0; x2 < w2; ++x2)
-				{
-					int index = x2 + y2 * w2;
-					Color32 uc = c2[index];
-					if (uc.a == 255) continue;
-
-					Color original = uc;
-					float val = original.a * 4f;
-					int count = 4;
-					float div1 = 1f / 255f;
-					float div2 = 2f / 255f;
-
-					if (x2 != 0)
-					{
-						val += c2[x2 - 1 + y2 * w2].a * div2;
-						count += 2;
-					}
-
-					if (x2 + 1 != w2)
-					{
-						val += c2[x2 + 1 + y2 * w2].a * div2;
-						count += 2;
-					}
-
-					if (y2 != 0)
-					{
-						val += c2[x2 + (y2 - 1) * w2].a * div2;
-						count += 2;
-					}
-
-					if (y2 + 1 != h2)
-					{
-						val += c2[x2 + (y2 + 1) * w2].a * div2;
-						count += 2;
-					}
-
-					if (x2 != 0 && y2 != 0)
-					{
-						val += c2[x2 - 1 + (y2 - 1) * w2].a * div1;
-						++count;
-					}
-
-					if (x2 != 0 && y2 + 1 != h2)
-					{
-						val += c2[x2 - 1 + (y2 + 1) * w2].a * div1;
-						++count;
-					}
-
-					if (x2 + 1 != w2 && y2 != 0)
-					{
-						val += c2[x2 + 1 + (y2 - 1) * w2].a * div1;
-						++count;
-					}
-
-					if (x2 + 1 != w2 && y2 + 1 != h2)
-					{
-						val += c2[x2 + 1 + (y2 + 1) * w2].a * div1;
-						++count;
-					}
-
-					val /= count;
-
-					Color shadow = new Color(0f, 0f, 0f, val);
-					shadow = Color.Lerp(original, shadow, mAlpha);
-					c2[index] = Color.Lerp(shadow, original, original.a);
-				}
-			}
+			Color32[] c2 = NGUIEditorTools.AddBorder(se.tex.GetPixels32(), w1, h1);
+			NGUIEditorTools.AddDepth(c2, w2, h2, NGUISettings.backgroundColor);
 
 			if (se.temporaryTexture) DestroyImmediate(se.tex);
 
-			++se.borderLeft;
-			++se.borderRight;
-			++se.borderTop;
-			++se.borderBottom;
+			if ((se.borderLeft | se.borderRight | se.borderBottom | se.borderTop) != 0)
+			{
+				++se.borderLeft;
+				++se.borderRight;
+				++se.borderTop;
+				++se.borderBottom;
+			}
 
 			se.tex = new Texture2D(w2, h2);
 			se.tex.name = sprite.name;

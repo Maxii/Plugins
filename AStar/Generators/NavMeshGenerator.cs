@@ -1,21 +1,18 @@
 //#define ASTARDEBUG    //Some debugging
+//#define ASTAR_NO_JSON
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using Pathfinding.Serialization.JsonFx;
+using Pathfinding.Serialization;
+using Pathfinding;
+
 
 namespace Pathfinding {
 	public interface INavmesh {
-		Int3[] vertices {
-			get;
-			set;
-		}
 		
-		/** Bounding Box Tree */
-		BBTree bbTree {
-			get;
-			set;
-		}
+		//TriangleMeshNode[] TriNodes {get;}
+		void GetNodes(GraphNodeDelegateCancelable del);
 		
 		//Int3[] originalVertices {
 		//	get;
@@ -37,16 +34,15 @@ and have a low memory footprint because of their smaller size to describe the sa
 \shadowimage{navmeshgraph_inspector.png}
 
 	 */
-	public class NavMeshGraph : NavGraph, INavmesh, ISerializableGraph, IUpdatableGraph, IFunnelGraph
+	public class NavMeshGraph : NavGraph, INavmesh, IUpdatableGraph, IFunnelGraph, INavmeshHolder
 	{
 		
-		public override Node[] CreateNodes (int number) {
-			MeshNode[] tmp = new MeshNode[number];
+		public override void CreateNodes (int number) {
+			TriangleMeshNode[] tmp = new TriangleMeshNode[number];
 			for (int i=0;i<number;i++) {
-				tmp[i] = new MeshNode ();
-				tmp[i].penalty = initialPenalty;
+				tmp[i] = new TriangleMeshNode (active);
+				tmp[i].Penalty = initialPenalty;
 			}
-			return tmp as Node[];
 		}
 		
 		[JsonMember]
@@ -69,7 +65,37 @@ and have a low memory footprint because of their smaller size to describe the sa
 		 */
 		public bool accurateNearestNode = true;
 		
-		//public Node[] graphNodes;
+		public TriangleMeshNode[] nodes;
+		
+		public TriangleMeshNode[] TriNodes {
+			get { return nodes; }
+		}
+		
+		public override void GetNodes (GraphNodeDelegateCancelable del) {
+			if (nodes == null) return;
+			for (int i=0;i<nodes.Length && del (nodes[i]);i++) {}
+		}
+		
+		public override void OnDestroy () {
+			
+			base.OnDestroy ();
+			
+			// Cleanup
+			TriangleMeshNode.SetNavmeshHolder (active.astarData.GetGraphIndex(this), null);
+		}
+		
+		public Int3 GetVertex (int index) {
+			return vertices[index];
+		}
+		
+		public int GetVertexArrayIndex (int index) {
+			return index;
+		}
+		
+		public void GetTileCoordinates (int tileIndex, out int x, out int z) {
+			//Tiles not supported
+			x = z = 0;
+		}
 		
 		/** Bounding Box Tree. Enables really fast lookups of nodes. \astarpro */
 		BBTree _bbTree;
@@ -93,10 +119,6 @@ and have a low memory footprint because of their smaller size to describe the sa
 		[System.NonSerialized]
 		Vector3[] originalVertices;
 		
-		//[System.NonSerialized]
-		//Int3[] _originalVertices;
-		Matrix4x4 _originalMatrix;
-		
 		/*public Int3[] originalVertices {
 			get { 	return _originalVertices; 	}
 			set { 	_originalVertices = value;	}
@@ -107,7 +129,7 @@ and have a low memory footprint because of their smaller size to describe the sa
 		
 		public void GenerateMatrix () {
 			
-			matrix = Matrix4x4.TRS (offset,Quaternion.Euler (rotation),new Vector3 (scale,scale,scale));
+			SetMatrix (Matrix4x4.TRS (offset,Quaternion.Euler (rotation),new Vector3 (scale,scale,scale)));
 			
 		}
 		
@@ -120,25 +142,28 @@ and have a low memory footprint because of their smaller size to describe the sa
 				return;
 			}
 			
-			for (int i=0;i<vertices.Length;i++) {
+			for (int i=0;i<_vertices.Length;i++) {
 				//Vector3 tmp = inv.MultiplyPoint3x4 (vertices[i]);
 				//vertices[i] = (Int3)newMatrix.MultiplyPoint3x4 (tmp);
-				vertices[i] = (Int3)newMatrix.MultiplyPoint3x4 ((Vector3)originalVertices[i]);
+				_vertices[i] = (Int3)newMatrix.MultiplyPoint3x4 ((Vector3)originalVertices[i]);
 			}
 			
 			for (int i=0;i<nodes.Length;i++) {
-				MeshNode node = (MeshNode)nodes[i];
-				node.position = (vertices[node.v1]+vertices[node.v2]+vertices[node.v3])/3F;
+				TriangleMeshNode node = (TriangleMeshNode)nodes[i];
+				node.UpdatePositionFromVertices();
 				
 				if (node.connections != null) {
 					for (int q=0;q<node.connections.Length;q++) {
-						node.connectionCosts[q] = (node.position-node.connections[q].position).costMagnitude;
+						node.connectionCosts[q] = (uint)(node.position-node.connections[q].position).costMagnitude;
 					}
 				}
 			}
+			
+			SetMatrix (newMatrix);
+			
 		}
 	
-		public static NNInfo GetNearest (INavmesh graph, Node[] nodes, Vector3 position, NNConstraint constraint, bool accurateNearestNode) {
+		public static NNInfo GetNearest (NavMeshGraph graph, GraphNode[] nodes, Vector3 position, NNConstraint constraint, bool accurateNearestNode) {
 			if (nodes == null || nodes.Length == 0) {
 				Debug.LogError ("NavGraph hasn't been generated yet or does not contain any nodes");
 				return new NNInfo ();
@@ -147,10 +172,10 @@ and have a low memory footprint because of their smaller size to describe the sa
 			if (constraint == null) constraint = NNConstraint.None;
 			
 			
-			return GetNearestForceBoth (nodes,graph.vertices, position, NNConstraint.None, accurateNearestNode);
+			return GetNearestForceBoth (graph,graph, position, NNConstraint.None, accurateNearestNode);
 		}
 		
-		public override NNInfo GetNearest (Vector3 position, NNConstraint constraint, Node hint) {
+		public override NNInfo GetNearest (Vector3 position, NNConstraint constraint, GraphNode hint) {
 			return GetNearest (this, nodes,position, constraint, accurateNearestNode);
 		}
 		
@@ -159,15 +184,15 @@ and have a low memory footprint because of their smaller size to describe the sa
 		 */
 		public override NNInfo GetNearestForce (Vector3 position, NNConstraint constraint) {
 			
-			return GetNearestForce (nodes,vertices,position,constraint, accurateNearestNode);
+			return GetNearestForce (this, this,position,constraint, accurateNearestNode);
 			//Debug.LogWarning ("This function shouldn't be called since constrained nodes are sent back in the GetNearest call");
 			
 			//return new NNInfo ();
 		}
 		
 		/** This performs a linear search through all polygons returning the closest one */
-		public static NNInfo GetNearestForce (Node[] nodes, Int3[] vertices, Vector3 position, NNConstraint constraint, bool accurateNearestNode) {
-			NNInfo nn = GetNearestForceBoth (nodes,vertices,position,constraint,accurateNearestNode);
+		public static NNInfo GetNearestForce (NavGraph graph, INavmeshHolder navmesh, Vector3 position, NNConstraint constraint, bool accurateNearestNode) {
+			NNInfo nn = GetNearestForceBoth (graph, navmesh,position,constraint,accurateNearestNode);
 			nn.node = nn.constrainedNode;
 			nn.clampedPosition = nn.constClampedPosition;
 			return nn;
@@ -178,27 +203,23 @@ and have a low memory footprint because of their smaller size to describe the sa
 		  * complying with the NNConstraint.
 		  * \see GetNearestForce(Node[],Int3[],Vector3,NNConstraint,bool)
 		  */
-		public static NNInfo GetNearestForceBoth (Node[] nodes, Int3[] vertices, Vector3 position, NNConstraint constraint, bool accurateNearestNode) {
+		public static NNInfo GetNearestForceBoth (NavGraph graph, INavmeshHolder navmesh, Vector3 position, NNConstraint constraint, bool accurateNearestNode) {
 			Int3 pos = (Int3)position;
 			
 			float minDist = -1;
-			Node minNode = null;
+			GraphNode minNode = null;
 			
 			float minConstDist = -1;
-			Node minConstNode = null;
+			GraphNode minConstNode = null;
 			
 			float maxDistSqr = constraint.constrainDistance ? AstarPath.active.maxNearestNodeDistanceSqr : float.PositiveInfinity;
 			
-			if (nodes == null || nodes.Length == 0) {
-				return new NNInfo ();
-			}
-			
-			for (int i=0;i<nodes.Length;i++) {
-				MeshNode node = nodes[i] as MeshNode;
+			GraphNodeDelegateCancelable del = delegate (GraphNode _node) {
+				TriangleMeshNode node = _node as TriangleMeshNode;
 				
 				if (accurateNearestNode) {
 					
-					Vector3 closest = Polygon.ClosestPointOnTriangle((Vector3)vertices[node.v1],(Vector3)vertices[node.v2],(Vector3)vertices[node.v3],position);
+					Vector3 closest = node.ClosestPointOnNode (position);
 					float dist = ((Vector3)pos-closest).sqrMagnitude;
 					
 					if (minNode == null || dist < minDist) {
@@ -214,8 +235,8 @@ and have a low memory footprint because of their smaller size to describe the sa
 					}
 					
 				} else {
-					if (!Polygon.IsClockwise (vertices[node.v1],vertices[node.v2],pos) || !Polygon.IsClockwise (vertices[node.v2],vertices[node.v3],pos) || !Polygon.IsClockwise (vertices[node.v3],vertices[node.v1],pos))
-					{
+					
+					if (!node.ContainsPoint ((Int3)position)) {
 						
 						float dist = (node.position-pos).sqrMagnitude;
 						if (minNode == null || dist < minDist) {
@@ -233,7 +254,7 @@ and have a low memory footprint because of their smaller size to describe the sa
 					} else {
 					
 						
-						int dist = Mathfx.Abs (node.position.y-pos.y);
+						int dist = AstarMath.Abs (node.position.y-pos.y);
 						
 						if (minNode == null || dist < minDist) {
 							minDist = dist;
@@ -248,25 +269,28 @@ and have a low memory footprint because of their smaller size to describe the sa
 						}
 					}
 				}
-			}
+				return true;
+			};
+			
+			graph.GetNodes (del);
 			
 			NNInfo nninfo = new NNInfo (minNode);
 			
 			//Find the point closest to the nearest triangle
 				
 			if (nninfo.node != null) {
-				MeshNode node = nninfo.node as MeshNode;//minNode2 as MeshNode;
+				TriangleMeshNode node = nninfo.node as TriangleMeshNode;//minNode2 as MeshNode;
 				
-				Vector3 clP = Polygon.ClosestPointOnTriangle ((Vector3)vertices[node.v1],(Vector3)vertices[node.v2],(Vector3)vertices[node.v3],position);
+				Vector3 clP = node.ClosestPointOnNode (position);
 				
 				nninfo.clampedPosition = clP;
 			}
 			
 			nninfo.constrainedNode = minConstNode;
 			if (nninfo.constrainedNode != null) {
-				MeshNode node = nninfo.constrainedNode as MeshNode;//minNode2 as MeshNode;
+				TriangleMeshNode node = nninfo.constrainedNode as TriangleMeshNode;//minNode2 as MeshNode;
 				
-				Vector3 clP = Polygon.ClosestPointOnTriangle ((Vector3)vertices[node.v1],(Vector3)vertices[node.v2],(Vector3)vertices[node.v3],position);
+				Vector3 clP = node.ClosestPointOnNode (position);
 				
 				nninfo.constClampedPosition = clP;
 			}
@@ -274,110 +298,63 @@ and have a low memory footprint because of their smaller size to describe the sa
 			return nninfo;
 		}
 		
-		public void BuildFunnelCorridor (List<Node> path, int startIndex, int endIndex, List<Vector3> left, List<Vector3> right) {
+		public void BuildFunnelCorridor (List<GraphNode> path, int startIndex, int endIndex, List<Vector3> left, List<Vector3> right) {
 			BuildFunnelCorridor (this,path,startIndex,endIndex,left,right);
 		}
 		
-		public static void BuildFunnelCorridor (INavmesh graph, List<Node> path, int startIndex, int endIndex, List<Vector3> left, List<Vector3> right) {
+		public static void BuildFunnelCorridor (INavmesh graph, List<GraphNode> path, int startIndex, int endIndex, List<Vector3> left, List<Vector3> right) {
 			
 			if (graph == null) {
 				Debug.LogError ("Couldn't cast graph to the appropriate type (graph isn't a Navmesh type graph, it doesn't implement the INavmesh interface)");
 				return;
 			}
 			
-			Int3[] vertices = graph.vertices;
-			
-			int lastLeftIndex = -1;
-			int lastRightIndex = -1;
-			
 			for (int i=startIndex;i<endIndex;i++) {
 				//Find the connection between the nodes
 				
-				MeshNode n1 = path[i] as MeshNode;
-				MeshNode n2 = path[i+1] as MeshNode;
+				TriangleMeshNode n1 = path[i] as TriangleMeshNode;
+				TriangleMeshNode n2 = path[i+1] as TriangleMeshNode;
 				
-				bool foundFirst = false;
-				
-				int first = -1;
-				int second = -1;
-				
-				for (int x=0;x<3;x++) {
-					//Vector3 vertice1 = vertices[n1.vertices[x]];
-					int vertice1 = n1.GetVertexIndex (x);
-					for (int y=0;y<3;y++) {
-						//Vector3 vertice2 = vertices[n2.vertices[y]];
-						int vertice2 = n2.GetVertexIndex (y);
-						
-						if (vertice1 == vertice2) {
-							if (foundFirst) {
-								second = vertice2;
-								break;
-							} else {
-								first = vertice2;
-								foundFirst = true;
-							}
+				int a;
+				bool search = true;
+				for (a=0;a<3;a++) {
+					for (int b=0;b<3;b++) {
+						if (n1.GetVertexIndex(a) == n2.GetVertexIndex((b+1)%3) && n1.GetVertexIndex((a+1)%3) == n2.GetVertexIndex(b)) {
+							search = false;
+							break;
 						}
 					}
+					if (!search) break;
 				}
 				
-				if (first == -1 || second == -1) {
+				if (a == 3) {
 					left.Add ((Vector3)n1.position);
 					right.Add ((Vector3)n1.position);
 					left.Add ((Vector3)n2.position);
 					right.Add ((Vector3)n2.position);
-					lastLeftIndex = first;
-					lastRightIndex = second;
-					
 				} else {
-				
-					//Debug.DrawLine ((Vector3)vertices[first]+Vector3.up*0.1F,(Vector3)vertices[second]+Vector3.up*0.1F,Color.cyan);
-					//Debug.Log (first+" "+second);
-					if (first == lastLeftIndex) {
-						left.Add ((Vector3)vertices[first]);
-						right.Add ((Vector3)vertices[second]);
-						lastLeftIndex = first;
-						lastRightIndex = second;
-						
-					} else if (first == lastRightIndex) {
-						left.Add ((Vector3)vertices[second]);
-						right.Add ((Vector3)vertices[first]);
-						lastLeftIndex = second;
-						lastRightIndex = first;
-						
-					} else if (second == lastLeftIndex) {
-						left.Add ((Vector3)vertices[second]);
-						right.Add ((Vector3)vertices[first]);
-						lastLeftIndex = second;
-						lastRightIndex = first;
-						
-					} else {
-						left.Add ((Vector3)vertices[first]);
-						right.Add ((Vector3)vertices[second]);
-						lastLeftIndex = first;
-						lastRightIndex = second;
-					}
+					left.Add ((Vector3)n1.GetVertex(a));
+					right.Add ((Vector3)n1.GetVertex((a+1)%3));
 				}
 			}
 		}
 		
-		public void AddPortal (Node n1, Node n2, List<Vector3> left, List<Vector3> right) {
+		public void AddPortal (GraphNode n1, GraphNode n2, List<Vector3> left, List<Vector3> right) {
 		}
 		
+		
+		public GraphUpdateThreading CanUpdateAsync (GraphUpdateObject o) {
+			return GraphUpdateThreading.UnityThread;
+		}
+		
+		public void UpdateAreaInit (GraphUpdateObject o) {}
 		
 		public void UpdateArea (GraphUpdateObject o) {
 			
 		}
 		
-		public static void UpdateArea (GraphUpdateObject o, NavGraph graph) {
-			
-			INavmesh navgraph = graph as INavmesh;
-			
-			if (navgraph == null) { Debug.LogError ("Update Area on NavMesh must be called with a graph implementing INavmesh"); return; }
-			
-			if (graph.nodes == null || graph.nodes.Length == 0) {
-				Debug.LogError ("NavGraph hasn't been generated yet or does not contain any nodes");
-				return;// new NNInfo ();
-			}
+		
+		public static void UpdateArea (GraphUpdateObject o, INavmesh graph) {
 			
 			//System.DateTime startTime = System.DateTime.UtcNow;
 				
@@ -385,14 +362,32 @@ and have a low memory footprint because of their smaller size to describe the sa
 			
 			Rect r = Rect.MinMaxRect (bounds.min.x,bounds.min.z,bounds.max.x,bounds.max.z);
 			
-			Vector3 a = new Vector3 (r.xMin,0,r.yMin);//	-1 	-1
+			IntRect r2 = new IntRect(
+				Mathf.FloorToInt(bounds.min.x*Int3.Precision),
+				Mathf.FloorToInt(bounds.min.z*Int3.Precision),
+				Mathf.FloorToInt(bounds.max.x*Int3.Precision),
+				Mathf.FloorToInt(bounds.max.z*Int3.Precision)
+			);
+			
+			/*Vector3 a = new Vector3 (r.xMin,0,r.yMin);//	-1 	-1
 			Vector3 b = new Vector3 (r.xMin,0,r.yMax);//	-1	 1 
 			Vector3 c = new Vector3 (r.xMax,0,r.yMin);//	 1 	-1
 			Vector3 d = new Vector3 (r.xMax,0,r.yMax);//	 1 	 1
+			*/
+			Int3 a = new Int3(r2.xmin,0,r2.ymin);
+			Int3 b = new Int3(r2.xmin,0,r2.ymax);
+			Int3 c = new Int3(r2.xmax,0,r2.ymin);
+			Int3 d = new Int3(r2.xmax,0,r2.ymax);
+			
+			Int3 ia = (Int3)a;
+			Int3 ib = (Int3)b;
+			Int3 ic = (Int3)c;
+			Int3 id = (Int3)d;
 			
 			
-			for (int i=0;i<graph.nodes.Length;i++) {
-				MeshNode node = graph.nodes[i] as MeshNode;
+			//for (int i=0;i<nodes.Length;i++) {
+			graph.GetNodes (delegate (GraphNode _node) {
+				TriangleMeshNode node = _node as TriangleMeshNode;
 				
 				bool inside = false;
 				
@@ -403,11 +398,12 @@ and have a low memory footprint because of their smaller size to describe the sa
 				
 				for (int v=0;v<3;v++) {
 					
-					Vector3 vert = (Vector3)navgraph.vertices[node[v]];
-					Vector2 vert2D = new Vector2 (vert.x,vert.z);
+					Int3 p = node.GetVertex(v);
+					Vector3 vert = (Vector3)p;
+					//Vector2 vert2D = new Vector2 (vert.x,vert.z);
 					
-					if (r.Contains (vert2D)) {
-						//Debug.DrawRay (vert,Vector3.up,Color.yellow);
+					if (r2.Contains (p.x,p.z)) {
+						//Debug.DrawRay (vert,Vector3.up*10,Color.yellow);
 						inside = true;
 						break;
 					}
@@ -424,15 +420,19 @@ and have a low memory footprint because of their smaller size to describe the sa
 				}
 				if (!inside) {
 					if (allLeft == 3 || allRight == 3 || allTop == 3 || allBottom == 3) {
-						continue;
+						return true;
 					}
 				}
+				
+				//Debug.DrawLine ((Vector3)node.GetVertex(0),(Vector3)node.GetVertex(1),Color.yellow);
+				//Debug.DrawLine ((Vector3)node.GetVertex(1),(Vector3)node.GetVertex(2),Color.yellow);
+				//Debug.DrawLine ((Vector3)node.GetVertex(2),(Vector3)node.GetVertex(0),Color.yellow);
 				
 				for (int v=0;v<3;v++) {
 					int v2 = v > 1 ? 0 : v+1;
 					
-					Vector3 vert1 = (Vector3)navgraph.vertices[node[v]];
-					Vector3 vert2 = (Vector3)navgraph.vertices[node[v2]];
+					Int3 vert1 = node.GetVertex(v);
+					Int3 vert2 = node.GetVertex(v2);
 					
 					if (Polygon.Intersects (a,b,vert1,vert2)) { inside = true; break; }
 					if (Polygon.Intersects (a,c,vert1,vert2)) { inside = true; break; }
@@ -442,22 +442,22 @@ and have a low memory footprint because of their smaller size to describe the sa
 				
 				
 				
-				if (!inside && ContainsPoint (node,a,navgraph.vertices)) { inside = true; }//Debug.DrawRay (a+Vector3.right*0.01F*i,Vector3.up,Color.red); }
-				if (!inside && ContainsPoint (node,b,navgraph.vertices)) { inside = true; } //Debug.DrawRay (b+Vector3.right*0.01F*i,Vector3.up,Color.red); }
-				if (!inside && ContainsPoint (node,c,navgraph.vertices)) { inside = true; }//Debug.DrawRay (c+Vector3.right*0.01F*i,Vector3.up,Color.red); }
-				if (!inside && ContainsPoint (node,d,navgraph.vertices)) { inside = true; }//Debug.DrawRay (d+Vector3.right*0.01F*i,Vector3.up,Color.red); }
+				if (node.ContainsPoint (ia) || node.ContainsPoint (ib) || node.ContainsPoint (ic) || node.ContainsPoint (id)) {
+					inside = true;
+				}
 				
 				if (!inside) {
-					continue;
+					return true;
 				}
 				
 				o.WillUpdateNode(node);
 				o.Apply (node);
-				//Debug.DrawLine (vertices[node.v1],vertices[node.v2],Color.blue);
-				//Debug.DrawLine (vertices[node.v2],vertices[node.v3],Color.blue);
-				//Debug.DrawLine (vertices[node.v3],vertices[node.v1],Color.blue);
-				//Debug.Break ();
-			}
+				/*Debug.DrawLine ((Vector3)node.GetVertex(0),(Vector3)node.GetVertex(1),Color.blue);
+				Debug.DrawLine ((Vector3)node.GetVertex(1),(Vector3)node.GetVertex(2),Color.blue);
+				Debug.DrawLine ((Vector3)node.GetVertex(2),(Vector3)node.GetVertex(0),Color.blue);
+				Debug.Break ();*/
+				return true;
+			});
 			
 			//System.DateTime endTime = System.DateTime.UtcNow;
 			//float theTime = (endTime-startTime).Ticks*0.0001F;
@@ -466,36 +466,36 @@ and have a low memory footprint because of their smaller size to describe the sa
 		}
 		
 		/** Returns the closest point of the node */
-		public static Vector3 ClosestPointOnNode (MeshNode node, Int3[] vertices, Vector3 pos) {
-			return Polygon.ClosestPointOnTriangle ((Vector3)vertices[node[0]],(Vector3)vertices[node[1]],(Vector3)vertices[node[2]],pos);
+		public static Vector3 ClosestPointOnNode (TriangleMeshNode node, Int3[] vertices, Vector3 pos) {
+			return Polygon.ClosestPointOnTriangle ((Vector3)vertices[node.v0],(Vector3)vertices[node.v1],(Vector3)vertices[node.v2],pos);
 		}
 		
 		/** Returns if the point is inside the node in XZ space */
-		public bool ContainsPoint (MeshNode node, Vector3 pos) {
-			if (	Polygon.IsClockwise ((Vector3)vertices[node.v1],(Vector3)vertices[node.v2], pos)
-			    && 	Polygon.IsClockwise ((Vector3)vertices[node.v2],(Vector3)vertices[node.v3], pos)
-			    && 	Polygon.IsClockwise ((Vector3)vertices[node.v3],(Vector3)vertices[node.v1], pos)) {
+		public bool ContainsPoint (TriangleMeshNode node, Vector3 pos) {
+			if (	Polygon.IsClockwise ((Vector3)vertices[node.v0],(Vector3)vertices[node.v1], pos)
+			    && 	Polygon.IsClockwise ((Vector3)vertices[node.v1],(Vector3)vertices[node.v2], pos)
+			    && 	Polygon.IsClockwise ((Vector3)vertices[node.v2],(Vector3)vertices[node.v0], pos)) {
 				return true;
 			}
 			return false;
 		}
 		
 		/** Returns if the point is inside the node in XZ space */
-		public static bool ContainsPoint (MeshNode node, Vector3 pos, Int3[] vertices) {
-			if (!Polygon.IsClockwiseMargin ((Vector3)vertices[node.v1],(Vector3)vertices[node.v2], (Vector3)vertices[node.v3])) {
+		public static bool ContainsPoint (TriangleMeshNode node, Vector3 pos, Int3[] vertices) {
+			if (!Polygon.IsClockwiseMargin ((Vector3)vertices[node.v0],(Vector3)vertices[node.v1], (Vector3)vertices[node.v2])) {
 				Debug.LogError ("Noes!");
 			}
 			
-			if ( 	Polygon.IsClockwiseMargin ((Vector3)vertices[node.v1],(Vector3)vertices[node.v2], pos)
-			    && 	Polygon.IsClockwiseMargin ((Vector3)vertices[node.v2],(Vector3)vertices[node.v3], pos)
-			    && 	Polygon.IsClockwiseMargin ((Vector3)vertices[node.v3],(Vector3)vertices[node.v1], pos)) {
+			if ( 	Polygon.IsClockwiseMargin ((Vector3)vertices[node.v0],(Vector3)vertices[node.v1], pos)
+			    && 	Polygon.IsClockwiseMargin ((Vector3)vertices[node.v1],(Vector3)vertices[node.v2], pos)
+			    && 	Polygon.IsClockwiseMargin ((Vector3)vertices[node.v2],(Vector3)vertices[node.v0], pos)) {
 				return true;
 			}
 			return false;
 		}
 		
 		/** Scans the graph using the path to an .obj mesh */
-		public void Scan (string objMeshPath) {
+		public void ScanInternal (string objMeshPath) {
 			
 			Mesh mesh = ObjImporter.ImportFile (objMeshPath);
 			
@@ -505,10 +505,10 @@ and have a low memory footprint because of their smaller size to describe the sa
 			}
 			
 			sourceMesh = mesh;
-			Scan ();
+			ScanInternal ();
 		}
 		
-		public override void Scan () {
+		public override void ScanInternal (OnScanStatus statusCallback) {
 			
 			if (sourceMesh == null) {
 				return;
@@ -522,25 +522,21 @@ and have a low memory footprint because of their smaller size to describe the sa
 			
 			triangles = sourceMesh.triangles;
 			
-			GenerateNodes (this,vectorVertices,triangles, out originalVertices, out _vertices);
+			TriangleMeshNode.SetNavmeshHolder (active.astarData.GetGraphIndex(this),this);
+			GenerateNodes (vectorVertices,triangles, out originalVertices, out _vertices);
 		
 		}
 		
 		/** Generates a navmesh. Based on the supplied vertices and triangles. Memory usage is about O(n) */
-		public static void GenerateNodes (NavGraph graph, Vector3[] vectorVertices, int[] triangles, out Vector3[] originalVertices, out Int3[] vertices) {
+		public void GenerateNodes (Vector3[] vectorVertices, int[] triangles, out Vector3[] originalVertices, out Int3[] vertices) {
 			
-			if (!(graph is INavmesh)) {
-				Debug.LogError ("The specified graph does not implement interface 'INavmesh'");
-				originalVertices = vectorVertices;
-				vertices = new Int3[0];
-				graph.nodes = graph.CreateNodes (0);
-				return;
-			}
-			
+			Profiler.BeginSample ("Init");
+
 			if (vectorVertices.Length == 0 || triangles.Length == 0) {
 				originalVertices = vectorVertices;
 				vertices = new Int3[0];
-				graph.nodes = graph.CreateNodes (0);
+				//graph.CreateNodes (0);
+				nodes = new TriangleMeshNode[0];
 				return;
 			}
 			
@@ -552,34 +548,19 @@ and have a low memory footprint because of their smaller size to describe the sa
 			//}
 			
 			int c = 0;
-			/*int maxX = 0;
-			int maxZ = 0;
-			
-			//Almost infinity
-			int minX = 0xFFFFFFF;
-			int minZ = 0xFFFFFFF;*/
 			
 			for (int i=0;i<vertices.Length;i++) {
-				vertices[i] = (Int3)graph.matrix.MultiplyPoint (vectorVertices[i]);
-				/*maxX = Mathfx.Max (vertices[i].x, maxX);
-				maxZ = Mathfx.Max (vertices[i].z, maxZ);
-				minX = Mathfx.Min (vertices[i].x, minX);
-				minZ = Mathfx.Min (vertices[i].z, minZ);*/
+				vertices[i] = (Int3)matrix.MultiplyPoint3x4 (vectorVertices[i]);
 			}
-			
-			//maxX = maxX-minX;
-			//maxZ = maxZ-minZ;
 			
 			Dictionary<Int3,int> hashedVerts = new Dictionary<Int3,int> ();
 			
 			int[] newVertices = new int[vertices.Length];
 				
-			for (int i=0;i<vertices.Length-1;i++) {
-				
-				//int hash = Mathfx.ComputeVertexHash (vertices[i].x,vertices[i].y,vertices[i].z);
-				
-				//(vertices[i].x-minX)+(vertices[i].z-minX)*maxX+vertices[i].y*maxX*maxZ;
-				//if (sortedVertices[i] != sortedVertices[i+1]) {
+			Profiler.EndSample ();
+			Profiler.BeginSample ("Hashing");
+
+			for (int i=0;i<vertices.Length;i++) {
 				if (!hashedVerts.ContainsKey (vertices[i])) {
 					newVertices[c] = i;
 					hashedVerts.Add (vertices[i], c);
@@ -589,22 +570,17 @@ and have a low memory footprint because of their smaller size to describe the sa
 				//}
 			}
 			
-			newVertices[c] = vertices.Length-1;
-			
-			//int hash2 = (newVertices[c].x-minX)+(newVertices[c].z-minX)*maxX+newVertices[c].y*maxX*maxZ;
-			//int hash2 = Mathfx.ComputeVertexHash (newVertices[c].x,newVertices[c].y,newVertices[c].z);
+			/*newVertices[c] = vertices.Length-1;
+
 			if (!hashedVerts.ContainsKey (vertices[newVertices[c]])) {
 				
 				hashedVerts.Add (vertices[newVertices[c]], c);
 				c++;
-			}
+			}*/
 			
 			for (int x=0;x<triangles.Length;x++) {
 				Int3 vertex = vertices[triangles[x]];
-				
-				//int hash3 = (vertex.x-minX)+(vertex.z-minX)*maxX+vertex.y*maxX*maxZ;
-				//int hash3 = Mathfx.ComputeVertexHash (vertex.x,vertex.y,vertex.z);
-				//for (int y=0;y<newVertices.Length;y++) {
+
 				triangles[x] = hashedVerts[vertex];
 			}
 			
@@ -616,95 +592,87 @@ and have a low memory footprint because of their smaller size to describe the sa
 				Debug.DrawLine (newVertices[triangles[i+2]]+offset,newVertices[triangles[i]]+offset,Color.blue);
 			}*/
 			
-			//Debug.Log ("NavMesh - Old vertice count "+vertices.Length+", new vertice count "+c+" "+maxX+" "+maxZ+" "+maxX*maxZ);
-			
 			Int3[] totalIntVertices = vertices;
 			vertices = new Int3[c];
 			originalVertices = new Vector3[c];
 			for (int i=0;i<c;i++) {
 				
 				vertices[i] = totalIntVertices[newVertices[i]];//(Int3)graph.matrix.MultiplyPoint (vectorVertices[i]);
-				originalVertices[i] = (Vector3)vertices[i];//vectorVertices[newVertices[i]];
+				originalVertices[i] = (Vector3)vectorVertices[newVertices[i]];//vectorVertices[newVertices[i]];
 			}
+
+			Profiler.EndSample ();
+			Profiler.BeginSample ("Constructing Nodes");
+
+			//graph.CreateNodes (triangles.Length/3);//new Node[triangles.Length/3];
+			nodes = new TriangleMeshNode[triangles.Length/3];
 			
-			Node[] nodes = graph.CreateNodes (triangles.Length/3);//new Node[triangles.Length/3];
-			graph.nodes = nodes;
 			for (int i=0;i<nodes.Length;i++) {
 				
-				MeshNode node = (MeshNode)nodes[i];//new MeshNode ();
-				node.walkable = true;
+				nodes[i] = new TriangleMeshNode(active);
+				TriangleMeshNode node = nodes[i];//new MeshNode ();
 				
-				node.position = (vertices[triangles[i*3]] + vertices[triangles[i*3+1]] + vertices[triangles[i*3+2]])/3F;
+				node.Penalty = initialPenalty;
+				node.Walkable = true;
 				
-				node.v1 = triangles[i*3];
-				node.v2 = triangles[i*3+1];
-				node.v3 = triangles[i*3+2];
 				
-				if (!Polygon.IsClockwise (vertices[node.v1],vertices[node.v2],vertices[node.v3])) {
+				node.v0 = triangles[i*3];
+				node.v1 = triangles[i*3+1];
+				node.v2 = triangles[i*3+2];
+				
+				if (!Polygon.IsClockwise (vertices[node.v0],vertices[node.v1],vertices[node.v2])) {
+					//Debug.DrawLine (vertices[node.v0],vertices[node.v1],Color.red);
 					//Debug.DrawLine (vertices[node.v1],vertices[node.v2],Color.red);
-					//Debug.DrawLine (vertices[node.v2],vertices[node.v3],Color.red);
-					//Debug.DrawLine (vertices[node.v3],vertices[node.v1],Color.red);
+					//Debug.DrawLine (vertices[node.v2],vertices[node.v0],Color.red);
 					
-					int tmp = node.v1;
-					node.v1 = node.v3;
-					node.v3 = tmp;
+					int tmp = node.v0;
+					node.v0 = node.v2;
+					node.v2 = tmp;
 				}
 				
-				if (Polygon.IsColinear (vertices[node.v1],vertices[node.v2],vertices[node.v3])) {
+				if (Polygon.IsColinear (vertices[node.v0],vertices[node.v1],vertices[node.v2])) {
+					Debug.DrawLine ((Vector3)vertices[node.v0],(Vector3)vertices[node.v1],Color.red);
 					Debug.DrawLine ((Vector3)vertices[node.v1],(Vector3)vertices[node.v2],Color.red);
-					Debug.DrawLine ((Vector3)vertices[node.v2],(Vector3)vertices[node.v3],Color.red);
-					Debug.DrawLine ((Vector3)vertices[node.v3],(Vector3)vertices[node.v1],Color.red);
+					Debug.DrawLine ((Vector3)vertices[node.v2],(Vector3)vertices[node.v0],Color.red);
 				}
 				
-				nodes[i] = node;
+				// Make sure position is correctly set
+				node.UpdatePositionFromVertices();
 			}
+
+			Profiler.EndSample ();
+
+			Dictionary<Int2,TriangleMeshNode> sides = new Dictionary<Int2, TriangleMeshNode>();
 			
-			List<Node> connections = new List<Node> ();
-			List<int> connectionCosts = new List<int> ();
+			for (int i=0, j=0;i<triangles.Length; j+=1, i+=3) {
+				sides[new Int2(triangles[i+0],triangles[i+1])] = nodes[j];
+				sides[new Int2(triangles[i+1],triangles[i+2])] = nodes[j];
+				sides[new Int2(triangles[i+2],triangles[i+0])] = nodes[j];
+			}
+
+			Profiler.BeginSample ("Connecting Nodes");
+
+			List<MeshNode> connections = new List<MeshNode> ();
+			List<uint> connectionCosts = new List<uint> ();
 			
 			int identicalError = 0;
-			
-			for (int i=0;i<triangles.Length;i+=3) {
-				
+
+			for (int i=0, j=0;i<triangles.Length; j+=1, i+=3) {
 				connections.Clear ();
 				connectionCosts.Clear ();
 				
 				//Int3 indices = new Int3(triangles[i],triangles[i+1],triangles[i+2]);
 				
-				Node node = nodes[i/3];
-				
-				for (int x=0;x<triangles.Length;x+=3) {
-					
-					if (x == i) {
-						continue;
-					}
-					
-					int count = 0;
-					if (triangles[x] 	== 	triangles[i]) { count++; }
-					if (triangles[x+1]	== 	triangles[i]) { count++; }
-					if (triangles[x+2] 	== 	triangles[i]) { count++; }
-					if (triangles[x] 	== 	triangles[i+1]) { count++; }
-					if (triangles[x+1] 	== 	triangles[i+1]) { count++; }
-					if (triangles[x+2] 	== 	triangles[i+1]) { count++; }
-					if (triangles[x] 	== 	triangles[i+2]) { count++; }
-					if (triangles[x+1] 	== 	triangles[i+2]) { count++; }
-					if (triangles[x+2] 	== 	triangles[i+2]) { count++; }
-					
-					if (count >= 3) {
-						identicalError++;
-						Debug.DrawLine ((Vector3)vertices[triangles[x]],(Vector3)vertices[triangles[x+1]],Color.red);
-						Debug.DrawLine ((Vector3)vertices[triangles[x]],(Vector3)vertices[triangles[x+2]],Color.red);
-						Debug.DrawLine ((Vector3)vertices[triangles[x+2]],(Vector3)vertices[triangles[x+1]],Color.red);
-						
-					}
-					
-					if (count == 2) {
-						Node other = nodes[x/3];
+				TriangleMeshNode node = nodes[j];
+
+				for ( int q = 0; q < 3; q++ ) {
+					TriangleMeshNode other;
+					if (sides.TryGetValue ( new Int2 (triangles[i+((q+1)%3)], triangles[i+q]), out other ) ) {
 						connections.Add (other);
-						connectionCosts.Add (Mathf.RoundToInt ((node.position-other.position).costMagnitude));
+						connectionCosts.Add ((uint)(node.position-other.position).costMagnitude);
 					}
 				}
-				
+
 				node.connections = connections.ToArray ();
 				node.connectionCosts = connectionCosts.ToArray ();
 			}
@@ -712,46 +680,25 @@ and have a low memory footprint because of their smaller size to describe the sa
 			if (identicalError > 0) {
 				Debug.LogError ("One or more triangles are identical to other triangles, this is not a good thing to have in a navmesh\nIncreasing the scale of the mesh might help\nNumber of triangles with error: "+identicalError+"\n");
 			}
-			RebuildBBTree (graph);
-			
+
+			Profiler.EndSample ();
+			Profiler.BeginSample ("Rebuilding BBTree");
+
+			RebuildBBTree (this);
+
+			Profiler.EndSample ();
+
 			//Debug.Log ("Graph Generation - NavMesh - Time to compute graph "+((Time.realtimeSinceStartup-startTime)*1000F).ToString ("0")+"ms");
 		}
 		
 		/** Rebuilds the BBTree on a NavGraph.
 		 * \astarpro
 		 * \see NavMeshGraph.bbTree */
-		public static void RebuildBBTree (NavGraph graph) {
-			//BBTrees is a A* Pathfinding Project Pro only feature - The Pro version can be bought on the Unity Asset Store or on arongranberg.com
+		public static void RebuildBBTree (NavMeshGraph graph) {
+			//BBTrees is a A* Pathfinding Project Pro only feature - The Pro version can be bought in the Unity Asset Store or on arongranberg.com
 		}
 		
 		public void PostProcess () {
-			int rnd = Random.Range (0,nodes.Length);
-			
-			Node nodex = nodes[rnd];
-			
-			NavGraph gr = null;
-			
-			if (AstarPath.active.astarData.GetGraphIndex(this) == 0) {
-				gr = AstarPath.active.graphs[1];
-			} else {
-				gr = AstarPath.active.graphs[0];
-			}
-			
-			rnd = Random.Range (0,gr.nodes.Length);
-			
-			List<Node> connections = new List<Node> ();
-			List<int> connectionCosts = new List<int> ();
-			
-			connections.AddRange (nodex.connections);
-			connectionCosts.AddRange (nodex.connectionCosts);
-			
-			Node otherNode = gr.nodes[rnd];
-			
-			connections.Add (otherNode);
-			connectionCosts.Add ((nodex.position-otherNode.position).costMagnitude);
-			
-			nodex.connections = connections.ToArray ();
-			nodex.connectionCosts = connectionCosts.ToArray ();
 		}
 		
 		public void Sort (Vector3[] a) {
@@ -776,38 +723,43 @@ and have a low memory footprint because of their smaller size to describe the sa
 			if (!drawNodes) {
 				return;
 			}
-			
+
 			Matrix4x4 preMatrix = matrix;
 			
 			GenerateMatrix ();
 			
 			if (nodes == null) {
-				Scan ();
+				//Scan ();
 			}
 			
 			if (nodes == null) {
 				return;
 			}
-			
+
+			if ( bbTree != null ) {
+				bbTree.OnDrawGizmos ();
+			}
+
 			if (preMatrix != matrix) {
 				//Debug.Log ("Relocating Nodes");
 				RelocateNodes (preMatrix, matrix);
 			}
 			
+			PathHandler debugData = AstarPath.active.debugPathData;
 			for (int i=0;i<nodes.Length;i++) {
 				
 				
-				MeshNode node = (MeshNode)nodes[i];
+				TriangleMeshNode node = (TriangleMeshNode)nodes[i];
 				
 				Gizmos.color = NodeColor (node,AstarPath.active.debugPathData);
 				
-				if (node.walkable ) {
+				if (node.Walkable ) {
 					
-					if (AstarPath.active.showSearchTree && AstarPath.active.debugPathData != null && node.GetNodeRun(AstarPath.active.debugPathData).parent != null) {
-						Gizmos.DrawLine ((Vector3)node.position,(Vector3)node.GetNodeRun(AstarPath.active.debugPathData).parent.node.position);
+					if (AstarPath.active.showSearchTree && debugData != null && debugData.GetPathNode(node).parent != null) {
+						Gizmos.DrawLine ((Vector3)node.position,(Vector3)debugData.GetPathNode(node).parent.node.position);
 					} else {
 						for (int q=0;q<node.connections.Length;q++) {
-							Gizmos.DrawLine ((Vector3)node.position,(Vector3)node.connections[q].position);
+							Gizmos.DrawLine ((Vector3)node.position,Vector3.Lerp ((Vector3)node.position, (Vector3)node.connections[q].position, 0.45f));
 						}
 					}
 				
@@ -815,38 +767,89 @@ and have a low memory footprint because of their smaller size to describe the sa
 				} else {
 					Gizmos.color = Color.red;
 				}
+				Gizmos.DrawLine ((Vector3)vertices[node.v0],(Vector3)vertices[node.v1]);
 				Gizmos.DrawLine ((Vector3)vertices[node.v1],(Vector3)vertices[node.v2]);
-				Gizmos.DrawLine ((Vector3)vertices[node.v2],(Vector3)vertices[node.v3]);
-				Gizmos.DrawLine ((Vector3)vertices[node.v3],(Vector3)vertices[node.v1]);
+				Gizmos.DrawLine ((Vector3)vertices[node.v2],(Vector3)vertices[node.v0]);
 				
 			}
 			
 		}
 		
-		public override byte[] SerializeExtraInfo () {
-			return SerializeMeshNodes (this,nodes);
+		public override void DeserializeExtraInfo (GraphSerializationContext ctx)
+		{
+			
+			uint graphIndex = (uint)active.astarData.GetGraphIndex(this);
+			TriangleMeshNode.SetNavmeshHolder ((int)graphIndex,this);
+			
+			int c1 = ctx.reader.ReadInt32();
+			int c2 = ctx.reader.ReadInt32();
+			
+			if (c1 == -1) {
+				nodes = new TriangleMeshNode[0];
+				_vertices = new Int3[0];
+				originalVertices = new Vector3[0];
+			}
+			
+			nodes = new TriangleMeshNode[c1];
+			_vertices = new Int3[c2];
+			originalVertices = new Vector3[c2];
+			
+			for (int i=0;i<c2;i++) {
+				_vertices[i] = new Int3(ctx.reader.ReadInt32(), ctx.reader.ReadInt32(), ctx.reader.ReadInt32());
+				originalVertices[i] = new Vector3(ctx.reader.ReadSingle(), ctx.reader.ReadSingle(), ctx.reader.ReadSingle());
+			}
+			
+			
+			for (int i=0;i<c1;i++) {
+				nodes[i] = new TriangleMeshNode(active);
+				TriangleMeshNode node = nodes[i];
+				node.DeserializeNode(ctx);
+				node.GraphIndex = graphIndex;
+				node.UpdatePositionFromVertices();
+			}
 		}
 		
-		public override void DeserializeExtraInfo (byte[] bytes) {
-			DeserializeMeshNodes (this,nodes,bytes);
+		public override void SerializeExtraInfo (GraphSerializationContext ctx)
+		{
+			if (nodes == null || originalVertices == null || _vertices == null || originalVertices.Length != _vertices.Length) {
+				ctx.writer.Write (-1);
+				ctx.writer.Write (-1);
+				return;
+			}
+			ctx.writer.Write(nodes.Length);
+			ctx.writer.Write(_vertices.Length);
+			
+			for (int i=0;i<_vertices.Length;i++) {
+				ctx.writer.Write (_vertices[i].x);
+				ctx.writer.Write (_vertices[i].y);
+				ctx.writer.Write (_vertices[i].z);
+				
+				ctx.writer.Write (originalVertices[i].x);
+				ctx.writer.Write (originalVertices[i].y);
+				ctx.writer.Write (originalVertices[i].z);
+			}
+			
+			for (int i=0;i<nodes.Length;i++) {
+				nodes[i].SerializeNode (ctx);
+			}
 		}
 		
-		public static void DeserializeMeshNodes (INavmesh graph, Node[] nodes, byte[] bytes) {
+		public static void DeserializeMeshNodes (NavMeshGraph graph, GraphNode[] nodes, byte[] bytes) {
 			
 			System.IO.MemoryStream mem = new System.IO.MemoryStream(bytes);
 			System.IO.BinaryReader stream = new System.IO.BinaryReader(mem);
 			
 			for (int i=0;i<nodes.Length;i++) {
-				MeshNode node = nodes[i] as MeshNode;
+				TriangleMeshNode node = nodes[i] as TriangleMeshNode;
 				
 				if (node == null) {
 					Debug.LogError ("Serialization Error : Couldn't cast the node to the appropriate type - NavMeshGenerator");
 					return;
 				}
 				
+				node.v0 = stream.ReadInt32 ();
 				node.v1 = stream.ReadInt32 ();
 				node.v2 = stream.ReadInt32 ();
-				node.v3 = stream.ReadInt32 ();
 				
 			}
 			
@@ -862,186 +865,8 @@ and have a low memory footprint because of their smaller size to describe the sa
 				graph.vertices[i] = new Int3 (x,y,z);
 			}
 			
-			RebuildBBTree (graph as NavGraph);
+			RebuildBBTree (graph);
 		}
-		
-		//These functions are for serialization, the static ones are there so other graphs using mesh nodes can serialize them more easily
-		public static byte[] SerializeMeshNodes (INavmesh graph, Node[] nodes) {
-			
-			System.IO.MemoryStream mem = new System.IO.MemoryStream();
-			System.IO.BinaryWriter stream = new System.IO.BinaryWriter(mem);
-			
-			for (int i=0;i<nodes.Length;i++) {
-				MeshNode node = nodes[i] as MeshNode;
-				
-				if (node == null) {
-					Debug.LogError ("Serialization Error : Couldn't cast the node to the appropriate type - NavMeshGenerator. Omitting node data.");
-					return null;
-				}
-				
-				stream.Write (node.v1);
-				stream.Write (node.v2);
-				stream.Write (node.v3);
-			}
-			
-			Int3[] vertices = graph.vertices;
-			
-			if (vertices == null) {
-				vertices = new Int3[0];
-			}
-			
-			stream.Write (vertices.Length);
-			
-			for (int i=0;i<vertices.Length;i++) {
-				stream.Write (vertices[i].x);
-				stream.Write (vertices[i].y);
-				stream.Write (vertices[i].z);
-			}
-			
-			stream.Close ();
-			return mem.ToArray();
-		}
-		
-#region OldSerializer
-		
-		//These functions are for serialization, the static ones are there so other graphs using mesh nodes can serialize them more easily
-		public static void SerializeMeshNodes (INavmesh graph, Node[] nodes, AstarSerializer serializer) {
-			
-			System.IO.BinaryWriter stream = serializer.writerStream;
-			
-			for (int i=0;i<nodes.Length;i++) {
-				MeshNode node = nodes[i] as MeshNode;
-				
-				if (node == null) {
-					Debug.LogError ("Serialization Error : Couldn't cast the node to the appropriate type - NavMeshGenerator");
-					return;
-				}
-				
-				stream.Write (node.v1);
-				stream.Write (node.v2);
-				stream.Write (node.v3);
-			}
-			
-			Int3[] vertices = graph.vertices;
-			
-			if (vertices == null) {
-				vertices = new Int3[0];
-			}
-			
-			stream.Write (vertices.Length);
-			
-			for (int i=0;i<vertices.Length;i++) {
-				stream.Write (vertices[i].x);
-				stream.Write (vertices[i].y);
-				stream.Write (vertices[i].z);
-			}
-		}
-		
-		public static void DeSerializeMeshNodes (INavmesh graph, Node[] nodes, AstarSerializer serializer) {
-			
-			System.IO.BinaryReader stream = serializer.readerStream;
-			
-			for (int i=0;i<nodes.Length;i++) {
-				MeshNode node = nodes[i] as MeshNode;
-				
-				if (node == null) {
-					Debug.LogError ("Serialization Error : Couldn't cast the node to the appropriate type - NavMeshGenerator");
-					return;
-				}
-				
-				node.v1 = stream.ReadInt32 ();
-				node.v2 = stream.ReadInt32 ();
-				node.v3 = stream.ReadInt32 ();
-			}
-			
-			int numVertices = stream.ReadInt32 ();
-			
-			graph.vertices = new Int3[numVertices];
-			
-			for (int i=0;i<numVertices;i++) {
-				int x = stream.ReadInt32 ();
-				int y = stream.ReadInt32 ();
-				int z = stream.ReadInt32 ();
-				
-				graph.vertices[i] = new Int3 (x,y,z);
-			}
-				
-			RebuildBBTree (graph as NavGraph);
-		}
-		
-		public void SerializeNodes (Node[] nodes, AstarSerializer serializer) {
-			NavMeshGraph.SerializeMeshNodes (this as INavmesh, nodes, serializer);
-		}
-		
-		public void DeSerializeNodes (Node[] nodes, AstarSerializer serializer) {
-			NavMeshGraph.DeSerializeMeshNodes (this as INavmesh, nodes, serializer);
-		}
-		
-		public void SerializeSettings (AstarSerializer serializer) {
-			
-			System.IO.BinaryWriter stream = serializer.writerStream;
-			
-			serializer.AddValue ("offset",offset);
-			serializer.AddValue ("rotation",rotation);
-			serializer.AddValue ("scale",scale);
-			
-			if (sourceMesh != null) {
-				
-				Vector3[] verts = sourceMesh.vertices;
-				int[] tris = sourceMesh.triangles;
-				
-				stream.Write (verts.Length);
-				stream.Write (tris.Length);
-				
-				for (int i=0;i<verts.Length;i++) {
-					stream.Write (verts[i].x);
-					stream.Write (verts[i].y);
-					stream.Write (verts[i].z);
-				}
-				
-				for (int i=0;i<tris.Length;i++) {
-					stream.Write (tris[i]);
-				}
-			} else {
-				stream.Write (0);
-				stream.Write (0);
-			}
-			
-			serializer.AddUnityReferenceValue ("sourceMesh",sourceMesh);
-		}
-		
-		public void DeSerializeSettings (AstarSerializer serializer) {
-			
-			System.IO.BinaryReader stream = serializer.readerStream;
-			
-			offset = (Vector3)serializer.GetValue ("offset",typeof(Vector3));
-			rotation = (Vector3)serializer.GetValue ("rotation",typeof(Vector3));
-			scale = (float)serializer.GetValue ("scale",typeof(float));
-			
-			GenerateMatrix ();
-			
-			Vector3[] verts = new Vector3[stream.ReadInt32 ()];
-			int[] tris = new int[stream.ReadInt32 ()];
-			
-			for (int i=0;i<verts.Length;i++) {
-				verts[i] = new Vector3(stream.ReadSingle (),stream.ReadSingle (),stream.ReadSingle ());
-			}
-				
-			for (int i=0;i<tris.Length;i++) {
-				tris[i] = stream.ReadInt32 ();
-			}
-			
-			sourceMesh = serializer.GetUnityReferenceValue ("sourceMesh",typeof(Mesh)) as Mesh;
-			
-			if (Application.isPlaying) {
-				sourceMesh = new Mesh ();
-				sourceMesh.name = "NavGraph Mesh";
-				sourceMesh.vertices = verts;
-				sourceMesh.triangles = tris;
-			}
-		}
-		
-#endregion
-		
+
 	}
 }

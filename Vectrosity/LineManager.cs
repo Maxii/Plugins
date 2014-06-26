@@ -1,5 +1,5 @@
-// Version 2.3
-// ©2013 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 3.1
+// ©2014 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using System.Collections;
@@ -15,14 +15,20 @@ public class LineManager : MonoBehaviour {
 	bool destroyed = false;
 
 	void Awake () {
+		Initialize();
+		DontDestroyOnLoad(this);
+	}
+	
+	void Initialize () {
 		lines = new List<VectorLine>();
 		transforms = new List<Transform>();
-		DontDestroyOnLoad(this);
+		lineCount = 0;
+		enabled = false;
 	}
 
 	public void AddLine (VectorLine vectorLine, Transform thisTransform, float time) {
 		if (time > 0.0f) {	// Needs to be before the line check, to accommodate re-added lines
-			StartCoroutine (DisableLine (vectorLine, time, true));
+			StartCoroutine (DisableLine (vectorLine, time, false));
 		}
 		for (int i = 0; i < lineCount; i++) {
 			if (vectorLine == lines[i]) {
@@ -47,6 +53,7 @@ public class LineManager : MonoBehaviour {
 			RemoveLine (vectorLine);
 		}
 		else {
+			RemoveLine (vectorLine);
 			VectorLine.Destroy (ref vectorLine);
 		}
 		vectorLine = null;
@@ -58,7 +65,7 @@ public class LineManager : MonoBehaviour {
 		// Draw3DAuto lines
 		for (int i = 0; i < lineCount; i++) {
 			if (lines[i].vectorObject != null) {
-				lines[i].Draw3D (transforms[i]);
+				lines[i].Draw3D();
 			}
 			else {
 				RemoveLine (i--);
@@ -87,7 +94,6 @@ public class LineManager : MonoBehaviour {
 		for (int i = 0; i < lineCount; i++) {
 			if (vectorLine == lines[i]) {
 				RemoveLine (i);
-				VectorLine.Destroy (ref vectorLine);
 				break;
 			}
 		}
@@ -117,5 +123,9 @@ public class LineManager : MonoBehaviour {
 	
 	void OnDestroy () {
 		destroyed = true;
+	}
+	
+	void OnLevelWasLoaded () {
+		Initialize();
 	}
 }

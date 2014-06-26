@@ -198,6 +198,7 @@ public class UIAtlas : MonoBehaviour
 				if (rep != null && rep.replacement == this) rep.replacement = null;
 				if (mReplacement != null) MarkAsChanged();
 				mReplacement = rep;
+				if (rep != null) material = null;
 				MarkAsChanged();
 			}
 		}

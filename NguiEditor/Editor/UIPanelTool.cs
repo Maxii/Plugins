@@ -28,7 +28,23 @@ public class UIPanelTool : EditorWindow
 		public bool widgetsEnabled = false;
 		public List<UIWidget> widgets = new List<UIWidget>();
 	}
-	static int Compare (Entry a, Entry b) { return UIPanel.CompareFunc(a.panel, b.panel); }
+
+	/// <summary>
+	/// First sort by depth, then alphabetically, then by instance ID.
+	/// </summary>
+
+	static int Compare (Entry a, Entry b)
+	{
+		if (a != b && a != null && b != null)
+		{
+			if (a.panel.depth < b.panel.depth) return -1;
+			if (a.panel.depth > b.panel.depth) return 1;
+			int val = string.Compare(a.panel.name, b.panel.name);
+			if (val != 0) return val;
+			return (a.panel.GetInstanceID() < b.panel.GetInstanceID()) ? -1 : 1;
+		}
+		return 0;
+	}
 
 	Vector2 mScroll = Vector2.zero;
 
@@ -121,7 +137,7 @@ public class UIPanelTool : EditorWindow
 				entries.Add(ent);
 			}
 
-			// Sort the list alphabetically
+			// Sort the list by depth
 			entries.Sort(Compare);
 
 			mScroll = GUILayout.BeginScrollView(mScroll);
@@ -165,7 +181,7 @@ public class UIPanelTool : EditorWindow
 	bool DrawRow (Entry ent, UIPanel selected, bool isChecked)
 	{
 		bool retVal = false;
-		string panelName, layer, depth, widgetCount, drawCalls, clipping;
+		string panelName, layer, depth, widgetCount, drawCalls, clipping, triangles;
 
 		if (ent != null)
 		{
@@ -175,6 +191,12 @@ public class UIPanelTool : EditorWindow
 			widgetCount = ent.widgets.Count.ToString();
 			drawCalls = ent.panel.drawCalls.size.ToString();
 			clipping = (ent.panel.clipping != UIDrawCall.Clipping.None) ? "Yes" : "";
+
+			int triangeCount = 0;
+			foreach (var dc in ent.panel.drawCalls)
+				triangeCount += dc.triangles;
+
+			triangles = triangeCount.ToString();
 		}
 		else
 		{
@@ -184,6 +206,7 @@ public class UIPanelTool : EditorWindow
 			widgetCount = "WG";
 			drawCalls = "DC";
 			clipping = "Clip";
+			triangles = "Tris";
 		}
 
 		if (ent != null) GUILayout.Space(-1f);
@@ -217,6 +240,7 @@ public class UIPanelTool : EditorWindow
 		GUILayout.Label(widgetCount, GUILayout.Width(30f));
 		GUILayout.Label(drawCalls, GUILayout.Width(30f));
 		GUILayout.Label(clipping, GUILayout.Width(30f));
+		GUILayout.Label(triangles, GUILayout.Width(30f));
 
 		if (ent == null)
 		{

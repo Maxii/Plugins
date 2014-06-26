@@ -3,10 +3,6 @@
 // Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
-#if UNITY_FLASH || UNITY_WP8 || UNITY_METRO
-#define USE_SIMPLE_DICTIONARY
-#endif
-
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -23,13 +19,6 @@ public class UIPanel : UIRect
 	/// </summary>
 
 	static public BetterList<UIPanel> list = new BetterList<UIPanel>();
-
-	public enum DebugInfo
-	{
-		None,
-		Gizmos,
-		Geometry,
-	}
 
 	public enum RenderQueue
 	{
@@ -120,6 +109,21 @@ public class UIPanel : UIRect
 	[System.NonSerialized]
 	public Matrix4x4 worldToLocal = Matrix4x4.identity;
 
+	/// <summary>
+	/// Cached clip range passed to the draw call's shader.
+	/// </summary>
+
+	[System.NonSerialized]
+	public Vector4 drawCallClipRange = new Vector4(0f, 0f, 1f, 1f);
+
+	public delegate void OnClippingMoved (UIPanel panel);
+
+	/// <summary>
+	/// Event callback that's triggered when the panel's clip region gets moved.
+	/// </summary>
+
+	public OnClippingMoved onClipMove;
+
 	// Panel's alpha (affects the alpha of all widgets)
 	[HideInInspector][SerializeField] float mAlpha = 1f;
 
@@ -128,17 +132,11 @@ public class UIPanel : UIRect
 	[HideInInspector][SerializeField] Vector4 mClipRange = new Vector4(0f, 0f, 300f, 200f);
 	[HideInInspector][SerializeField] Vector2 mClipSoftness = new Vector2(4f, 4f);
 	[HideInInspector][SerializeField] int mDepth = 0;
+	[HideInInspector][SerializeField] int mSortingOrder = 0;
 
 	// Whether a full rebuild of geometry buffers is required
 	bool mRebuild = false;
 	bool mResized = false;
-
-	// Cached in order to reduce memory allocations
-	static BetterList<Vector3> mVerts = new BetterList<Vector3>();
-	static BetterList<Vector3> mNorms = new BetterList<Vector3>();
-	static BetterList<Vector4> mTans = new BetterList<Vector4>();
-	static BetterList<Vector2> mUvs = new BetterList<Vector2>();
-	static BetterList<Color32> mCols = new BetterList<Color32>();
 
 	Camera mCam;
 	[SerializeField] Vector2 mClipOffset = Vector2.zero;
@@ -155,6 +153,7 @@ public class UIPanel : UIRect
 	Vector2 mMax = Vector2.zero;
 	bool mHalfPixelOffset = false;
 	bool mSortWidgets = false;
+	bool mUpdateScroll = false;
 
 	/// <summary>
 	/// Helper property that returns the first unused depth value.
@@ -220,6 +219,29 @@ public class UIPanel : UIRect
 				NGUITools.SetDirty(this);
 #endif
 				list.Sort(CompareFunc);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Sorting order value for the panel's draw calls, to be used with Unity's 2D system.
+	/// </summary>
+
+	public int sortingOrder
+	{
+		get
+		{
+			return mSortingOrder;
+		}
+		set
+		{
+			if (mSortingOrder != value)
+			{
+				mSortingOrder = value;
+#if UNITY_EDITOR
+				NGUITools.SetDirty(this);
+#endif
+				UpdateDrawCalls();
 			}
 		}
 	}
@@ -305,11 +327,48 @@ public class UIPanel : UIRect
 		}
 	}
 
+	UIPanel mParentPanel = null;
+
+	/// <summary>
+	/// Reference to the parent panel, if any.
+	/// </summary>
+
+	public UIPanel parentPanel { get { return mParentPanel; } }
+
+	/// <summary>
+	/// Number of times the panel's contents get clipped.
+	/// </summary>
+
+	public int clipCount
+	{
+		get
+		{
+			int count = 0;
+			UIPanel p = this;
+
+			while (p != null)
+			{
+				if (p.mClipping == UIDrawCall.Clipping.SoftClip) ++count;
+				p = p.mParentPanel;
+			}
+			return count;
+		}
+	}
+
 	/// <summary>
 	/// Whether the panel will actually perform clipping of children.
 	/// </summary>
 
-	public bool clipsChildren { get { return mClipping == UIDrawCall.Clipping.AlphaClip || mClipping == UIDrawCall.Clipping.SoftClip; } }
+	public bool hasClipping { get { return mClipping == UIDrawCall.Clipping.SoftClip; } }
+
+	/// <summary>
+	/// Whether the panel will actually perform clipping of children.
+	/// </summary>
+
+	public bool hasCumulativeClipping { get { return clipCount != 0; } }
+
+	[System.Obsolete("Use 'hasClipping' or 'hasCumulativeClipping' instead")]
+	public bool clipsChildren { get { return hasCumulativeClipping; } }
 
 	/// <summary>
 	/// Clipping area offset used to make it possible to move clipped panels (scroll views) efficiently.
@@ -328,14 +387,33 @@ public class UIPanel : UIRect
 			if (Mathf.Abs(mClipOffset.x - value.x) > 0.001f ||
 				Mathf.Abs(mClipOffset.y - value.y) > 0.001f)
 			{
-				mResized = true;
-				mCullTime = (mCullTime == 0f) ? 0.001f : RealTime.time + 0.15f;
 				mClipOffset = value;
-				mMatrixFrame = -1;
+				InvalidateClipping();
+
+				// Call the event delegate
+				if (onClipMove != null) onClipMove(this);
 #if UNITY_EDITOR
 				if (!Application.isPlaying) UpdateDrawCalls();
 #endif
 			}
+		}
+	}
+
+	/// <summary>
+	/// Invalidate the panel's clipping, calling child panels in turn.
+	/// </summary>
+
+	void InvalidateClipping ()
+	{
+		mResized = true;
+		mMatrixFrame = -1;
+		mCullTime = (mCullTime == 0f) ? 0.001f : RealTime.time + 0.15f;
+
+		for (int i = 0; i < list.size; ++i)
+		{
+			UIPanel p = list[i];
+			if (p != this && p.parentPanel == this)
+				p.InvalidateClipping();
 		}
 	}
 
@@ -370,10 +448,10 @@ public class UIPanel : UIRect
 		}
 		set
 		{
-			if (Mathf.Abs(mClipRange.x - value.x) > 0.49f ||
-				Mathf.Abs(mClipRange.y - value.y) > 0.49f ||
-				Mathf.Abs(mClipRange.z - value.z) > 0.49f ||
-				Mathf.Abs(mClipRange.w - value.w) > 0.49f)
+			if (Mathf.Abs(mClipRange.x - value.x) > 0.001f ||
+				Mathf.Abs(mClipRange.y - value.y) > 0.001f ||
+				Mathf.Abs(mClipRange.z - value.z) > 0.001f ||
+				Mathf.Abs(mClipRange.w - value.w) > 0.001f)
 			{
 				mResized = true;
 				mCullTime = (mCullTime == 0f) ? 0.001f : RealTime.time + 0.15f;
@@ -382,6 +460,7 @@ public class UIPanel : UIRect
 
 				UIScrollView sv = GetComponent<UIScrollView>();
 				if (sv != null) sv.UpdatePosition();
+				if (onClipMove != null) onClipMove(this);
 #if UNITY_EDITOR
 				if (!Application.isPlaying) UpdateDrawCalls();
 #endif
@@ -584,13 +663,53 @@ public class UIPanel : UIRect
 
 	public override float CalculateFinalAlpha (int frameID)
 	{
+#if UNITY_EDITOR
+		if (mAlphaFrameID != frameID || !Application.isPlaying)
+#else
 		if (mAlphaFrameID != frameID)
+#endif
 		{
 			mAlphaFrameID = frameID;
 			UIRect pt = parent;
 			finalAlpha = (parent != null) ? pt.CalculateFinalAlpha(frameID) * mAlpha : mAlpha;
 		}
 		return finalAlpha;
+	}
+
+	/// <summary>
+	/// Set the panel's rectangle.
+	/// </summary>
+
+	public override void SetRect (float x, float y, float width, float height)
+	{
+		int finalWidth = Mathf.FloorToInt(width + 0.5f);
+		int finalHeight = Mathf.FloorToInt(height + 0.5f);
+
+		finalWidth = ((finalWidth >> 1) << 1);
+		finalHeight = ((finalHeight >> 1) << 1);
+
+		Transform t = cachedTransform;
+		Vector3 pos = t.localPosition;
+		pos.x = Mathf.Floor(x + 0.5f);
+		pos.y = Mathf.Floor(y + 0.5f);
+
+		if (finalWidth < 2) finalWidth = 2;
+		if (finalHeight < 2) finalHeight = 2;
+
+		baseClipRegion = new Vector4(pos.x, pos.y, finalWidth, finalHeight);
+
+		if (isAnchored)
+		{
+			t = t.parent;
+
+			if (leftAnchor.target) leftAnchor.SetHorizontal(t, x);
+			if (rightAnchor.target) rightAnchor.SetHorizontal(t, x + width);
+			if (bottomAnchor.target) bottomAnchor.SetVertical(t, y);
+			if (topAnchor.target) topAnchor.SetVertical(t, y + height);
+#if UNITY_EDITOR
+			NGUITools.SetDirty(this);
+#endif
+		}
 	}
 
 	/// <summary>
@@ -657,10 +776,44 @@ public class UIPanel : UIRect
 
 	public bool IsVisible (UIWidget w)
 	{
-		if ((mClipping == UIDrawCall.Clipping.None || mClipping == UIDrawCall.Clipping.ConstrainButDontClip) && !w.hideIfOffScreen)
-			return true;
-		Vector3[] corners = w.worldCorners;
-		return IsVisible(corners[0], corners[1], corners[2], corners[3]);
+		UIPanel p = this;
+		Vector3[] corners = null;
+
+		while (p != null)
+		{
+			if ((p.mClipping == UIDrawCall.Clipping.None || p.mClipping == UIDrawCall.Clipping.ConstrainButDontClip) && !w.hideIfOffScreen)
+			{
+				p = p.mParentPanel;
+				continue;
+			}
+
+			if (corners == null) corners = w.worldCorners;
+			if (!p.IsVisible(corners[0], corners[1], corners[2], corners[3])) return false;
+			p = p.mParentPanel;
+		}
+		return true;
+	}
+
+	/// <summary>
+	/// Whether the specified widget is going to be affected by this panel in any way.
+	/// </summary>
+
+	public bool Affects (UIWidget w)
+	{
+		if (w == null) return false;
+
+		UIPanel expected = w.panel;
+		if (expected == null) return false;
+
+		UIPanel p = this;
+
+		while (p != null)
+		{
+			if (p == expected) return true;
+			if (!p.hasCumulativeClipping) return false;
+			p = p.mParentPanel;
+		}
+		return false;
 	}
 
 	/// <summary>
@@ -701,6 +854,26 @@ public class UIPanel : UIRect
 	}
 
 	/// <summary>
+	/// Find the parent panel, if we have one.
+	/// </summary>
+
+	void FindParent ()
+	{
+		Transform parent = cachedTransform.parent;
+		mParentPanel = (parent != null) ? NGUITools.FindInParents<UIPanel>(parent.gameObject) : null;
+	}
+
+	/// <summary>
+	/// Find the parent panel, if we have one.
+	/// </summary>
+
+	public override void ParentHasChanged ()
+	{
+		base.ParentHasChanged();
+		FindParent();
+	}
+
+	/// <summary>
 	/// Layer is used to ensure that if it changes, widgets get moved as well.
 	/// </summary>
 
@@ -709,6 +882,18 @@ public class UIPanel : UIRect
 		mLayer = mGo.layer;
 		UICamera uic = UICamera.FindCameraForLayer(mLayer);
 		mCam = (uic != null) ? uic.cachedCamera : NGUITools.FindCameraForLayer(mLayer);
+	}
+
+	/// <summary>
+	/// Reset the frame IDs.
+	/// </summary>
+
+	protected override void OnEnable ()
+	{
+		mRebuild = true;
+		mAlphaFrameID = -1;
+		mMatrixFrame = -1;
+		base.OnEnable();
 	}
 
 	/// <summary>
@@ -722,11 +907,27 @@ public class UIPanel : UIRect
 		// Apparently having a rigidbody helps
 		if (rigidbody == null)
 		{
-			Rigidbody rb = gameObject.AddComponent<Rigidbody>();
-			rb.isKinematic = true;
-			rb.useGravity = false;
+			UICamera uic = (mCam != null) ? mCam.GetComponent<UICamera>() : null;
+
+			if (uic != null)
+			{
+				if (uic.eventType == UICamera.EventType.UI_3D || uic.eventType == UICamera.EventType.World_3D)
+				{
+					Rigidbody rb = gameObject.AddComponent<Rigidbody>();
+					rb.isKinematic = true;
+					rb.useGravity = false;
+				}
+				// It's unclear if this helps 2D physics or not, so leaving it disabled for now.
+				// Note that when enabling this, the 'if (rigidbody == null)' statement above should be adjusted as well.
+				//else
+				//{
+				//    Rigidbody2D rb = gameObject.AddComponent<Rigidbody2D>();
+				//    rb.isKinematic = true;
+				//}
+			}
 		}
 
+		FindParent();
 		mRebuild = true;
 		mAlphaFrameID = -1;
 		mMatrixFrame = -1;
@@ -906,8 +1107,8 @@ public class UIPanel : UIRect
 		float w = rt - lt;
 		float h = tt - bt;
 
-		float minx = Mathf.Max(20f, mClipSoftness.x);
-		float miny = Mathf.Max(20f, mClipSoftness.y);
+		float minx = Mathf.Max(2f, mClipSoftness.x);
+		float miny = Mathf.Max(2f, mClipSoftness.y);
 
 		if (w < minx) w = minx;
 		if (h < miny) h = miny;
@@ -924,7 +1125,11 @@ public class UIPanel : UIRect
 
 	void LateUpdate ()
 	{
+#if UNITY_EDITOR
+		if (mUpdateFrame != Time.frameCount || !Application.isPlaying)
+#else
 		if (mUpdateFrame != Time.frameCount)
+#endif
 		{
 			mUpdateFrame = Time.frameCount;
 
@@ -993,6 +1198,13 @@ public class UIPanel : UIRect
 				++i;
 			}
 		}
+
+		if (mUpdateScroll)
+		{
+			mUpdateScroll = false;
+			UIScrollView sv = GetComponent<UIScrollView>();
+			if (sv != null) sv.UpdateScrollbars();
+		}
 	}
 
 	/// <summary>
@@ -1034,9 +1246,10 @@ public class UIPanel : UIRect
 
 				if (mat != mt || tex != tx || sdr != sd)
 				{
-					if (mVerts.size != 0)
+					if (dc != null && dc.verts.size != 0)
 					{
-						SubmitDrawCall(dc);
+						drawCalls.Add(dc);
+						dc.UpdateGeometry();
 						dc = null;
 					}
 
@@ -1063,28 +1276,18 @@ public class UIPanel : UIRect
 
 					w.drawCall = dc;
 
-					if (generateNormals) w.WriteToBuffers(mVerts, mUvs, mCols, mNorms, mTans);
-					else w.WriteToBuffers(mVerts, mUvs, mCols, null, null);
+					if (generateNormals) w.WriteToBuffers(dc.verts, dc.uvs, dc.cols, dc.norms, dc.tans);
+					else w.WriteToBuffers(dc.verts, dc.uvs, dc.cols, null, null);
 				}
 			}
 			else w.drawCall = null;
 		}
-		if (mVerts.size != 0) SubmitDrawCall(dc);
-	}
 
-	/// <summary>
-	/// Submit the draw call using the current geometry.
-	/// </summary>
-
-	void SubmitDrawCall (UIDrawCall dc)
-	{
-		drawCalls.Add(dc);
-		dc.Set(mVerts, generateNormals ? mNorms : null, generateNormals ? mTans : null, mUvs, mCols);
-		mVerts.Clear();
-		mNorms.Clear();
-		mTans.Clear();
-		mUvs.Clear();
-		mCols.Clear();
+		if (dc != null && dc.verts.size != 0)
+		{
+			drawCalls.Add(dc);
+			dc.UpdateGeometry();
+		}
 	}
 
 	/// <summary>
@@ -1114,22 +1317,17 @@ public class UIPanel : UIRect
 				{
 					if (w.isVisible && w.hasVertices)
 					{
-						if (generateNormals) w.WriteToBuffers(mVerts, mUvs, mCols, mNorms, mTans);
-						else w.WriteToBuffers(mVerts, mUvs, mCols, null, null);
+						if (generateNormals) w.WriteToBuffers(dc.verts, dc.uvs, dc.cols, dc.norms, dc.tans);
+						else w.WriteToBuffers(dc.verts, dc.uvs, dc.cols, null, null);
 					}
 					else w.drawCall = null;
 				}
 				++i;
 			}
 
-			if (mVerts.size != 0)
+			if (dc.verts.size != 0)
 			{
-				dc.Set(mVerts, generateNormals ? mNorms : null, generateNormals ? mTans : null, mUvs, mCols);
-				mVerts.Clear();
-				mNorms.Clear();
-				mTans.Clear();
-				mUvs.Clear();
-				mCols.Clear();
+				dc.UpdateGeometry();
 				return true;
 			}
 		}
@@ -1143,22 +1341,25 @@ public class UIPanel : UIRect
 	void UpdateDrawCalls ()
 	{
 		Transform trans = cachedTransform;
-		Vector4 range = Vector4.zero;
 		bool isUI = usedForUI;
 
 		if (clipping != UIDrawCall.Clipping.None)
 		{
-			Vector4 cr = finalClipRegion;
-			range = new Vector4(cr.x, cr.y, cr.z * 0.5f, cr.w * 0.5f);
+			drawCallClipRange = finalClipRegion;
+			drawCallClipRange.z *= 0.5f;
+			drawCallClipRange.w *= 0.5f;
 		}
+		else drawCallClipRange = Vector4.zero;
 
-		if (range.z == 0f) range.z = Screen.width * 0.5f;
-		if (range.w == 0f) range.w = Screen.height * 0.5f;
+		// Legacy functionality
+		if (drawCallClipRange.z == 0f) drawCallClipRange.z = Screen.width * 0.5f;
+		if (drawCallClipRange.w == 0f) drawCallClipRange.w = Screen.height * 0.5f;
 
+		// DirectX 9 half-pixel offset
 		if (halfPixelOffset)
 		{
-			range.x -= 0.5f;
-			range.y += 0.5f;
+			drawCallClipRange.x -= 0.5f;
+			drawCallClipRange.y += 0.5f;
 		}
 
 		Vector3 pos;
@@ -1174,8 +1375,10 @@ public class UIPanel : UIRect
 			{
 				float x = Mathf.Round(pos.x);
 				float y = Mathf.Round(pos.y);
-				range.x += pos.x - x;
-				range.y += pos.y - y;
+
+				drawCallClipRange.x += pos.x - x;
+				drawCallClipRange.y += pos.y - y;
+
 				pos.x = x;
 				pos.y = y;
 				pos = parent.TransformPoint(pos);
@@ -1197,11 +1400,9 @@ public class UIPanel : UIRect
 			t.localScale = scale;
 
 			dc.renderQueue = (renderQueue == RenderQueue.Explicit) ? startingRenderQueue : startingRenderQueue + i;
-			dc.clipping = clipping;
-			dc.clipRange = range;
-			dc.clipSoftness = mClipSoftness;
 			dc.alwaysOnScreen = alwaysOnScreen &&
 				(mClipping == UIDrawCall.Clipping.None || mClipping == UIDrawCall.Clipping.ConstrainButDontClip);
+			dc.sortingOrder = mSortingOrder;
 		}
 	}
 
@@ -1245,7 +1446,7 @@ public class UIPanel : UIRect
 			mResized = true;
 		}
 
-		bool clipped = clipsChildren;
+		bool clipped = hasCumulativeClipping;
 
 		// Update all widgets
 		for (int i = 0, imax = widgets.size; i < imax; ++i)
@@ -1369,6 +1570,8 @@ public class UIPanel : UIRect
 
 	public void AddWidget (UIWidget w)
 	{
+		mUpdateScroll = true;
+
 		if (widgets.size == 0)
 		{
 			widgets.Add(w);
@@ -1455,7 +1658,7 @@ public class UIPanel : UIRect
 	{
 		Vector3 offset = CalculateConstrainOffset(targetBounds.min, targetBounds.max);
 
-		if (offset.magnitude > 0f)
+		if (offset.sqrMagnitude > 0f)
 		{
 			if (immediate)
 			{
@@ -1557,7 +1760,6 @@ public class UIPanel : UIRect
 	}
 
 #if UNITY_EDITOR
-
 	static int mSizeFrame = -1;
 	static System.Reflection.MethodInfo s_GetSizeOfMainGameView;
 	static Vector2 mGameSize = Vector2.one;
@@ -1570,7 +1772,7 @@ public class UIPanel : UIRect
 	{
 		int frame = Time.frameCount;
 
-		if (mSizeFrame != frame)
+		if (mSizeFrame != frame || !Application.isPlaying)
 		{
 			mSizeFrame = frame;
 
@@ -1640,5 +1842,5 @@ public class UIPanel : UIRect
 			}
 		}
 	}
-#endif
+#endif // UNITY_EDITOR
 }

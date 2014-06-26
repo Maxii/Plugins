@@ -56,9 +56,11 @@
     <Compile Include="Editor\ActiveAnimationEditor.cs" />
     <Compile Include="Editor\BMFontReader.cs" />
     <Compile Include="Editor\ComponentSelector.cs" />
+    <Compile Include="Editor\EventDelegateDrawer.cs" />
     <Compile Include="Editor\EventDelegateEditor.cs" />
     <Compile Include="Editor\FreeType.cs" />
     <Compile Include="Editor\NGUIContextMenu.cs" />
+    <Compile Include="Editor\NGUIEditorExtensions.cs" />
     <Compile Include="Editor\NGUIEditorTools.cs" />
     <Compile Include="Editor\NGUIHandles.cs" />
     <Compile Include="Editor\NGUIHelp.cs" />
@@ -68,6 +70,8 @@
     <Compile Include="Editor\NGUISettings.cs" />
     <Compile Include="Editor\NGUISnap.cs" />
     <Compile Include="Editor\NGUITransformInspector.cs" />
+    <Compile Include="Editor\PropertyBindingEditor.cs" />
+    <Compile Include="Editor\PropertyReferenceDrawer.cs" />
     <Compile Include="Editor\SpriteSelector.cs" />
     <Compile Include="Editor\TweenAlphaEditor.cs" />
     <Compile Include="Editor\TweenColorEditor.cs" />
@@ -84,8 +88,10 @@
     <Compile Include="Editor\UIAnchorEditor.cs" />
     <Compile Include="Editor\UIAtlasInspector.cs" />
     <Compile Include="Editor\UIAtlasMaker.cs" />
+    <Compile Include="Editor\UIBasicSpriteEditor.cs" />
     <Compile Include="Editor\UIButtonColorEditor.cs" />
     <Compile Include="Editor\UIButtonEditor.cs" />
+    <Compile Include="Editor\UIButtonKeysEditor.cs" />
     <Compile Include="Editor\UIButtonMessageEditor.cs" />
     <Compile Include="Editor\UICameraEditor.cs" />
     <Compile Include="Editor\UICameraTool.cs" />
@@ -101,6 +107,7 @@
     <Compile Include="Editor\UIGridEditor.cs" />
     <Compile Include="Editor\UIImageButtonInspector.cs" />
     <Compile Include="Editor\UIInputEditor.cs" />
+    <Compile Include="Editor\UIKeyNavigationEditor.cs" />
     <Compile Include="Editor\UILabelInspector.cs" />
     <Compile Include="Editor\UILocalizeEditor.cs" />
     <Compile Include="Editor\UIPanelInspector.cs" />
@@ -108,12 +115,14 @@
     <Compile Include="Editor\UIPlayAnimationEditor.cs" />
     <Compile Include="Editor\UIPlayTweenEditor.cs" />
     <Compile Include="Editor\UIPopupListInspector.cs" />
+    <Compile Include="Editor\UIPrefabTool.cs" />
     <Compile Include="Editor\UIProgressBarEditor.cs" />
     <Compile Include="Editor\UIRectEditor.cs" />
     <Compile Include="Editor\UIRootEditor.cs" />
     <Compile Include="Editor\UIScrollBarEditor.cs" />
     <Compile Include="Editor\UIScrollViewEditor.cs" />
     <Compile Include="Editor\UISliderEditor.cs" />
+    <Compile Include="Editor\UISnapshotPointEditor.cs" />
     <Compile Include="Editor\UISpriteAnimationInspector.cs" />
     <Compile Include="Editor\UISpriteInspector.cs" />
     <Compile Include="Editor\UIStretchEditor.cs" />
@@ -124,6 +133,7 @@
     <Compile Include="Editor\UITweenerEditor.cs" />
     <Compile Include="Editor\UIWidgetContainerEditor.cs" />
     <Compile Include="Editor\UIWidgetInspector.cs" />
+    <Compile Include="Editor\UIWrapContentEditor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -60,10 +60,14 @@
     <Compile Include="GFRectGrid.cs" />
     <Compile Include="Grid Rendering\GFGridRenderCamera.cs" />
     <Compile Include="Grid Rendering\GFGridRenderManager.cs" />
+    <Compile Include="PlayMaker Actions\FsmGFStateAction.cs" />
+    <Compile Include="PlayMaker Actions\FsmGFStateActionGetSet.cs" />
+    <Compile Include="PlayMaker Actions\FsmGFStateActionMethods.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Vectors\GFBoolVector3.cs" />
     <Compile Include="Vectors\GFColorVector3.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

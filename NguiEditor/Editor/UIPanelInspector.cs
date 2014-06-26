@@ -38,6 +38,12 @@ public class UIPanelInspector : UIRectEditor
 		mPanel = target as UIPanel;
 	}
 
+	protected override void OnDisable ()
+	{
+		base.OnDisable();
+		NGUIEditorTools.HideMoveTool(false);
+	}
+
 	/// <summary>
 	/// Helper function that draws draggable knobs.
 	/// </summary>
@@ -58,8 +64,6 @@ public class UIPanelInspector : UIRectEditor
 			mStyle0.Draw(rect, GUIContent.none, id);
 		}
 	}
-
-	void OnDisable () { NGUIEditorTools.HideMoveTool(false); }
 
 	/// <summary>
 	/// Handles & interaction.
@@ -450,11 +454,11 @@ public class UIPanelInspector : UIRectEditor
 			Vector4 range = mPanel.baseClipRegion;
 
 			// Scroll view is anchored, meaning it adjusts the offset itself, so we don't want it to be modifiable
-			EditorGUI.BeginDisabledGroup(mPanel.GetComponent<UIScrollView>() != null);
+			//EditorGUI.BeginDisabledGroup(mPanel.GetComponent<UIScrollView>() != null);
 			GUI.changed = false;
 			GUILayout.BeginHorizontal();
 			GUILayout.Space(80f);
-			Vector3 off = EditorGUILayout.Vector2Field("Offset", mPanel.clipOffset);
+			Vector3 off = EditorGUILayout.Vector2Field("Offset", mPanel.clipOffset, GUILayout.MinWidth(20f));
 			GUILayout.EndHorizontal();
 
 			if (GUI.changed)
@@ -463,16 +467,16 @@ public class UIPanelInspector : UIRectEditor
 				mPanel.clipOffset = off;
 				EditorUtility.SetDirty(mPanel);
 			}
-			EditorGUI.EndDisabledGroup();
+			//EditorGUI.EndDisabledGroup();
 
 			GUILayout.BeginHorizontal();
 			GUILayout.Space(80f);
-			Vector2 pos = EditorGUILayout.Vector2Field("Center", new Vector2(range.x, range.y));
+			Vector2 pos = EditorGUILayout.Vector2Field("Center", new Vector2(range.x, range.y), GUILayout.MinWidth(20f));
 			GUILayout.EndHorizontal();
 
 			GUILayout.BeginHorizontal();
 			GUILayout.Space(80f);
-			Vector2 size = EditorGUILayout.Vector2Field("Size", new Vector2(range.z, range.w));
+			Vector2 size = EditorGUILayout.Vector2Field("Size", new Vector2(range.z, range.w), GUILayout.MinWidth(20f));
 			GUILayout.EndHorizontal();
 
 			if (size.x < 0f) size.x = 0f;
@@ -494,11 +498,11 @@ public class UIPanelInspector : UIRectEditor
 			{
 				GUILayout.BeginHorizontal();
 				GUILayout.Space(80f);
-				Vector2 soft = EditorGUILayout.Vector2Field("Softness", mPanel.clipSoftness);
+				Vector2 soft = EditorGUILayout.Vector2Field("Softness", mPanel.clipSoftness, GUILayout.MinWidth(20f));
 				GUILayout.EndHorizontal();
 
-				if (soft.x < 1f) soft.x = 1f;
-				if (soft.y < 1f) soft.y = 1f;
+				if (soft.x < 0f) soft.x = 0f;
+				if (soft.y < 0f) soft.y = 0f;
 
 				if (mPanel.clipSoftness != soft)
 				{
@@ -550,6 +554,11 @@ public class UIPanelInspector : UIRectEditor
 			}
 			GUILayout.EndHorizontal();
 
+#if !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2
+			GUI.changed = false;
+			int so = EditorGUILayout.IntField("Sort Order", mPanel.sortingOrder, GUILayout.Width(120f));
+			if (GUI.changed) mPanel.sortingOrder = so;
+#endif
 			GUILayout.BeginHorizontal();
 			bool norms = EditorGUILayout.Toggle("Normals", mPanel.generateNormals, GUILayout.Width(100f));
 			GUILayout.Label("Needed for lit shaders", GUILayout.MinWidth(20f));
