@@ -3,6 +3,7 @@ using System.Collections;
 
 public class SpyHandler : SaucerBaseHandler
 {
+	public CtxMenu commandSubmenu;
 	CtxMenu.Item[] menuItems;
 	
 	enum Commands
@@ -51,18 +52,25 @@ public class SpyHandler : SaucerBaseHandler
 	
 		menuItems[baseItem].text = "Spy";
 		menuItems[baseItem].isSubmenu = true;
-		menuItems[baseItem].submenu = submenu;
-		menuItems[baseItem].submenuItems = new CtxMenu.Item[3];
+		menuItems[baseItem].submenu = commandSubmenu;
 		
+#if CTX_NO_SERIALIZATION_FIX
+		CtxMenu.Item[] submenuItems = new CtxMenu.Item[3];
+		menuItems[baseItem].submenuItems = submenuItems;
+#else
+		CtxMenu.Item[] submenuItems = new CtxMenu.Item[3];
+		commandSubmenu.items = submenuItems;
+#endif
+
 		for (int i=0; i<3; i++)
 		{
-			menuItems[baseItem].submenuItems[i] = new CtxMenu.Item();
-			menuItems[baseItem].submenuItems[i].id = (int)Commands.FakeAutopsy+i;
+			submenuItems[i] = new CtxMenu.Item();
+			submenuItems[i].id = (int)Commands.FakeAutopsy+i;
 		}
 		
-		menuItems[baseItem].submenuItems[0].text = "Fake Autopsy";
-		menuItems[baseItem].submenuItems[1].text = "Make Crop Circles";
-		menuItems[baseItem].submenuItems[2].text = "Buzz Radar Towers";
+		submenuItems[0].text = "Fake Autopsy";
+		submenuItems[1].text = "Make Crop Circles";
+		submenuItems[2].text = "Buzz Radar Towers";
 	}
 	
 	public new void OnMenuSelection()

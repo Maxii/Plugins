@@ -3,6 +3,7 @@ using System.Collections;
 
 public class AbductorHandler : SaucerBaseHandler
 {
+	public CtxMenu commandSubmenu;
 	CtxMenu.Item[] menuItems;
 	
 	enum Commands
@@ -51,18 +52,25 @@ public class AbductorHandler : SaucerBaseHandler
 	
 		menuItems[baseItem].text = "Abductor";
 		menuItems[baseItem].isSubmenu = true;
-		menuItems[baseItem].submenu = submenu;
-		menuItems[baseItem].submenuItems = new CtxMenu.Item[3];
+		menuItems[baseItem].submenu = commandSubmenu;
 		
+#if CTX_NO_SERIALIZATION_FIX
+		CtxMenu.Item[] submenuItems = new CtxMenu.Item[3];
+		menuItems[baseItem].submenuItems = submenuItems;
+#else
+		CtxMenu.Item[] submenuItems = new CtxMenu.Item[3];
+		commandSubmenu.items = submenuItems;
+#endif
+
 		for (int i=0; i<3; i++)
 		{
-			menuItems[baseItem].submenuItems[i] = new CtxMenu.Item();
-			menuItems[baseItem].submenuItems[i].id = (int)Commands.AbductSpecimens+i;
+			submenuItems[i] = new CtxMenu.Item();
+			submenuItems[i].id = (int)Commands.AbductSpecimens+i;
 		}
 		
-		menuItems[baseItem].submenuItems[0].text = "Abduct Specimens";
-		menuItems[baseItem].submenuItems[1].text = "Erase Memory";
-		menuItems[baseItem].submenuItems[2].text = "Use 'Probe' Device";
+		submenuItems[0].text = "Abduct Specimens";
+		submenuItems[1].text = "Erase Memory";
+		submenuItems[2].text = "Use 'Probe' Device";
 	}
 	
 	public new void OnMenuSelection()

@@ -265,10 +265,31 @@ public abstract class CtxMenuItemInspector : Editor
 				{
 					RegisterUndo();
 					item.submenu = submenu;
+
+#if CTX_NO_SERIALIZATION_FIX
+					if (submenu.items == null || submenu.items.Length == 0)
+					{
+						Debug.Log("Wizzy Submenu Item Transfer Test!!!!");
+						
+						if (item.submenuItems != null && item.submenuItems.Length > 0)
+						{
+							Debug.Log("Wizzy Submenu Item Transfer!!!!");
+							submenu.items = item.submenuItems;
+							item.submenuItems = null;
+
+							EditorUtility.SetDirty(submenu);
+							EditorUtility.SetDirty(target);
+						}
+					}
+#endif
 				}
 				
 				if (submenu != null)
+#if CTX_NO_SERIALIZATION_FIX
 					EditMenuItemList(ref item.submenuItems, submenu.atlas, false, ref item.isEditingItems);
+#else
+					EditMenuItemList(ref submenu.items, submenu.atlas, false, ref item.isEditingItems);
+#endif
 			}
 		}
 		

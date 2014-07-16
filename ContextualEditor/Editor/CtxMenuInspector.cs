@@ -360,14 +360,7 @@ public class CtxMenuInspector : CtxMenuItemInspector
 				RegisterUndo();
 				contextMenu.submenuIndicatorColor = submenuIndColor;
 			}
-			
-			float submenuTimeDelay = EditorGUILayout.FloatField("Show Delay", contextMenu.submenuTimeDelay);
-			if (contextMenu.submenuTimeDelay != submenuTimeDelay)
-			{
-				RegisterUndo();
-				contextMenu.submenuTimeDelay = submenuTimeDelay;
-			}
-			
+
 			GUILayout.Space(4f);
 		}
 		EditorGUILayout.EndVertical();

@@ -3,6 +3,7 @@ using System.Collections;
 
 public class TransportHandler : SaucerBaseHandler
 {
+	public CtxMenu commandSubmenu;
 	CtxMenu.Item[] menuItems;
 	
 	enum Commands
@@ -51,18 +52,25 @@ public class TransportHandler : SaucerBaseHandler
 	
 		menuItems[baseItem].text = "Transport";
 		menuItems[baseItem].isSubmenu = true;
-		menuItems[baseItem].submenu = submenu;
-		menuItems[baseItem].submenuItems = new CtxMenu.Item[3];
+		menuItems[baseItem].submenu = commandSubmenu;
 		
+#if CTX_NO_SERIALIZATION_FIX
+		CtxMenu.Item[] submenuItems = new CtxMenu.Item[3];
+		menuItems[baseItem].submenuItems = submenuItems;
+#else
+		CtxMenu.Item[] submenuItems = new CtxMenu.Item[3];
+		commandSubmenu.items = submenuItems;
+#endif
+
 		for (int i=0; i<3; i++)
 		{
-			menuItems[baseItem].submenuItems[i] = new CtxMenu.Item();
-			menuItems[baseItem].submenuItems[i].id = (int)Commands.LandAtWhiteHouse+i;
+			submenuItems[i] = new CtxMenu.Item();
+			submenuItems[i].id = (int)Commands.LandAtWhiteHouse+i;
 		}
 		
-		menuItems[baseItem].submenuItems[0].text = "Land At White House";
-		menuItems[baseItem].submenuItems[1].text = "Deploy Grays";
-		menuItems[baseItem].submenuItems[2].text = "Recover Grays";
+		submenuItems[0].text = "Land At White House";
+		submenuItems[1].text = "Deploy Grays";
+		submenuItems[2].text = "Recover Grays";
 	}
 	
 	public new void OnMenuSelection()

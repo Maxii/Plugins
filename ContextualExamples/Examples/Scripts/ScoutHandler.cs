@@ -3,6 +3,7 @@ using System.Collections;
 
 public class ScoutHandler : SaucerBaseHandler
 {
+	public CtxMenu commandSubmenu;
 	CtxMenu.Item[] menuItems;
 	
 	enum Commands
@@ -51,18 +52,25 @@ public class ScoutHandler : SaucerBaseHandler
 	
 		menuItems[baseItem].text = "Scout";
 		menuItems[baseItem].isSubmenu = true;
-		menuItems[baseItem].submenu = submenu;
-		menuItems[baseItem].submenuItems = new CtxMenu.Item[3];
+		menuItems[baseItem].submenu = commandSubmenu;
 		
+#if CTX_NO_SERIALIZATION_FIX
+		CtxMenu.Item[] submenuItems = new CtxMenu.Item[3];
+		menuItems[baseItem].submenuItems = submenuItems;
+#else
+		CtxMenu.Item[] submenuItems = new CtxMenu.Item[3];
+		commandSubmenu.items = submenuItems;
+#endif
+
 		for (int i=0; i<3; i++)
 		{
-			menuItems[baseItem].submenuItems[i] = new CtxMenu.Item();
-			menuItems[baseItem].submenuItems[i].id = (int)Commands.BuzzAirliners+i;
+			submenuItems[i] = new CtxMenu.Item();
+			submenuItems[i].id = (int)Commands.BuzzAirliners+i;
 		}
 		
-		menuItems[baseItem].submenuItems[0].text = "Buzz Airliners";
-		menuItems[baseItem].submenuItems[1].text = "Fly in Circles";
-		menuItems[baseItem].submenuItems[2].text = "Hover Aimlessly";
+		submenuItems[0].text = "Buzz Airliners";
+		submenuItems[1].text = "Fly in Circles";
+		submenuItems[2].text = "Hover Aimlessly";
 	}
 	
 	public new void OnMenuSelection()

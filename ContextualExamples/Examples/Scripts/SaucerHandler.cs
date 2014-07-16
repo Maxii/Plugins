@@ -3,17 +3,17 @@ using System.Collections;
 
 public class SaucerHandler : MonoBehaviour
 {
-	enum MenuCommands
+	public enum MenuCommands
 	{
 		Small,
 		Medium,
 		Large,
 		
-		ColorScheme1 = 5,
-		ColorScheme2,
-		ColorScheme3,
-		ColorScheme4,
-		ColorScheme5,
+		ColorSchemeMirage = 5,
+		ColorSchemeVineyard,
+		ColorSchemeSunset,
+		ColorSchemeHolly,
+		ColorSchemeEmbers,
 
 		ScoutBuzzAirliners = 10,
 		ScoutFlyInCircles,
@@ -35,7 +35,8 @@ public class SaucerHandler : MonoBehaviour
 		SpyMakeCropCircles,
 		SpyBuzzRadarTowers
 	}
-	
+
+	public MenuCommands currentColorScheme;
 	public Material[] hullMaterials;
 	public Material[] glowMaterials;
 	
@@ -55,14 +56,15 @@ public class SaucerHandler : MonoBehaviour
 			transform.localScale = new Vector3(1.3f, 1.3f, 1.3f);
 			break;
 		
-		case MenuCommands.ColorScheme1:
-		case MenuCommands.ColorScheme2:
-		case MenuCommands.ColorScheme3:
-		case MenuCommands.ColorScheme4:
-		case MenuCommands.ColorScheme5:
+		case MenuCommands.ColorSchemeMirage:
+		case MenuCommands.ColorSchemeVineyard:
+		case MenuCommands.ColorSchemeSunset:
+		case MenuCommands.ColorSchemeHolly:
+		case MenuCommands.ColorSchemeEmbers:
 		{
-			int cs = item - (int)MenuCommands.ColorScheme1;
+			int cs = item - (int)MenuCommands.ColorSchemeMirage;
 			SetColorScheme(hullMaterials[cs], glowMaterials[cs]);
+			currentColorScheme = cmd;
 			break;
 		}
 
@@ -92,7 +94,8 @@ public class SaucerHandler : MonoBehaviour
 		
 	public void OnShowMenu(CtxObject obj)
 	{
-		//Debug.Log("SaucerHandler.OnShowMenu() "+menu);
+		//Debug.Log("SaucerHandler.OnShowMenu() "+obj);
+		obj.SetChecked((int)currentColorScheme, true);
 	}
 
 	void SetColorScheme(Material hullMat, Material glowMat)

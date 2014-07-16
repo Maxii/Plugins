@@ -490,20 +490,26 @@ public class CtxHelper
 				return true;
 			}
 			
+#if CTX_NO_SERIALIZATION_FIX
 			if (item.submenuItems != null || item.submenu)
-				hasSubmenus = true;
+#else
+			if (item.submenu)
+#endif
+					hasSubmenus = true;
 		}
 		
 		if (hasSubmenus)
 		{
 			foreach (CtxMenu.Item item in itemsArray)
 			{
+#if CTX_NO_SERIALIZATION_FIX
 				if (item.submenuItems != null)
 				{
 					if (MutexItems(item.submenuItems, id, mutexGroup))
 						return true;
 				}
-				else if (item.submenu != null)
+#endif
+				if (item.submenu != null)
 				{
 					if (MutexItems(item.submenu.items, id, mutexGroup))
 						return true;
@@ -558,7 +564,11 @@ public class CtxHelper
 			if (item.id == id)
 				return item;
 			
+#if CTX_NO_SERIALIZATION_FIX
 			if (item.submenuItems != null || item.submenu)
+#else
+			if (item.submenu)
+#endif
 				hasSubmenus = true;
 		}
 		
@@ -566,13 +576,15 @@ public class CtxHelper
 		{
 			foreach (CtxMenu.Item item in itemsArray)
 			{
+#if CTX_NO_SERIALIZATION_FIX
 				if (item.submenuItems != null)
 				{
 					CtxMenu.Item res = FindItemRecursively(item.submenuItems, id);
 					if (res != null)
 						return res;
 				}
-				else if (item.submenu != null)
+#endif
+				if (item.submenu != null)
 				{
 					CtxMenu.Item res = FindItemRecursively(item.submenu.items, id);
 					if (res != null)

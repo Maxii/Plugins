@@ -3,6 +3,7 @@ using System.Collections;
 
 public class EnforcerHandler : SaucerBaseHandler
 {
+	public CtxMenu commandSubmenu;
 	CtxMenu.Item[] menuItems;
 	
 	enum Commands
@@ -51,18 +52,25 @@ public class EnforcerHandler : SaucerBaseHandler
 	
 		menuItems[baseItem].text = "Enforcer";
 		menuItems[baseItem].isSubmenu = true;
-		menuItems[baseItem].submenu = submenu;
-		menuItems[baseItem].submenuItems = new CtxMenu.Item[3];
+		menuItems[baseItem].submenu = commandSubmenu;
 		
+#if CTX_NO_SERIALIZATION_FIX
+		CtxMenu.Item[] submenuItems = new CtxMenu.Item[3];
+		menuItems[baseItem].submenuItems = submenuItems;
+#else
+		CtxMenu.Item[] submenuItems = new CtxMenu.Item[3];
+		commandSubmenu.items = submenuItems;
+#endif
+
 		for (int i=0; i<3; i++)
 		{
-			menuItems[baseItem].submenuItems[i] = new CtxMenu.Item();
-			menuItems[baseItem].submenuItems[i].id = (int)Commands.AttackMilitary+i;
+			submenuItems[i] = new CtxMenu.Item();
+			submenuItems[i].id = (int)Commands.AttackMilitary+i;
 		}
 		
-		menuItems[baseItem].submenuItems[0].text = "Attack Military";
-		menuItems[baseItem].submenuItems[1].text = "Attack Civilians";
-		menuItems[baseItem].submenuItems[2].text = "Deploy Ultimate Weapon";
+		submenuItems[0].text = "Attack Military";
+		submenuItems[1].text = "Attack Civilians";
+		submenuItems[2].text = "Deploy Ultimate Weapon";
 	}
 	
 	public new void OnMenuSelection()

@@ -18,7 +18,8 @@ public class SaucerBaseHandler : MonoBehaviour
 		Last
 	}
 	
-	public CtxMenu submenu;
+	public CtxMenu colorSubmenu;
+	private CtxMenu.Item[] submenuItems;
 	
 	protected int MenuItemCount
 	{
@@ -54,27 +55,38 @@ public class SaucerBaseHandler : MonoBehaviour
 		
 		items[4].text = "Color Scheme";
 		items[4].isSubmenu = true;
-		items[4].submenu = submenu;
-		items[4].submenuItems = new CtxMenu.Item[5];
-		
+		items[4].submenu = colorSubmenu;
+
+		if (submenuItems == null)
+		{
+			submenuItems = new CtxMenu.Item[5];
+			for (int i=0; i<5; i++)
+				submenuItems[i] = new CtxMenu.Item();
+		}
+
+#if CTX_NO_SERIALIZATION_FIX
+		items[4].submenuItems = submenuItems;
+#else
+		colorSubmenu.items = submenuItems;
+#endif
+
 		int matID = FindMaterialIndex();
 		
 		for (int i=0; i<5; i++)
 		{
-			items[4].submenuItems[i] = new CtxMenu.Item();
-			items[4].submenuItems[i].isCheckable = true;
-			items[4].submenuItems[i].mutexGroup = 0;
-			items[4].submenuItems[i].id = (int)MenuCommands.ColorScheme1 + i;
+			submenuItems[i].isCheckable = true;
+			submenuItems[i].mutexGroup = 0;
+			submenuItems[i].id = (int)MenuCommands.ColorScheme1 + i;
 			
 			if (i == matID)
-				items[4].submenuItems[i].isChecked = true;
+				submenuItems[i].isChecked = true;
 		}
 		
-		items[4].submenuItems[0].text = "Mirage";
-		items[4].submenuItems[1].text = "Vinyard";
-		items[4].submenuItems[2].text = "Sunset";
-		items[4].submenuItems[3].text = "Holly";
-		items[4].submenuItems[4].text = "Embers";
+		submenuItems[0].text = "Mirage";
+		submenuItems[1].text = "Vinyard";
+		submenuItems[2].text = "Sunset";
+		submenuItems[3].text = "Holly";
+		submenuItems[4].text = "Embers";
 	}
 	
 	protected void OnMenuSelection()
