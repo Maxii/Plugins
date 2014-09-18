@@ -349,6 +349,7 @@ public class UIProgressBar : UIWidgetContainer
 					mFG.drawRegion = isInverted ?
 						new Vector4(1f - value, 0f, 1f, 1f) :
 						new Vector4(0f, 0f, value, 1f);
+					mFG.enabled = value > 0.001f;
 				}
 			}
 			else if (sprite != null && sprite.type == UIBasicSprite.Type.Filled)
@@ -366,6 +367,7 @@ public class UIProgressBar : UIWidgetContainer
 				mFG.drawRegion = isInverted ?
 					new Vector4(0f, 1f - value, 1f, 1f) :
 					new Vector4(0f, 0f, 1f, value);
+				mFG.enabled = value > 0.001f;
 			}
 		}
 

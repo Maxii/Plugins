@@ -25,11 +25,7 @@ public class UICameraEditor : Editor
 		}
 		else
 		{
-#if !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2
 			string[] options = new string[] { "3D World", "3D UI", "2D World", "2D UI" };
-#else
-			string[] options = new string[] { "3D World", "3D UI" };
-#endif
 			int val = EditorGUILayout.Popup("Event Type", et.intValue, options);
 			if (val != et.intValue) et.intValue = val;
 		}

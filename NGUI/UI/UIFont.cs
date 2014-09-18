@@ -182,6 +182,13 @@ public class UIFont : MonoBehaviour
 	/// Whether the font is using a premultiplied alpha material.
 	/// </summary>
 
+	[System.Obsolete("Use UIFont.premultipliedAlphaShader instead")]
+	public bool premultipliedAlpha { get { return premultipliedAlphaShader; } }
+
+	/// <summary>
+	/// Whether the font is using a premultiplied alpha material.
+	/// </summary>
+
 	public bool premultipliedAlphaShader
 	{
 		get

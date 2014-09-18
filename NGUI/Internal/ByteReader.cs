@@ -217,7 +217,6 @@ public class ByteReader
 				if (s == null) return null;
 				s = s.Replace("\\n", "\n");
 				line += "\n" + s;
-				++wordStart;
 			}
 			else
 			{
@@ -251,7 +250,7 @@ public class ByteReader
 
 						if (line[i + 1] != '"')
 						{
-							mTemp.Add(line.Substring(wordStart, i - wordStart));
+							mTemp.Add(line.Substring(wordStart, i - wordStart).Replace("\"\"", "\""));
 							insideQuotes = false;
 
 							if (line[i + 1] == ',')

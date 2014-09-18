@@ -236,8 +236,19 @@ public class PropertyReference
 		{
 			try
 			{
-				if (mProperty != null) mProperty.SetValue(mTarget, null, null);
-				else mField.SetValue(mTarget, null);
+				if (mProperty != null)
+				{
+					if (mProperty.CanWrite)
+					{
+						mProperty.SetValue(mTarget, null, null);
+						return true;
+					}
+				}
+				else
+				{
+					mField.SetValue(mTarget, null);
+					return true;
+				}
 			}
 			catch (Exception) { return false; }
 		}

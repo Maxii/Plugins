@@ -21,6 +21,7 @@ public class UITexture : UIBasicSprite
 	[HideInInspector][SerializeField] Material mMat;
 	[HideInInspector][SerializeField] Shader mShader;
 	[HideInInspector][SerializeField] Vector4 mBorder = Vector4.zero;
+	[HideInInspector][SerializeField] bool mFixedAspect = false;
 
 	[System.NonSerialized] int mPMA = -1;
 
@@ -40,10 +41,18 @@ public class UITexture : UIBasicSprite
 		{
 			if (mTexture != value)
 			{
-				RemoveFromPanel();
-				mTexture = value;
-				mPMA = -1;
-				MarkAsChanged();
+				if (drawCall != null && drawCall.widgetCount == 1 && mMat == null)
+				{
+					mTexture = value;
+					drawCall.mainTexture = value;
+				}
+				else
+				{
+					RemoveFromPanel();
+					mTexture = value;
+					mPMA = -1;
+					MarkAsChanged();
+				}
 			}
 		}
 	}
@@ -87,11 +96,19 @@ public class UITexture : UIBasicSprite
 		{
 			if (mShader != value)
 			{
-				RemoveFromPanel();
-				mShader = value;
-				mPMA = -1;
-				mMat = null;
-				MarkAsChanged();
+				if (drawCall != null && drawCall.widgetCount == 1 && mMat == null)
+				{
+					mShader = value;
+					drawCall.shader = value;
+				}
+				else
+				{
+					RemoveFromPanel();
+					mShader = value;
+					mPMA = -1;
+					mMat = null;
+					MarkAsChanged();
+				}
 			}
 		}
 	}
@@ -203,16 +220,48 @@ public class UITexture : UIBasicSprite
 				else y1 -= padTop * py;
 			}
 
-			Vector4 br = border;
+			float fw, fh;
 
-			float fw = br.x + br.z;
-			float fh = br.y + br.w;
+			if (mFixedAspect)
+			{
+				fw = 0f;
+				fh = 0f;
+			}
+			else
+			{
+				Vector4 br = border;
+				fw = br.x + br.z;
+				fh = br.y + br.w;
+			}
+
 			float vx = Mathf.Lerp(x0, x1 - fw, mDrawRegion.x);
 			float vy = Mathf.Lerp(y0, y1 - fh, mDrawRegion.y);
 			float vz = Mathf.Lerp(x0 + fw, x1, mDrawRegion.z);
 			float vw = Mathf.Lerp(y0 + fh, y1, mDrawRegion.w);
 
 			return new Vector4(vx, vy, vz, vw);
+		}
+	}
+
+	/// <summary>
+	/// Whether the drawn texture will always maintain a fixed aspect ratio.
+	/// This setting is not compatible with drawRegion adjustments (sliders, progress bars, etc).
+	/// </summary>
+
+	public bool fixedAspect
+	{
+		get
+		{
+			return mFixedAspect;
+		}
+		set
+		{
+			if (mFixedAspect != value)
+			{
+				mFixedAspect = value;
+				mDrawRegion = new Vector4(0f, 0f, 1f, 1f);
+				MarkAsChanged();
+			}
 		}
 	}
 
@@ -240,6 +289,43 @@ public class UITexture : UIBasicSprite
 
 				width = w;
 				height = h;
+			}
+		}
+	}
+
+	/// <summary>
+	/// Adjust the draw region if the texture is using a fixed aspect ratio.
+	/// </summary>
+
+	protected override void OnUpdate ()
+	{
+		base.OnUpdate();
+		
+		if (mFixedAspect)
+		{
+			Texture tex = mainTexture;
+
+			if (tex != null)
+			{
+				int w = tex.width;
+				int h = tex.height;
+				if ((w & 1) == 1) ++w;
+				if ((h & 1) == 1) ++h;
+				float widgetWidth = mWidth;
+				float widgetHeight = mHeight;
+				float widgetAspect = widgetWidth / widgetHeight;
+				float textureAspect = (float)w / h;
+
+				if (textureAspect < widgetAspect)
+				{
+					float x = (widgetWidth - widgetHeight * textureAspect) / widgetWidth * 0.5f;
+					drawRegion = new Vector4(x, 0f, 1f - x, 1f);
+				}
+				else
+				{
+					float y = (widgetHeight - widgetWidth / textureAspect) / widgetHeight * 0.5f;
+					drawRegion = new Vector4(0f, y, 1f, 1f - y);
+				}
 			}
 		}
 	}
@@ -274,6 +360,10 @@ public class UITexture : UIBasicSprite
 		inner.yMin *= h;
 		inner.yMax *= h;
 
+		int offset = verts.size;
 		Fill(verts, uvs, cols, outer, inner);
+
+		if (onPostFill != null)
+			onPostFill(this, offset, verts, uvs, cols);
 	}
 }

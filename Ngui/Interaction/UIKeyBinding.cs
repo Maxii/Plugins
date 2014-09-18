@@ -16,6 +16,7 @@ public class UIKeyBinding : MonoBehaviour
 	{
 		PressAndClick,
 		Select,
+		All,
 	}
 
 	public enum Modifier
@@ -99,7 +100,7 @@ public class UIKeyBinding : MonoBehaviour
 	{
 		if (keyCode == KeyCode.None || !IsModifierActive()) return;
 
-		if (action == Action.PressAndClick)
+		if (action == Action.PressAndClick || action == Action.All)
 		{
 			if (UICamera.inputHasFocus) return;
 
@@ -125,7 +126,8 @@ public class UIKeyBinding : MonoBehaviour
 			}
 			UICamera.currentTouch.current = null;
 		}
-		else if (action == Action.Select)
+
+		if (action == Action.Select || action == Action.All)
 		{
 			if (Input.GetKeyUp(keyCode))
 			{

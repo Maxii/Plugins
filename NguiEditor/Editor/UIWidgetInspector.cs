@@ -740,8 +740,8 @@ public class UIWidgetInspector : UIRectEditor
 				}
 				else if (mAllowSelection)
 				{
-					BetterList<UIWidget> widgets = NGUIEditorTools.SceneViewRaycast(e.mousePosition);
-					if (widgets.size > 0) Selection.activeGameObject = widgets[0].gameObject;
+					List<UIWidget> widgets = NGUIEditorTools.SceneViewRaycast(e.mousePosition);
+					if (widgets.Count > 0) Selection.activeGameObject = widgets[0].gameObject;
 				}
 				mAllowSelection = true;
 			}
@@ -1038,7 +1038,7 @@ public class UIWidgetInspector : UIRectEditor
 
 		if (p != null)
 		{
-			for (int i = 0; i < p.widgets.size; ++i)
+			for (int i = 0, imax = p.widgets.Count; i < imax; ++i)
 			{
 				UIWidget pw = p.widgets[i];
 				if (pw != w && pw.depth == w.depth)

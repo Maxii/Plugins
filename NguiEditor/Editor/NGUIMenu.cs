@@ -105,15 +105,9 @@ static public class NGUIMenu
 
 		if (go != null)
 		{
-#if UNITY_3_5 || UNITY_4_0 || UNITY_4_1 || UNITY_4_2
-			Undo.RegisterSceneUndo("Add a Sprite");
-#endif
 			Selection.activeGameObject = NGUISettings.AddSprite(go).gameObject;
 		}
-		else
-		{
-			Debug.Log("You must select a game object first.");
-		}
+		else Debug.Log("You must select a game object first.");
 	}
 
 	[MenuItem("NGUI/Create/Label &#l", false, 6)]
@@ -123,15 +117,9 @@ static public class NGUIMenu
 
 		if (go != null)
 		{
-#if UNITY_3_5 || UNITY_4_0 || UNITY_4_1 || UNITY_4_2
-			Undo.RegisterSceneUndo("Add a Label");
-#endif
 			Selection.activeGameObject = NGUISettings.AddLabel(go).gameObject;
 		}
-		else
-		{
-			Debug.Log("You must select a game object first.");
-		}
+		else Debug.Log("You must select a game object first.");
 	}
 
 	[MenuItem("NGUI/Create/Texture &#t", false, 6)]
@@ -141,18 +129,11 @@ static public class NGUIMenu
 
 		if (go != null)
 		{
-#if UNITY_3_5 || UNITY_4_0 || UNITY_4_1 || UNITY_4_2
-			Undo.RegisterSceneUndo("Add a Texture");
-#endif
 			Selection.activeGameObject = NGUISettings.AddTexture(go).gameObject;
 		}
-		else
-		{
-			Debug.Log("You must select a game object first.");
-		}
+		else Debug.Log("You must select a game object first.");
 	}
 
-#if !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2
 	[MenuItem("NGUI/Create/Unity 2D Sprite &#d", false, 6)]
 	static public void AddSprite2D ()
 	{
@@ -160,7 +141,6 @@ static public class NGUIMenu
 		if (go != null) Selection.activeGameObject = NGUISettings.Add2DSprite(go).gameObject;
 		else Debug.Log("You must select a game object first.");
 	}
-#endif
 
 	[MenuItem("NGUI/Create/Widget &#w", false, 6)]
 	static public void AddWidget ()
@@ -169,15 +149,9 @@ static public class NGUIMenu
 
 		if (go != null)
 		{
-#if UNITY_3_5 || UNITY_4_0 || UNITY_4_1 || UNITY_4_2
-			Undo.RegisterSceneUndo("Add a Widget");
-#endif
 			Selection.activeGameObject = NGUISettings.AddWidget(go).gameObject;
 		}
-		else
-		{
-			Debug.Log("You must select a game object first.");
-		}
+		else Debug.Log("You must select a game object first.");
 	}
 
 	[MenuItem("NGUI/Create/", false, 6)]
@@ -579,7 +553,6 @@ static public class NGUIMenu
 		UIPrefabTool.instance.Repaint();
 	}
 
-#if !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2
 	[MenuItem("NGUI/Extras/Switch to 2D Colliders", false, 10)]
 	static public void SwitchTo2D ()
 	{
@@ -670,8 +643,47 @@ static public class NGUIMenu
 			}
 		}
 	}
-#endif
 
+	[MenuItem("NGUI/Extras/Align Scene View to UI", false, 10)]
+	static public void AlignSVToUI ()
+	{
+		GameObject go = Selection.activeGameObject ?? UICamera.list[0].gameObject;
+		Camera cam = NGUITools.FindCameraForLayer(go.layer);
+		SceneView sv = SceneView.lastActiveSceneView;
+		Camera svc = sv.camera;
+		svc.nearClipPlane = cam.nearClipPlane;
+		svc.farClipPlane = cam.farClipPlane;
+		sv.size = Mathf.Sqrt(svc.aspect) / 0.7071068f;
+		sv.pivot = cam.transform.position;
+		sv.rotation = cam.transform.rotation;
+		sv.orthographic = true;
+		sv.Repaint();
+	}
+
+	[MenuItem("NGUI/Extras/Align Scene View to UI", true, 10)]
+	static public bool AlignSVToUICheck ()
+	{
+		if (SceneView.lastActiveSceneView == null) return false;
+		if (UICamera.list.size == 0) return false;
+		
+		GameObject go = Selection.activeGameObject ?? UICamera.list[0].gameObject;
+		if (go == null) return false;
+		
+		Camera cam = NGUITools.FindCameraForLayer(go.layer);
+		if (cam == null || !cam.orthographic) return false;
+		return true;
+	}
+
+	[MenuItem("GameObject/Align View To Selected UI", false, 999)]
+	static public void AlignSVWithSelectedUI () { AlignSVToUI(); }
+
+	[MenuItem("GameObject/Align View To Selected UI", true, 999)]
+	static public bool AlignSVWithSelectedUICheck ()
+	{
+		GameObject go = Selection.activeGameObject;
+		if (go == null) return false;
+		return AlignSVToUICheck();
+	}
 #endregion
 
 	[MenuItem("NGUI/Normalize Depth Hierarchy &#0", false, 11)]

@@ -3,8 +3,6 @@
 // Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
-#if !UNITY_3_5 && !UNITY_4_0 && !UNITY_4_1 && !UNITY_4_2
-
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -23,6 +21,7 @@ public class UI2DSprite : UIBasicSprite
 	[HideInInspector][SerializeField] Material mMat;
 	[HideInInspector][SerializeField] Shader mShader;
 	[HideInInspector][SerializeField] Vector4 mBorder = Vector4.zero;
+	[HideInInspector][SerializeField] bool mFixedAspect = false;
 
 	/// <summary>
 	/// To be used with animations.
@@ -49,7 +48,7 @@ public class UI2DSprite : UIBasicSprite
 				RemoveFromPanel();
 				mSprite = value;
 				nextSprite = null;
-				MarkAsChanged();
+				CreatePanel();
 			}
 		}
 	}
@@ -196,10 +195,20 @@ public class UI2DSprite : UIBasicSprite
 				}
 			}
 
-			Vector4 br = border;
+			float fw, fh;
 
-			float fw = br.x + br.z;
-			float fh = br.y + br.w;
+			if (mFixedAspect)
+			{
+				fw = 0f;
+				fh = 0f;
+			}
+			else
+			{
+				Vector4 br = border;
+				fw = br.x + br.z;
+				fh = br.y + br.w;
+			}
+
 			float vx = Mathf.Lerp(x0, x1 - fw, mDrawRegion.x);
 			float vy = Mathf.Lerp(y0, y1 - fh, mDrawRegion.y);
 			float vz = Mathf.Lerp(x0 + fw, x1, mDrawRegion.z);
@@ -244,6 +253,40 @@ public class UI2DSprite : UIBasicSprite
 			nextSprite = null;
 		}
 		base.OnUpdate();
+
+		if (mFixedAspect)
+		{
+			Texture tex = mainTexture;
+
+			if (tex != null)
+			{
+				int w = Mathf.RoundToInt(mSprite.rect.width);
+				int h = Mathf.RoundToInt(mSprite.rect.height);
+				int padLeft = Mathf.RoundToInt(mSprite.textureRectOffset.x);
+				int padBottom = Mathf.RoundToInt(mSprite.textureRectOffset.y);
+				int padRight = Mathf.RoundToInt(mSprite.rect.width - mSprite.textureRect.width - mSprite.textureRectOffset.x);
+				int padTop = Mathf.RoundToInt(mSprite.rect.height - mSprite.textureRect.height - mSprite.textureRectOffset.y);
+
+				w += padLeft + padRight;
+				h += padTop + padBottom;
+
+				float widgetWidth = mWidth;
+				float widgetHeight = mHeight;
+				float widgetAspect = widgetWidth / widgetHeight;
+				float textureAspect = (float)w / h;
+
+				if (textureAspect < widgetAspect)
+				{
+					float x = (widgetWidth - widgetHeight * textureAspect) / widgetWidth * 0.5f;
+					drawRegion = new Vector4(x, 0f, 1f - x, 1f);
+				}
+				else
+				{
+					float y = (widgetHeight - widgetWidth / textureAspect) / widgetHeight * 0.5f;
+					drawRegion = new Vector4(0f, y, 1f, 1f - y);
+				}
+			}
+		}
 	}
 
 #if UNITY_EDITOR
@@ -320,7 +363,10 @@ public class UI2DSprite : UIBasicSprite
 		inner.yMin *= h;
 		inner.yMax *= h;
 
+		int offset = verts.size;
 		Fill(verts, uvs, cols, outer, inner);
+
+		if (onPostFill != null)
+			onPostFill(this, offset, verts, uvs, cols);
 	}
 }
-#endif

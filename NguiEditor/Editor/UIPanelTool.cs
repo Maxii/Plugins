@@ -189,7 +189,7 @@ public class UIPanelTool : EditorWindow
 			layer = LayerMask.LayerToName(ent.panel.gameObject.layer);
 			depth = ent.panel.depth.ToString();
 			widgetCount = ent.widgets.Count.ToString();
-			drawCalls = ent.panel.drawCalls.size.ToString();
+			drawCalls = ent.panel.drawCalls.Count.ToString();
 			clipping = (ent.panel.clipping != UIDrawCall.Clipping.None) ? "Yes" : "";
 
 			int triangeCount = 0;

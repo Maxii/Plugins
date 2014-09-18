@@ -8,7 +8,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 
 /// <summary>
-/// This improved version of the System.Collections.Generic.List that doesn't release the buffer on Clear(), resulting in better performance and less garbage collection.
+/// This improved version of the System.Collections.Generic.List that doesn't release the buffer on Clear(),
+/// resulting in better performance and less garbage collection.
+/// PRO: BetterList performs faster than List when you Add and Remove items (although slower if you remove from the beginning).
+/// CON: BetterList performs worse when sorting the list. If your operations involve sorting, use the standard List instead.
 /// </summary>
 
 public class BetterList<T>

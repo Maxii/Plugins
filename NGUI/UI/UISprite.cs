@@ -418,6 +418,10 @@ public class UISprite : UIBasicSprite
 		outer = NGUIMath.ConvertToTexCoords(outer, tex.width, tex.height);
 		inner = NGUIMath.ConvertToTexCoords(inner, tex.width, tex.height);
 
+		int offset = verts.size;
 		Fill(verts, uvs, cols, outer, inner);
+
+		if (onPostFill != null)
+			onPostFill(this, offset, verts, uvs, cols);
 	}
 }

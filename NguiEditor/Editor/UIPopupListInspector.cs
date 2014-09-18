@@ -132,6 +132,7 @@ public class UIPopupListInspector : UIWidgetContainerEditor
 
 		NGUIEditorTools.DrawProperty("Position", serializedObject, "position");
 		NGUIEditorTools.DrawProperty("Alignment", serializedObject, "alignment");
+		NGUIEditorTools.DrawProperty("Open on", serializedObject, "openOn");
 		NGUIEditorTools.DrawProperty("Localized", serializedObject, "isLocalized");
 
 		DrawAtlas();

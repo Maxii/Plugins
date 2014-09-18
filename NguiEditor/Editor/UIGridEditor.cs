@@ -7,11 +7,7 @@ using UnityEngine;
 using UnityEditor;
 
 [CanEditMultipleObjects]
-#if UNITY_3_5
-[CustomEditor(typeof(UIGrid))]
-#else
 [CustomEditor(typeof(UIGrid), true)]
-#endif
 public class UIGridEditor : UIWidgetContainerEditor
 {
 	public override void OnInspectorGUI ()
