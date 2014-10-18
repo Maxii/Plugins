@@ -225,6 +225,7 @@ public class UIToggle : UIWidgetContainer
 
 			if (current == null)
 			{
+				UIToggle tog = current;
 				current = this;
 
 				if (EventDelegate.IsValid(onChange))
@@ -236,7 +237,7 @@ public class UIToggle : UIWidgetContainer
 					// Legacy functionality support (for backwards compatibility)
 					eventReceiver.SendMessage(functionName, mIsActive, SendMessageOptions.DontRequireReceiver);
 				}
-				current = null;
+				current = tog;
 			}
 
 			// Play the checkmark animation

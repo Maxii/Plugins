@@ -22,6 +22,7 @@ public class UI2DSprite : UIBasicSprite
 	[HideInInspector][SerializeField] Shader mShader;
 	[HideInInspector][SerializeField] Vector4 mBorder = Vector4.zero;
 	[HideInInspector][SerializeField] bool mFixedAspect = false;
+	[HideInInspector][SerializeField] float mPixelSize = 1f;
 
 	/// <summary>
 	/// To be used with animations.
@@ -133,6 +134,12 @@ public class UI2DSprite : UIBasicSprite
 			return (mPMA == 1);
 		}
 	}
+
+	/// <summary>
+	/// Size of the pixel -- used for drawing.
+	/// </summary>
+
+	override public float pixelSize { get { return mPixelSize; } }
 
 	/// <summary>
 	/// Widget's dimensions used for drawing. X = left, Y = bottom, Z = right, W = top.
@@ -342,7 +349,7 @@ public class UI2DSprite : UIBasicSprite
 		Texture tex = mainTexture;
 		if (tex == null) return;
 
-		Rect outer = mSprite.textureRect;
+		Rect outer = (mSprite != null) ? mSprite.textureRect : new Rect(0f, 0f, tex.width, tex.height);
 		Rect inner = outer;
 		Vector4 br = border;
 		inner.xMin += br.x;

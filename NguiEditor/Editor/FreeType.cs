@@ -460,7 +460,7 @@ static public class FreeType
 	/// Create a bitmap font from the specified dynamic font.
 	/// </summary>
 
-	static public bool CreateFont (Font ttf, int size, int faceIndex, bool kerning, string characters, out BMFont font, out Texture2D tex)
+	static public bool CreateFont (Font ttf, int size, int faceIndex, bool kerning, string characters, int padding, out BMFont font, out Texture2D tex)
 	{
 		font = null;
 		tex = null;
@@ -596,7 +596,7 @@ static public class FreeType
 
 			// Create a packed texture with all the characters
 			tex = new Texture2D(32, 32, TextureFormat.ARGB32, false);
-			Rect[] rects = tex.PackTextures(textures.ToArray(), 1);
+			Rect[] rects = tex.PackTextures(textures.ToArray(), padding);
 
 			// Make the RGB channel pure white
 			Color32[] cols = tex.GetPixels32();

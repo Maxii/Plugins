@@ -3,7 +3,7 @@
 // Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
-#if !UNITY_3_5 && !UNITY_FLASH
+#if !UNITY_3_5
 #define DYNAMIC_FONT
 #endif
 
@@ -150,7 +150,7 @@ public class UILabel : UIWidget
 		{
 			if (mMaterial != value)
 			{
-				MarkAsChanged();
+				RemoveFromPanel();
 				mMaterial = value;
 				MarkAsChanged();
 			}
@@ -821,8 +821,11 @@ public class UILabel : UIWidget
 				// Font hasn't been used yet? Register a change delegate callback
 				if (!mFontUsage.TryGetValue(mActiveTTF, out usage))
 					mActiveTTF.textureRebuildCallback = OnFontTextureChanged;
-
+#if UNITY_FLASH
+				mFontUsage[mActiveTTF] = usage + 1;
+#else
 				mFontUsage[mActiveTTF] = ++usage;
+#endif
 			}
 		}
 	}

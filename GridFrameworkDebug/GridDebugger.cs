@@ -1,11 +1,11 @@
 using UnityEngine;
-using System.Collections;
+using GridFramework;
 
 public class GridDebugger : MonoBehaviour {
 	public bool toggleDebugging = false;
 	public bool printLogs = true;
 	public GFGrid theGrid;
-	public GFGrid.GridPlane debuggedPlane = GFGrid.GridPlane.XY;
+	public GridPlane debuggedPlane = GridPlane.XY;
 	public enum GridFunction {NearestVertexW, NearestFaceW, NearestBoxW, WorldToGrid, GridToWorld};
 	public GridFunction debuggedFunction = GridFunction.NearestBoxW;
 	public Color debugColor = Color.red;

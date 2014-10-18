@@ -1,6 +1,4 @@
 using UnityEngine;
-using System.Collections;
-
 public class HexConversionDebugger : MonoBehaviour {
 
 	public enum CoordinateSystem {world, herringOdd, rhombic};
@@ -30,8 +28,8 @@ public class HexConversionDebugger : MonoBehaviour {
 		Vector4 cubic = grid.WorldToCubic (_transform.position);
 
 		if (coordinateSystem == CoordinateSystem.herringOdd) {
-			Vector3 herring = grid.WorldToHerringOdd (_transform.position);
-			Debug.Log ("Herring: " + herring + "; Cubic: " + cubic + "; disrepancy: " + (cubic - grid.HerringOddToCubic(herring)) + " with cubic " + grid.HerringOddToCubic(herring));
+			Vector3 herring = grid.WorldToHerringU (_transform.position);
+			Debug.Log ("Herring: " + herring + "; Cubic: " + cubic + "; disrepancy: " + (cubic - grid.HerringUToCubic(herring)) + " with cubic " + grid.HerringUToCubic(herring));
 		} else if (coordinateSystem == CoordinateSystem.rhombic) {
 			Vector3 rhombic = grid.WorldToRhombic (_transform.position);
 			Debug.Log ("Rhombic: " + rhombic + "; Cubic: " + cubic + "; disrepancy: " + (cubic - grid.RhombicToCubic (rhombic)) + " with cubic " + grid.RhombicToCubic (rhombic));

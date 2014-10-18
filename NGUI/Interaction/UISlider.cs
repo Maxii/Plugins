@@ -112,6 +112,7 @@ public class UISlider : UIProgressBar
 	protected void OnPressForeground (GameObject go, bool isPressed)
 	{
 		if (UICamera.currentScheme == UICamera.ControlScheme.Controller) return;
+		mCam = UICamera.currentCamera;
 
 		if (isPressed)
 		{

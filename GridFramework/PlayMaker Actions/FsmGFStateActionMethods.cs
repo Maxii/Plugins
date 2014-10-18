@@ -141,9 +141,9 @@ namespace HutongGames.PlayMaker.Actions {
 	public class WorldToHerringOdd : FsmGFStateActionMethodHex {
 		[RequiredField]
 		public FsmVector3 world;
-		public FsmVector3 herringOdd;
+		public FsmVector3 herringUp;
 
-		protected override void DoAction(){ herringOdd.Value = grid.WorldToHerringOdd(world.Value); }
+		protected override void DoAction(){ herringUp.Value = grid.WorldToHerringU(world.Value); }
 	}
 
 	[Tooltip("Converts world coordinates to rhombic coordinates")]
@@ -160,19 +160,19 @@ namespace HutongGames.PlayMaker.Actions {
 	[Tooltip("Converts odd herring coordinates to world coordinates")]
 	public class HerringOddToWorld : FsmGFStateActionMethodHex {
 		[RequiredField]
-		public FsmVector3 herringOdd;
+		public FsmVector3 herringUp;
 		public FsmVector3 world;
 
-		protected override void DoAction(){ world.Value = grid.HerringOddToWorld(herringOdd.Value); }
+		protected override void DoAction(){ world.Value = grid.HerringUToWorld(herringUp.Value); }
 	}
 
 	[Tooltip("Converts odd herring coordinates to rhombic coordinates")]
 	public class HerringOddToRhombic : FsmGFStateActionMethodHex {
 		[RequiredField]
-		public FsmVector3 herringOdd;
+		public FsmVector3 herringUp;
 		public FsmVector3 rhombic;
 
-		protected override void DoAction(){ rhombic.Value = grid.HerringOddToRhombic(herringOdd.Value); }
+		protected override void DoAction(){ rhombic.Value = grid.HerringUToRhombic(herringUp.Value); }
 	}
 
 	/// @todo Implement HerringOddToCubic
@@ -190,9 +190,9 @@ namespace HutongGames.PlayMaker.Actions {
 	public class RhombicToHerringOdd : FsmGFStateActionMethodHex {
 		[RequiredField]
 		public FsmVector3 rhombic;
-		public FsmVector3 herringOdd;
+		public FsmVector3 herringUp;
 
-		protected override void DoAction() { herringOdd.Value = grid.RhombicToHerringOdd(rhombic.Value); }
+		protected override void DoAction() { herringUp.Value = grid.RhombicToHerringU(rhombic.Value); }
 	}
 
 	/// @todo Implement RhombicToCubic

@@ -90,6 +90,8 @@ public class TypewriterEffect : MonoBehaviour
 		Finish();
 		mReset = true;
 		mActive = true;
+		mNextChar = 0f;
+		mCurrentOffset = 0;
 	}
 
 	/// <summary>

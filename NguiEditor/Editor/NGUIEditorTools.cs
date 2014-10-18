@@ -1600,6 +1600,7 @@ public static class NGUIEditorTools
 			for (int b = 0; b < p.widgets.Count; ++b)
 			{
 				UIWidget w = p.widgets[b];
+				if (!w.isVisible) continue;
 				Vector3[] corners = w.worldCorners;
 				if (SceneViewDistanceToRectangle(corners, mousePos) == 0f)
 					list.Add(w);

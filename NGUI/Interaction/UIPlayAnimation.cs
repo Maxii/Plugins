@@ -182,15 +182,24 @@ public class UIPlayAnimation : MonoBehaviour
 	void OnPress (bool isPressed)
 	{
 		if (!enabled) return;
+		if (UICamera.currentTouchID < -1) return;
 		if ( trigger == Trigger.OnPress ||
 			(trigger == Trigger.OnPressTrue && isPressed) ||
 			(trigger == Trigger.OnPressFalse && !isPressed))
 			Play(isPressed, dualState);
 	}
 
-	void OnClick () { if (enabled && trigger == Trigger.OnClick) Play(true, false); }
+	void OnClick ()
+	{
+		if (UICamera.currentTouchID < -1) return;
+		if (enabled && trigger == Trigger.OnClick) Play(true, false);
+	}
 
-	void OnDoubleClick () { if (enabled && trigger == Trigger.OnDoubleClick) Play(true, false); }
+	void OnDoubleClick ()
+	{
+		if (UICamera.currentTouchID < -1) return;
+		if (enabled && trigger == Trigger.OnDoubleClick) Play(true, false);
+	}
 
 	void OnSelect (bool isSelected)
 	{

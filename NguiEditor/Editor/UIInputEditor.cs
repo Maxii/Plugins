@@ -57,7 +57,9 @@ public class UIInputEditor : UIWidgetContainerEditor
 			NGUIEditorTools.DrawPaddedProperty("Mobile Keyboard", serializedObject, "keyboardType");
 			NGUIEditorTools.DrawPaddedProperty("  Hide Input", serializedObject, "hideInput");
 			NGUIEditorTools.DrawPaddedProperty(serializedObject, "onReturnKey");
-			NGUIEditorTools.DrawProperty(serializedObject, "selectOnTab");
+
+			// Deprecated, use UIKeyNavigation instead.
+			//NGUIEditorTools.DrawProperty(serializedObject, "selectOnTab");
 
 			SerializedProperty sp = serializedObject.FindProperty("characterLimit");
 

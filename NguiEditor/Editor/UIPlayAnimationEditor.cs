@@ -11,8 +11,8 @@ public class UIPlayAnimationEditor : Editor
 {
 	enum ResetOnPlay
 	{
-		Continue,
-		StartFromBeginning,
+		ContinueFromCurrent,
+		RestartAnimation,
 	}
 
 	enum SelectedObject
@@ -48,8 +48,8 @@ public class UIPlayAnimationEditor : Editor
 		SelectedObject so = pa.clearSelection ? SelectedObject.SetToNothing : SelectedObject.KeepCurrent;
 		bool clear = (SelectedObject)EditorGUILayout.EnumPopup("Selected object", so) == SelectedObject.SetToNothing;
 		AnimationOrTween.EnableCondition enab = (AnimationOrTween.EnableCondition)EditorGUILayout.EnumPopup("If disabled on start", pa.ifDisabledOnPlay);
-		ResetOnPlay rs = pa.resetOnPlay ? ResetOnPlay.StartFromBeginning : ResetOnPlay.Continue;
-		bool reset = (ResetOnPlay)EditorGUILayout.EnumPopup("If already playing", rs) == ResetOnPlay.StartFromBeginning;
+		ResetOnPlay rs = pa.resetOnPlay ? ResetOnPlay.RestartAnimation : ResetOnPlay.ContinueFromCurrent;
+		bool reset = (ResetOnPlay)EditorGUILayout.EnumPopup("On activation", rs) == ResetOnPlay.RestartAnimation;
 		AnimationOrTween.DisableCondition dis = (AnimationOrTween.DisableCondition)EditorGUILayout.EnumPopup("When finished", pa.disableWhenFinished);
 		EditorGUI.EndDisabledGroup();
 

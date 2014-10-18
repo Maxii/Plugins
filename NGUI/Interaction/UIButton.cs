@@ -263,7 +263,7 @@ public class UIButton : UIButtonColor
 			switch (state)
 			{
 				case State.Normal: SetSprite(mNormalSprite); break;
-				case State.Hover: SetSprite(hoverSprite); break;
+				case State.Hover: SetSprite(string.IsNullOrEmpty(hoverSprite) ? mNormalSprite : hoverSprite); break;
 				case State.Pressed: SetSprite(pressedSprite); break;
 				case State.Disabled: SetSprite(disabledSprite); break;
 			}
@@ -273,7 +273,7 @@ public class UIButton : UIButtonColor
 			switch (state)
 			{
 				case State.Normal: SetSprite(mNormalSprite2D); break;
-				case State.Hover: SetSprite(hoverSprite2D); break;
+				case State.Hover: SetSprite(hoverSprite2D == null ? mNormalSprite2D : hoverSprite2D); break;
 				case State.Pressed: SetSprite(pressedSprite2D); break;
 				case State.Disabled: SetSprite(disabledSprite2D); break;
 			}

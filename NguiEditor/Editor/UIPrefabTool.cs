@@ -374,6 +374,24 @@ public class UIPrefabTool : EditorWindow
 	}
 
 	/// <summary>
+	/// GetComponentInChildren doesn't work on prefabs.
+	/// </summary>
+
+	static UISnapshotPoint GetSnapshotPoint (Transform t)
+	{
+		UISnapshotPoint point = t.GetComponent<UISnapshotPoint>();
+		if (point != null) return point;
+		
+		for (int i = 0, imax = t.childCount; i < imax; ++i)
+		{
+			Transform c = t.GetChild(i);
+			point = GetSnapshotPoint(c);
+			if (point != null) return point;
+		}
+		return null;
+	}
+
+	/// <summary>
 	/// Generate an item preview for the specified item.
 	/// </summary>
 
@@ -381,9 +399,19 @@ public class UIPrefabTool : EditorWindow
 	{
 		if (item == null || item.prefab == null) return;
 
-		// Render textures only work in Unity Pro
-		if (!UnityEditorInternal.InternalEditorUtility.HasPro())
+		if (point == null) point = GetSnapshotPoint(item.prefab.transform);
+
+		if (point != null && point.thumbnail != null)
 		{
+			Debug.Log(2);
+			// Explicitly chosen thumbnail
+			item.tex = point.thumbnail;
+			item.dynamicTex = false;
+			return;
+		}
+		else if (!UnityEditorInternal.InternalEditorUtility.HasPro())
+		{
+			// Render textures only work in Unity Pro
 			string path = "Assets/NGUI/Editor/Preview/" + item.prefab.name + ".png";
 			item.tex = File.Exists(path) ? (Texture2D)Resources.LoadAssetAtPath(path, typeof(Texture2D)) : null;
 			item.dynamicTex = false;

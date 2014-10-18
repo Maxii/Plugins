@@ -40,6 +40,8 @@ public class UI2DSpriteEditor : UIBasicSpriteEditor
 			NGUIEditorTools.DrawProperty("Shader", serializedObject, "mShader");
 		}
 
+		NGUIEditorTools.DrawProperty("Pixel Size", serializedObject, "mPixelSize");
+
 		SerializedProperty fa = serializedObject.FindProperty("mFixedAspect");
 		bool before = fa.boolValue;
 		NGUIEditorTools.DrawProperty("Fixed Aspect", fa);

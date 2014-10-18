@@ -10,25 +10,47 @@ using UnityEditor;
 [CustomEditor(typeof(UISnapshotPoint), true)]
 public class UISnapshotPointEditor : Editor
 {
+	enum Type
+	{
+		Manual,
+		Automatic,
+	}
+
+	Type mType = Type.Automatic;
+
+	void OnEnable ()
+	{
+		mType = (target as UISnapshotPoint).thumbnail == null ? Type.Automatic : Type.Manual;
+	}
+
 	public override void OnInspectorGUI ()
 	{
+		mType = (Type)EditorGUILayout.EnumPopup("Type", mType);
+
 		serializedObject.Update();
 
-		SerializedProperty sp = NGUIEditorTools.DrawProperty("Orthographic", serializedObject, "isOrthographic");
-
-		if (sp.hasMultipleDifferentValues)
+		if (mType == Type.Manual)
 		{
-			NGUIEditorTools.DrawProperty("Ortho Size", serializedObject, "orthoSize");
-			NGUIEditorTools.DrawProperty("Field of View", serializedObject, "fieldOfView");
+			NGUIEditorTools.DrawProperty("Thumbnail", serializedObject, "thumbnail");
 		}
-		else if (sp.boolValue)
+		else
 		{
-			NGUIEditorTools.DrawProperty("Ortho Size", serializedObject, "orthoSize");
-		}
-		else NGUIEditorTools.DrawProperty("Field of View", serializedObject, "fieldOfView");
+			SerializedProperty sp = NGUIEditorTools.DrawProperty("Orthographic", serializedObject, "isOrthographic");
 
-		NGUIEditorTools.DrawProperty("Near Clip", serializedObject, "nearClip");
-		NGUIEditorTools.DrawProperty("Far Clip", serializedObject, "farClip");
+			if (sp.hasMultipleDifferentValues)
+			{
+				NGUIEditorTools.DrawProperty("Ortho Size", serializedObject, "orthoSize");
+				NGUIEditorTools.DrawProperty("Field of View", serializedObject, "fieldOfView");
+			}
+			else if (sp.boolValue)
+			{
+				NGUIEditorTools.DrawProperty("Ortho Size", serializedObject, "orthoSize");
+			}
+			else NGUIEditorTools.DrawProperty("Field of View", serializedObject, "fieldOfView");
+
+			NGUIEditorTools.DrawProperty("Near Clip", serializedObject, "nearClip");
+			NGUIEditorTools.DrawProperty("Far Clip", serializedObject, "farClip");
+		}
 
 		serializedObject.ApplyModifiedProperties();
 

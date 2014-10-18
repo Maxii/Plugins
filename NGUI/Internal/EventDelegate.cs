@@ -105,9 +105,9 @@ public class EventDelegate
 #else // REFLECTION_SUPPORT
 		public object value { get { if (mValue != null) return mValue; return obj; } }
  #if UNITY_EDITOR || !UNITY_FLASH
-		public System.Type type { get { if (mValue != null) return mValue.GeType(); return typeof(void); } }
+		public System.Type type { get { if (mValue != null) return mValue.GetType(); return typeof(void); } }
  #else
-		public System.Type type { get { if (mValue != null) return mValue.GeType(); return null; } }
+		public System.Type type { get { if (mValue != null) return mValue.GetType(); return null; } }
  #endif
 #endif
 	}
@@ -613,6 +613,7 @@ public class EventDelegate
 
 				if (del != null)
 				{
+#if !UNITY_EDITOR && !UNITY_FLASH
 					try
 					{
 						del.Execute();
@@ -622,6 +623,9 @@ public class EventDelegate
 						if (ex.InnerException != null) Debug.LogError(ex.InnerException.Message);
 						else Debug.LogError(ex.Message);
 					}
+#else
+					del.Execute();
+#endif
 
 					if (i >= list.Count) break;
 					if (list[i] != del) continue;

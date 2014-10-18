@@ -69,16 +69,16 @@ public class PropertyBinding : MonoBehaviour
 
 	void Update ()
 	{
-		if (update == UpdateCondition.OnUpdate) UpdateTarget();
 #if UNITY_EDITOR
-		else if (editMode && !Application.isPlaying) UpdateTarget();
+		if (!editMode && !Application.isPlaying) return;
 #endif
+		if (update == UpdateCondition.OnUpdate) UpdateTarget();
 	}
 
 	void LateUpdate ()
 	{
 #if UNITY_EDITOR
-		if (!Application.isPlaying) return;
+		if (!editMode && !Application.isPlaying) return;
 #endif
 		if (update == UpdateCondition.OnLateUpdate) UpdateTarget();
 	}
@@ -86,7 +86,7 @@ public class PropertyBinding : MonoBehaviour
 	void FixedUpdate ()
 	{
 #if UNITY_EDITOR
-		if (!Application.isPlaying) return;
+		if (!editMode && !Application.isPlaying) return;
 #endif
 		if (update == UpdateCondition.OnFixedUpdate) UpdateTarget();
 	}

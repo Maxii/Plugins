@@ -72,8 +72,10 @@ public class UIWidget : UIRect
 		{
 			if (mOnRender != value)
 			{
+#if !UNITY_FLASH
 				if (drawCall != null && drawCall.onRender != null && mOnRender != null)
 					drawCall.onRender -= mOnRender;
+#endif
 				mOnRender = value;
 				if (drawCall != null) drawCall.onRender += value;
 			}

@@ -23,8 +23,11 @@ public class UIEventTrigger : MonoBehaviour
 	public List<EventDelegate> onDeselect = new List<EventDelegate>();
 	public List<EventDelegate> onClick = new List<EventDelegate>();
 	public List<EventDelegate> onDoubleClick = new List<EventDelegate>();
+	public List<EventDelegate> onDragStart = new List<EventDelegate>();
+	public List<EventDelegate> onDragEnd = new List<EventDelegate>();
 	public List<EventDelegate> onDragOver = new List<EventDelegate>();
 	public List<EventDelegate> onDragOut = new List<EventDelegate>();
+	public List<EventDelegate> onDrag = new List<EventDelegate>();
 
 	void OnHover (bool isOver)
 	{
@@ -69,6 +72,22 @@ public class UIEventTrigger : MonoBehaviour
 		current = null;
 	}
 
+	void OnDragStart (GameObject go)
+	{
+		if (current != null) return;
+		current = this;
+		EventDelegate.Execute(onDragStart);
+		current = null;
+	}
+
+	void OnDragEnd (GameObject go)
+	{
+		if (current != null) return;
+		current = this;
+		EventDelegate.Execute(onDragEnd);
+		current = null;
+	}
+
 	void OnDragOver (GameObject go)
 	{
 		if (current != null) return;
@@ -78,6 +97,14 @@ public class UIEventTrigger : MonoBehaviour
 	}
 
 	void OnDragOut (GameObject go)
+	{
+		if (current != null) return;
+		current = this;
+		EventDelegate.Execute(onDragOut);
+		current = null;
+	}
+
+	void OnDrag (Vector2 delta)
 	{
 		if (current != null) return;
 		current = this;

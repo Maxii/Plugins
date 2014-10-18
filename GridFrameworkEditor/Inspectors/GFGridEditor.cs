@@ -56,21 +56,23 @@ public abstract class GFGridEditor : Editor {
 		GUILayout.Label("Axis Colors");
 		
 		EditorGUILayout.BeginHorizontal();
-		++EditorGUI.indentLevel;
-		grid.axisColors.x = EditorGUILayout.ColorField(grid.axisColors.x);
-		grid.axisColors.y = EditorGUILayout.ColorField(grid.axisColors.y);
-		grid.axisColors.z = EditorGUILayout.ColorField(grid.axisColors.z);
+		++EditorGUI.indentLevel; {
+			grid.axisColors.x = EditorGUILayout.ColorField(grid.axisColors.x);
+			grid.axisColors.y = EditorGUILayout.ColorField(grid.axisColors.y);
+			grid.axisColors.z = EditorGUILayout.ColorField(grid.axisColors.z);
+		}
 		--EditorGUI.indentLevel;
 		EditorGUILayout.EndHorizontal();
 		
 		grid.useSeparateRenderColor = EditorGUILayout.Foldout(grid.useSeparateRenderColor, "Use Separate Render Color");
 		if(grid.useSeparateRenderColor){
 			GUILayout.Label("Render Axis Colors");
-			EditorGUILayout.BeginHorizontal();
+			EditorGUILayout.BeginHorizontal(); {
 			++EditorGUI.indentLevel;
-			grid.renderAxisColors.x = EditorGUILayout.ColorField(grid.renderAxisColors.x);
-			grid.renderAxisColors.y = EditorGUILayout.ColorField(grid.renderAxisColors.y);
-			grid.renderAxisColors.z = EditorGUILayout.ColorField(grid.renderAxisColors.z);
+				grid.renderAxisColors.x = EditorGUILayout.ColorField(grid.renderAxisColors.x);
+				grid.renderAxisColors.y = EditorGUILayout.ColorField(grid.renderAxisColors.y);
+				grid.renderAxisColors.z = EditorGUILayout.ColorField(grid.renderAxisColors.z);
+			}
 			--EditorGUI.indentLevel;
 		EditorGUILayout.EndHorizontal();
 		}		

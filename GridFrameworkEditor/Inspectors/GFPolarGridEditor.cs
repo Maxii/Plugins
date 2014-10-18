@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEditor;
-using System.Collections;
+using GridFramework;
 
 [CustomEditor (typeof(GFPolarGrid))]
 public class GFPolarGridEditor : GFGridEditor {
@@ -16,7 +16,7 @@ public class GFPolarGridEditor : GFGridEditor {
 		pGrid.sectors = EditorGUILayout.IntField("Sectors", pGrid.sectors);
 		EditorGUILayout.LabelField("Angle / Deg Angle", ""+ pGrid.angle / Mathf.PI + "\u03c0 = " + pGrid.angleDeg + "\u00b0");
 		pGrid.depth = EditorGUILayout.FloatField("Depth", pGrid.depth);
-		pGrid.gridPlane = (GFGrid.GridPlane) EditorGUILayout.EnumPopup("Grid Plane", pGrid.gridPlane);
+		pGrid.gridPlane = (GridPlane) EditorGUILayout.EnumPopup("Grid Plane", pGrid.gridPlane);
 		pGrid.smoothness = EditorGUILayout.IntField("Smoothness", pGrid.smoothness);
 	}
 	

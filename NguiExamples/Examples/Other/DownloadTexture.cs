@@ -14,6 +14,7 @@ using System.Collections;
 public class DownloadTexture : MonoBehaviour
 {
 	public string url = "http://www.yourwebsite.com/logo.png";
+	public bool pixelPerfect = true;
 
 	Texture2D mTex;
 
@@ -27,7 +28,7 @@ public class DownloadTexture : MonoBehaviour
 		{
 			UITexture ut = GetComponent<UITexture>();
 			ut.mainTexture = mTex;
-			ut.MakePixelPerfect();
+			if (pixelPerfect) ut.MakePixelPerfect();
 		}
 		www.Dispose();
 	}

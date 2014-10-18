@@ -202,7 +202,14 @@ public class UIRoot : MonoBehaviour
 	/// Pixel size adjustment. Most of the time it's at 1, unless the scaling style is set to FixedSize.
 	/// </summary>
 
-	public float pixelSizeAdjustment { get { return GetPixelSizeAdjustment(Mathf.RoundToInt(NGUITools.screenSize.y)); } }
+	public float pixelSizeAdjustment
+	{
+		get
+		{
+			int height = Mathf.RoundToInt(NGUITools.screenSize.y);
+			return height == -1 ? 1f : GetPixelSizeAdjustment(height);
+		}
+	}
 
 	/// <summary>
 	/// Helper function that figures out the pixel size adjustment for the specified game object.

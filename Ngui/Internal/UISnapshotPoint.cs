@@ -17,5 +17,7 @@ public class UISnapshotPoint : MonoBehaviour
 	public int fieldOfView = 35;
 	public float orthoSize = 30f;
 
+	public Texture2D thumbnail;
+
 	void Start () { if (tag != "EditorOnly") tag = "EditorOnly"; }
 }

@@ -1,8 +1,7 @@
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
-using System;
-
+using GridFramework.Vectors;
 
 /* THINGS NEEDED
 
@@ -12,6 +11,7 @@ using System;
 
 public class GFGridAlignPanel : EditorWindow {
 	#region class members
+	[SerializeField]
 	GFGrid grid;
 	private Transform gridTransform;
 	private Transform gTrnsfrm {
@@ -21,16 +21,25 @@ public class GFGridAlignPanel : EditorWindow {
 			return gridTransform;
 		}
 	}
+	[SerializeField]
 	bool ignoreRootObjects;
+	[SerializeField]
 	LayerMask affectedLayers;
+	[SerializeField]
 	bool inculdeChildren;
+	[SerializeField]
 	bool rotateTransform = true;
+	[SerializeField]
 	bool autoSnapping = false;
+	[SerializeField]
 	bool autoRotating = false;
-	GFBoolVector3 lockAxes = new GFBoolVector3(false);
+	[SerializeField]
+	BoolVector3 lockAxes = new BoolVector3(false);
 
 	private bool showOffsets = false;
+	[SerializeField]
 	public Vector3 alignOffset = Vector3.zero;
+	[SerializeField]
 	public Vector3 scaleOffset = Vector3.zero;
 	#endregion
 	

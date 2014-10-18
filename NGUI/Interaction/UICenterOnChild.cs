@@ -4,6 +4,7 @@
 //----------------------------------------------
 
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Ever wanted to be able to auto-center on an object within a draggable panel?
@@ -153,17 +154,28 @@ public class UICenterOnChild : MonoBehaviour
 					}
 				}
 
-				if (delta > nextPageThreshold)
+				if (Mathf.Abs(delta) > nextPageThreshold)
 				{
-					// Next page
-					if (index > 0)
-						closest = trans.GetChild(index - 1);
-				}
-				else if (delta < -nextPageThreshold)
-				{
-					// Previous page
-					if (index < trans.childCount - 1)
-						closest = trans.GetChild(index + 1);
+					UIGrid grid = GetComponent<UIGrid>();
+
+					if (grid != null && grid.sorting != UIGrid.Sorting.None)
+					{
+						List<Transform> list = grid.GetChildList();
+
+						if (delta > nextPageThreshold)
+						{
+							// Next page
+							if (index > 0) closest = list[index - 1];
+							else closest = list[0];
+						}
+						else if (delta < -nextPageThreshold)
+						{
+							// Previous page
+							if (index < list.Count - 1) closest = list[index + 1];
+							else closest = list[list.Count - 1];
+						}
+					}
+					else Debug.LogWarning("Next Page Threshold requires a sorted UIGrid in order to work properly", this);
 				}
 			}
 		}
