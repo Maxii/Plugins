@@ -3,7 +3,7 @@
 // Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
-#if !UNITY_3_5 && !UNITY_FLASH
+#if !UNITY_FLASH
 #define DYNAMIC_FONT
 #endif
 
@@ -15,11 +15,7 @@ using UnityEditor;
 /// </summary>
 
 [CanEditMultipleObjects]
-#if UNITY_3_5
-[CustomEditor(typeof(UILabel))]
-#else
 [CustomEditor(typeof(UILabel), true)]
-#endif
 public class UILabelInspector : UIWidgetInspector
 {
 	public enum FontType
@@ -111,6 +107,12 @@ public class UILabelInspector : UIWidgetInspector
 
 		GUILayout.EndHorizontal();
 
+		if (mFontType == FontType.Unity)
+		{
+			EditorGUILayout.HelpBox("Dynamic fonts suffer from issues in Unity itself where your characters may disappear, get garbled, or just not show at times. Use this feature at your own risk.\n\n" +
+				"When you do run into such issues, please submit a Bug Report to Unity via Help -> Report a Bug (as this is will be a Unity bug, not an NGUI one).", MessageType.Warning);
+		}
+
 		EditorGUI.BeginDisabledGroup(!isValid);
 		{
 			UIFont uiFont = (fnt != null) ? fnt.objectReferenceValue as UIFont : null;
@@ -173,8 +175,8 @@ public class UILabelInspector : UIWidgetInspector
 
 				if (height > 90f)
 				{
-				    offset = false;
-				    height = style.CalcHeight(new GUIContent(sp.stringValue), Screen.width - 20f);
+					offset = false;
+					height = style.CalcHeight(new GUIContent(sp.stringValue), Screen.width - 20f);
 				}
 				else
 				{
@@ -251,15 +253,31 @@ public class UILabelInspector : UIWidgetInspector
 			GUILayout.EndHorizontal();
 			EditorGUI.EndDisabledGroup();
 
-			GUILayout.BeginHorizontal();
-			GUILayout.Label("Spacing", GUILayout.Width(56f));
-			NGUIEditorTools.SetLabelWidth(20f);
-			NGUIEditorTools.DrawProperty("X", serializedObject, "mSpacingX", GUILayout.MinWidth(40f));
-			NGUIEditorTools.DrawProperty("Y", serializedObject, "mSpacingY", GUILayout.MinWidth(40f));
-			NGUIEditorTools.DrawPadding();
-			NGUIEditorTools.SetLabelWidth(80f);
-			GUILayout.EndHorizontal();
+			sp = NGUIEditorTools.DrawProperty("Float spacing", serializedObject, "mUseFloatSpacing", GUILayout.Width(100f));
 
+			if (!sp.boolValue)
+			{
+				GUILayout.BeginHorizontal();
+				GUILayout.Label("Spacing", GUILayout.Width(56f));
+				NGUIEditorTools.SetLabelWidth(20f);
+				NGUIEditorTools.DrawProperty("X", serializedObject, "mSpacingX", GUILayout.MinWidth(40f));
+				NGUIEditorTools.DrawProperty("Y", serializedObject, "mSpacingY", GUILayout.MinWidth(40f));
+				NGUIEditorTools.DrawPadding();
+				NGUIEditorTools.SetLabelWidth(80f);
+				GUILayout.EndHorizontal();
+			}
+			else
+			{
+				GUILayout.BeginHorizontal();
+				GUILayout.Label("Spacing", GUILayout.Width(56f));
+				NGUIEditorTools.SetLabelWidth(20f);
+				NGUIEditorTools.DrawProperty("X", serializedObject, "mFloatSpacingX", GUILayout.MinWidth(40f));
+				NGUIEditorTools.DrawProperty("Y", serializedObject, "mFloatSpacingY", GUILayout.MinWidth(40f));
+				NGUIEditorTools.DrawPadding();
+				NGUIEditorTools.SetLabelWidth(80f);
+				GUILayout.EndHorizontal();
+			}
+			
 			NGUIEditorTools.DrawProperty("Max Lines", serializedObject, "mMaxLineCount", GUILayout.Width(110f));
 
 			GUILayout.BeginHorizontal();

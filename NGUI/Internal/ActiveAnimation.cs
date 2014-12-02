@@ -101,6 +101,7 @@ public class ActiveAnimation : MonoBehaviour
 				if (mLastDirection == Direction.Forward) state.time = state.length;
 				else if (mLastDirection == Direction.Reverse) state.time = 0f;
 			}
+			mAnim.Sample();
 		}
 		else if (mAnimator != null)
 		{

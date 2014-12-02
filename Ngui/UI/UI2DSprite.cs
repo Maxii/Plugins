@@ -211,9 +211,9 @@ public class UI2DSprite : UIBasicSprite
 			}
 			else
 			{
-				Vector4 br = border;
-				fw = br.x + br.z;
-				fh = br.y + br.w;
+				Vector4 br = border * pixelSize;
+				fw = (br.x + br.z);
+				fh = (br.y + br.w);
 			}
 
 			float vx = Mathf.Lerp(x0, x1 - fw, mDrawRegion.x);

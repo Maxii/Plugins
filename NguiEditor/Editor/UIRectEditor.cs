@@ -69,7 +69,11 @@ public class UIRectEditor : Editor
 	{
 		Transform target = sp.objectReferenceValue as Transform;
 		if (target == null) return null;
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 		return target.camera;
+#else
+		return target.GetComponent<Camera>();
+#endif
 	}
 
 	/// <summary>
@@ -533,9 +537,15 @@ public class UIRectEditor : Editor
 				anchor.Set(anchor.relative, val);
 			}
 		}
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 		else if (anchor.target.camera != null)
 		{
 			Vector3[] sides = anchor.target.camera.GetSides(parent);
+#else
+		else if (anchor.target.GetComponent<Camera>() != null)
+		{
+			Vector3[] sides = anchor.target.GetComponent<Camera>().GetSides(parent);
+#endif
 			Vector3 side0 = sides[0];
 			Vector3 side1 = sides[2];
 
@@ -612,9 +622,15 @@ public class UIRectEditor : Editor
 				anchor.Set(anchor.relative, val);
 			}
 		}
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 		else if (anchor.target.camera != null)
 		{
 			Vector3[] sides = anchor.target.camera.GetSides(parent);
+#else
+		else if (anchor.target.GetComponent<Camera>() != null)
+		{
+			Vector3[] sides = anchor.target.GetComponent<Camera>().GetSides(parent);
+#endif
 			Vector3 side0 = sides[3];
 			Vector3 side1 = sides[1];
 

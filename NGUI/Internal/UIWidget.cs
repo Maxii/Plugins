@@ -70,7 +70,11 @@ public class UIWidget : UIRect
 		}
 		set
 		{
+#if UNITY_FLASH
+			if (!(mOnRender == value))
+#else
 			if (mOnRender != value)
+#endif
 			{
 #if !UNITY_FLASH
 				if (drawCall != null && drawCall.onRender != null && mOnRender != null)
@@ -609,7 +613,11 @@ public class UIWidget : UIRect
 	{
 		get
 		{
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 			BoxCollider box = collider as BoxCollider;
+#else
+			BoxCollider box = GetComponent<Collider>() as BoxCollider;
+#endif
 			if (box != null) return true;
 			return GetComponent<BoxCollider2D>() != null;
 		}
@@ -1301,11 +1309,15 @@ public class UIWidget : UIRect
 	{
 		get
 		{
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 			if (showHandlesWithMoveTool)
 			{
 				return UnityEditor.Tools.current == UnityEditor.Tool.Move;
 			}
 			return UnityEditor.Tools.current == UnityEditor.Tool.View;
+#else
+			return UnityEditor.Tools.current == UnityEditor.Tool.Rect;
+#endif
 		}
 	}
 

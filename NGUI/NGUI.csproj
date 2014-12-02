@@ -123,6 +123,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Tweening\AnimatedAlpha.cs" />
     <Compile Include="Tweening\AnimatedColor.cs" />
+    <Compile Include="Tweening\AnimatedWidget.cs" />
     <Compile Include="Tweening\SpringPosition.cs" />
     <Compile Include="Tweening\TweenAlpha.cs" />
     <Compile Include="Tweening\TweenColor.cs" />
@@ -143,6 +144,7 @@
     <Compile Include="UI\UICamera.cs" />
     <Compile Include="UI\UIFont.cs" />
     <Compile Include="UI\UIInput.cs" />
+    <Compile Include="UI\UIInputOnGUI.cs" />
     <Compile Include="UI\UILabel.cs" />
     <Compile Include="UI\UILocalize.cs" />
     <Compile Include="UI\UIOrthoCamera.cs" />

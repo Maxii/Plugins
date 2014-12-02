@@ -88,7 +88,11 @@ public class UIButton : UIButtonColor
 		get
 		{
 			if (!enabled) return false;
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 			Collider col = collider;
+#else
+			Collider col = gameObject.GetComponent<Collider>();
+#endif
 			if (col && col.enabled) return true;
 			Collider2D c2d = GetComponent<Collider2D>();
 			return (c2d && c2d.enabled);
@@ -97,8 +101,11 @@ public class UIButton : UIButtonColor
 		{
 			if (isEnabled != value)
 			{
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 				Collider col = collider;
-
+#else
+				Collider col = gameObject.GetComponent<Collider>();
+#endif
 				if (col != null)
 				{
 					col.enabled = value;

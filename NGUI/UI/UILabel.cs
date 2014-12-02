@@ -67,6 +67,9 @@ public class UILabel : UIWidget
 	[HideInInspector][SerializeField] Color mGradientBottom = new Color(0.7f, 0.7f, 0.7f);
 	[HideInInspector][SerializeField] int mSpacingX = 0;
 	[HideInInspector][SerializeField] int mSpacingY = 0;
+	[HideInInspector][SerializeField] bool mUseFloatSpacing = false;
+	[HideInInspector][SerializeField] float mFloatSpacingX = 0;
+	[HideInInspector][SerializeField] float mFloatSpacingY = 0;
 
 	// Obsolete values
 	[HideInInspector][SerializeField] bool mShrinkToFit = false;
@@ -435,6 +438,92 @@ public class UILabel : UIWidget
 				mSpacingY = value;
 				MarkAsChanged();
 			}
+		}
+	}
+
+	/// <summary>
+	/// Whether this label will use float text spacing values, instead of integers.
+	/// </summary>
+
+	public bool useFloatSpacing
+	{
+		get
+		{
+			return mUseFloatSpacing;
+		}
+		set
+		{
+			if (mUseFloatSpacing != value)
+			{
+				mUseFloatSpacing = value;
+				shouldBeProcessed = true;
+			}
+		}
+	}
+
+	/// <summary>
+	/// Additional horizontal spacing between characters when printing text.
+	/// For this to have any effect useFloatSpacing must be true.
+	/// </summary>
+
+	public float floatSpacingX
+	{
+		get
+		{
+			return mFloatSpacingX;
+		}
+		set
+		{
+			if (!Mathf.Approximately(mFloatSpacingX, value))
+			{
+				mFloatSpacingX = value;
+				MarkAsChanged();
+			}
+		}
+	}
+
+	/// <summary>
+	/// Additional vertical spacing between lines when printing text.
+	/// For this to have any effect useFloatSpacing must be true.
+	/// </summary>
+
+	public float floatSpacingY
+	{
+		get
+		{
+			return mFloatSpacingY;
+		}
+		set
+		{
+			if (!Mathf.Approximately(mFloatSpacingY, value))
+			{
+				mFloatSpacingY = value;
+				MarkAsChanged();
+			}
+		}
+	}
+
+	/// <summary>
+	/// Convenience property to get the used y spacing.
+	/// </summary>
+
+	public float effectiveSpacingY
+	{
+		get
+		{
+			return mUseFloatSpacing ? mFloatSpacingY : mSpacingY;
+		}
+	}
+
+	/// <summary>
+	/// Convenience property to get the used x spacing.
+	/// </summary>
+
+	public float effectiveSpacingX
+	{
+		get
+		{
+			return mUseFloatSpacing ? mFloatSpacingX : mSpacingX;
 		}
 	}
 
@@ -1341,9 +1430,13 @@ public class UILabel : UIWidget
 	{
 		if (characterIndex != -1 && characterIndex < mText.Length)
 		{
+#if UNITY_FLASH
+			int wordStart = LastIndexOfAny(mText, new char[] { ' ', '\n' }, characterIndex) + 1;
+			int wordEnd = IndexOfAny(mText, new char[] { ' ', '\n', ',', '.' }, characterIndex);
+#else
 			int wordStart = mText.LastIndexOfAny(new char[] {' ', '\n'}, characterIndex) + 1;
 			int wordEnd = mText.IndexOfAny(new char[] { ' ', '\n', ',', '.' }, characterIndex);
-
+#endif
 			if (wordEnd == -1) wordEnd = mText.Length;
 
 			if (wordStart != wordEnd)
@@ -1359,6 +1452,52 @@ public class UILabel : UIWidget
 		}
 		return null;
 	}
+
+#if UNITY_FLASH
+	/// <summary>
+	/// Flash is fail IRL: http://www.tasharen.com/forum/index.php?topic=11390.0
+	/// </summary>
+
+	int LastIndexOfAny (string input, char[] any, int start)
+	{
+		if (start >= 0 && input.Length > 0 && any.Length > 0 && start < input.Length)
+		{
+			for (int w = start; w >= 0; w--)
+			{
+				for (int r = 0; r < any.Length; r++)
+				{
+					if (any[r] == input[w])
+					{
+						return w;
+					}
+				}
+			}
+		}
+		return -1;
+	}
+
+	/// <summary>
+	/// Flash is fail IRL: http://www.tasharen.com/forum/index.php?topic=11390.0
+	/// </summary>
+
+	int IndexOfAny (string input, char[] any, int start)
+	{
+		if (start >= 0 && input.Length > 0 && any.Length > 0 && start < input.Length)
+		{
+			for (int w = start; w < input.Length; w++)
+			{
+				for (int r = 0; r < any.Length; r++)
+				{
+					if (any[r] == input[w])
+					{
+						return w;
+					}
+				}
+			}
+		}
+		return -1;
+	}
+#endif
 
 	/// <summary>
 	/// Retrieve the URL directly below the specified world-space position.
@@ -1433,8 +1572,8 @@ public class UILabel : UIWidget
 						// Determine position on the line above or below this character
 						Vector2 localPos = mTempVerts[i];
 
-						if (key == KeyCode.UpArrow) localPos.y += def + spacingY;
-						else if (key == KeyCode.DownArrow) localPos.y -= def + spacingY;
+						if (key == KeyCode.UpArrow) localPos.y += def + effectiveSpacingY;
+						else if (key == KeyCode.DownArrow) localPos.y -= def + effectiveSpacingY;
 						else if (key == KeyCode.Home) localPos.x -= 1000f;
 						else if (key == KeyCode.End) localPos.x += 1000f;
 
@@ -1754,8 +1893,8 @@ public class UILabel : UIWidget
 		NGUIText.premultiply = mPremultiply;
 		NGUIText.symbolStyle = mSymbols;
 		NGUIText.maxLines = mMaxLineCount;
-		NGUIText.spacingX = mSpacingX;
-		NGUIText.spacingY = mSpacingY;
+		NGUIText.spacingX = effectiveSpacingX;
+		NGUIText.spacingY = effectiveSpacingY;
 		NGUIText.fontScale = isDynamic ? mScale : ((float)mFontSize / mFont.defaultSize) * mScale;
 
 		if (mFont != null)

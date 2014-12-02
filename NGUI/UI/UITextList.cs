@@ -106,7 +106,7 @@ public class UITextList : MonoBehaviour
 	/// Height of each line.
 	/// </summary>
 
-	protected float lineHeight { get { return (textLabel != null) ? textLabel.fontSize + textLabel.spacingY : 20f; } }
+	protected float lineHeight { get { return (textLabel != null) ? textLabel.fontSize + textLabel.effectiveSpacingY : 20f; } }
 
 	/// <summary>
 	/// Height of the scrollable area (outside of the visible area's bounds).

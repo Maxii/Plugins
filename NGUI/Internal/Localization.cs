@@ -293,7 +293,7 @@ public static class Localization
 
 	static void AddCSV (BetterList<string> values)
 	{
-		if (values.size < 2) return;
+		if (values.size < 2 || string.IsNullOrEmpty(values[0])) return;
 		string[] temp = new string[values.size - 1];
 		for (int i = 1; i < values.size; ++i) temp[i - 1] = values[i];
 		

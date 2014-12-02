@@ -119,7 +119,11 @@ public abstract class UIRect : MonoBehaviour
 			if (target != null)
 			{
 				if (rect != null) return rect.GetSides(relativeTo);
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 				if (target.camera != null) return target.camera.GetSides(relativeTo);
+#else
+				if (target.GetComponent<Camera>() != null) return target.GetComponent<Camera>().GetSides(relativeTo);
+#endif
 			}
 			return null;
 		}
@@ -172,18 +176,16 @@ public abstract class UIRect : MonoBehaviour
 	[System.NonSerialized] bool mUpdateAnchors = true;
 	[System.NonSerialized] int mUpdateFrame = -1;
 	[System.NonSerialized] bool mAnchorsCached = false;
+	[System.NonSerialized] UIRoot mRoot;
+	[System.NonSerialized] UIRect mParent;
+	[System.NonSerialized] bool mRootSet = false;
+	[System.NonSerialized] protected Camera mCam;
 
 	/// <summary>
 	/// Final calculated alpha.
 	/// </summary>
 
-	[System.NonSerialized]
-	public float finalAlpha = 1f;
-
-	UIRoot mRoot;
-	UIRect mParent;
-	bool mRootSet = false;
-	protected Camera mCam;
+	[System.NonSerialized] public float finalAlpha = 1f;
 
 	/// <summary>
 	/// Game object gets cached for speed. Can't simply return 'mGo' set in Awake because this function may be called on a prefab.
@@ -309,7 +311,11 @@ public abstract class UIRect : MonoBehaviour
 		{
 			if (anchorCamera == null) return 0f;
 
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 			if (!mCam.isOrthoGraphic)
+#else
+			if (!mCam.orthographic)
+#endif
 			{
 				Transform t = cachedTransform;
 				Transform ct = mCam.transform;
@@ -367,12 +373,19 @@ public abstract class UIRect : MonoBehaviour
 		if (anchorCamera == null || ac.targetCam == null)
 			return cachedTransform.localPosition;
 
-		Vector3 pos = mCam.ViewportToWorldPoint(ac.targetCam.WorldToViewportPoint(ac.target.position));
+		Rect rect = ac.targetCam.rect;
+		Vector3 viewPos = ac.targetCam.WorldToViewportPoint(ac.target.position);
+		Vector3 pos = new Vector3((viewPos.x * rect.width) + rect.x, (viewPos.y * rect.height) + rect.y, viewPos.z);
+		pos = mCam.ViewportToWorldPoint(pos);
 		if (trans != null) pos = trans.InverseTransformPoint(pos);
 		pos.x = Mathf.Floor(pos.x + 0.5f);
 		pos.y = Mathf.Floor(pos.y + 0.5f);
 		return pos;
 	}
+
+#if UNITY_EDITOR
+	[System.NonSerialized] bool mEnabled = false;
+#endif
 
 	/// <summary>
 	/// Automatically find the parent rectangle.
@@ -380,6 +393,9 @@ public abstract class UIRect : MonoBehaviour
 
 	protected virtual void OnEnable ()
 	{
+#if UNITY_EDITOR
+		mEnabled = true;
+#endif
 		mUpdateFrame = -1;
 		
 		if (updateAnchors == AnchorUpdate.OnEnable)
@@ -409,6 +425,9 @@ public abstract class UIRect : MonoBehaviour
 
 	protected virtual void OnDisable ()
 	{
+#if UNITY_EDITOR
+		mEnabled = false;
+#endif
 		if (mParent) mParent.mChildren.Remove(this);
 		mParent = null;
 		mRoot = null;
@@ -655,7 +674,7 @@ public abstract class UIRect : MonoBehaviour
 
 	protected virtual void OnValidate ()
 	{
-		if (NGUITools.GetActive(this))
+		if (mEnabled && NGUITools.GetActive(this))
 		{
 			if (!Application.isPlaying) ResetAnchors();
 			Invalidate(true);

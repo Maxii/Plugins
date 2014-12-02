@@ -3,7 +3,7 @@
 // Copyright © 2011-2014 Tasharen Entertainment
 //----------------------------------------------
 
-#if !UNITY_EDITOR && (UNITY_IPHONE || UNITY_ANDROID || UNITY_WP8 || UNITY_BLACKBERRY || UNITY_WINRT)
+#if !UNITY_EDITOR && (UNITY_IPHONE || UNITY_ANDROID || UNITY_WP8 || UNITY_BLACKBERRY)
 #define MOBILE
 #endif
 
@@ -97,6 +97,13 @@ public class UIInput : MonoBehaviour
 	/// </summary>
 
 	public bool hideInput = false;
+
+	/// <summary>
+	/// Whether all text will be selected when the input field gains focus.
+	/// </summary>
+
+	[System.NonSerialized]
+	public bool selectAllTextOnFocus = true;
 
 	/// <summary>
 	/// What kind of validation to use with the input field's data.
@@ -480,14 +487,34 @@ public class UIInput : MonoBehaviour
 		}
 	}
 
+#if !MOBILE
+	[System.NonSerialized] UIInputOnGUI mOnGUI;
+#endif
 	/// <summary>
 	/// Selection event, sent by the EventSystem.
 	/// </summary>
 
 	protected virtual void OnSelect (bool isSelected)
 	{
-		if (isSelected) OnSelectEvent();
-		else OnDeselectEvent();
+		if (isSelected)
+		{
+#if !MOBILE
+			if (mOnGUI == null)
+				mOnGUI = gameObject.AddComponent<UIInputOnGUI>();
+#endif
+			OnSelectEvent();
+		}
+		else
+		{
+#if !MOBILE
+			if (mOnGUI != null)
+			{
+				Destroy(mOnGUI);
+				mOnGUI = null;
+			}
+#endif
+			OnDeselectEvent();
+		}
 	}
 
 	/// <summary>
@@ -563,9 +590,9 @@ public class UIInput : MonoBehaviour
 			if (mSelectMe != -1 && mSelectMe != Time.frameCount)
 			{
 				mSelectMe = -1;
-				mSelectionStart = 0;
 				mSelectionEnd = string.IsNullOrEmpty(mValue) ? 0 : mValue.Length;
 				mDrawStart = 0;
+				mSelectionStart = selectAllTextOnFocus ? 0 : mSelectionEnd;
 				label.color = activeTextColor;
 #if MOBILE
 				if (Application.platform == RuntimePlatform.IPhonePlayer
@@ -721,16 +748,6 @@ public class UIInput : MonoBehaviour
 	}
 
 	/// <summary>
-	/// Unfortunately Unity 4.3 and earlier doesn't offer a way to properly process events outside of OnGUI.
-	/// </summary>
-
-	void OnGUI ()
-	{
-		if (isSelected && Event.current.rawType == EventType.KeyDown)
-			ProcessEvent(Event.current);
-	}
-
-	/// <summary>
 	/// Perform a backspace operation.
 	/// </summary>
 
@@ -747,11 +764,12 @@ public class UIInput : MonoBehaviour
 		}
 	}
 
+#if !MOBILE
 	/// <summary>
 	/// Handle the specified event.
 	/// </summary>
 
-	protected virtual bool ProcessEvent (Event ev)
+	public virtual bool ProcessEvent (Event ev)
 	{
 		if (label == null) return false;
 
@@ -988,6 +1006,7 @@ public class UIInput : MonoBehaviour
 		}
 		return false;
 	}
+#endif
 
 	/// <summary>
 	/// Insert the specified text string into the current input value, respecting selection and validation.

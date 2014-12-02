@@ -169,7 +169,7 @@ public class UIDragObject : MonoBehaviour
 			else if (mPressed && mTouchID == UICamera.currentTouchID)
 			{
 				mPressed = false;
-				
+
 				if (restrictWithinPanel && dragEffect == DragEffect.MomentumAndSpring)
 				{
 					if (panelRegion.ConstrainTargetToBounds(target, ref mBounds, false))
@@ -269,11 +269,11 @@ public class UIDragObject : MonoBehaviour
 		mMomentum -= mScroll;
 		mScroll = NGUIMath.SpringLerp(mScroll, Vector3.zero, 20f, delta);
 
+		// No momentum? Exit.
+		if (mMomentum.magnitude < 0.0001f) return;
+
 		if (!mPressed)
 		{
-			// No momentum? Exit.
-			if (mMomentum.magnitude < 0.0001f) return;
-
 			// Apply the momentum
 			if (panelRegion == null) FindPanel();
 
@@ -289,11 +289,14 @@ public class UIDragObject : MonoBehaviour
 				}
 				else CancelSpring();
 			}
-		}
-		else mTargetPos = (target != null) ? target.position : Vector3.zero;
 
-		// Dampen the momentum
-		NGUIMath.SpringDampen(ref mMomentum, 9f, delta);
+			// Dampen the momentum
+			NGUIMath.SpringDampen(ref mMomentum, 9f, delta);
+
+			// Cancel all movement (and snap to pixels) at the end
+			if (mMomentum.magnitude < 0.0001f) CancelMovement();
+		}
+		else NGUIMath.SpringDampen(ref mMomentum, 9f, delta);
 	}
 
 	/// <summary>
@@ -302,6 +305,14 @@ public class UIDragObject : MonoBehaviour
 
 	public void CancelMovement ()
 	{
+		if (target != null)
+		{
+			Vector3 pos = target.localPosition;
+			pos.x = Mathf.RoundToInt(pos.x);
+			pos.y = Mathf.RoundToInt(pos.y);
+			pos.z = Mathf.RoundToInt(pos.z);
+			target.localPosition = pos;
+		}
 		mTargetPos = (target != null) ? target.position : Vector3.zero;
 		mMomentum = Vector3.zero;
 		mScroll = Vector3.zero;

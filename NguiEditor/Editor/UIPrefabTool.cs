@@ -438,10 +438,15 @@ public class UIPrefabTool : EditorWindow
 		root.layer = item.prefab.layer;
 
 		// Set up the camera
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 		Camera cam = camGO.camera;
+		cam.isOrthoGraphic = true;
+#else
+		Camera cam = camGO.GetComponent<Camera>();
+		cam.orthographic = true;
+#endif
 		cam.renderingPath = RenderingPath.Forward;
 		cam.clearFlags = CameraClearFlags.Skybox;
-		cam.isOrthoGraphic = true;
 		cam.backgroundColor = new Color(0f, 0f, 0f, 0f);
 		cam.targetTexture = (item.tex as RenderTexture);
 		cam.enabled = false;
@@ -529,7 +534,11 @@ public class UIPrefabTool : EditorWindow
 
 		// Set the camera's properties
 		cam.cullingMask = mask;
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 		cam.isOrthoGraphic = true;
+#else
+		cam.orthographic = true;
+#endif
 		cam.transform.position = bounds.center;
 		cam.transform.rotation = Quaternion.LookRotation(camDir);
 
@@ -570,7 +579,11 @@ public class UIPrefabTool : EditorWindow
 
 		cam.transform.position = pos;
 		cam.transform.rotation = rot;
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 		cam.isOrthoGraphic = point.isOrthographic;
+#else
+		cam.orthographic = point.isOrthographic;
+#endif
 		cam.nearClipPlane = point.nearClip;
 		cam.farClipPlane = point.farClip;
 		cam.orthographicSize = point.orthoSize;
@@ -615,7 +628,11 @@ public class UIPrefabTool : EditorWindow
 			float.TryParse(parts[1], out far);
 			float.TryParse(parts[2], out fov);
 
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 			cam.isOrthoGraphic = false;
+#else
+			cam.orthographic = false;
+#endif
 			cam.nearClipPlane = near;
 			cam.farClipPlane = far;
 			cam.fieldOfView = fov;

@@ -116,7 +116,11 @@ public class UIWidgetInspector : UIRectEditor
 
 		Vector2 screenPoint = HandleUtility.WorldToGUIPoint(point);
 
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 		Rect rect = new Rect(screenPoint.x - 7f, screenPoint.y - 7f, 14f, 14f);
+#else
+		Rect rect = new Rect(screenPoint.x - 5f, screenPoint.y - 9f, 14f, 14f);
+#endif
 
 		if (selected)
 		{
@@ -330,9 +334,14 @@ public class UIWidgetInspector : UIRectEditor
 		{
 			sides = anchor.rect.worldCorners;
 		}
-		else if (anchor.target.camera != null)
+		else
 		{
-			sides = anchor.target.camera.GetWorldCorners();
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
+			Camera cam = anchor.target.camera;
+#else
+			Camera cam = anchor.target.GetComponent<Camera>();
+#endif
+			if (cam != null) sides = cam.GetWorldCorners();
 		}
 
 		Vector3 theirPos;
@@ -366,7 +375,11 @@ public class UIWidgetInspector : UIRectEditor
 		if (Event.current.GetTypeForControl(id) == EventType.Repaint)
 		{
 			Vector2 screenPoint = HandleUtility.WorldToGUIPoint(theirPos);
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 			Rect rect = new Rect(screenPoint.x - 7f, screenPoint.y - 7f, 14f, 14f);
+#else
+			Rect rect = new Rect(screenPoint.x - 5f, screenPoint.y - 9f, 14f, 14f);
+#endif
 			if (mYellowDot == null) mYellowDot = "sv_label_4";
 
 			Vector3 v0 = HandleUtility.WorldToGUIPoint(myPos);

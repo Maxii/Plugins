@@ -65,7 +65,7 @@ public class UIDragScrollView : MonoBehaviour
 		// If the scroll view is on a parent, don't try to remember it (as we want it to be dynamic in case of re-parenting)
 		UIScrollView sv = NGUITools.FindInParents<UIScrollView>(mTrans);
 
-		if (scrollView == null)
+		if (scrollView == null || (mAutoFind && sv != scrollView))
 		{
 			scrollView = sv;
 			mAutoFind = true;

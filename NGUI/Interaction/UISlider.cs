@@ -69,12 +69,21 @@ public class UISlider : UIProgressBar
 
 	protected override void OnStart ()
 	{
-		GameObject bg = (mBG != null && (mBG.collider != null || mBG.GetComponent<Collider2D>() != null)) ? mBG.gameObject : gameObject;
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
+				GameObject bg = (mBG != null && (mBG.collider != null || mBG.GetComponent<Collider2D>() != null)) ? mBG.gameObject : gameObject;
 		UIEventListener bgl = UIEventListener.Get(bg);
 		bgl.onPress += OnPressBackground;
 		bgl.onDrag += OnDragBackground;
 
 		if (thumb != null && (thumb.collider != null || thumb.GetComponent<Collider2D>() != null) && (mFG == null || thumb != mFG.cachedTransform))
+#else
+		GameObject bg = (mBG != null && (mBG.GetComponent<Collider>() != null || mBG.GetComponent<Collider2D>() != null)) ? mBG.gameObject : gameObject;
+		UIEventListener bgl = UIEventListener.Get(bg);
+		bgl.onPress += OnPressBackground;
+		bgl.onDrag += OnDragBackground;
+
+		if (thumb != null && (thumb.GetComponent<Collider>() != null || thumb.GetComponent<Collider2D>() != null) && (mFG == null || thumb != mFG.cachedTransform))
+#endif
 		{
 			UIEventListener fgl = UIEventListener.Get(thumb.gameObject);
 			fgl.onPress += OnPressForeground;
@@ -143,15 +152,35 @@ public class UISlider : UIProgressBar
 		{
 			float step = (numberOfSteps > 1f) ? 1f / (numberOfSteps - 1) : 0.125f;
 
-			if (fillDirection == FillDirection.LeftToRight || fillDirection == FillDirection.RightToLeft)
+			switch (mFill)
 			{
-				if (key == KeyCode.LeftArrow) value = mValue - step;
-				else if (key == KeyCode.RightArrow) value = mValue + step;
-			}
-			else
-			{
-				if (key == KeyCode.DownArrow) value = mValue - step;
-				else if (key == KeyCode.UpArrow) value = mValue + step;
+				case FillDirection.LeftToRight:
+				{
+					if (key == KeyCode.LeftArrow) value = mValue - step;
+					else if (key == KeyCode.RightArrow) value = mValue + step;
+				}
+				break;
+
+				case FillDirection.RightToLeft:
+				{
+					if (key == KeyCode.LeftArrow) value = mValue + step;
+					else if (key == KeyCode.RightArrow) value = mValue - step;
+				}
+				break;
+
+				case FillDirection.BottomToTop:
+				{
+					if (key == KeyCode.DownArrow) value = mValue - step;
+					else if (key == KeyCode.UpArrow) value = mValue + step;
+				}
+				break;
+
+				case FillDirection.TopToBottom:
+				{
+					if (key == KeyCode.DownArrow) value = mValue + step;
+					else if (key == KeyCode.UpArrow) value = mValue - step;
+				}
+				break;
 			}
 		}
 	}

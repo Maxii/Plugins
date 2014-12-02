@@ -201,7 +201,11 @@ static public class NGUIMenu
 	{
 		if (UIRoot.list.Count == 0 || UICamera.list.size == 0) return true;
 		foreach (UICamera c in UICamera.list)
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 			if (NGUITools.GetActive(c) && c.camera.isOrthoGraphic)
+#else
+			if (NGUITools.GetActive(c) && c.GetComponent<Camera>().orthographic)
+#endif
 				return false;
 		return true;
 	}
@@ -216,7 +220,11 @@ static public class NGUIMenu
 	{
 		if (UIRoot.list.Count == 0 || UICamera.list.size == 0) return true;
 		foreach (UICamera c in UICamera.list)
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 			if (NGUITools.GetActive(c) && !c.camera.isOrthoGraphic)
+#else
+			if (NGUITools.GetActive(c) && !c.GetComponent<Camera>().orthographic)
+#endif
 				return false;
 		return true;
 	}
@@ -576,7 +584,11 @@ static public class NGUIMenu
 
 			BoxCollider2D bc = go.AddComponent<BoxCollider2D>();
 			bc.size = size;
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 			bc.center = center;
+#else
+			bc.offset = center;
+#endif
 			bc.isTrigger = true;
 			NGUITools.SetDirty(go);
 
@@ -584,8 +596,11 @@ static public class NGUIMenu
 			
 			if (p != null)
 			{
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 				if (p.rigidbody != null) NGUITools.Destroy(p.rigidbody);
-
+#else
+				if (p.GetComponent<Rigidbody>() != null) NGUITools.Destroy(p.GetComponent<Rigidbody>());
+#endif
 				// It's unclear if having a 2D rigidbody actually helps or not
 				//if (p.GetComponent<Rigidbody2D>() == null)
 				//{
@@ -613,7 +628,11 @@ static public class NGUIMenu
 
 			cam.eventType = UICamera.EventType.UI_3D;
 
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 			Vector3 center = c.center;
+#else
+			Vector3 center = c.offset;
+#endif
 			Vector3 size = c.size;
 			NGUITools.DestroyImmediate(c);
 
@@ -634,7 +653,11 @@ static public class NGUIMenu
 				if (p.GetComponent<Rigidbody2D>() != null)
 					NGUITools.Destroy(p.GetComponent<Rigidbody2D>());
 
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 				if (p.rigidbody == null)
+#else
+				if (p.GetComponent<Rigidbody>() == null)
+#endif
 				{
 					Rigidbody rb = p.gameObject.AddComponent<Rigidbody>();
 					rb.isKinematic = true;

@@ -6,28 +6,29 @@
 using UnityEngine;
 
 /// <summary>
-/// Makes it possible to animate alpha of the widget or a panel.
+/// Makes it possible to animate the widget's width and height using Unity's animations.
 /// </summary>
 
 [ExecuteInEditMode]
-public class AnimatedAlpha : MonoBehaviour
+public class AnimatedWidget : MonoBehaviour
 {
-	[Range(0f, 1f)]
-	public float alpha = 1f;
+	public float width = 1f;
+	public float height = 1f;
 
 	UIWidget mWidget;
-	UIPanel mPanel;
 
 	void OnEnable ()
 	{
 		mWidget = GetComponent<UIWidget>();
-		mPanel = GetComponent<UIPanel>();
 		LateUpdate();
 	}
 
 	void LateUpdate ()
 	{
-		if (mWidget != null) mWidget.alpha = alpha;
-		if (mPanel != null) mPanel.alpha = alpha;
+		if (mWidget != null)
+		{
+			mWidget.width = Mathf.RoundToInt(width);
+			mWidget.height = Mathf.RoundToInt(height);
+		}
 	}
 }

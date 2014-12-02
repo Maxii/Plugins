@@ -82,14 +82,14 @@ public class UICenterOnChild : MonoBehaviour
 				if (mScrollView)
 				{
 					mScrollView.centerOnChild = this;
-					mScrollView.onDragFinished = OnDragFinished;
+					mScrollView.onDragFinished += OnDragFinished;
 				}
 
 				if (mScrollView.horizontalScrollBar != null)
-					mScrollView.horizontalScrollBar.onDragFinished = OnDragFinished;
+					mScrollView.horizontalScrollBar.onDragFinished += OnDragFinished;
 
 				if (mScrollView.verticalScrollBar != null)
-					mScrollView.verticalScrollBar.onDragFinished = OnDragFinished;
+					mScrollView.verticalScrollBar.onDragFinished += OnDragFinished;
 			}
 		}
 		if (mScrollView.panel == null) return;
@@ -109,9 +109,10 @@ public class UICenterOnChild : MonoBehaviour
 		float min = float.MaxValue;
 		Transform closest = null;
 		int index = 0;
+		int ignoredIndex = 0;
 
 		// Determine the closest child
-		for (int i = 0, imax = trans.childCount; i < imax; ++i)
+		for (int i = 0, imax = trans.childCount, ii = 0; i < imax; ++i)
 		{
 			Transform t = trans.GetChild(i);
 			if (!t.gameObject.activeInHierarchy) continue;
@@ -122,7 +123,9 @@ public class UICenterOnChild : MonoBehaviour
 				min = sqrDist;
 				closest = t;
 				index = i;
+				ignoredIndex = ii;
 			}
+			++ii;
 		}
 
 		// If we have a touch in progress and the next page threshold set
@@ -165,13 +168,13 @@ public class UICenterOnChild : MonoBehaviour
 						if (delta > nextPageThreshold)
 						{
 							// Next page
-							if (index > 0) closest = list[index - 1];
+							if (ignoredIndex > 0) closest = list[ignoredIndex - 1];
 							else closest = list[0];
 						}
 						else if (delta < -nextPageThreshold)
 						{
 							// Previous page
-							if (index < list.Count - 1) closest = list[index + 1];
+							if (ignoredIndex < list.Count - 1) closest = list[ignoredIndex + 1];
 							else closest = list[list.Count - 1];
 						}
 					}
