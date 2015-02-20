@@ -3,19 +3,19 @@ using GridFramework;
 
 [CustomEditor (typeof(GFHexGrid))]
 public class GFHexGridEditor : GFGridEditor {
-	protected GFHexGrid hGrid {get{return (GFHexGrid)grid;}}
+	protected GFHexGrid _hGrid {get{return (GFHexGrid)_grid;}}
 	
 	protected override void SpacingFields () {
-		hGrid.radius = EditorGUILayout.FloatField("Radius", hGrid.radius);
-		hGrid.depth = EditorGUILayout.FloatField("Depth", hGrid.depth);
-		hGrid.gridPlane = (GridPlane) EditorGUILayout.EnumPopup("Grid Plane", hGrid.gridPlane);
-		hGrid.hexSideMode = (GFHexGrid.HexOrientation) EditorGUILayout.EnumPopup("Hex Side Mode", hGrid.hexSideMode);
-		hGrid.gridStyle = (GFHexGrid.HexGridShape)EditorGUILayout.EnumPopup("Grid Style", hGrid.gridStyle);
+		_hGrid.radius = EditorGUILayout.FloatField("Radius", _hGrid.radius);
+		_hGrid.depth = EditorGUILayout.FloatField("Depth", _hGrid.depth);
+		_hGrid.gridPlane = (GridPlane) EditorGUILayout.EnumPopup("Grid Plane", _hGrid.gridPlane);
+		_hGrid.hexSideMode = (GFHexGrid.HexOrientation) EditorGUILayout.EnumPopup("Hex Side Mode", _hGrid.hexSideMode);
+		_hGrid.gridStyle = (GFHexGrid.HexGridShape)EditorGUILayout.EnumPopup("Grid Style", _hGrid.gridStyle);
 	}
 
 	[MenuItem ("CONTEXT/GFHexGrid/Help")]
 	private static void BrowseDocs (MenuCommand command) {
-		string url = docsDir + "class_g_f_hex_grid.html";
+		string url = _docsDir + "class_g_f_hex_grid.html";
 		Help.ShowHelpPage (url);
 	}
 }

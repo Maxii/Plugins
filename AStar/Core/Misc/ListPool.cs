@@ -1,5 +1,5 @@
-//#define ASTAR_NO_POOLING //Disable pooling for some reason. Could be debugging or just for measuring the difference.
-//#define ASTAR_OPTIMIZE_POOLING //Skip some error checking for pooling. Optimizes Release calls to O(1) instead of O(n) where n is the number of lists in the pool. Recommended for release. Make sure you are pooling everything correctly.
+//#define ASTAR_NO_POOLING //@SHOWINEDITOR Disable pooling for some reason. Could be debugging or just for measuring the difference.
+//#define ASTAR_OPTIMIZE_POOLING //@SHOWINEDITOR Skip some error checking for pooling. Optimizes Release calls to O(1) instead of O(n) where n is the number of lists in the pool. Recommended for release. Make sure you are pooling everything correctly.
 
 using System;
 using System.Collections.Generic;

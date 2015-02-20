@@ -24,8 +24,6 @@ namespace Pathfinding {
 		/** Delete existing connection instead of adding one */
 		public bool deleteConnection = false;
 		
-		//private bool createHiddenNodes = true;
-		
 		public Transform Start {
 			get { return transform; }
 		}
@@ -51,7 +49,6 @@ namespace Pathfinding {
 		}
 	
 		public override void OnGraphsPostUpdate () {
-			//if (connectedNode1 != null && connectedNode2 != null) {
 			if (!AstarPath.active.isScanning) {
 				AstarPath.active.AddWorkItem (new AstarPath.AstarWorkItem (delegate (bool force) {
 					InternalOnPostScan ();
@@ -61,7 +58,6 @@ namespace Pathfinding {
 		}
 	
 		public virtual void Apply () {
-	//#if FALSE
 			if (Start == null || End == null || AstarPath.active == null) return;
 			
 			GraphNode startNode = AstarPath.active.GetNearest (Start.position).node;
@@ -81,7 +77,6 @@ namespace Pathfinding {
 				if (!oneWay)
 					endNode.AddConnection (startNode,cost);
 			}
-	//#endif
 		}
 		
 		public void OnDrawGizmos () {

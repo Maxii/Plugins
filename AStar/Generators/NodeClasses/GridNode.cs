@@ -1,6 +1,6 @@
 //#define ASTAR_NoTagPenalty
-#define ASTAR_GRID_CUSTOM_CONNECTIONS //Disabling this will reduce memory usage and improve performance slightly but you will not be able to add custom connections to grid nodes using e.g the NodeLink component.
-
+#define ASTAR_GRID_CUSTOM_CONNECTIONS //@SHOWINEDITOR Disabling this will reduce memory usage and improve performance slightly but you will not be able to add custom connections to grid nodes using e.g the NodeLink component.
+#define ASTAR_CONSTANT_PENALTY
 using System;
 using Pathfinding;
 using System.Collections.Generic;
@@ -37,7 +37,13 @@ namespace Pathfinding {
 		
 		protected int nodeInGridIndex;
 		protected ushort gridFlags;
-		
+
+		/** Internal use only */
+		internal ushort InternalGridFlags {
+			get { return gridFlags; }
+			set { gridFlags = value; }
+		}
+
 		const int GridFlagsConnectionOffset = 0;
 		const int GridFlagsConnectionBit0 = 1 << GridFlagsConnectionOffset;
 		const int GridFlagsConnectionMask = 0xFF << GridFlagsConnectionOffset;
@@ -257,60 +263,74 @@ namespace Pathfinding {
 			}
 			
 		}
-		
+
+
+
 		public override void Open (Path path, PathNode pathNode, PathHandler handler) {
-			
+
 			GridGraph gg = GetGridGraph (GraphIndex);
-			int[] neighbourOffsets = gg.neighbourOffsets;
-			uint[] neighbourCosts = gg.neighbourCosts;
-			GridNode[] nodes = gg.nodes;
+
 			ushort pid = handler.PathID;
-			 
-			for (int i=0;i<8;i++) {
-				if (GetConnectionInternal(i)) {
-					
-					GridNode other = nodes[nodeInGridIndex + neighbourOffsets[i]];
-					if (!path.CanTraverse (other)) continue;
-					
-					PathNode otherPN = handler.GetPathNode (other);
-					
-					if (otherPN.pathID != pid) {
-						otherPN.parent = pathNode;
-						otherPN.pathID = pid;
+
+			{
+				int[] neighbourOffsets = gg.neighbourOffsets;
+				uint[] neighbourCosts = gg.neighbourCosts;
+				GridNode[] nodes = gg.nodes;
+				 
+				for (int i=0;i<8;i++) {
+					if (GetConnectionInternal(i)) {
 						
-						otherPN.cost = neighbourCosts[i];
+						GridNode other = nodes[nodeInGridIndex + neighbourOffsets[i]];
+						if (!path.CanTraverse (other)) continue;
 						
-						otherPN.H = path.CalculateHScore (other);
-						other.UpdateG (path, otherPN);
-						
-						//Debug.Log ("G " + otherPN.G + " F " + otherPN.F);
-						handler.PushNode (otherPN);
-						//Debug.DrawRay ((Vector3)otherPN.node.Position, Vector3.up,Color.blue);
-					} else {
-						
-						//If not we can test if the path from the current node to this one is a better one then the one already used
-						uint tmpCost = neighbourCosts[i];
-						
-						if (pathNode.G+tmpCost+path.GetTraversalCost(other) < otherPN.G) {
-							//Debug.Log ("Path better from " + NodeIndex + " to " + otherPN.node.NodeIndex + " " + (pathNode.G+tmpCost+path.GetTraversalCost(other)) + " < " + otherPN.G);
-							otherPN.cost = tmpCost;
-							
+						PathNode otherPN = handler.GetPathNode (other);
+
+						// Multiply the connection cost with 1 + the average of the traversal costs for the two nodes
+						uint tmpCost = (neighbourCosts[i] * (256 + path.GetTraversalCost(this) + path.GetTraversalCost(other)))/128;
+
+						if (otherPN.pathID != pid) {
 							otherPN.parent = pathNode;
+							otherPN.pathID = pid;
+
+							otherPN.cost = tmpCost;
+
+							otherPN.H = path.CalculateHScore (other);
+							other.UpdateG (path, otherPN);
 							
-							other.UpdateRecursiveG (path,otherPN, handler);
-							
-						//Or if the path from this node ("other") to the current ("current") is better
-						} else if (otherPN.G+tmpCost+path.GetTraversalCost (this) < pathNode.G) {
-							//Debug.Log ("Path better from " + otherPN.node.NodeIndex + " to " + NodeIndex + " " + (otherPN.G+tmpCost+path.GetTraversalCost (this)) + " < " + pathNode.G);
-							pathNode.parent = otherPN;
-							pathNode.cost = tmpCost;
-							
-							UpdateRecursiveG(path, pathNode, handler);
+							//Debug.Log ("G " + otherPN.G + " F " + otherPN.F);
+							handler.PushNode (otherPN);
+							//Debug.DrawRay ((Vector3)otherPN.node.Position, Vector3.up,Color.blue);
+						} else {
+
+							// Sorry for the huge number of #ifs
+
+							//If not we can test if the path from the current node to this one is a better one then the one already used
+
+							if (pathNode.G+tmpCost < otherPN.G)
+							{
+								//Debug.Log ("Path better from " + NodeIndex + " to " + otherPN.node.NodeIndex + " " + (pathNode.G+tmpCost+path.GetTraversalCost(other)) + " < " + otherPN.G);
+								otherPN.cost = tmpCost;
+								
+								otherPN.parent = pathNode;
+								
+								other.UpdateRecursiveG (path,otherPN, handler);
+								
+							//Or if the path from this node ("other") to the current ("current") is better
+							}
+							else if (otherPN.G+tmpCost < pathNode.G)
+							{
+
+								//Debug.Log ("Path better from " + otherPN.node.NodeIndex + " to " + NodeIndex + " " + (otherPN.G+tmpCost+path.GetTraversalCost (this)) + " < " + pathNode.G);
+								pathNode.parent = otherPN;
+								pathNode.cost = tmpCost;
+								
+								UpdateRecursiveG(path, pathNode, handler);
+							}
 						}
 					}
 				}
 			}
-			
+
 		}
 		
 		public override void SerializeNode (GraphSerializationContext ctx) {

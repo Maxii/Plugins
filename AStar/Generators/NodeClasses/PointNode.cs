@@ -8,7 +8,12 @@ namespace Pathfinding
 		
 		public GraphNode[] connections;
 		public uint[] connectionCosts;
-		
+
+		/** GameObject this node was created from (if any).
+		 * \warning When loading a graph from a saved file or from cache, this field will be null.
+		 */
+		public GameObject gameObject;
+
 		/** Used for internal linked list structure.
 		 * \warning Do not modify
 		 */

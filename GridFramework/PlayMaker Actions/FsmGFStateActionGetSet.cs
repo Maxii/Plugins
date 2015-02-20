@@ -4,8 +4,6 @@
 //#define PLAYMAKER_PRESENT
 
 #if PLAYMAKER_PRESENT
-using UnityEngine;
-using System.Collections;
 
 namespace HutongGames.PlayMaker.Actions {
 	#region GFGrid

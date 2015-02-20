@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -71,12 +71,20 @@ static public class NGUITools
 
 	static public AudioSource PlaySound (AudioClip clip, float volume) { return PlaySound(clip, volume, 1f); }
 
+	static float mLastTimestamp = 0f;
+	static AudioClip mLastClip;
+
 	/// <summary>
 	/// Play the specified audio clip with the specified volume and pitch.
 	/// </summary>
 
 	static public AudioSource PlaySound (AudioClip clip, float volume, float pitch)
 	{
+		float time = Time.time;
+		if (mLastClip == clip && mLastTimestamp + 0.1f > time) return null;
+
+		mLastClip = clip;
+		mLastTimestamp = time;
 		volume *= soundVolume;
 
 		if (clip != null && volume > 0.01f)
@@ -113,8 +121,10 @@ static public class NGUITools
 				AudioSource source = mListener.GetComponent<AudioSource>();
 #endif
 				if (source == null) source = mListener.gameObject.AddComponent<AudioSource>();
+#if !UNITY_FLASH
 				source.priority = 50;
 				source.pitch = pitch;
+#endif
 				source.PlayOneShot(clip, volume);
 				return source;
 			}
@@ -1060,6 +1070,8 @@ static public class NGUITools
 	{
 		if (obj != null)
 		{
+			if (obj is Transform) obj = (obj as Transform).gameObject;
+
 			if (Application.isPlaying)
 			{
 				if (obj is GameObject)
@@ -1330,7 +1342,7 @@ static public class NGUITools
 
 	static public bool Save (string fileName, byte[] bytes)
 	{
-#if UNITY_WEBPLAYER || UNITY_FLASH || UNITY_METRO || UNITY_WP8
+#if UNITY_WEBPLAYER || UNITY_FLASH || UNITY_METRO || UNITY_WP8 || UNITY_WP_8_1
 		return false;
 #else
 		if (!NGUITools.fileAccess) return false;
@@ -1367,7 +1379,7 @@ static public class NGUITools
 
 	static public byte[] Load (string fileName)
 	{
-#if UNITY_WEBPLAYER || UNITY_FLASH || UNITY_METRO || UNITY_WP8
+#if UNITY_WEBPLAYER || UNITY_FLASH || UNITY_METRO || UNITY_WP8 || UNITY_WP_8_1
 		return null;
 #else
 		if (!NGUITools.fileAccess) return null;
@@ -1649,7 +1661,7 @@ static public class NGUITools
 
 		foreach (T comp in comps)
 		{
-#if !UNITY_EDITOR && (UNITY_WEBPLAYER || UNITY_FLASH || UNITY_METRO || UNITY_WP8)
+#if !UNITY_EDITOR && (UNITY_WEBPLAYER || UNITY_FLASH || UNITY_METRO || UNITY_WP8 || UNITY_WP_8_1)
 			comp.SendMessage(funcName, SendMessageOptions.DontRequireReceiver);
 #else
 			MethodInfo method = comp.GetType().GetMethod(funcName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);

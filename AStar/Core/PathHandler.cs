@@ -95,7 +95,10 @@ namespace Pathfinding
 		  * \see #PathID
 		  */
 		private ushort pathID;
-		
+
+		public readonly int threadID;
+		public readonly int totalThreadCount;
+
 		/** Binary heap to keep nodes on the "Open list" */
 		private BinaryHeapM heap = new BinaryHeapM(128);
 		
@@ -156,7 +159,10 @@ namespace Pathfinding
 		 */
 		public readonly System.Text.StringBuilder DebugStringBuilder = new System.Text.StringBuilder();
 		
-		public PathHandler () {
+		public PathHandler (int threadID, int totalThreadCount ) {
+			this.threadID = threadID;
+			this.totalThreadCount = totalThreadCount;
+
 		}
 		
 		public void InitializeForPath (Path p) {
@@ -225,10 +231,12 @@ namespace Pathfinding
 			PathNode pn = nodes[bucketNumber][bucketIndex];
 			pn.node = node;
 		}
-			
-		public PathNode GetPathNode (GraphNode node) {
-			
-			
+
+		public PathNode GetPathNode ( int nodeIndex ) {
+			return nodes[nodeIndex >> BucketSizeLog2][nodeIndex & BucketIndexMask];	
+		}
+
+		public PathNode GetPathNode ( GraphNode node ) {
 			//Get the index of the node
 			int ind = node.NodeIndex;
 			

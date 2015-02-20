@@ -7,7 +7,7 @@ namespace Pathfinding
 {
 	
 	
-	class Profile {
+	public class Profile {
 		const bool PROFILE_MEM = false;
 		
 		public string name;
@@ -58,7 +58,9 @@ namespace Pathfinding
 		[System.Diagnostics.ConditionalAttribute("PROFILE")]
 		/** Log using System.Console */
 		public void ConsoleLog () {
+#if !NETFX_CORE || UNITY_EDITOR
 			System.Console.WriteLine (ToString());
+#endif
 		}
 		
 		[System.Diagnostics.ConditionalAttribute("PROFILE")]

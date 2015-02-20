@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -156,8 +156,23 @@ public class UIKeyNavigation : MonoBehaviour
 	static protected Vector3 GetCenter (GameObject go)
 	{
 		UIWidget w = go.GetComponent<UIWidget>();
+		UICamera cam = UICamera.FindCameraForLayer(go.layer);
 
-		if (w != null)
+		if (cam != null)
+		{
+			Vector3 center = go.transform.position;
+
+			if (w != null)
+			{
+				Vector3[] corners = w.worldCorners;
+				center = (corners[0] + corners[2]) * 0.5f;
+			}
+
+			center = cam.cachedCamera.WorldToScreenPoint(center);
+			center.z = 0;
+			return center;
+		}
+		else if (w != null)
 		{
 			Vector3[] corners = w.worldCorners;
 			return (corners[0] + corners[2]) * 0.5f;

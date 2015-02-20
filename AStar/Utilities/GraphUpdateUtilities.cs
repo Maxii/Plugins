@@ -111,7 +111,7 @@ namespace Pathfinding {
 					//The revert operation does not revert ALL nodes' area values, so we must flood fill again
 					AstarPath.active.FloodFill ();
 				}
-			},true);
+			});
 			
 			//Force the thread safe callback to be called
 			AstarPath.active.FlushThreadSafeCallbacks();

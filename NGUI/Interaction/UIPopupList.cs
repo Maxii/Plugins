@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -191,6 +191,8 @@ public class UIPopupList : UIWidgetContainer
 	[HideInInspector][SerializeField] UILabel mHighlightedLabel = null;
 	[HideInInspector][SerializeField] List<UILabel> mLabelList = new List<UILabel>();
 	[HideInInspector][SerializeField] float mBgBorder = 0f;
+
+	[System.NonSerialized] GameObject mSelection;
 
 	// Deprecated functionality
 	[HideInInspector][SerializeField] GameObject eventReceiver;
@@ -637,6 +639,9 @@ public class UIPopupList : UIWidgetContainer
 
 	public void Close ()
 	{
+		StopCoroutine("CloseIfUnselected");
+		mSelection = null;
+
 		if (mChild != null)
 		{
 			mLabelList.Clear();
@@ -746,13 +751,11 @@ public class UIPopupList : UIWidgetContainer
 
 	IEnumerator CloseIfUnselected ()
 	{
-		GameObject go = UICamera.selectedObject;
-
 		for (; ; )
 		{
 			yield return null;
 
-			if (UICamera.selectedObject != go)
+			if (UICamera.selectedObject != mSelection)
 			{
 				Close();
 				break;
@@ -782,7 +785,9 @@ public class UIPopupList : UIWidgetContainer
 
 			// Calculate the dimensions of the object triggering the popup list so we can position it below it
 			Transform myTrans = transform;
-			Bounds bounds = NGUIMath.CalculateRelativeWidgetBounds(myTrans.parent, myTrans);
+
+			Vector3 min;
+			Vector3 max;
 
 			// Create the root object for the list
 			mChild = new GameObject("Drop-down List");
@@ -790,27 +795,35 @@ public class UIPopupList : UIWidgetContainer
 
 			Transform t = mChild.transform;
 			t.parent = myTrans.parent;
-			Vector3 min;
-			Vector3 max;
 			Vector3 pos;
 
-			// Manually triggered popup list on some other game object
-			if (openOn == OpenOn.Manual && UICamera.selectedObject != gameObject && bounds.size == Vector3.zero)
+			StopCoroutine("CloseIfUnselected");
+
+			if (UICamera.selectedObject == null)
 			{
-				StopCoroutine("CloseIfUnselected");
+				mSelection = gameObject;
+				UICamera.selectedObject = mSelection;
+			}
+			else mSelection = UICamera.selectedObject;
+
+			// Manually triggered popup list on some other game object
+			if (openOn == OpenOn.Manual && mSelection != gameObject)
+			{
 				min = t.parent.InverseTransformPoint(mPanel.anchorCamera.ScreenToWorldPoint(UICamera.lastTouchPosition));
 				max = min;
 				t.localPosition = min;
 				pos = t.position;
-				StartCoroutine("CloseIfUnselected");
 			}
 			else
 			{
+				Bounds bounds = NGUIMath.CalculateRelativeWidgetBounds(myTrans.parent, myTrans, false, false);
 				min = bounds.min;
 				max = bounds.max;
 				t.localPosition = min;
 				pos = myTrans.position;
 			}
+
+			StartCoroutine("CloseIfUnselected");
 
 			t.localRotation = Quaternion.identity;
 			t.localScale = Vector3.one;
@@ -884,7 +897,7 @@ public class UIPopupList : UIWidgetContainer
 			}
 
 			// The triggering widget's width should be the minimum allowed width
-			x = Mathf.Max(x, bounds.size.x * dynScale - (bgPadding.x + padding.x) * 2f);
+			x = Mathf.Max(x, (max.x - min.x) * dynScale - (bgPadding.x + padding.x) * 2f);
 
 			float cx = x;
 			Vector3 bcCenter = new Vector3(cx * 0.5f, -labelHeight * 0.5f, 0f);
@@ -943,7 +956,7 @@ public class UIPopupList : UIWidgetContainer
 
 			if (position == Position.Auto)
 			{
-				UICamera cam = UICamera.FindCameraForLayer((UICamera.selectedObject ?? gameObject).layer);
+				UICamera cam = UICamera.FindCameraForLayer(mSelection.layer);
 
 				if (cam != null)
 				{
@@ -970,7 +983,7 @@ public class UIPopupList : UIWidgetContainer
 
 			min = t.localPosition;
 			max.x = min.x + mBackground.width;
-			max.y = min.y + mBackground.height;
+			max.y = min.y - mBackground.height;
 			max.z = min.z;
 			Vector3 offset = mPanel.CalculateConstrainOffset(min, max);
 			t.localPosition += offset;

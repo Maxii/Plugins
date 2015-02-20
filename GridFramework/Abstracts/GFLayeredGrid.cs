@@ -18,16 +18,7 @@ public abstract class GFLayeredGrid : GFGrid {
 	public float depth {
 		get{ return _depth;}
 		set {
-			if (value == _depth) {// needed because the editor fires the setter even if this wasn't changed
-				return;
-			}
-			_depth = Mathf.Max(value, 0.1f);
-			_matricesMustUpdate = true;
-			_drawPointsMustUpdate = true;
-			if (!relativeSize) {
-				_drawPointsCountMustUpdate = true;
-			}
-			GridChanged();
+			SetMember<float>(value, ref _depth, restrictor: Mathf.Max, limit: 0.1f);
 		}
 	}
 	
@@ -43,14 +34,7 @@ public abstract class GFLayeredGrid : GFGrid {
 			return _gridPlane;
 		}
 		set {
-			if (value == _gridPlane) {
-				return;
-			}
-			_gridPlane = value;
-			_matricesMustUpdate = true;
-			_drawPointsMustUpdate = true;
-			_drawPointsCountMustUpdate = true;
-			GridChanged();
+			SetMember<GridPlane>(value, ref _gridPlane);
 		}
 	}
 	

@@ -73,14 +73,7 @@ public class GFPolarGrid : GFLayeredGrid {
 	public float radius {
 		get{ return _radius;}
 		set {
-			if (value == _radius) {// needed because the editor fires the setter even if this wasn't changed
-				return;
-			}
-			_radius = Mathf.Max(0.01f, value);
-			_matricesMustUpdate = true;
-			_drawPointsMustUpdate = true;
-			_drawPointsCountMustUpdate |= !relativeSize; // if size is relative, the amount of points does not change
-			GridChanged();
+			SetMember<float>(value, ref _radius, restrictor: Mathf.Max, limit: 0.1f);
 		}
 	}
 	
@@ -93,14 +86,7 @@ public class GFPolarGrid : GFLayeredGrid {
 	public int sectors {
 		get {return _sectors;}
 		set {
-			if (value == _sectors) {// needed because the editor fires the setter even if this wasn't changed
-				return;
-			}
-			_sectors = Mathf.Max(1, value);
-			_matricesMustUpdate = true;
-			_drawPointsMustUpdate = true;
-			_drawPointsCountMustUpdate = true;
-			GridChanged();
+			SetMember<int>(value, ref _sectors, restrictor: Mathf.Max, limit: 1);
 		}
 	}
 			
@@ -116,12 +102,7 @@ public class GFPolarGrid : GFLayeredGrid {
 	public int smoothness {
 		get {return _smoothness;}
 		set {
-			if (value == _smoothness) {// needed because the editor fires the setter even if this wasn't changed
-				return;
-			}
-			_smoothness = Mathf.Max(1, value);
-			_drawPointsMustUpdate = true;
-			_drawPointsCountMustUpdate = true;
+			SetMember<int>(value, ref _smoothness, restrictor: Mathf.Max, limit: 1, updateMatrix: false);
 		}
 	}
 	#endregion
@@ -240,7 +221,9 @@ public class GFPolarGrid : GFLayeredGrid {
 	/// thrid one the distance from the main plane. This order applies to XY-grids only, for the other two orientations please consult the manual.
 	public Vector3 WorldToPolar(Vector3 worldPoint) {
 		// first transform the point into local coordinates
-		Vector3 localPoint = _Transform.GFInverseTransformPointFixed(worldPoint) - originOffset;
+		//Vector3 localPoint = _Transform.GFInverseTransformPointFixed(worldPoint) - originOffset;
+		//var localPoint = _Transform.InverseTransformDirection(worldPoint - _Transform.position) - originOffset;
+		var localPoint = wlMatrix.MultiplyPoint3x4(worldPoint);
 		// now turn the point from Cartesian coordinates into polar coordinates
 		return Mathf.Sqrt(Mathf.Pow(localPoint[idx[0]], 2) + Mathf.Pow(localPoint[idx[1]], 2)) * units[idx[0]]
 			+ Atan3(localPoint[idx[1]], localPoint[idx[0]]) * units[idx[1]]
@@ -253,11 +236,18 @@ public class GFPolarGrid : GFLayeredGrid {
 	/// 
 	/// Converts a point from polar space to world space.
 	public Vector3 PolarToWorld(Vector3 polarPoint) {
-		return _Transform.GFTransformPointFixed(
+		var vec =
 			polarPoint[idx[0]] * Mathf.Cos(Float2Rad(polarPoint[idx[1]])) * units[idx[0]]
 			+ polarPoint[idx[0]] * Mathf.Sin(Float2Rad(polarPoint[idx[1]])) * units[idx[1]]
-			+ polarPoint[idx[2]] * units[idx[2]])
-			+ _Transform.TransformDirection(originOffset);
+			+ polarPoint[idx[2]] * units[idx[2]];
+
+		return lwMatrix.MultiplyPoint3x4(vec);
+
+		//return _Transform.GFTransformPointFixed(
+		//	polarPoint[idx[0]] * Mathf.Cos(Float2Rad(polarPoint[idx[1]])) * units[idx[0]]
+		//	+ polarPoint[idx[0]] * Mathf.Sin(Float2Rad(polarPoint[idx[1]])) * units[idx[1]]
+		//	+ polarPoint[idx[2]] * units[idx[2]])
+		//	+ _Transform.TransformDirection(originOffset);
 	}
 	#endregion
 	
@@ -280,7 +270,12 @@ public class GFPolarGrid : GFLayeredGrid {
 	/// 
 	/// Converts a point from polar to grid space. The main difference is that grid coordinates are dependent on the grid's parameters, while polar coordinates are not.
 	public Vector3 PolarToGrid(Vector3 polarPoint) {
-		return polarPoint.GFReverseScale(radius * units[idx[0]] + Float2Rad(angle) * units[idx[1]] + depth * units[idx[2]]);
+		//return polarPoint.GFReverseScale(radius * units[idx[0]] + Float2Rad(angle) * units[idx[1]] + depth * units[idx[2]]);
+		var relativeVector = radius * units[idx[0]] + Float2Rad(angle) * units[idx[1]] + depth * units[idx[2]];
+		for (int i = 0; i <=2; i++){
+			polarPoint[i] = polarPoint[i]/relativeVector[i];
+		}
+		return polarPoint;
 	}
 	#endregion
 
@@ -618,6 +613,7 @@ public class GFPolarGrid : GFLayeredGrid {
 		layer_count   = Mathf.FloorToInt(to[idx[2]]             ) - Mathf.CeilToInt(from[idx[2]]             ) + 1; // number of layers
 	}
 	
+	/// <summary>Contributes a point of the grid to drawing.</summary>
 	private Vector3 ContributePoint(float r, float phi, float z, Vector3 origin) {
 		//return GridToWorld(new Vector3(r, phi, z)); // <-- sometimes the most bizarre things can happen.
 		return ContributePoint(r, Quaternion.AngleAxis(phi, locUnits[idx[2]]), z, origin);
@@ -681,17 +677,17 @@ public class GFPolarGrid : GFLayeredGrid {
 			r = Mathf.Ceil(from[idx[0]]) * radius;
 			for (int j = 0; j < arc_count; ++j) {         // for every circle/arc
 				// the first point is an exception
-				_drawPoints[idx[0]][i * arc_count * segment_count + j * segment_count + 0][0] = ContributePoint(r, from[idx[1]] * angleDeg, z, origin);
+				points[idx[0]][i * arc_count * segment_count + j * segment_count + 0][0] = ContributePoint(r, from[idx[1]] * angleDeg, z, origin);
 
 				phi = Mathf.Ceil(from[idx[1]] * smoothness) / smoothness * angleDeg;
 				for (int k = 1; k < segment_count; ++k) { // for every segment
 					Vector3 point = ContributePoint(r, phi, z, origin);
-					_drawPoints[idx[0]][i * arc_count * segment_count + j * segment_count + k - 1][1] = point;
-					_drawPoints[idx[0]][i * arc_count * segment_count + j * segment_count + k    ][0] = point;
+					points[idx[0]][i * arc_count * segment_count + j * segment_count + k - 1][1] = point;
+					points[idx[0]][i * arc_count * segment_count + j * segment_count + k    ][0] = point;
 					phi += delta_phi;
 				}
 				// the last point is an exception as well
-				_drawPoints[idx[0]][i * arc_count * segment_count + j * segment_count + segment_count - 1][1] = ContributePoint(r, to[idx[1]] * angleDeg, z, origin);
+				points[idx[0]][i * arc_count * segment_count + j * segment_count + segment_count - 1][1] = ContributePoint(r, to[idx[1]] * angleDeg, z, origin);
 
 				r += radius;
 			}
@@ -712,6 +708,8 @@ public class GFPolarGrid : GFLayeredGrid {
 
 		// cylindric lines
 		r = Mathf.Ceil(from[idx[0]]) * radius;
+		from[idx[2]] *= depth; // the start of the cylindric lines is affected by depth for relative-sized grids
+		to  [idx[2]] *= depth; // we could do this in the loop when contributing the point, but that would be linear complexity
 		for (int i = 0; i < arc_count; ++i) {
 			phi = Mathf.Ceil(from[idx[1]]) * angleDeg;
 			for (int j = 0; j < sector_count; ++j) {
@@ -721,6 +719,8 @@ public class GFPolarGrid : GFLayeredGrid {
 			}
 			r += radius;
 		}
+		from[idx[2]] /= depth; // undo the change from above
+		to  [idx[2]] /= depth;
 
 		/* TO DO: performance can be improved by reducing the amount of rotations computed. To this end invert the loop, i.e. iterate over the angles first, inside those
 		 * iterate over the arcs and inside those over the layers. Compute the rotation once per angle and use that for drawing radial lines, segments and layer lines.

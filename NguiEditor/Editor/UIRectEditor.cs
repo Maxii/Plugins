@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -392,7 +392,7 @@ public class UIRectEditor : Editor
 			bool isOutside01 = relative < 0f || relative > 1f;
 
 			// Horizontal slider for relative values, for convenience
-			EditorGUI.BeginDisabledGroup(isOutside01);
+			//EditorGUI.BeginDisabledGroup(isOutside01);
 			{
 				GUILayout.Space(10f);
 				float val = GUILayout.HorizontalSlider(relative, 0f, 1f);
@@ -425,7 +425,7 @@ public class UIRectEditor : Editor
 					rel.floatValue = (size > 0f) ? intVal / size : 0.5f;
 				}
 			}
-			EditorGUI.EndDisabledGroup();
+			//EditorGUI.EndDisabledGroup();
 		}
 
 		// Draw the absolute value

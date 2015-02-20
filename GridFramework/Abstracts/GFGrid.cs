@@ -1,15 +1,18 @@
+#if UNITY_3_0 || UNITY_3_0_0 || UNITY_3_1 || UNITY_3_2 || UNITY_3_3 || UNITY_3_4 || UNITY_3_5
+#define UNITY_3_API
+#endif
+
 using UnityEngine;
+using System;
 using GridFramework;
 using GridFramework.Vectors;
-//using System.Collections.Specialized;
 
 /// <summary>Abstract base class for all Grid Framework grids.</summary>
 /// 
 /// This is the standard class all grids are based on. Aside from providing a common set of variables and a template for what methods to use, this class has no practical
 /// meaning for end users. Use this as reference for what can be done without having to specify which type of grid you are using. For anything more specific you have to
 /// look at the child classes.
-[System.Serializable]
-public abstract class GFGrid : MonoBehaviour {
+[System.Serializable] public abstract class GFGrid : MonoBehaviour {
 	#region nested classes and enums
 
 	// instead of always aligning the centre we can use this to align other regions (WIP)
@@ -173,85 +176,64 @@ public abstract class GFGrid : MonoBehaviour {
 	
 	#region class members
 	#region size and range
+
 	#region Protected
-	[SerializeField]
-	private bool
-		_relativeSize = false;
+	///<summary> Whether rendering depends on "spacing" or not. </summary>
+	[SerializeField] private bool _relativeSize = true;
 	
-	[SerializeField]
-	protected Vector3
-		_size = new Vector3(5.0f, 5.0f, 5.0f);
+	///<summary> Combined upper and lower rendering range bound. </summary>
+	[SerializeField] protected Vector3 _size = 5.0f * Vector3.one;
 	
-	[SerializeField]
-	protected Vector3
-		_renderFrom = Vector3.zero; //first one from, second one to 
+	///<summary> Lower rendering range bound. </summary>
+	[SerializeField] protected Vector3 _renderFrom = -5 * Vector3.one;
 	
-	[SerializeField]
-	protected Vector3
-		_renderTo = 3 * Vector3.one; //first one from, second one to 
+	///<summary> Upper rendering range bound. </summary>
+	[SerializeField] protected Vector3 _renderTo = 5 * Vector3.one;
 	#endregion
+
 	#region Accessors
 	/// <summary>Whether the drawing/rendering will scale with spacing.</summary>
 	/// <value><c>true</c> if the grid's size is in grid coordinates; <c>false</c> if it's in world coordinates.</value>
-	/// Set this to <c>true</c> if you want the drawing to have relative size, i.e. to scale with the spacing/radius or whatever the specific grid uses.
-	/// Otherwise set it to <c>false</c>.
+	/// Set this to <c>true</c> if you want the drawing to have relative size,
+	/// i.e. to scale with the spacing/radius or whatever the specific grid
+	/// uses.  Otherwise set it to <c>false</c>.
 	/// 
 	/// See also: <see cref="size"/>, <see cref="renderFrom"/>, <see cref="renderTo"/>
 	public bool relativeSize {
-		get{ return _relativeSize;}
-		set {
-			if (value == _relativeSize) {// needed because the editor fires the setter even if this wasn't changed
-				return;
-			}
-			_relativeSize = value;
-			_drawPointsMustUpdate = true;
-			_drawPointsCountMustUpdate = true;
-			if( GridChangedEvent != null ) // fire the event
-				GridChangedEvent( this );
-
-		}
+		get {return _relativeSize;}
+		set {SetMember<bool>(value, ref _relativeSize, updateMatrix: false);}
 	}
 
 	/// <summary>The size of the visual representation of the grid.</summary>
 	/// <value>The size of the grid's visual representation.</value>
-	/// Defines the size of the drawing and rendering of the grid. Keep in mind that the grid is infinitely large, the drawing is just a visual
-	/// representation, stretching on all three directions from the origin. The size is either absolute or relative to the grid's other parameters,
+	/// Defines the size of the drawing and rendering of the grid. Keep in mind
+	/// that the grid is infinitely large, the drawing is just a visual
+	/// representation, stretching on all three directions from the origin. The
+	/// size is either absolute or relative to the grid's other parameters,
 	/// depending on the value of <see cref="relativeSize"/>.
 	/// 
-	/// If you set <see cref="useCustomRenderRange"/> to <c>true</c> that range will override this member. The size is either absolute or relative to the grid's other
-	/// parameters, depending on the value of <see cref="relativeSize"/>.
+	/// If you set <see cref="useCustomRenderRange"/> to <c>true</c> that range
+	/// will override this member. The size is either absolute or relative to
+	/// the grid's other parameters, depending on the value of <see cref="relativeSize"/>.
 	/// 
-	/// See also: <see cref="relativeSize"/>, <see cref="useCustomRenderRange">
+	/// See also: <see cref="relativeSize"/>, <see cref="useCustomRenderRange"/>
 	public virtual Vector3 size {
-		get{ return _size;}
+		get {return _size;}
 		set {
-			if (value == _size) {// needed because the editor fires the setter even if this wasn't changed
-				return;
-			}
-			_size = Vector3.Max(value, Vector3.zero);
-			_drawPointsMustUpdate = true;
-			_drawPointsCountMustUpdate = true;
-			if( GridChangedEvent != null ) // fire the event
-				GridChangedEvent( this );
+			SetMember<Vector3>(value, ref _size, restrictor: Vector3.Max, limit: Vector3.zero, updateMatrix: false);
 		}
 	}
 
 	/// <summary>Custom lower limit for drawing and rendering.</summary>
 	/// <value>Custom lower limit for drawing and rendering.</value>
-	/// When using a custom rendering range this is the lower left backward limit of the rendering and drawing.
+	/// When using a custom rendering range this is the lower left backward
+	/// limit of the rendering and drawing.
 	/// 
-	/// See also: <see cref="relativeSize"/>, <see cref="useCustomRenderRange">, <see cref="renderTo"/>
+	/// See also: <see cref="relativeSize"/>, <see cref="useCustomRenderRange"/>, <see cref="renderTo"/>
 	public virtual Vector3 renderFrom {
-		get{ return _renderFrom;}
+		get {return _renderFrom;}
 		set {
-			if (value == _renderFrom) {// needed because the editor fires the setter even if this wasn't changed
-				return;
-			}
-			_renderFrom = Vector3.Min(value, renderTo);
-			_drawPointsMustUpdate = true;
-			_drawPointsCountMustUpdate = true;
-			if( GridChangedEvent != null ) // fire the event
-				GridChangedEvent( this );
+			SetMember<Vector3>(value, ref _renderFrom, restrictor: Vector3.Min, limit: renderTo, updateMatrix: false);
 		}
 	}
 
@@ -259,18 +241,11 @@ public abstract class GFGrid : MonoBehaviour {
 	/// <value>Custom upper limit for drawing and rendering.</value>
 	/// When using a custom rendering range this is the upper right forward limit of the rendering and drawing.
 	/// 
-	/// See also: <see cref="relativeSize"/>, <see cref="useCustomRenderRange">, <see cref="renderFrom"/>
+	/// See also: <see cref="relativeSize"/>, <see cref="useCustomRenderRange"/>, <see cref="renderFrom"/>
 	public virtual Vector3 renderTo {
-		get{ return _renderTo;}
+		get {return _renderTo;}
 		set {
-			if (value == _renderTo) {// needed because the editor fires the setter even if this wasn't changed
-				return;
-			}
-			_renderTo = Vector3.Max(value, _renderFrom);
-			_drawPointsMustUpdate = true;
-			_drawPointsCountMustUpdate = true;
-			if( GridChangedEvent != null ) // fire the event
-				GridChangedEvent( this );
+			SetMember<Vector3>(value, ref _renderTo, restrictor: Vector3.Max, limit: renderFrom, updateMatrix: false);
 		}
 	}
 	#endregion
@@ -301,15 +276,7 @@ public abstract class GFGrid : MonoBehaviour {
 	public Vector3 originOffset {
 		get { return _originOffset;}
 		set {
-			if (value == _originOffset) {// needed because the editor fires the setter even if this wasn't changed
-				return;
-			}
-			_originOffset = value;
-			_matricesMustUpdate = true;
-			_drawPointsMustUpdate = true;
-			_drawPointsCountMustUpdate = true;
-			if( GridChangedEvent != null ) // fire the event
-				GridChangedEvent(this);
+			SetMember<Vector3>(value, ref _originOffset);
 		}
 	}
 	#endregion
@@ -370,8 +337,7 @@ public abstract class GFGrid : MonoBehaviour {
 	/// The grid will only be rendered if this flag is set to <c>true</c>, otherwise you won't be able to see the grid in the game.
 	public bool renderGrid = true;
 
-	[SerializeField]
-	protected bool _useCustomRenderRange = false;
+	[SerializeField] protected bool _useCustomRenderRange = true;
 	/// <summary>Use your own values for the range of the rendering.</summary>
 	/// <value><c>true</c> if using a custom range for rendering and drawing; otherwise, <c>false</c>.</value>
 	/// If this flag is set to <c>true</c> the grid rendering and drawing will use the values of <see cref="renderFrom"/> and <see cref="renderTo"/> as limits. Otherwise
@@ -379,14 +345,7 @@ public abstract class GFGrid : MonoBehaviour {
 	public bool useCustomRenderRange {
 		get{ return _useCustomRenderRange;}
 		set{ 
-			if (value == _useCustomRenderRange) {
-				return;
-			}
-			_useCustomRenderRange = value;
-			_drawPointsMustUpdate = true;
-			_drawPointsCountMustUpdate = true;
-			if( GridChangedEvent != null ) // fire the event
-				GridChangedEvent( this );
+			SetMember<bool>(value, ref _useCustomRenderRange, false);
 		}
 	}
 
@@ -440,6 +399,58 @@ public abstract class GFGrid : MonoBehaviour {
 		if (GridChangedEvent != null) // fire the event
 			GridChangedEvent(this);
 	}
+	#endregion
+
+	#region Set Members
+	// These two methods should be combined if I can figure out how to make the
+	// limit and restrictor optional for both value- and reference types.
+
+	/// <summary>Sets a member to a value and applies additional routines in the process.</summary>
+	/// <param name="value">        The value to assign.                   </param>
+	/// <param name="member">       The member to be assigned to.          </param>
+	/// <param name="updateMatrix"> Whether to update the grid's matrices. </param>
+	///
+	/// This method should be used for setters of grid members. The method will
+	/// abort if the member is already equal to the value. Otherise it will update
+	/// matriced and draw points if necessary. When all that is done the grid
+	/// change event is fired.
+	protected void SetMember<T> (T value, ref T member, bool updateMatrix = true) {
+			if (System.Collections.Generic.EqualityComparer<T>.Default.Equals(value, member)) {
+				return;
+			}
+			member = value;
+			_matricesMustUpdate |= updateMatrix;
+			_drawPointsMustUpdate = true;
+			_drawPointsCountMustUpdate |= !relativeSize;
+			GridChanged();
+	}
+
+	/// <summary>Sets a member to a value and applies additional routines in the process.</summary>
+	/// <param name="value">        The value to assign.                   </param>
+	/// <param name="member">       The member to be assigned to.          </param>
+	/// <param name="limit">        A limiting value.                      </param>
+	/// <param name="restrictor">   A function to apply the limit.         </param>
+	/// <param name="updateMatrix"> Whether to update the grid's matrices. </param>
+	///
+	/// This method should be used for setters of grid members. The method will
+	/// abort if the member is already equal to the value. Otherise it will first
+	/// apply the limit using a supplied function and then update matriced and
+	/// draw points if necessary. When all that is done the grid change event is
+	/// fired.
+	protected void SetMember<T> (T value, ref T member, T limit, Func<T, T, T> restrictor, bool updateMatrix = true) {
+			// needed because the editor fires the setter even if this wasn't changed
+			if (System.Collections.Generic.EqualityComparer<T>.Default.Equals(value, member)) {
+				return;
+			}
+			//if (restrictor != null && limit != null) {
+				member = restrictor(value, limit);
+			//}
+			_matricesMustUpdate |= updateMatrix;
+			_drawPointsMustUpdate = true;
+			_drawPointsCountMustUpdate |= !relativeSize;
+			GridChanged();
+	}
+	
 	#endregion
 	#endregion
 	
@@ -741,7 +752,11 @@ public abstract class GFGrid : MonoBehaviour {
 					dir = Vector3.Cross(_drawPoints[i][0][0] - _drawPoints[i][0][1], camTransform.forward).normalized;
 				}
 				//multiply dir with the world length of one pixel in distance
+				#if UNITY_2_6 || UNITY_2_6_1
 				if (cam.isOrthoGraphic) {
+				#else
+				if (cam.orthographic) {
+				#endif
 					dir *= (cam.orthographicSize * 2) / cam.pixelHeight;
 				} else {// (the 50 below is just there to smooth things out)
 					dir *= (cam.ScreenToWorldPoint(new Vector3(0, 0, 50)) - cam.ScreenToWorldPoint(new Vector3(20, 0, 50))).magnitude / 20;
@@ -830,7 +845,7 @@ public abstract class GFGrid : MonoBehaviour {
 	/// next entry is the starting point of the next line and so on.
 	public Vector3[] GetVectrosityPoints(Vector3 from, Vector3 to) {
 		Vector3[][] seperatePoints = GetVectrosityPointsSeparate(from, to); 
-		Vector3[] returnedPoints = new Vector3[seperatePoints[0].Length + seperatePoints[1].Length + seperatePoints[2].Length];
+		var returnedPoints = new Vector3[seperatePoints[0].Length + seperatePoints[1].Length + seperatePoints[2].Length];
 		seperatePoints[0].CopyTo(returnedPoints, 0);
 		seperatePoints[1].CopyTo(returnedPoints, seperatePoints[0].Length);
 		seperatePoints[2].CopyTo(returnedPoints, seperatePoints[0].Length + seperatePoints[1].Length);
@@ -855,20 +870,20 @@ public abstract class GFGrid : MonoBehaviour {
 		// Count the amount of points
 		int lengthX = 0, lengthY = 0, lengthZ = 0;
 		drawPointsCount(ref lengthX, ref lengthY, ref lengthZ, ref from, ref to);
-		int[] lengths = new int[3] {lengthX, lengthY, lengthZ};
+		var lengths = new [] {lengthX, lengthY, lengthZ};
 
 		// Compute the lines
-		Vector3[][][] lines = new Vector3[3][][]; // allocate the arrays first
+		var lines = new Vector3[3][][]; // allocate the arrays first
 		for (int i = 0; i < 3; ++i) {
 			lines[i] = new Vector3[lengths[i]][];
 			for (int j = 0; j < lengths[i]; ++j) {
-				lines[i][j] = new Vector3[2] {Vector3.zero, Vector3.zero};
+				lines[i][j] = new [] {Vector3.zero, Vector3.zero};
 			}
 		}
 		drawPointsCalculate(ref lines, ref lengths, from, to);
 
 		// Make lines into points
-		Vector3[][] points = new Vector3[3][];
+		var points = new Vector3[3][];
 		for (int i = 0; i < 3; ++i) {
 			points[i] = new Vector3[2 * lengths[i]];
 			for (int j = 0; j < lengths[i]; ++j) {
@@ -915,7 +930,10 @@ public abstract class GFGrid : MonoBehaviour {
 	
 	#region helper methods
 	// swaps two variables, useful for swapping quasi-X and quasi-Y to keep the same formula for pointy sides and flat sides
-	protected static void Swap<T>(ref T a, ref T b, bool condition = true) {
+	protected static void Swap<T>(ref T a, ref T b) {
+		Swap<T>(ref a, ref b, true);
+	}
+	protected static void Swap<T>(ref T a, ref T b, bool condition) {
 		if (condition) {
 			T temp = b;
 			b = a;
@@ -934,6 +952,15 @@ public abstract class GFGrid : MonoBehaviour {
 	// returns the a number rounded to the nearest multiple of anothr number (rounds down)
 	protected static float RoundFloor(float number, float multiple) {
 		return Mathf.Floor(number / multiple) * multiple;// could use Ceil or Floor to always round up or down
+	}
+
+	/// <summary>Computes the remainder, but always as a positive number.</summary>
+	/// <param name="a">Dividend.</param>
+	/// <param name="b">Divisor.</param>
+	/// <returns>Remainerder of Dividend / Divisor, always as a positive number.</returns>
+	/// The default % operator will return a negative number if Dividend is negative, this variant always returns a positive number.
+	protected static int Mod(int a, int b) {
+		return (a %= b) >= 0 ? a : -a;
 	}
 	#endregion
 	

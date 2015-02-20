@@ -1,4 +1,4 @@
-//#define NoTagPenalty		//Enables or disables tag penalties. Can give small performance boost
+//#define ASTAR_NoTagPenalty		//Enables or disables tag penalties. Can give small performance boost
 
 #if UNITY_4_0 || UNITY_4_1 || UNITY_4_2 || UNITY_3_5 || UNITY_3_4 || UNITY_3_3
 #define UNITY_LE_4_3

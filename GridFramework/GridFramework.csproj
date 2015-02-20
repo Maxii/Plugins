@@ -53,9 +53,6 @@
     <Compile Include="Abstracts\GFGrid.cs" />
     <Compile Include="Abstracts\GFLayeredGrid.cs" />
     <Compile Include="Enumerations.cs" />
-    <Compile Include="Extension Methods\GFTransformExtensions.cs" />
-    <Compile Include="Extension Methods\GFVectorThreeExtensions.cs" />
-    <Compile Include="Extension Methods\GFVectorTwoExtensions.cs" />
     <Compile Include="GFHexGrid.cs" />
     <Compile Include="GFPolarGrid.cs" />
     <Compile Include="GFRectGrid.cs" />

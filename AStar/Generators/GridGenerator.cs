@@ -1,6 +1,14 @@
-//#define ASTAR_NoTagPenalty		//Enables or disables tag penalties. Can give small performance boost
+//#define ASTAR_NoTagPenalty		//@SHOWINEDITOR Enables or disables tag penalties. Can give small performance boost
 //#define ASTARDEBUG
+//#define ASTAR_NO_JSON
 #define ASTAR_GRID_CUSTOM_CONNECTIONS	
+
+//#if UNITY_WINRT && !UNITY_EDITOR
+//using Math = MarkerMetro.Unity.WinLegacy.Math;
+//#else
+using Math = System.Math;
+//#endif
+	
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
@@ -100,7 +108,28 @@ AstarPath.active.Scan();
 		
 		[JsonMember]
 		public float aspectRatio = 1F; /**< Scaling of the graph along the X axis. This should be used if you want different scales on the X and Y axis of the grid */
-		//public Vector3 offset;
+
+		/** Angle to use for the isometric projection.
+		 * If you are making a 2D isometric game, you may want to use this parameter to adjust the layout of the graph to match your game.
+		 * This will essentially scale the graph along one of its diagonals to produce something like this:
+		 * 
+		 * A perspective view of an isometric graph.
+		 * \shadowimage{isometric/isometric_perspective.png}
+		 * 
+		 * A top down view of an isometric graph. Note that the graph is entirely 2D, there is no perspective in this image.
+		 * \shadowimage{isometric/isometric_top.png}
+		 * 
+		 * Usually the angle that you want to use is either 30 degrees (alternatively 90-30 = 60 degrees) or atan(1/sqrt(2)) which is approximately 35.264 degrees (alternatively 90 - 35.264 = 54.736 degrees).
+		 * You might also want to rotate the graph plus or minus 45 degrees around the Y axis to get the oritientation required for your game.
+		 * 
+		 * You can read more about it on the wikipedia page linked below.
+		 * 
+		 * \see http://en.wikipedia.org/wiki/Isometric_projection
+		 * \see rotation
+		 */
+		[JsonMember]
+		public float isometricAngle = 0;
+
 		[JsonMember]
 		public Vector3 rotation; /**< Rotation of the grid in degrees */
 		
@@ -170,11 +199,19 @@ AstarPath.active.Scan();
 		[JsonMember]
 		public int erosionFirstTag = 1;
 		
-		/** Auto link the graph's edge nodes together with other GridGraphs in the scene on Scan. \see #autoLinkDistLimit */
+		/** 
+		 * Auto link the graph's edge nodes together with other GridGraphs in the scene on Scan.
+		 * \warning This feature is experimental and it is currently disabled.
+		 *
+		 * \see #autoLinkDistLimit */
 		[JsonMember]
 		public bool autoLinkGrids = false;
 		
-		/** Distance limit for grid graphs to be auto linked. \see #autoLinkGrids */
+		/**
+		 * Distance limit for grid graphs to be auto linked.
+		 * \warning This feature is experimental and it is currently disabled.
+		 *
+		 * \see #autoLinkGrids */
 		[JsonMember]
 		public float autoLinkDistLimit = 10F;
 		
@@ -186,24 +223,38 @@ AstarPath.active.Scan();
 		[JsonMember]
 		public bool cutCorners = true;
 		
-		[JsonMember]
 		/** Offset for the position when calculating penalty.
 		  * \see penaltyPosition */
+		[JsonMember]
 		public float penaltyPositionOffset = 0;
-		[JsonMember]
+
 		/** Use position (y-coordinate) to calculate penalty */
-		public bool penaltyPosition = false;
 		[JsonMember]
+
+		public bool penaltyPosition = false;
 		/** Scale factor for penalty when calculating from position.
 		 * \see penaltyPosition
 		 */
+		[JsonMember]
 		public float penaltyPositionFactor = 1F;
 		
 		[JsonMember]
 		public bool penaltyAngle = false;
+
 		[JsonMember]
+		/** How much penalty is applied depending on the slope of the terrain.
+		  * At a 90 degree slope (not that exactly 90 degree slopes can occur, but almost 90 degree), this penalty is applied.
+		  * At a 45 degree slope, half of this is applied and so on.
+		  * Note that you may require very large values, a value of 1000 is equivalent to the cost of moving 1 world unit.
+		  */
 		public float penaltyAngleFactor = 100F;
-		
+
+		[JsonMember]
+		/** How much extra to penalize very steep angles.
+		 */
+		public float penaltyAnglePower = 1;
+
+
 		
 		/** \} */
 		
@@ -251,7 +302,6 @@ AstarPath.active.Scan();
 		}
 		
 		public Int3 GetNodePosition (int index, int yOffset) {
-			//int z = Math.DivRem (index,Width, out x);
 			int z = index/Width;
 			int x = index - z*Width;
 			return (Int3)matrix.MultiplyPoint3x4(new Vector3(x+0.5f,yOffset*Int3.PrecisionFactor,z+0.5f));//return Int3.zero;}
@@ -298,7 +348,6 @@ AstarPath.active.Scan();
 				return true;
 			} else {
 				int index = node.NodeInGridIndex;
-				//int z = Math.DivRem (index,Width, out x);
 				int z = index/Width;
 				int x = index - z*Width;
 				
@@ -308,7 +357,6 @@ AstarPath.active.Scan();
 		
 		public void SetNodeConnection (GridNode node, int dir, bool value) {
 			int index = node.NodeInGridIndex;
-			//int z = Math.DivRem (index,Width, out x);
 			int z = index/Width;
 			int x = index - z*Width;
 			
@@ -350,17 +398,6 @@ AstarPath.active.Scan();
 		 */
 		public void SetNodeConnection (int index, int x, int z, int dir, bool value) {
 			nodes[index].SetConnectionInternal (dir, value);
-			
-			/*
-			/* \todo Mark edge nodes and only do bounds checking for them /
-			int nx = x + neighbourXOffsets[dir];
-			if (nx < 0 || nx >= Width) return; /** \todo Modify to get adjacent grid graph here 
-			int nz = z + neighbourZOffsets[dir];
-			if (nz < 0 || nz >= Depth) return;
-			int nindex = index + neighbourOffsets[dir];
-			
-			if (dir < 8) nodes[index].SetConnectionInternal (dir, value);
-			else nodes[nindex].SetConnectionInternal (dir, value);*/
 		}
 		
 		public bool HasNodeConnection (int index, int x, int z, int dir) {
@@ -371,7 +408,6 @@ AstarPath.active.Scan();
 			if (nx < 0 || nx >= Width) return false; /** \todo Modify to get adjacent grid graph here */
 			int nz = z + neighbourZOffsets[dir];
 			if (nz < 0 || nz >= Depth) return false;
-			//int nindex = index + neighbourOffsets[dir];
 			
 			return true;
 		}
@@ -400,11 +436,10 @@ AstarPath.active.Scan();
 			//size.y = size.y < 0.1F ? 0.1F : size.y;
 			size.y = size.y < nodeSize ? nodeSize : size.y;
 			
-			
-			boundsMatrix.SetTRS (center,Quaternion.Euler (rotation),new Vector3 (aspectRatio,1,1));
-			
-			//bounds.center = boundsMatrix.MultiplyPoint (Vector3.up*height*0.5F);
-			//bounds.size = new Vector3 (width*nodeSize,height,depth*nodeSize);
+			var isometricMatrix = Matrix4x4.TRS (Vector3.zero, Quaternion.Euler(0,45,0), Vector3.one);
+			isometricMatrix = Matrix4x4.Scale ( new Vector3 ( Mathf.Cos(Mathf.Deg2Rad*isometricAngle), 1, 1 ) ) * isometricMatrix;
+			isometricMatrix = Matrix4x4.TRS (Vector3.zero, Quaternion.Euler(0,-45,0), Vector3.one) * isometricMatrix;
+			boundsMatrix = Matrix4x4.TRS (center,Quaternion.Euler (rotation),new Vector3 (aspectRatio,1,1)) * isometricMatrix;
 			
 			width = Mathf.FloorToInt (size.x / nodeSize);
 			depth = Mathf.FloorToInt (size.y / nodeSize);
@@ -418,14 +453,12 @@ AstarPath.active.Scan();
 			}
 			
 			//height = size.y;
-			
-			SetMatrix (Matrix4x4.TRS (boundsMatrix.MultiplyPoint3x4 (-new Vector3 (size.x,0,size.y)*0.5F),Quaternion.Euler(rotation), new Vector3 (nodeSize*aspectRatio,1,nodeSize)));
+
+
+			var m = Matrix4x4.TRS (boundsMatrix.MultiplyPoint3x4 (-new Vector3 (size.x,0,size.y)*0.5F),Quaternion.Euler(rotation), new Vector3 (nodeSize*aspectRatio,1,nodeSize)) * isometricMatrix;
+
+			SetMatrix (m);
 		}
-		
-		//public void GenerateBounds () {
-			//bounds.center = offset+new Vector3 (0,height*0.5F,0);
-			//bounds.size = new Vector3 (width*scale,height,depth*scale);
-		//}
 		
 		/** \todo Set clamped position for Grid Graph */
 		public override NNInfo GetNearest (Vector3 position, NNConstraint constraint, GraphNode hint) {
@@ -445,10 +478,6 @@ AstarPath.active.Scan();
 			
 			float y = inverseMatrix.MultiplyPoint3x4((Vector3)nodes[z*width+x].position).y;
 			nn.clampedPosition = matrix.MultiplyPoint3x4 (new Vector3(Mathf.Clamp(xf,x-0.5f,x+0.5f)+0.5f,y,Mathf.Clamp(zf,z-0.5f,z+0.5f)+0.5f));
-			
-			//Set clamped position
-			//nn.clampedPosition = new Vector3(Mathf.Clamp (xf,x-0.5f,x+0.5f),position.y,Mathf.Clamp (zf,z-0.5f,z+0.5f));
-			//nn.clampedPosition = matrix.MultiplyPoint3x4 (nn.clampedPosition);
 			
 			return nn;
 		}
@@ -493,15 +522,10 @@ AstarPath.active.Scan();
 				else overlap--;
 			}
 			
-			
-			//int counter = 0;
-			
-			
 			float maxDist = constraint.constrainDistance ? AstarPath.active.maxNearestNodeDistance : float.PositiveInfinity;
 			float maxDistSqr = maxDist*maxDist;
 			
-			
-			//for (int w = 1; w < getNearestForceLimit;w++) {
+
 			for (int w = 1;;w++) {
 				
 				//Check if the nodes are within distance limit
@@ -665,25 +689,13 @@ AstarPath.active.Scan();
 				Debug.LogError ("One of the grid's sides is longer than 1024 nodes");
 				return;
 			}
-			
-			//GenerateBounds ();
-			
-			/*neighbourOffsets = new int[8] {
-				-width-1,-width,-width+1,
-				-1,1,
-				width-1,width,width+1
-			}*/
+
 			
 			SetUpOffsetsAndCosts ();
 			
-			//GridNode.RemoveGridGraph (this);
-			
 			int graphIndex = AstarPath.active.astarData.GetGraphIndex(this);
 			GridNode.SetGridGraph (graphIndex,this);
-			
-			//graphNodes = new GridNode[width*depth];
-			
-			//nodes = CreateNodes (width*depth);
+
 			nodes = new GridNode[width*depth];
 			for (int i=0;i<nodes.Length;i++) {
 				nodes[i] = new GridNode(active);
@@ -696,48 +708,14 @@ AstarPath.active.Scan();
 			collision.Initialize (matrix,nodeSize);
 			
 			
-			//Max slope in cosinus
-			//float cosAngle = Mathf.Cos (maxSlope*Mathf.Deg2Rad);
-			
 			for (int z = 0; z < depth; z ++) {
 				for (int x = 0; x < width; x++) {
 					
-					GridNode node = nodes[z*width+x];//new GridNode ();
+					GridNode node = nodes[z*width+x];
 					
 					node.NodeInGridIndex = z*width+x;
 					
 					UpdateNodePositionCollision (node,x,z);
-					
-					
-					/*node.position = matrix.MultiplyPoint3x4 (new Vector3 (x+0.5F,0,z+0.5F));
-					
-					RaycastHit hit;
-					
-					bool walkable = true;
-					
-					node.position = collision.CheckHeight (node.position, out hit, out walkable);
-					
-					node.penalty = 0;//Mathf.RoundToInt (Random.value*100);
-					
-					//Check if the node is on a slope steeper than permitted
-					if (walkable && useRaycastNormal && collision.heightCheck) {
-						
-						if (hit.normal != Vector3.zero) {
-							//Take the dot product to find out the cosinus of the angle it has (faster than Vector3.Angle)
-							float angle = Vector3.Dot (hit.normal.normalized,Vector3.up);
-							
-							if (angle < cosAngle) {
-								walkable = false;
-							}
-						}
-					}
-					
-					//If the walkable flag has already been set to false, there is no point in checking for it again
-					if (walkable) {
-						node.walkable = collision.Check (node.position);
-					} else {
-						node.walkable = walkable;
-					}*/
 					
 				}
 			}
@@ -755,10 +733,6 @@ AstarPath.active.Scan();
 			
 			
 			ErodeWalkableArea ();
-			//Assign the nodes to the main storage
-			
-			//startIndex = AstarPath.active.AssignNodes (graphNodes);
-			//endIndex = startIndex+graphNodes.Length;
 		}
 		
 		/** Updates position, walkability and penalty for the node.
@@ -772,31 +746,28 @@ AstarPath.active.Scan();
 			bool walkable = true;
 
 			Vector3 position = collision.CheckHeight ((Vector3)node.position, out hit, out walkable);
-			//if (walkable)
-				node.position = (Int3)position;//GetNodePosition ( node.NodeInGridIndex, (int)((collision.fromHeight - hit.distance)*Int3.Precision) );
+			node.position = (Int3)position;
 			
 			if (resetPenalty)
-				node.Penalty = initialPenalty;//Mathf.RoundToInt (Random.value*100);
+				node.Penalty = initialPenalty;
 			
 			if (penaltyPosition && resetPenalty) {
 				node.Penalty += (uint)Mathf.RoundToInt ((node.position.y-penaltyPositionOffset)*penaltyPositionFactor);
 			}
-			
-			/*if (textureData && textureSourceData != null && x < textureSource.width && z < textureSource.height) {
-				for (int i=0;i<3;i++) {
-					//node.penalty = textureSourceData
-				}
-			}*/
+
 			//Check if the node is on a slope steeper than permitted
 			if (walkable && useRaycastNormal && collision.heightCheck) {
 				
 				if (hit.normal != Vector3.zero) {
 					//Take the dot product to find out the cosinus of the angle it has (faster than Vector3.Angle)
 					float angle = Vector3.Dot (hit.normal.normalized,collision.up);
-					
+					if ( Mathf.Abs ( 1 - collision.up.magnitude ) > 0.1f ) {
+						Debug.Log ("HI");
+					}
+
 					//Add penalty based on normal
 					if (penaltyAngle && resetPenalty) {
-						node.Penalty += (uint)Mathf.RoundToInt ((1F-angle)*penaltyAngleFactor);
+						node.Penalty += (uint)Mathf.RoundToInt ((1F-Mathf.Pow(angle, penaltyAnglePower))*penaltyAngleFactor);
 					}
 					
 					//Max slope in cosinus
@@ -816,8 +787,6 @@ AstarPath.active.Scan();
 				node.Walkable = walkable;
 			
 			node.WalkableErosion = node.Walkable;
-			//Equal to (node as GridNode).WalkableErosion = node.walkable, but this is faster
-			
 		}
 		
 		/** Erodes the walkable area. \see #erodeIterations */
@@ -960,17 +929,17 @@ AstarPath.active.Scan();
 		public virtual void CalculateConnections (GridNode[] nodes, int x, int z, GridNode node) {
 			
 			//Reset all connections
-			//node.flags = node.lags & -256;
-			
+			// This makes the node have NO connections to any neighbour nodes
 			node.ResetConnectionsInternal ();
 			
 			//All connections are disabled if the node is not walkable
 			if (!node.Walkable) {
 				return;
 			}
-			
+
+			// Internal index of where in the graph the node is
 			int index = node.NodeInGridIndex;
-			
+
 			if (corners == null) {
 				corners = new int[4];
 			} else {
@@ -978,7 +947,8 @@ AstarPath.active.Scan();
 					corners[i] = 0;
 				}
 			}
-			
+
+			// Loop through axis aligned neighbours (up, down, right, left)
 			for (int i=0, j = 3; i<4; j = i, i++) {
 				
 				int nx = x + neighbourXOffsets[i];
@@ -992,15 +962,14 @@ AstarPath.active.Scan();
 				
 				if (IsValidConnection (node, other)) {
 					node.SetConnectionInternal (i, true);
-					//SetNodeConnection (node, i, true);
 					corners[i]++;
 					corners[j]++;
 				} else {
 					node.SetConnectionInternal (i, false);
-					//SetNodeConnection (node, i, false);
 				}
 			}
-			
+
+			// Add in the diagonal connections
 			if (neighbours == NumNeighbours.Eight) {
 				if (cutCorners) {
 					for (int i=0; i<4; i++) {
@@ -1016,7 +985,6 @@ AstarPath.active.Scan();
 							GridNode other = nodes[index+neighbourOffsets[i+4]];
 							
 							node.SetConnectionInternal (i+4, IsValidConnection (node,other));
-							//SetNodeConnection (node, i+4, IsValidConnection (node,other));
 						}
 					}
 				} else {
@@ -1027,7 +995,6 @@ AstarPath.active.Scan();
 							GridNode other = nodes[index+neighbourOffsets[i+4]];
 							
 							node.SetConnectionInternal (i+4, IsValidConnection (node,other));
-							//SetNodeConnection (node, i+4, IsValidConnection (node,other));
 						}
 					}
 				}
@@ -1054,9 +1021,7 @@ AstarPath.active.Scan();
 		}
 		
 		public override void OnDrawGizmos (bool drawNodes) {
-			
-			//GenerateMatrix ();
-			
+
 			Gizmos.matrix = boundsMatrix;
 			Gizmos.color = Color.white;
 			Gizmos.DrawWireCube (Vector3.zero, new Vector3 (size.x,0,size.y));
@@ -1071,34 +1036,22 @@ AstarPath.active.Scan();
 				//Scan (AstarPath.active.GetGraphIndex (this));
 				return;
 			}
-			
-			//base.OnDrawGizmos (drawNodes);
-			
+
 			PathHandler debugData = AstarPath.active.debugPathData;
 			
 			GridNode node = null;
-			
-			/*GraphNodeDelegate del = delegate (GraphNode other) {
-				Gizmos.DrawLine ((Vector3)node.Position, (Vector3)other.Position);
-			};*/
-			
+
 			for (int z = 0; z < depth; z ++) {
 				for (int x = 0; x < width; x++) {
 					node = nodes[z*width+x] as GridNode;
 					
-					if (!node.Walkable) {// || node.activePath != AstarPath.active.debugPath)  
+					if (!node.Walkable) {
 						continue;
 					}
-					//Gizmos.color = node.walkable ? Color.green : Color.red;
-					//Gizmos.DrawSphere (node.position,0.2F);
-					
+
 					Gizmos.color = NodeColor (node,AstarPath.active.debugPathData);
-					
-					//if (true) {
-					//	Gizmos.DrawCube (node.position,Vector3.one*nodeSize);
-					//}
-					//else 
-					if (AstarPath.active.showSearchTree && AstarPath.active.debugPathData != null) {
+
+					if (AstarPath.active.showSearchTree && debugData != null) {
 						if (InSearchTree(node,AstarPath.active.debugPath)) {
 							PathNode nodeR = debugData.GetPathNode (node);
 							if (nodeR != null && nodeR.parent != null) {
@@ -1404,88 +1357,6 @@ AstarPath.active.Scan();
 			}
 		}
 		
-		//IFunnelGraph Implementation
-		
-		/*
-		public void BuildFunnelCorridor (List<GraphNode> path, int sIndex, int eIndex, List<Vector3> left, List<Vector3> right) {
-			
-			for (int n=sIndex;n<eIndex;n++) {
-				
-				GridNode n1 = path[n] as GridNode;
-				GridNode n2 = path[n+1] as GridNode;
-				
-				AddPortal (n1,n2,left,right);
-			}
-		}
-		
-		public void AddPortal (GraphNode n1, GraphNode n2, List<Vector3> left, List<Vector3> right) {
-			//Not implemented
-		}
-		
-		public void AddPortal (GridNode n1, GridNode n2, List<Vector3> left, List<Vector3> right) {
-			
-			if (n1 == n2) {
-				return;
-			}
-			
-			int i1 = n1.NodeInGridIndex;
-			int i2 = n2.NodeInGridIndex;
-			/** \todo Use System.Math.DivRem *
-			int x1 = i1 % width;
-			int x2 = i2 % width;
-			int z1 = i1 / width;
-			int z2 = i2 / width;
-			
-			Vector3 n1p = (Vector3)n1.Position;
-			Vector3 n2p = (Vector3)n2.Position;
-			
-			int diffx = Mathf.Abs (x1-x2);
-			int diffz = Mathf.Abs (z1-z2);
-			
-			if (diffx > 1 || diffz > 1) {
-				//If the nodes are not adjacent to each other
-				
-				left.Add (n1p);
-				right.Add (n1p);
-				left.Add (n2p);
-				right.Add (n2p);
-			} else if ((diffx+diffz) <= 1){
-				//If it is not a diagonal move
-				
-				Vector3 dir = n2p - n1p;
-				dir = dir.normalized * nodeSize * 0.5F;
-				Vector3 tangent = Vector3.Cross (dir, Vector3.up);
-				tangent = tangent.normalized * nodeSize * 0.5F;
-				
-				left.Add (n1p + dir - tangent);
-				right.Add (n1p + dir + tangent);
-			} else {
-				//Diagonal move
-				
-				GraphNode t1 = nodes[z1 * width + x2];
-				GraphNode t2 = nodes[z2 * width + x1];
-				GraphNode target = null;
-				
-				if (t1.Walkable) {
-					target = t1;
-				} else if (t2.Walkable) {
-					target = t2;
-				}
-				
-				if (target == null) {
-					Vector3 avg = (n1p + n2p) * 0.5F;
-					
-					left.Add (avg);
-					right.Add (avg);
-				} else {
-					AddPortal (n1,(GridNode)target,left,right);
-					AddPortal ((GridNode)target,n2,left,right);
-				}
-			}
-		}*/
-		
-		//END IFunnelGraph Implementation
-		
 		
 		/** Returns if \a node is connected to it's neighbour in the specified direction.
 		  * This will also return true if #neighbours = NumNeighbours.Four, the direction is diagonal and one can move through one of the adjacent nodes
@@ -1515,7 +1386,7 @@ AstarPath.active.Scan();
 				return true;
 			}
 		}
-		
+
 		public override void SerializeExtraInfo (GraphSerializationContext ctx)
 		{
 			if (nodes == null) {
@@ -1546,7 +1417,67 @@ AstarPath.active.Scan();
 				nodes[i].DeserializeNode(ctx);
 			}
 		}
+
+#if ASTAR_NO_JSON
+
+		public override void SerializeSettings ( GraphSerializationContext ctx ) {
+
+			base.SerializeSettings (ctx);
+			ctx.writer.Write (aspectRatio);
+			ctx.SerializeVector3 (rotation);
+			ctx.SerializeVector3 (center);
+			ctx.SerializeVector3 ((Vector3)unclampedSize);
+			ctx.writer.Write (nodeSize);
+			// collision
+			collision.SerializeSettings (ctx);
+
+			ctx.writer.Write (maxClimb);
+			ctx.writer.Write (maxClimbAxis);
+			ctx.writer.Write (maxSlope);
+			ctx.writer.Write (erodeIterations);
+			ctx.writer.Write (erosionUseTags);
+			ctx.writer.Write (erosionFirstTag);
+			ctx.writer.Write (autoLinkGrids);
+			ctx.writer.Write ((int)neighbours);
+			ctx.writer.Write (cutCorners);
+			ctx.writer.Write (penaltyPosition);
+			ctx.writer.Write (penaltyPositionFactor);
+			ctx.writer.Write (penaltyAngle);
+			ctx.writer.Write (penaltyAngleFactor);
+			ctx.writer.Write (penaltyAnglePower);
+			ctx.writer.Write (isometricAngle);
+
+		}
 		
+		public override void DeserializeSettings ( GraphSerializationContext ctx ) {
+			
+			base.DeserializeSettings (ctx);
+			
+			aspectRatio = ctx.reader.ReadSingle();
+			rotation = ctx.DeserializeVector3();
+			center = ctx.DeserializeVector3();
+			unclampedSize = (Vector2)ctx.DeserializeVector3();
+			nodeSize = ctx.reader.ReadSingle();
+			collision.DeserializeSettings(ctx);
+			maxClimb = ctx.reader.ReadSingle();
+			maxClimbAxis = ctx.reader.ReadInt32();
+			maxSlope = ctx.reader.ReadSingle();
+			erodeIterations = ctx.reader.ReadInt32();
+			erosionUseTags = ctx.reader.ReadBoolean();
+			erosionFirstTag = ctx.reader.ReadInt32();
+			autoLinkGrids = ctx.reader.ReadBoolean();
+			neighbours = (NumNeighbours)ctx.reader.ReadInt32();
+			cutCorners = ctx.reader.ReadBoolean();
+			penaltyPosition = ctx.reader.ReadBoolean();
+			penaltyPositionFactor = ctx.reader.ReadSingle();
+			penaltyAngle = ctx.reader.ReadBoolean();
+			penaltyAngleFactor = ctx.reader.ReadSingle();
+			penaltyAnglePower = ctx.reader.ReadSingle();
+			isometricAngle = ctx.reader.ReadSingle();
+
+		}
+#endif
+
 		public override void PostDeserialization () {
 			
 			
@@ -1561,8 +1492,6 @@ AstarPath.active.Scan();
 				nodes = new GridNode[0];
 				return;
 			}
-			
-			//graphNodes = new GridNode[nodes.Length];
 			
 			GridNode.SetGridGraph (AstarPath.active.astarData.GetGraphIndex(this),this);
 			

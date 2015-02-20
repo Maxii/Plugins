@@ -6,6 +6,8 @@
 #if PLAYMAKER_PRESENT
 using UnityEngine;
 using System.Collections;
+using GridFramework;
+using GridFramework.Vectors;
 
 namespace HutongGames.PlayMaker.Actions {
 	#region Grid Methods
@@ -69,17 +71,25 @@ namespace HutongGames.PlayMaker.Actions {
 		public FsmBool ignoreX, ignoreY, ignoreZ;
 
 		public FsmVector3 result;
-		protected override void DoAction() { result.Value = grid.AlignVector3 (pos.Value, scale.Value, new GFBoolVector3 (ignoreX.Value, ignoreY.Value, ignoreZ.Value)); }
+		protected override void DoAction() { result.Value = grid.AlignVector3 (pos.Value, scale.Value, new BoolVector3 (ignoreX.Value, ignoreY.Value, ignoreZ.Value)); }
 	}
 
 	[Tooltip("Aligns a `Transform`'s position to the gird's \"spacing\"")]
 	public class GridAlignTransform : FsmGFStateActionMethodGrid {
 		[RequiredField]
 		[CheckForComponent(typeof(Transform))]
-		public FsmObject transform;
+		public FsmGameObject transform;
 		[RequiredField]
 		public FsmBool rotate, ignoreX, ignoreY, ignoreZ;
-		protected override void DoAction() { grid.AlignTransform ((Transform)transform.Value, rotate.Value, new GFBoolVector3 (ignoreX.Value, ignoreY.Value, ignoreZ.Value)); }
+
+		private Transform _transform;
+
+		protected override void DoAction() {
+			if (!_transform) {
+				_transform = transform.Value.transform;
+			}
+			grid.AlignTransform (_transform, rotate.Value, new BoolVector3 (ignoreX.Value, ignoreY.Value, ignoreZ.Value));
+		}
 	}
 
 	[Tooltip("Scales a direction `Vector3` to the gird's \"spacing\"")]
@@ -90,18 +100,25 @@ namespace HutongGames.PlayMaker.Actions {
 		public FsmBool ignoreX, ignoreY, ignoreZ;
 
 		public FsmVector3 result;
-		protected override void DoAction() { result.Value = grid.ScaleVector3 (scl.Value, new GFBoolVector3 (ignoreX.Value, ignoreY.Value, ignoreZ.Value)); }
+		protected override void DoAction() { result.Value = grid.ScaleVector3 (scl.Value, new BoolVector3 (ignoreX.Value, ignoreY.Value, ignoreZ.Value)); }
 	}
 
 	[Tooltip("Scales a `Transform`'s scale to the gird's \"spacing\"")]
 	public class GridScaleTransform : FsmGFStateActionMethodGrid {
 		[RequiredField]
 		[CheckForComponent(typeof(Transform))]
-		public FsmObject transform;
+		public FsmGameObject transform;
 		[RequiredField]
 		public FsmBool ignoreX, ignoreY, ignoreZ;
 
-		protected override void DoAction() { grid.ScaleTransform ((Transform)transform.Value, new GFBoolVector3 (ignoreX.Value, ignoreY.Value, ignoreZ.Value)); }
+		private Transform _transform;
+
+		protected override void DoAction() {
+			if (!_transform) {
+				_transform = transform.Value.transform;
+			}
+			grid.ScaleTransform (_transform, new BoolVector3 (ignoreX.Value, ignoreY.Value, ignoreZ.Value));
+		}
 	}
 
 	/*

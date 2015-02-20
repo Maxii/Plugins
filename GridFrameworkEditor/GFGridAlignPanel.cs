@@ -9,10 +9,12 @@ using GridFramework.Vectors;
 - implement offsets
 */ 
 
+/// <summary>Editor extension for aligning and scaling objects along a grid.</summary>
 public class GFGridAlignPanel : EditorWindow {
 	#region class members
-	[SerializeField]
-	GFGrid grid;
+	///<summary>The grid to align objects to.</summary>
+	[SerializeField] GFGrid grid;
+
 	private Transform gridTransform;
 	private Transform gTrnsfrm {
 		get {
@@ -21,26 +23,18 @@ public class GFGridAlignPanel : EditorWindow {
 			return gridTransform;
 		}
 	}
-	[SerializeField]
-	bool ignoreRootObjects;
-	[SerializeField]
-	LayerMask affectedLayers;
-	[SerializeField]
-	bool inculdeChildren;
-	[SerializeField]
-	bool rotateTransform = true;
-	[SerializeField]
-	bool autoSnapping = false;
-	[SerializeField]
-	bool autoRotating = false;
-	[SerializeField]
-	BoolVector3 lockAxes = new BoolVector3(false);
+	[SerializeField] bool ignoreRootObjects;
+	[SerializeField] LayerMask affectedLayers;
+	[SerializeField] bool inculdeChildren;
+	[SerializeField] bool rotateTransform = true;
+	/// <summary>Whether to auto snap objects when dragging.</summary>
+	[SerializeField] bool autoSnapping = false; 
+	[SerializeField] bool autoRotating = false;
+	[SerializeField] BoolVector3 lockAxes = new BoolVector3(false);
 
 	private bool showOffsets = false;
-	[SerializeField]
-	public Vector3 alignOffset = Vector3.zero;
-	[SerializeField]
-	public Vector3 scaleOffset = Vector3.zero;
+	[SerializeField] public Vector3 alignOffset = Vector3.zero;
+	[SerializeField] public Vector3 scaleOffset = Vector3.zero;
 	#endregion
 	
 	[MenuItem("Window/Grid Align Panel")]
@@ -171,8 +165,11 @@ public class GFGridAlignPanel : EditorWindow {
 		RemoveAlignedRotated(ref allTransforms, pGrid);
 		if(allTransforms.Count == 0)
 			return;
-		//Undo.RegisterSceneUndo(name);
+		#if UNITY_3_0 || UNITY_3_0_0 || UNITY_3_1 || UNITY_3_2 || UNITY_3_3 || UNITY_3_4 || UNITY_3_5
+		Undo.RegisterSceneUndo(name);
+		#else
 		Undo.RecordObjects (allTransforms.ToArray (), name);
+		#endif
 		AlignRotateTransforms (pGrid, allTransforms);
 		foreach (Transform t in allTransforms)
 			EditorUtility.SetDirty (t);
@@ -220,7 +217,7 @@ public class GFGridAlignPanel : EditorWindow {
 				if(selectedTransform != gTrnsfrm){
 					if (selectedTransform)
 						if (!AlreadyAligned (selectedTransform))
-							AlignTransform (selectedTransform, true);
+							AlignTransform (selectedTransform, rotateTransform);
 				}
 			}
 		}
@@ -251,8 +248,11 @@ public class GFGridAlignPanel : EditorWindow {
 		RemoveAligned(ref allTransforms);
 		if(allTransforms.Count == 0)
 			return;
-		//Undo.RegisterSceneUndo(name);
+		#if UNITY_3_0 || UNITY_3_0_0 || UNITY_3_1 || UNITY_3_2 || UNITY_3_3 || UNITY_3_4 || UNITY_3_5
+		Undo.RegisterSceneUndo(name);
+		#else
 		Undo.RecordObjects (allTransforms.ToArray (), name);
+		#endif
 		AlignTransforms (allTransforms);
 		foreach (Transform t in allTransforms)
 			EditorUtility.SetDirty (t);
@@ -261,7 +261,7 @@ public class GFGridAlignPanel : EditorWindow {
 	void AlignTransforms (List<Transform> allTransforms) {
 		foreach(Transform curTransform in allTransforms){
 			if(!(ignoreRootObjects && curTransform.parent == null && curTransform.childCount > 0) && (affectedLayers.value & 1<<curTransform.gameObject.layer) != 0){
-				AlignTransform (curTransform, true);
+				AlignTransform (curTransform, rotateTransform);
 				if(inculdeChildren){
 					foreach(Transform child in curTransform){
 						AlignTransform (child, rotateTransform);
@@ -272,7 +272,9 @@ public class GFGridAlignPanel : EditorWindow {
 	}
 
 	private bool AlreadyAligned(Transform trans){
-		return (trans.position - grid.AlignVector3(trans.position, trans.lossyScale) + alignOffset).sqrMagnitude < 0.0001;
+		bool inPlace = (trans.position - grid.AlignVector3(trans.position, trans.lossyScale) + alignOffset).sqrMagnitude < 0.0001;
+		bool rotated = rotateTransform ? Quaternion.Angle(gTrnsfrm.rotation, trans.rotation) < 0.0001 : true;
+		return inPlace && rotated;
 	}
 	
 	private void RemoveAligned(ref List<Transform> transformList){
@@ -295,8 +297,11 @@ public class GFGridAlignPanel : EditorWindow {
 		if(!grid)
 			return;
 		allTransforms.Remove(grid.transform);
-		//Undo.RegisterSceneUndo(name);
+		#if UNITY_3_0 || UNITY_3_0_0 || UNITY_3_1 || UNITY_3_2 || UNITY_3_3 || UNITY_3_4 || UNITY_3_5
+		Undo.RegisterSceneUndo(name);
+		#else
 		Undo.RecordObjects (allTransforms.ToArray (), name);
+		#endif
 		ScaleTransforms (allTransforms);
 		foreach (Transform t in allTransforms)
 			EditorUtility.SetDirty (t);
@@ -325,7 +330,7 @@ public class GFGridAlignPanel : EditorWindow {
 	#endregion
 
 	#region Actual Align & Scale
-	void AlignTransform (Transform t, bool rotate = true) {
+	void AlignTransform (Transform t, bool rotate) {
 		grid.AlignTransform (t, rotate, lockAxes);
 		t.position += alignOffset;
 	}

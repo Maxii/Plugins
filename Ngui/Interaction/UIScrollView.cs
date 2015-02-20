@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -349,23 +349,32 @@ public class UIScrollView : MonoBehaviour
 		}
 	}
 
+	[System.NonSerialized] bool mStarted = false;
+
 	void OnEnable ()
 	{
 		list.Add(this);
+		if (mStarted && Application.isPlaying) CheckScrollbars();
+	}
 
-		if (Application.isPlaying)
+	void Start ()
+	{
+		mStarted = true;
+		if (Application.isPlaying) CheckScrollbars();
+	}
+
+	void CheckScrollbars ()
+	{
+		if (horizontalScrollBar != null)
 		{
-			if (horizontalScrollBar != null)
-			{
-				EventDelegate.Add(horizontalScrollBar.onChange, OnScrollBar);
-				horizontalScrollBar.alpha = ((showScrollBars == ShowCondition.Always) || shouldMoveHorizontally) ? 1f : 0f;
-			}
+			EventDelegate.Add(horizontalScrollBar.onChange, OnScrollBar);
+			horizontalScrollBar.alpha = ((showScrollBars == ShowCondition.Always) || shouldMoveHorizontally) ? 1f : 0f;
+		}
 
-			if (verticalScrollBar != null)
-			{
-				EventDelegate.Add(verticalScrollBar.onChange, OnScrollBar);
-				verticalScrollBar.alpha = ((showScrollBars == ShowCondition.Always) || shouldMoveVertically) ? 1f : 0f;
-			}
+		if (verticalScrollBar != null)
+		{
+			EventDelegate.Add(verticalScrollBar.onChange, OnScrollBar);
+			verticalScrollBar.alpha = ((showScrollBars == ShowCondition.Always) || shouldMoveVertically) ? 1f : 0f;
 		}
 	}
 
@@ -750,6 +759,10 @@ public class UIScrollView : MonoBehaviour
 					mDragStartOffset = Vector2.zero;
 					if (onDragStarted != null) onDragStarted();
 				}
+			}
+			else if (centerOnChild)
+			{
+				centerOnChild.Recenter();
 			}
 			else
 			{

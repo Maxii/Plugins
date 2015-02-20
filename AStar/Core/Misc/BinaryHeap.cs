@@ -8,9 +8,10 @@ using System.Collections.Generic;
 using Pathfinding;
 
 namespace Pathfinding {
-//Binary Heap
-	
 	/** Binary heap implementation. Binary heaps are really fast for ordering nodes in a way that makes it possible to get the node with the lowest F score. Also known as a priority queue.
+	 * 
+	 * This has actually been rewritten as an n-ary heap (by default a 4-ary heap) for performance, but it's the same principle.
+	 * 
 	 * \see http://en.wikipedia.org/wiki/Binary_heap
 	 */
 	public class BinaryHeapM { 
@@ -21,10 +22,22 @@ namespace Pathfinding {
 
 		public const int D = 4;
 
-		private PathNode[] binaryHeap; 
+		const bool SortGScores = true;
+
+		private Tuple[] binaryHeap; 
+
+		private struct Tuple {
+			public uint F;
+			public PathNode node;
+
+			public Tuple ( uint F, PathNode node ) {
+				this.F = F;
+				this.node = node;
+			}
+		}
 
 		public BinaryHeapM ( int numberOfElements ) { 
-			binaryHeap = new PathNode[numberOfElements]; 
+			binaryHeap = new Tuple[numberOfElements]; 
 			numberOfItems = 0;
 		}
 		
@@ -32,8 +45,12 @@ namespace Pathfinding {
 			numberOfItems = 0;
 		}
 		
-		public PathNode GetNode (int i) {
-			return binaryHeap[i];
+		internal PathNode GetNode (int i) {
+			return binaryHeap[i].node;
+		}
+
+		internal void SetF (int i, uint F) {
+			binaryHeap[i].F = F;
 		}
 
 		/** Adds a node to the heap */
@@ -48,7 +65,7 @@ namespace Pathfinding {
 						"\nRemove this check (in BinaryHeap.cs) if you are sure that it is not caused by a bug");
 				}
 
-				PathNode[] tmp = new PathNode[newSize];
+				Tuple[] tmp = new Tuple[newSize];
 
 				for (int i=0;i<binaryHeap.Length;i++) {
 					tmp[i] = binaryHeap[i];
@@ -59,13 +76,15 @@ namespace Pathfinding {
 				//numberOfItems--;
 			}
 
-			PathNode obj = node;
+			Tuple obj = new Tuple(node.F,node);
 			binaryHeap[numberOfItems] = obj;
 
 			//node.heapIndex = numberOfItems;//Heap index
 
 			int bubbleIndex = numberOfItems;
 			uint nodeF = node.F;
+			uint nodeG = node.G;
+
 			//Debug.Log ( "Adding node with " + nodeF + " to index " + numberOfItems);
 			
 			while (bubbleIndex != 0 ) {
@@ -73,7 +92,7 @@ namespace Pathfinding {
 
 				//Debug.Log ("Testing " + nodeF + " < " + binaryHeap[parentIndex].F);
 
-				if (nodeF < binaryHeap[parentIndex].F) {
+				if (nodeF < binaryHeap[parentIndex].F || (nodeF == binaryHeap[parentIndex].F && nodeG > binaryHeap[parentIndex].node.G)) {
 
 				   	
 					//binaryHeap[bubbleIndex].f <= binaryHeap[parentIndex].f) { /* \todo Wouldn't it be more efficient with '<' instead of '<=' ? * /
@@ -101,7 +120,7 @@ namespace Pathfinding {
 		/** Returns the node with the lowest F score from the heap */
 		public PathNode Remove() {
 			numberOfItems--;
-			PathNode returnItem = binaryHeap[0];
+			PathNode returnItem = binaryHeap[0].node;
 
 		 	//returnItem.heapIndex = 0;//Heap index
 			
@@ -134,22 +153,22 @@ namespace Pathfinding {
 					uint swapF = binaryHeap[swapItem].F;
 					int pd = parent * D + 1;
 					
-					if (D >= 1 && pd+0 <= numberOfItems && binaryHeap[pd+0].F < swapF ) {
+					if (D >= 1 && pd+0 <= numberOfItems && (binaryHeap[pd+0].F < swapF || (SortGScores && binaryHeap[pd+0].F == swapF && binaryHeap[pd+0].node.G < binaryHeap[swapItem].node.G))) {
 						swapF = binaryHeap[pd+0].F;
 						swapItem = pd+0;
 					}
 					
-					if (D >= 2 && pd+1 <= numberOfItems && binaryHeap[pd+1].F < swapF ) {
+					if (D >= 2 && pd+1 <= numberOfItems && (binaryHeap[pd+1].F < swapF  || (SortGScores && binaryHeap[pd+1].F == swapF && binaryHeap[pd+1].node.G < binaryHeap[swapItem].node.G))) {
 						swapF = binaryHeap[pd+1].F;
 						swapItem = pd+1;
 					}
 					
-					if (D >= 3 && pd+2 <= numberOfItems && binaryHeap[pd+2].F < swapF ) {
+					if (D >= 3 && pd+2 <= numberOfItems && (binaryHeap[pd+2].F < swapF  || (SortGScores && binaryHeap[pd+2].F == swapF && binaryHeap[pd+2].node.G < binaryHeap[swapItem].node.G))) {
 						swapF = binaryHeap[pd+2].F;
 						swapItem = pd+2;
 					}
 					
-					if (D >= 4 && pd+3 <= numberOfItems && binaryHeap[pd+3].F < swapF ) {
+					if (D >= 4 && pd+3 <= numberOfItems && (binaryHeap[pd+3].F < swapF  || (SortGScores && binaryHeap[pd+3].F == swapF && binaryHeap[pd+3].node.G < binaryHeap[swapItem].node.G))) {
 						swapF = binaryHeap[pd+3].F;
 						swapItem = pd+3;
 					}

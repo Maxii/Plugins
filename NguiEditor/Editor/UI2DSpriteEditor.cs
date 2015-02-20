@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -29,7 +29,19 @@ public class UI2DSpriteEditor : UIBasicSpriteEditor
 
 	protected override bool ShouldDrawProperties ()
 	{
+		GUI.changed = false;
 		SerializedProperty sp = NGUIEditorTools.DrawProperty("2D Sprite", serializedObject, "mSprite");
+		
+		if (GUI.changed)
+		{
+			UnityEngine.Sprite sprite = sp.objectReferenceValue as Sprite;
+
+			if (sprite != null)
+			{
+				SerializedProperty border = serializedObject.FindProperty("mBorder");
+				border.vector4Value = sprite.border;
+			}
+		}
 
 		NGUISettings.sprite2D = sp.objectReferenceValue as Sprite;
 

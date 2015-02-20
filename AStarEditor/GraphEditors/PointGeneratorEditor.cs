@@ -68,7 +68,8 @@ namespace Pathfinding {
 			//if ( fade.Show () ) {
 			if ( graph.raycast ) {
 				EditorGUI.indentLevel++;
-				
+
+				graph.use2DPhysics = EditorGUILayout.Toggle (new GUIContent ("Use 2D Physics", "If enabled, all raycasts will use the Unity 2D Physics API instead of the 3D one."), graph.use2DPhysics);
 			 	graph.thickRaycast = EditorGUILayout.Toggle (new GUIContent ("Thick Raycast","A thick raycast checks along a thick line with radius instead of just along a line"),graph.thickRaycast);
 			 	
 			 	//editor.GUILayoutx.BeginFadeArea (graph.thickRaycast,"thickRaycast");
@@ -91,7 +92,7 @@ namespace Pathfinding {
 			PointGraph graph = target as PointGraph;
 			
 			//Debug.Log ("Gizmos "+(graph == null)+" "+target);
-			if (graph == null || !graph.active.showNavGraphs) {
+			if (graph == null || graph.active == null || !graph.active.showNavGraphs) {
 				return;
 			}
 			

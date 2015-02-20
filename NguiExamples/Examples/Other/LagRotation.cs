@@ -21,16 +21,19 @@ public class LagRotation : MonoBehaviour
 
 	void Interpolate (float delta)
 	{
-		Transform parent = mTrans.parent;
-
-		if (parent != null)
+		if (mTrans != null)
 		{
-			mAbsolute = Quaternion.Slerp(mAbsolute, parent.rotation * mRelative, delta * speed);
-			mTrans.rotation = mAbsolute;
+			Transform parent = mTrans.parent;
+
+			if (parent != null)
+			{
+				mAbsolute = Quaternion.Slerp(mAbsolute, parent.rotation * mRelative, delta * speed);
+				mTrans.rotation = mAbsolute;
+			}
 		}
 	}
 
-	void OnEnable ()
+	void Start ()
 	{
 		mTrans = transform;
 		mRelative = mTrans.localRotation;

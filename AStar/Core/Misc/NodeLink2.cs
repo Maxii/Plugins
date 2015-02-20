@@ -69,7 +69,9 @@ namespace Pathfinding {
 		}
 		
 		public void InternalOnPostScan () {
-			
+
+			if ( EndTransform == null || StartTransform == null ) return;
+
 			if ( AstarPath.active.astarData.pointGraph == null ) {
 				AstarPath.active.astarData.AddGraph ( new PointGraph () );
 			}
@@ -212,9 +214,9 @@ namespace Pathfinding {
 			
 			//Add connections between nodes, or replace old connections if existing
 			connectedNode1.AddConnection(startNode, (uint)Mathf.RoundToInt (((Int3)(clamped1 - StartTransform.position)).costMagnitude*costFactor));
-			connectedNode2.AddConnection(endNode, (uint)Mathf.RoundToInt (((Int3)(clamped2 - EndTransform.position)).costMagnitude*costFactor));
-			
-			startNode.AddConnection(connectedNode1, (uint)Mathf.RoundToInt (((Int3)(clamped1 - StartTransform.position)).costMagnitude*costFactor));
+			if ( !oneWay ) connectedNode2.AddConnection(endNode, (uint)Mathf.RoundToInt (((Int3)(clamped2 - EndTransform.position)).costMagnitude*costFactor));
+
+			if ( !oneWay ) startNode.AddConnection(connectedNode1, (uint)Mathf.RoundToInt (((Int3)(clamped1 - StartTransform.position)).costMagnitude*costFactor));
 			endNode.AddConnection(connectedNode2, (uint)Mathf.RoundToInt (((Int3)(clamped2 - EndTransform.position)).costMagnitude*costFactor));
 			
 		}

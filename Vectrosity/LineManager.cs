@@ -1,4 +1,4 @@
-// Version 3.1
+// Version 4.0
 // ©2014 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -64,7 +64,7 @@ public class LineManager : MonoBehaviour {
 		
 		// Draw3DAuto lines
 		for (int i = 0; i < lineCount; i++) {
-			if (lines[i].vectorObject != null) {
+			if (lines[i].rectTransform != null) {
 				lines[i].Draw3D();
 			}
 			else {

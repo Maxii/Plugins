@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 #if UNITY_EDITOR || !UNITY_FLASH
@@ -387,7 +387,7 @@ public class EventDelegate
 						if (mMethod != null) break;
 					}
 					catch (System.Exception) { }
-  #if UNITY_WP8
+  #if UNITY_WP8 || UNITY_WP_8_1
 					// For some odd reason Type.GetMethod(name, bindingFlags) doesn't seem to work on WP8...
 					try
 					{
@@ -479,7 +479,11 @@ public class EventDelegate
 			{
 				// There must be an [ExecuteInEditMode] flag on the script for us to call the function at edit time
 				System.Type type = mCachedCallback.Target.GetType();
+ //#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 				object[] objs = type.GetCustomAttributes(typeof(ExecuteInEditMode), true);
+// #else
+//				object[] objs = type.GetCustomAttributes(typeof(ExecuteInEditModeAttribute), true);
+// #endif
 				if (objs != null && objs.Length > 0) mCachedCallback();
 			}
 #endif
@@ -493,7 +497,11 @@ public class EventDelegate
 			if (mTarget != null && !Application.isPlaying)
 			{
 				System.Type type = mTarget.GetType();
+// #if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 				object[] objs = type.GetCustomAttributes(typeof(ExecuteInEditMode), true);
+// #else
+//				object[] objs = type.GetCustomAttributes(typeof(ExecuteInEditModeAttribute), true);
+// #endif
 				if (objs == null || objs.Length == 0) return true;
 			}
 #endif

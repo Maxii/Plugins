@@ -100,6 +100,7 @@
     <Compile Include="Generators\PointGenerator.cs" />
     <Compile Include="Generators\QuadtreeGraph.cs" />
     <Compile Include="Generators\Utilities\BBTree.cs" />
+    <Compile Include="Generators\Utilities\EuclideanEmbedding.cs" />
     <Compile Include="Generators\Utilities\NavMeshRenderer.cs" />
     <Compile Include="Generators\Utilities\ObjImporter.cs" />
     <Compile Include="Modifiers\AlternativePath.cs" />

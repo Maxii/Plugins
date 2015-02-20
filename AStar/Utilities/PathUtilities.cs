@@ -62,7 +62,7 @@ namespace Pathfinding
 			Stack<GraphNode> stack = Pathfinding.Util.StackPool<GraphNode>.Claim ();
 			List<GraphNode> list = Pathfinding.Util.ListPool<GraphNode>.Claim ();
 			
-			
+			/** \todo Pool */
 			HashSet<GraphNode> map = new HashSet<GraphNode>();
 			
 			GraphNodeDelegate callback;
@@ -92,8 +92,11 @@ namespace Pathfinding
 			
 			return list;
 		}
-		
-		/** Returns all nodes within a given node-distance from the seed node.
+
+		static Queue<GraphNode> BFSQueue;	
+		static Dictionary<GraphNode,int> BFSMap;
+
+		/** Returns all nodes up to a given node-distance from the seed node.
 		 * This function performs a BFS (breadth-first-search) or flood fill of the graph and returns all nodes within a specified node distance which can be reached from
 		 * the seed node. In almost all cases when \a depth is large enough this will be identical to returning all nodes which have the same area as the seed node.
 		 * In the editor areas are displayed as different colors of the nodes.
@@ -111,50 +114,63 @@ namespace Pathfinding
 		 * \param depth The maximum node-distance from the seed node.
 		 * \param tagMask Optional mask for tags. This is a bitmask.
 		 *
-		 * \returns A List<Node> containing all nodes reachable within a specified node distance from the seed node.
+		 * \returns A List<Node> containing all nodes reachable up to a specified node distance from the seed node.
 		 * For better memory management the returned list should be pooled, see Pathfinding.Util.ListPool
+		 * 
+		 * \warning This method is not thread safe. Only use it from the Unity thread (i.e normal game code).
 		 */
 		public static List<GraphNode> BFS (GraphNode seed, int depth, int tagMask = -1) {
-			List<GraphNode> que = Pathfinding.Util.ListPool<GraphNode>.Claim ();
-			List<GraphNode> list = Pathfinding.Util.ListPool<GraphNode>.Claim ();
 
-			/** \todo Pool */
-			Dictionary<GraphNode,int> map = new Dictionary<GraphNode,int>();
+			if ( BFSQueue == null ) BFSQueue = new Queue<GraphNode>();
+			var que = BFSQueue;
 
-			int currentDist = 0;
+			if ( BFSMap == null ) BFSMap = new Dictionary<GraphNode,int>();
+			var map = BFSMap;
+
+			// Even though we clear at the end of this function, it is good to
+			// do it here as well in case the previous invocation of the method
+			// threw an exception for some reason
+			// and didn't clear the que and map
+			que.Clear ();
+			map.Clear ();
+
+			List<GraphNode> result = Pathfinding.Util.ListPool<GraphNode>.Claim ();
+
+			int currentDist = -1;
 			GraphNodeDelegate callback;
 			if (tagMask == -1) {
 				callback = delegate (GraphNode node) {
 					if (node.Walkable && !map.ContainsKey (node)) {
 						map.Add (node, currentDist+1);
-						list.Add (node);
-						que.Add (node);
+						result.Add (node);
+						que.Enqueue (node);
 					}
 				};
 			} else {
 				callback = delegate (GraphNode node) {
 					if (node.Walkable && ((tagMask >> (int)node.Tag) & 0x1) != 0 && !map.ContainsKey (node)) {
 						map.Add (node, currentDist+1);
-						list.Add (node);
-						que.Add (node);
+						result.Add (node);
+						que.Enqueue (node);
 					}
 				};
 			}
 
-			map[seed] = currentDist;
 			callback (seed);
 
-
-			while (que.Count > 0 && currentDist < depth ) {
-				GraphNode n = que[que.Count-1];
+			while (que.Count > 0 ) {
+				GraphNode n = que.Dequeue ();
 				currentDist = map[n];
-				que.RemoveAt ( que.Count-1 );
+
+				if ( currentDist >= depth ) break;
+
 				n.GetConnections (callback);
 			}
-			
-			Pathfinding.Util.ListPool<GraphNode>.Release (que);
-			
-			return list;
+
+			que.Clear ();
+			map.Clear ();
+
+			return result;
 		}
 
 		/** Returns points in a spiral centered around the origin with a minimum clearance from other points.
@@ -303,7 +319,7 @@ namespace Pathfinding
 					
 					if (!worked) {
 
-						// Abort after 5 tries
+						// Abort after 8 tries
 						if (tests > 8) {
 							worked = true;
 						} else {

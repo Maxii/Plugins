@@ -1,4 +1,4 @@
-// Version 3.1
+// Version 4.0
 // ©2014 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -21,13 +21,10 @@ public class VisibilityControlStatic : MonoBehaviour {
 			VectorManager.SetupBoundsMesh (gameObject, line);
 		}
 		// Adjust points to this position, so the line doesn't have to be updated with the transform of this object
-		// We make a new array since each line must therefore be a unique instance, not a reference to the original set of Vector3s
-		var thisPoints = new Vector3[line.points3.Length];
 		var thisMatrix = transform.localToWorldMatrix;
-		for (int i = 0; i < thisPoints.Length; i++) {
-			thisPoints[i] = thisMatrix.MultiplyPoint3x4(line.points3[i]);
+		for (int i = 0; i < line.points3.Count; i++) {
+			line.points3[i] = thisMatrix.MultiplyPoint3x4 (line.points3[i]);
 		}
-		line.points3 = thisPoints;
 		m_vectorLine = line;
 		
 		VectorManager.VisibilityStaticSetup (line, out m_objectNumber);
@@ -38,10 +35,10 @@ public class VisibilityControlStatic : MonoBehaviour {
 		// Ensure that the line is drawn once even if the camera isn't moving
 		// Otherwise this object would be invisible until the camera moves
 		// However, the camera might not have been set up yet, so wait a frame and turn off if necessary
-		VectorManager.DrawArrayLine(m_objectNumber.i);
+		VectorManager.DrawArrayLine (m_objectNumber.i);
 		
 		yield return null;
-		if (!renderer.isVisible) {
+		if (!GetComponent<Renderer>().isVisible) {
 			m_vectorLine.active = false;
 		}
 	}

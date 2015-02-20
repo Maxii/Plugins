@@ -116,7 +116,7 @@ namespace Pathfinding {
 	    {
 	    	Vector3 lineDirection = lineEnd-lineStart;
 	    	float magn = lineDirection.magnitude;
-			lineDirection /= magn;
+			lineDirection = magn > float.Epsilon ? lineDirection/magn : Vector3.zero;
 	        
 	        float closestPoint = Vector3.Dot((point-lineStart),lineDirection); //Vector3.Dot(lineDirection,lineDirection);
 	        return closestPoint / magn;
@@ -131,7 +131,9 @@ namespace Pathfinding {
 	    	Int3 lineDirection = lineEnd-lineStart;
 	    	float magn = lineDirection.sqrMagnitude;
 	        
-	        float closestPoint = Int3.Dot((point-lineStart),lineDirection) / magn; //Vector3.Dot(lineDirection,lineDirection);
+	        float closestPoint = Int3.Dot((point-lineStart),lineDirection); //Vector3.Dot(lineDirection,lineDirection);
+	        if (magn != 0) closestPoint /= magn;
+
 			return closestPoint;
 	        //return closestPoint / magn;
 	    }
@@ -145,7 +147,9 @@ namespace Pathfinding {
 	    	Int2 lineDirection = lineEnd-lineStart;
 	    	double magn = lineDirection.sqrMagnitudeLong;
 	        
-	        double closestPoint = Int2.DotLong(point-lineStart,lineDirection) / magn; //Vector3.Dot(lineDirection,lineDirection);
+	        double closestPoint = Int2.DotLong(point-lineStart,lineDirection); //Vector3.Dot(lineDirection,lineDirection);
+	        if (magn != 0) closestPoint /= magn;
+
 			return (float)closestPoint;
 	        //return closestPoint / magn;
 	    }
@@ -157,7 +161,7 @@ namespace Pathfinding {
 	    {
 	        Vector3 fullDirection = lineEnd-lineStart;
 			float magn = fullDirection.magnitude;
-	        Vector3 lineDirection = fullDirection/magn;
+	        Vector3 lineDirection = magn > float.Epsilon ? fullDirection/magn : Vector3.zero;
 	        
 	        float closestPoint = Vector3.Dot((point-lineStart),lineDirection); //WASTE OF CPU POWER - This is always ONE -- Vector3.Dot(lineDirection,lineDirection);
 	        return lineStart+(Mathf.Clamp(closestPoint,0.0f,magn)*lineDirection);
@@ -173,7 +177,8 @@ namespace Pathfinding {
 	        Vector3 fullDirection = lineEnd-lineStart;
 			Vector3 fullDirection2 = fullDirection;
 			fullDirection2.y = 0;
-	        Vector3 lineDirection = Vector3.Normalize(fullDirection2);
+			float magn = fullDirection2.magnitude;
+	        Vector3 lineDirection = magn > float.Epsilon ? fullDirection2/magn : Vector3.zero;
 	        //lineDirection.y = 0;
 			
 	        float closestPoint = Vector3.Dot((point-lineStart),lineDirection); //WASTE OF CPU POWER - This is always ONE -- Vector3.Dot(lineDirection,lineDirection);

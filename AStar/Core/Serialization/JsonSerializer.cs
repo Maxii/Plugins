@@ -1,17 +1,39 @@
 //#define ASTARDEBUG
 //#define ASTAR_FAST_NO_EXCEPTIONS
-//#define ASTAR_NO_JSON //Strips out usage of the JsonFx library. Slightly lower build size but reduces backwards and forwards compatibility of saving graph settings. Only works properly with the NavmeshGraph right now. You can remove the Pathfinding.JsonFx.dll file if you enable this.
+//#define ASTAR_NO_JSON //@SHOWINEDITOR Strips out usage of the JsonFx library. Slightly lower build size but reduces backwards and forwards compatibility of saving graph settings. Only works properly with the NavmeshGraph right now. You can remove the Pathfinding.JsonFx.dll file if you enable this.
 //#define ASTAR_NO_ZIP
 using System;
 using Pathfinding;
 using Pathfinding.Serialization.JsonFx;
 
-using Pathfinding.Ionic.Zip;
+
 
 using System.IO;
 using UnityEngine;
 using System.Collections.Generic;
 using Pathfinding.Util;
+#if NETFX_CORE && !UNITY_EDITOR
+//using MarkerMetro.Unity.WinLegacy.Collections;
+//using MarkerMetro.Unity.WinLegacy.IO;
+//using CompatFileStream = MarkerMetro.Unity.WinLegacy.IO.FileStream;
+
+#if !ASTAR_NO_ZIP
+using Pathfinding.Ionic.Zip;
+#else
+using Pathfinding.Serialization.Zip;
+#endif
+
+#else
+using CompatFileStream = System.IO.FileStream;
+
+#if !ASTAR_NO_ZIP
+using Pathfinding.Ionic.Zip;
+#else
+using Pathfinding.Serialization.Zip;
+#endif
+
+#endif
+
 
 namespace Pathfinding.Serialization
 {
@@ -47,6 +69,106 @@ namespace Pathfinding.Serialization
 			if (node == null) throw new System.Exception ("Invalid id");
 			return node;
 		}
+
+#if ASTAR_NO_JSON
+		public void SerializeVector3 ( Vector3 v ) {
+			writer.Write (v.x);
+			writer.Write (v.y);
+			writer.Write (v.z);
+		}
+
+		public Vector3 DeserializeVector3 () {
+			return new Vector3 (reader.ReadSingle (), reader.ReadSingle (), reader.ReadSingle ());
+		}
+
+		public void SerializeUnityObject ( UnityEngine.Object ob ) {
+			
+			if ( ob == null ) {
+				writer.Write (int.MaxValue);
+				return;
+			}
+			
+			int inst = ob.GetInstanceID();
+			string name = ob.name;
+			string type = ob.GetType().AssemblyQualifiedName;
+			string guid = "";
+			
+			//Write scene path if the object is a Component or GameObject
+			Component component = ob as Component;
+			GameObject go = ob as GameObject;
+			
+			if (component != null || go != null) {
+				if (component != null && go == null) {
+					go = component.gameObject;
+				}
+				
+				UnityReferenceHelper helper = go.GetComponent<UnityReferenceHelper>();
+				
+				if (helper == null) {
+					Debug.Log ("Adding UnityReferenceHelper to Unity Reference '"+ob.name+"'");
+					helper = go.AddComponent<UnityReferenceHelper>();
+				}
+				
+				//Make sure it has a unique GUID
+				helper.Reset ();
+				
+				guid = helper.GetGUID ();
+			}
+			
+			
+			writer.Write(inst);
+			writer.Write(name);
+			writer.Write(type);
+			writer.Write(guid);
+		}
+		
+		
+		public UnityEngine.Object DeserializeUnityObject ( ) {
+			int inst = reader.ReadInt32();
+			
+			if ( inst == int.MaxValue ) {
+				return null;
+			}
+			
+			string name = reader.ReadString();
+			string typename = reader.ReadString();
+			string guid = reader.ReadString();
+			
+			System.Type type = System.Type.GetType (typename);
+			
+			if (type == null) {
+				Debug.LogError ("Could not find type '"+typename+"'. Cannot deserialize Unity reference");
+				return null;
+			}
+			
+			if (!string.IsNullOrEmpty(guid)) {
+				
+				UnityReferenceHelper[] helpers = UnityEngine.Object.FindObjectsOfType(typeof(UnityReferenceHelper)) as UnityReferenceHelper[];
+				
+				for (int i=0;i<helpers.Length;i++) {
+					if (helpers[i].GetGUID () == guid) {
+						if (type == typeof(GameObject)) {
+							return helpers[i].gameObject;
+						} else {
+							return helpers[i].GetComponent (type);
+						}
+					}
+				}
+				
+			}
+			
+			//Try to load from resources
+			UnityEngine.Object[] objs = Resources.LoadAll (name,type);
+			
+			for (int i=0;i<objs.Length;i++) {
+				if (objs[i].name == name || objs.Length == 1) {
+					return objs[i];
+				}
+			}
+			
+			return null;
+		}
+#endif
 	}
 	
 	/** Handles low level serialization and deserialization of graph settings and data */
@@ -54,8 +176,10 @@ namespace Pathfinding.Serialization
 	{
 		
 		private AstarData data;
+#if !ASTAR_NO_JSON
 		public JsonWriterSettings writerSettings;
 		public JsonReaderSettings readerSettings;
+#endif
 
 		private ZipFile zip;
 		private MemoryStream str;
@@ -67,11 +191,17 @@ namespace Pathfinding.Serialization
 		private NavGraph[] graphs;
 
 		const string binaryExt = ".binary";
+#if !ASTAR_NO_JSON
 		const string jsonExt = ".json";
+#else
+		const string jsonExt = binaryExt;
+#endif
 
 		private uint checksum = 0xffffffff;
 
+#if !ASTAR_NO_JSON
 		System.Text.UTF8Encoding encoding=new System.Text.UTF8Encoding();
+#endif
 
 		private static System.Text.StringBuilder _stringBuilder = new System.Text.StringBuilder();
 		
@@ -104,6 +234,7 @@ namespace Pathfinding.Serialization
 			zip.AlternateEncoding = System.Text.Encoding.UTF8;
 			zip.AlternateEncodingUsage = ZipOption.Always;
 
+#if !ASTAR_NO_JSON
 			writerSettings = new JsonWriterSettings();
 			writerSettings.AddTypeConverter (new VectorConverter());
 			writerSettings.AddTypeConverter (new BoundsConverter());
@@ -114,6 +245,7 @@ namespace Pathfinding.Serialization
 			
 			//writerSettings.DebugMode = true;
 			writerSettings.PrettyPrint = settings.prettyPrint;
+#endif			
 			meta = new GraphMeta();
 		}
 		
@@ -155,6 +287,7 @@ namespace Pathfinding.Serialization
 		}
 		
 		public void SerializeUserConnections (UserConnection[] conns) {
+#if !ASTAR_NO_JSON
 			if (conns == null) conns = new UserConnection[0];
 			
 			System.Text.StringBuilder output = GetStringBuilder ();//new System.Text.StringBuilder();
@@ -169,6 +302,7 @@ namespace Pathfinding.Serialization
 			
 			AddChecksum (bytes);
 			zip.AddEntry ("connections"+jsonExt,bytes);
+#endif
 		}
 		
 		/** Serialize metadata about alll graphs */
@@ -190,20 +324,46 @@ namespace Pathfinding.Serialization
 				//meta.nodeCounts[i] = data.graphs[i].nodes==null?0:data.graphs[i].nodes.Length;
 			}
 
+#if !ASTAR_NO_JSON
 			System.Text.StringBuilder output = GetStringBuilder ();//new System.Text.StringBuilder();
 			JsonWriter writer = new JsonWriter (output,writerSettings);
 			writer.Write (meta);
 			
 			return encoding.GetBytes (output.ToString());
+#else
+			var mem = new System.IO.MemoryStream();
+			var writer = new System.IO.BinaryWriter(mem);
+			writer.Write ( "A*" ); // Magic string
+			writer.Write (meta.version.Major);
+			writer.Write (meta.version.Minor);
+			writer.Write (meta.version.Build);
+			writer.Write (meta.version.Revision);
+			writer.Write (meta.graphs);
+			writer.Write (meta.guids.Length);
+			for ( int i = 0; i < meta.guids.Length; i++ ) writer.Write ( meta.guids[i] );
+			writer.Write (meta.typeNames.Length);
+			for ( int i = 0; i < meta.typeNames.Length; i++ ) writer.Write ( meta.typeNames[i] );
+			writer.Write (meta.nodeCounts.Length);
+			for ( int i = 0; i < meta.nodeCounts.Length; i++ ) writer.Write ( meta.nodeCounts[i] );
+			return mem.ToArray();
+#endif
 		}
 		
 		/** Serializes the graph settings to JSON and returns the data */
 		public byte[] Serialize (NavGraph graph) {
+#if !ASTAR_NO_JSON
 			System.Text.StringBuilder output = GetStringBuilder ();//new System.Text.StringBuilder();
 			JsonWriter writer = new JsonWriter (output,writerSettings);
 			writer.Write (graph);
 			
 			return encoding.GetBytes (output.ToString());
+#else
+			var mem = new System.IO.MemoryStream();
+			var writer = new System.IO.BinaryWriter(mem);
+			var ctx = new GraphSerializationContext (writer);
+			graph.SerializeSettings (ctx);
+			return mem.ToArray();
+#endif
 		}
 		
 		public void SerializeNodes () {
@@ -307,7 +467,11 @@ namespace Pathfinding.Serialization
 				if (c != totCount) throw new System.Exception ("Some graphs are not consistent in their GetNodes calls, sequential calls give different results.");
 
 				byte[] bytes = stream.ToArray ();
+#if NETFX_CORE
+				wr.Dispose();
+#else
 				wr.Close ();
+#endif
 
 				
 				AddChecksum (bytes);
@@ -324,7 +488,11 @@ namespace Pathfinding.Serialization
 				graphs[i].SerializeExtraInfo (ctx);
 				byte[] bytes = stream.ToArray ();
 
+#if NETFX_CORE
+				wr.Dispose();
+#else
 				wr.Close ();
+#endif
 				
 				AddChecksum (bytes);
 				zip.AddEntry ("graph"+i+"_extra"+binaryExt,bytes);
@@ -338,7 +506,11 @@ namespace Pathfinding.Serialization
 					return true;
 				});
 
+#if NETFX_CORE
+				wr.Dispose();
+#else
 				wr.Close ();
+#endif
 				
 				bytes = stream.ToArray ();
 				
@@ -399,6 +571,7 @@ for every node {
 		public void SerializeEditorSettings (GraphEditorBase[] editors) {
 			if (editors == null || !settings.editorSettings) return;
 
+#if !ASTAR_NO_JSON
 			for (int i=0;i<editors.Length;i++) {
 				if (editors[i] == null) return;
 				
@@ -415,6 +588,7 @@ for every node {
 				AddChecksum(bytes);
 				zip.AddEntry ("graph"+i+"_editor"+jsonExt,bytes);
 			}
+#endif
 		}
 //#endif
 		
@@ -423,6 +597,7 @@ for every node {
 #region Deserialize
 		
 		public bool OpenDeserialize (byte[] bytes) {
+#if !ASTAR_NO_JSON
 			readerSettings = new JsonReaderSettings();
 			readerSettings.AddTypeConverter (new VectorConverter());
 			readerSettings.AddTypeConverter (new BoundsConverter());
@@ -430,6 +605,7 @@ for every node {
 			readerSettings.AddTypeConverter (new MatrixConverter());
 			readerSettings.AddTypeConverter (new GuidConverter());
 			readerSettings.AddTypeConverter (new UnityObjectConverter());
+#endif
 
 			str = new MemoryStream();
 			str.Write(bytes,0,bytes.Length);
@@ -491,6 +667,7 @@ for every node {
 
 				NavGraph tmp = data.CreateGraph(tp);//(NavGraph)System.Activator.CreateInstance(tp);
 
+#if !ASTAR_NO_JSON
 				String entryText = GetString(entry);
 					
 				JsonReader reader = new JsonReader(entryText,readerSettings);
@@ -498,6 +675,14 @@ for every node {
 				//NavGraph graph = tmp.Deserialize(reader);//reader.Deserialize<NavGraph>();
 				reader.PopulateObject (ref tmp);
 				
+#else
+				var mem = new MemoryStream ();
+				entry.Extract(mem);
+				mem.Position = 0;
+				var reader = new BinaryReader (mem);
+				var ctx = new GraphSerializationContext(reader, null, i);
+				tmp.DeserializeSettings (ctx);
+#endif
 
 				graphs[i] = tmp;
 				if (graphs[i].guid.ToString () != meta.guids[i])
@@ -529,6 +714,7 @@ for every node {
 		 * \note Stored in a file named "connections.json".
 		 */
 		public UserConnection[] DeserializeUserConnections () {
+#if !ASTAR_NO_JSON
 			ZipEntry entry = zip["connections"+jsonExt];
 			
 			if (entry == null) return new UserConnection[0];
@@ -537,6 +723,9 @@ for every node {
 			JsonReader reader = new JsonReader(entryText,readerSettings);
 			UserConnection[] conns = (UserConnection[])reader.Deserialize(typeof(UserConnection[]));
 			return conns;
+#else
+			return new UserConnection[0];
+#endif
 		}
 		
 		/** Deserializes nodes.
@@ -663,7 +852,11 @@ for every node {
 					throw new System.Exception ("Some graph(s) has thrown an exception during GetNodes, or some graph(s) have deserialized more or fewer nodes than were serialized", e);
 				}
 
+#if NETFX_CORE
+				reader.Dispose();
+#else
 				reader.Close ();
+#endif
 				
 				// Deserialize node references
 				for (int i=0;i<graphs.Length;i++) {
@@ -714,6 +907,7 @@ for every node {
 		 * \note Stored in files named "graph#_editor.json" where # is the graph number.
 		 */
 		public void DeserializeEditorSettings (GraphEditorBase[] graphEditors) {
+#if !ASTAR_NO_JSON
 			if (graphEditors == null) return;
 			
 			for (int i=0;i<graphEditors.Length;i++) {
@@ -733,6 +927,7 @@ for every node {
 					break;
 				}
 			}
+#endif
 		}
 //#endif
 
@@ -750,11 +945,42 @@ for every node {
 		private GraphMeta DeserializeMeta (ZipEntry entry) {
 			if ( entry == null ) throw new System.Exception ("No metadata found in serialized data.");
 
+#if !ASTAR_NO_JSON
 			string s = GetString (entry);
 			
 			JsonReader reader = new JsonReader(s,readerSettings);
 			return (GraphMeta)reader.Deserialize(typeof(GraphMeta));
 			 //JsonConvert.DeserializeObject<GraphMeta>(s,settings);
+#else
+			var meta = new GraphMeta();
+
+			var mem = new System.IO.MemoryStream();
+			entry.Extract (mem);
+			mem.Position = 0;
+			var reader = new System.IO.BinaryReader(mem);
+			if ( reader.ReadString() != "A*" ) throw new System.Exception ("Invalid magic number in saved data");
+			int major = reader.ReadInt32 ();
+			int minor = reader.ReadInt32 ();
+			int build = reader.ReadInt32 ();
+			int revision = reader.ReadInt32 ();
+
+			// Required because when saving a version with a field not set, it will save it as -1
+			// and then the Version constructor will throw an exception (which we do not want)
+			if ( major < 0 ) meta.version = new Version (0, 0);
+			else if ( minor < 0 ) meta.version = new Version (major, 0);
+			else if ( build < 0 ) meta.version = new Version (major, minor);
+			else if ( revision < 0 ) meta.version = new Version (major, minor, build);
+			else meta.version = new Version (major, minor, build, revision);
+
+			meta.graphs = reader.ReadInt32 ();
+			meta.guids = new string[reader.ReadInt32()];
+			for ( int i = 0; i < meta.guids.Length; i++ ) meta.guids[i] = reader.ReadString();
+			meta.typeNames = new string[reader.ReadInt32()];
+			for ( int i = 0; i < meta.typeNames.Length; i++ ) meta.typeNames[i] = reader.ReadString();
+			meta.nodeCounts = new int[reader.ReadInt32()];
+			for ( int i = 0; i < meta.nodeCounts.Length; i++ ) meta.nodeCounts[i] = reader.ReadInt32();
+			return meta;
+#endif
 		}
 		
 		
@@ -763,19 +989,27 @@ for every node {
 #region Utils
 		
 		public static void SaveToFile (string path, byte[] data) {
+#if NETFX_CORE
+			throw new System.NotSupportedException ("Cannot save to file on this platform");
+#else
 			using (FileStream stream = new FileStream(path, FileMode.Create)) {
 				stream.Write (data,0,data.Length);
 			}
+#endif
 		}
 		
 		public static byte[] LoadFromFile (string path) {
+#if NETFX_CORE
+			throw new System.NotSupportedException ("Cannot load from file on this platform");
+#else
 			using (FileStream stream = new FileStream(path, FileMode.Open)) {
 				byte[] bytes = new byte[(int)stream.Length];
 				stream.Read (bytes,0,(int)stream.Length);
 				return bytes;
 			}
+#endif
 		}
-		
+
 #endregion		
 	}
 	

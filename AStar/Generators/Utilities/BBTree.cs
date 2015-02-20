@@ -1,6 +1,6 @@
 //#define ASTARDEBUG   //"BBTree Debug" If enables, some queries to the tree will show debug lines. Turn off multithreading when using this since DrawLine calls cannot be called from a different thread
 
-//#define ASTAR_OLD_BBTREE // Use class based BBTree implementation instead of struct based. Struct based is better for runtime performance and memory, but class based scans slightly faster.
+//#define ASTAR_OLD_BBTREE //@SHOWINEDITOR Use class based BBTree implementation instead of struct based. Struct based is better for runtime performance and memory, but class based scans slightly faster.
 using System;
 using UnityEngine;
 using Pathfinding;

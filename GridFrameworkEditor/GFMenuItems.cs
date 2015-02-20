@@ -6,7 +6,7 @@ using System.IO; // for StreamReader
 using System.Text.RegularExpressions; // for Regex
 
 public static class GFMenuItems {
-	private const string onlineHelpURL = "https://dl.dropboxusercontent.com/u/22321777/GridFrameworkHTMLDocs/html/index.html";
+	private const string onlineHelpURL = "http://hiphish.github.io/grid-framework/documentation/";
 	private const string offlineHelpURL = "/WebPlayerTemplates/Grid Framework Documentation/html/index.html";
 
 	#if PLAYMAKER_PRESENT
@@ -15,17 +15,17 @@ public static class GFMenuItems {
 	#endif // PLAYMAKER_PRESENT
 	
 	#region Grid Creation
-	[MenuItem("GameObject/Create Grid/Rectangular Grid", false, 0)]
+	[MenuItem("GameObject/3D Object/Grid/Rectangular Grid", false, 0)]
 	public static void CreateRectGrid(){
 		CreateGrid<GFRectGrid>("Rectangular");
 	}
 	
-	[MenuItem("GameObject/Create Grid/Hexagonal Grid", false, 0)]
+	[MenuItem("GameObject/3D Object/Grid/Hexagonal Grid", false, 0)]
 	public static void CreateHexGrid(){
 		CreateGrid<GFHexGrid>("Hexagonal");
 	}
 	
-	[MenuItem("GameObject/Create Grid/Polar Grid", false, 0)]
+	[MenuItem("GameObject/3D Object/Grid/Polar Grid", false, 0)]
 	public static void CreatePolarGrid(){
 		CreateGrid<GFPolarGrid>("Polar");
 	}

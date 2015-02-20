@@ -79,7 +79,10 @@ namespace Pathfinding {
 		
 		/** Offset to apply in each smoothing iteration when using Offset Simple. \see #smoothType */
 		public float offset = 0.2F;
-		
+
+		/** Roundness factor used for CurvedNonuniform */
+		public float factor = 0.1F;
+
 		public enum SmoothType {
 			Simple,
 			Bezier,
@@ -115,8 +118,6 @@ namespace Pathfinding {
 			//.vectorPath.Clear ();
 			//p.vectorPath.AddRange (path);
 		}
-		
-		public float factor = 0.1F;
 		
 		public List<Vector3> CurvedNonuniform (List<Vector3> path) {
 			

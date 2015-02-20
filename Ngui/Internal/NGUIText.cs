@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 #if !UNITY_3_5
@@ -387,6 +387,14 @@ static public class NGUIText
 	[System.Diagnostics.DebuggerHidden]
 	[System.Diagnostics.DebuggerStepThrough]
 	static public string EncodeColor (Color c) { return EncodeColor24(c); }
+
+	/// <summary>
+	/// Convenience function that wraps the specified text block in a color tag.
+	/// </summary>
+
+	[System.Diagnostics.DebuggerHidden]
+	[System.Diagnostics.DebuggerStepThrough]
+	static public string EncodeColor (string text, Color c) { return "[c][" + EncodeColor24(c) + "]" + text + "[-][/c]"; }
 
 	/// <summary>
 	/// The reverse of ParseAlpha -- encodes a color in Aa format.

@@ -36,8 +36,9 @@ public class AstarPathEditor : Editor {
 	
 #if !UNITY_LE_4_3
 	static int lastUndoGroup = -1000;
+	static int lastDragFrame = -1000;
 #endif
-	static int ignoreUndoHash = 0;
+	static uint ignoredChecksum = 0;
 
 	/** Path to the editor assets folder for the A* Pathfinding Project. If this path turns out to be incorrect, the script will try to find the correct path
 	  * \see LoadStyles */
@@ -401,7 +402,7 @@ public class AstarPathEditor : Editor {
 #endif
 
 	public override void OnInspectorGUI () {
-		
+
 		AstarProfiler.StartProfile ("OnInspectorGUI");
 
 		//Do some loading and checking
@@ -418,10 +419,12 @@ public class AstarPathEditor : Editor {
 		GUI.changed = false;
 		
 		EditorGUILayoutx.editor = this;
-		GUILayoutx.ClearStack ();
+		GUILayoutx.ClearFadeAreaStack ();
 		
 #if !UNITY_LE_4_3
-		Undo.RecordObject (script,"A* inspector");
+		//if ( Undo.GetCurrentGroup () != lastUndoGroup ) {
+			Undo.RecordObject (script,"A* inspector");
+		//}
 #endif
 		
 		AstarProfiler.StartProfile ("Check Updates and Editors");
@@ -439,8 +442,11 @@ public class AstarPathEditor : Editor {
 		EditorGUIUtility.LookLikeInspector ();
 #endif
 
-		EventType eT = Event.current.type;
-		
+		// Apparently these can sometimes get eaten by unity components
+		// so I catch them here for later use
+		EventType storedEventType = Event.current.type;
+		string storedEventCommand = Event.current.commandName;
+
 		DrawMainArea ();
 		
 		GUILayout.Space (5);
@@ -461,9 +467,8 @@ public class AstarPathEditor : Editor {
 		
 		AstarProfiler.StartProfile ("Undo");
 
-		// Handle undo at all times except during undo operations
-		if ( Event.current.commandName != "UndoRedoPerformed" )
-			SaveGraphsAndUndo (eT);
+		// Handle undo
+		SaveGraphsAndUndo (storedEventType, storedEventCommand);
 		
 		AstarProfiler.EndProfile ("Undo");
 		
@@ -1194,7 +1199,7 @@ public class AstarPathEditor : Editor {
 	}
 	
 	public void OnSceneGUI () {
-		
+
 		//AstarProfiler.StartProfile ("OnSceneGUI");
 		
 		bool preChanged = GUI.changed;
@@ -1540,7 +1545,27 @@ public class AstarPathEditor : Editor {
 		Event.current.Use ();
 		GUI.changed = true;
 	}
-	
+
+	TextAsset SaveGraphData ( byte[] bytes, TextAsset target = null ) {
+		string projectPath = System.IO.Path.GetDirectoryName (Application.dataPath) + "/";
+		
+		string path = null;
+		if ( target != null ) {
+			path = AssetDatabase.GetAssetPath (target);
+		} else {
+			int i = 0;
+			do {
+				path = "Assets/GraphCaches/GraphCache" + (i == 0 ? "" : i.ToString()) + ".bytes";
+				i++;
+			} while (System.IO.File.Exists (projectPath+path));
+		}
+
+		System.IO.Directory.CreateDirectory (System.IO.Path.GetDirectoryName (projectPath + path));
+		System.IO.File.WriteAllBytes (projectPath + path, bytes);
+		AssetDatabase.Refresh ();
+		return AssetDatabase.LoadAssetAtPath (path, typeof(TextAsset)) as TextAsset;
+	}
+
 	public void DrawSerializationSettings () {
 		
 		AstarProfiler.StartProfile ("Serialization step 1");
@@ -1559,7 +1584,7 @@ public class AstarPathEditor : Editor {
 			GUI.changed = true;
 		}
 
-		if (script.astarData.cacheStartup && script.astarData.data_cachedStartup != null && script.astarData.data_cachedStartup.Length > 0) {
+		if (script.astarData.cacheStartup && script.astarData.file_cachedStartup != null) {
 			tmp1 *= Color.yellow;
 			GUI.color = tmp1;
 			
@@ -1591,14 +1616,7 @@ public class AstarPathEditor : Editor {
 			
 			script.astarData.cacheStartup = EditorGUILayout.Toggle (new GUIContent ("Cache startup","If enabled, will cache the graphs so they don't have to be scanned at startup"),script.astarData.cacheStartup);
 			
-			tmp1 = GUI.color;
-			if (script.astarData.cacheStartup && (script.astarData.data_cachedStartup == null || script.astarData.data_cachedStartup.Length == 0)) {
-				GUI.color = Color.red;
-			}
-			
-			EditorGUILayout.LabelField ("Cache size",(script.astarData.data_cachedStartup != null ? EditorUtility.FormatBytes (script.astarData.data_cachedStartup.Length) : "null"));
-			
-			GUI.color = tmp1;
+			script.astarData.file_cachedStartup = EditorGUILayout.ObjectField (script.astarData.file_cachedStartup, typeof(TextAsset), false) as TextAsset;
 			
 			GUILayout.BeginHorizontal ();
 			
@@ -1606,27 +1624,43 @@ public class AstarPathEditor : Editor {
 				if (EditorUtility.DisplayDialog ("Scan before generating cache?","Do you want to scan the graphs before saving the cache","Scan","Don't scan")) {
 					MenuScan ();
 				}
-				script.astarData.SaveCacheData (serializationSettings);
+
+				// Save graphs
+				var bytes = script.astarData.SerializeGraphs (serializationSettings);
+
+				// Store it in a file
+				script.astarData.file_cachedStartup = SaveGraphData ( bytes, script.astarData.file_cachedStartup );
+				script.astarData.cacheStartup = true;
 			}
-			
-			GUI.enabled = script.astarData.data_cachedStartup != null; 
+
 			if (GUILayout.Button ("Load from cache")) {
 				if (EditorUtility.DisplayDialog ("Are you sure you want to load from cache?","Are you sure you want to load graphs from the cache, this will replace your current graphs?","Yes","Cancel")) {
 					script.astarData.LoadFromCache ();
 				}
 			}
-			
-			GUILayout.EndHorizontal ();
-			
+
 			AstarProfiler.EndProfile ("Cache Startup");
 			
 			AstarProfiler.StartProfile ("Clear Cache");
-			if (GUILayout.Button ("Clear Cache", GUILayout.MaxWidth (120))) {
+			if (GUILayout.Button ("Clear cache", GUILayout.MaxWidth (120))) {
 				script.astarData.data_cachedStartup = null;
+				script.astarData.file_cachedStartup = null;
 				script.astarData.cacheStartup = false;
 			}
+
+			GUILayout.EndHorizontal ();
 			
 			GUI.enabled = preEnabled;
+
+			if ( script.astarData.data_cachedStartup != null && script.astarData.data_cachedStartup.Length > 0 ) {
+				EditorGUILayout.HelpBox ("Storing the cached starup data on the AstarPath object has been deprecated. It is now stored " +
+					"in a separate file.", MessageType.Error );
+
+				if (GUILayout.Button ("Transfer cache data to separate file")) {
+					script.astarData.file_cachedStartup = SaveGraphData ( script.astarData.data_cachedStartup );
+					script.astarData.data_cachedStartup = null;
+				}
+			}
 
 	#if UNITY_BEFORE_4
 			GUILayout.Label ("When using 'cache startup', the 'Nodes' toggle should always be enabled otherwise the graphs' nodes won't be saved and the caching is quite useless",helpBox);
@@ -1646,7 +1680,7 @@ public class AstarPathEditor : Editor {
 			
 			GUILayout.BeginHorizontal ();
 			if (GUILayout.Button ("Save to file")) {
-				string path = EditorUtility.SaveFilePanel ("Save Graphs","","myGraph.zip","zip");
+				string path = EditorUtility.SaveFilePanel ("Save Graphs","","graph.bytes","bytes");
 				
 				if (path != "") {
 					if (EditorUtility.DisplayDialog ("Scan before saving?","Do you want to scan the graphs before saving" +
@@ -1665,7 +1699,7 @@ public class AstarPathEditor : Editor {
 			AstarProfiler.EndProfile ("SaveToFile");
 			AstarProfiler.StartProfile ("LoadFromFile");
 			if (GUILayout.Button ("Load from file")) {
-				string path = EditorUtility.OpenFilePanel ("Load Graphs","","zip");
+				string path = EditorUtility.OpenFilePanel ("Load Graphs","","");
 				
 				if (path != "") {
 					byte[] bytes;
@@ -1707,9 +1741,9 @@ public class AstarPathEditor : Editor {
 				GUI.enabled = false;
 			}
 			//script.useMultithreading = EditorGUILayout.Toggle ("Multithreading",script.useMultithreading);
-			script.threadCount = (ThreadCount)EditorGUILayout.EnumPopup (new GUIContent ("Thread Count","Number of threads to run the pathfinding in (if any). More threads" +
-				"can boost performance on multi core systems.\n" +
-				"Use None for debugging or if you dont use pathfinding that much.\n" +
+			script.threadCount = (ThreadCount)EditorGUILayout.EnumPopup (new GUIContent ("Thread Count","Number of threads to run the pathfinding in (if any). More threads " +
+				"can boost performance on multi core systems. \n" +
+				"Use None for debugging or if you dont use pathfinding that much.\n " +
 	                                                                "See docs for more info"),script.threadCount);
 		
 			GUI.enabled = true;
@@ -1726,10 +1760,13 @@ public class AstarPathEditor : Editor {
 		                                                                "See docs for more info\nThis is an A* Pathfinding Project Pro feature"),script.threadCount);
 			GUI.enabled = true;
 		*/
-			script.maxFrameTime = EditorGUILayout.FloatField ("Max Frame Time",script.maxFrameTime);
-			
-			script.minAreaSize = EditorGUILayout.IntField (new GUIContent ("Min Area Size","The minimum number of nodes an area must have to be granted an unique area id. Only 256 area ids are available (8 bits). This merges small areas to use the same area id and helps keeping the area count under 256. [default = 10]"),script.minAreaSize);
-			
+
+			if (script.threadCount == ThreadCount.None) {
+				script.maxFrameTime = EditorGUILayout.FloatField (new GUIContent ("Max Frame Time", "Max number of milliseconds to use for path calculation per frame"),script.maxFrameTime);
+			} else {
+				script.maxFrameTime = 10;
+			}
+
 			script.heuristic = (Heuristic)EditorGUILayout.EnumPopup ("Heuristic",script.heuristic);
 			
 			GUILayoutx.BeginFadeArea (script.heuristic == Heuristic.Manhattan || script.heuristic == Heuristic.Euclidean || script.heuristic == Heuristic.DiagonalManhattan,"hScale");
@@ -1739,8 +1776,60 @@ public class AstarPathEditor : Editor {
 				EditorGUI.indentLevel--;
 			}
 			GUILayoutx.EndFadeArea ();
+
+			script.maxNearestNodeDistance = EditorGUILayout.FloatField (new GUIContent ("Max Nearest Node Distance",
+			                                                                            "Normally, if the nearest node to e.g the start point of a path was not walkable" +
+			                                                                            " a search will be done for the nearest node which is walkble. This is the maximum distance (world units) which it will serarch"),
+			                                                            script.maxNearestNodeDistance);
+
+			GUILayout.Label (new GUIContent ("Advanced"), EditorStyles.boldLabel);
+
+			script.minAreaSize = EditorGUILayout.IntField (new GUIContent ("Min Area Size","The minimum number of nodes an area must have to be granted an unique area id. 2^17 area ids are available (131072). This merges small areas to use the same area id and helps keeping the area count below 131072. Usually this is not required. [default = 0]"),script.minAreaSize);
+
+			// BEGIN HEURISTIC OPTIMIZATION
+
+
+			script.euclideanEmbedding.mode = (HeuristicOptimizationMode)EditorGUILayout.EnumPopup ( new GUIContent ("Heuristic Optimization"), script.euclideanEmbedding.mode);
 			
-			//script.binaryHeapSize = EditorGUILayout.IntField (new GUIContent ("Binary Heap Size","The max size of the open list during a pathfinding request. If you get errors saying the heap is too small, increase it here. A good value is about 30-50% of the number of nodes in the graphs. But it depends a lot on how the graph is structured"),script.binaryHeapSize);
+			EditorGUI.indentLevel++;
+			if ( script.euclideanEmbedding.mode == HeuristicOptimizationMode.Random ) {
+
+				script.euclideanEmbedding.spreadOutCount = EditorGUILayout.IntField (new GUIContent ("Count", "Number of optimization points, higher numbers give better heuristics and could make it faster, " +
+				                                                                                     "but too many could make the overhead too great and slow it down. Try to find the optimal value for your map. Recommended value < 100"), script.euclideanEmbedding.spreadOutCount );
+
+
+			} else if ( script.euclideanEmbedding.mode == HeuristicOptimizationMode.Custom ) {
+				
+				script.euclideanEmbedding.pivotPointRoot = EditorGUILayout.ObjectField (new GUIContent ("Pivot point root", 
+                                                                                   "All children of this transform are going to be used as pivot points. " +
+                                                                                        "Recommended count < 100"), script.euclideanEmbedding.pivotPointRoot, typeof(Transform), true) as Transform;
+				if ( script.euclideanEmbedding.pivotPointRoot == null ) {
+					EditorGUILayout.HelpBox ("Please assign an object", MessageType.Error );
+				}
+
+			} else if ( script.euclideanEmbedding.mode == HeuristicOptimizationMode.RandomSpreadOut ) {
+
+				script.euclideanEmbedding.pivotPointRoot = EditorGUILayout.ObjectField (new GUIContent ("Pivot point root", 
+				                                                                                        "All children of this transform are going to be used as pivot points. " +
+				                                                                                        "They will seed the calculation of more pivot points. " +
+				                                                                                        "Recommended count < 100"), script.euclideanEmbedding.pivotPointRoot, typeof(Transform), true) as Transform;
+
+				if ( script.euclideanEmbedding.pivotPointRoot == null ) {
+					EditorGUILayout.HelpBox ("No root is assigned. A random node will be choosen as the seed.", MessageType.Info );
+				}
+
+				script.euclideanEmbedding.spreadOutCount = EditorGUILayout.IntField (new GUIContent ("Count", "Number of optimization points, higher numbers give better heuristics and could make it faster, " +
+				                                                                     "but too many could make the overhead too great and slow it down. Try to find the optimal value for your map. Recommended value < 100"), script.euclideanEmbedding.spreadOutCount );
+			}
+			
+			if ( script.euclideanEmbedding.mode != HeuristicOptimizationMode.None ) {
+				EditorGUILayout.HelpBox ("Heuristic optimization assumes the graph remains static. No graph updates, dynamic obstacles or similar should be applied to the graph " +
+				                         "when using heuristic optimization.", MessageType.Info );
+			}
+			
+			EditorGUI.indentLevel--;
+
+			// END HEURISTIC OPTIMIZATIOn
 			
 			
 			script.limitGraphUpdates = EditorGUILayout.Toggle (new GUIContent ("Limit Graph Updates","Limit graph updates to only run every x seconds. Can have positive impact on performance if many graph updates are done"),script.limitGraphUpdates);
@@ -1763,11 +1852,6 @@ public class AstarPathEditor : Editor {
 				EditorGUI.indentLevel--;
 			}
 			GUILayoutx.EndFadeArea ();
-			
-			script.maxNearestNodeDistance = EditorGUILayout.FloatField (new GUIContent ("Max Nearest Node Distance",
-		                                                                            "Normally, if the nearest node to e.g the start point of a path was not walkable" +
-		                                                                            " a search will be done for the nearest node which is walkble. This is the maximum distance (world units) which it will serarch"),
-		                                                            script.maxNearestNodeDistance);
 		
 			script.fullGetNearestSearch = EditorGUILayout.Toggle (new GUIContent ("Full Get Nearest Node Search","Forces more accurate searches on all graphs. " +
 				"Normally only the closest graph in the initial fast check will perform additional searches, " +
@@ -1852,7 +1936,36 @@ public class AstarPathEditor : Editor {
 		
 		GUILayoutx.EndFadeArea ();
 	}
-	
+
+	static void DrawColorSlider ( ref float left, ref float right, bool editable ) {
+		GUILayout.BeginHorizontal ();
+		
+		GUILayout.Space (20);
+		
+		GUILayout.BeginVertical ();
+		
+		GUILayout.Box ("", astarSkin.GetStyle("ColorInterpolationBox"));
+		GUILayout.BeginHorizontal ();
+		if (editable) {
+			left = EditorGUILayout.IntField ((int)left);
+		} else {
+			GUILayout.Label (left.ToString ("0"));
+		}
+		GUILayout.FlexibleSpace ();
+		if (editable) {
+			right = EditorGUILayout.IntField ((int)right);
+		} else {
+			GUILayout.Label (right.ToString ("0"));
+		}
+		GUILayout.EndHorizontal ();
+		
+		GUILayout.EndVertical ();
+		
+		GUILayout.Space (4);
+		
+		GUILayout.EndHorizontal ();
+	}
+
 	public void DrawDebugSettings () {
 		GUILayoutx.BeginFadeArea (true,"Debug","debugSettings",graphBoxStyle);
 		
@@ -1863,11 +1976,11 @@ public class AstarPathEditor : Editor {
 			
 			bool show = script.debugMode == GraphDebugMode.G || script.debugMode == GraphDebugMode.H || script.debugMode == GraphDebugMode.F || script.debugMode == GraphDebugMode.Penalty;
 			GUILayoutx.BeginFadeArea (show,"debugRoof");
-			
+
 			if (GUILayoutx.DrawID ("debugRoof")) {
-				EditorGUI.indentLevel++;
-				script.debugRoof = EditorGUILayout.FloatField ("Gradient Max (red)",script.debugRoof);
-				EditorGUI.indentLevel--;
+				script.manualDebugFloorRoof = !EditorGUILayout.Toggle ("Automatic Limits", !script.manualDebugFloorRoof);
+
+				DrawColorSlider (ref script.debugFloor, ref script.debugRoof, script.manualDebugFloorRoof);
 			}
 			
 			GUILayoutx.EndFadeArea ();
@@ -2081,7 +2194,7 @@ public class AstarPathEditor : Editor {
 	
 	/** Draw Editor Gizmos in graphs. This is called using a delegate OnDrawGizmosCallback in the AstarPath script.*/
 	public void OnDrawGizmos () {
-		
+
 		AstarProfiler.StartProfile ("OnDrawGizmosEditor");
 		
 		CheckGraphEditors ();
@@ -2110,7 +2223,7 @@ public class AstarPathEditor : Editor {
 				script.astarData.SetData (new byte[0], 0);
 			} else {
 
-				Debug.Log ("Undo: " + hash (script.astarData.GetData()));
+				//Debug.Log ("Undo: " + hash (script.astarData.GetData()));
 				LoadGraphs ();
 
 				return true;
@@ -2125,11 +2238,12 @@ public class AstarPathEditor : Editor {
 		if ( arr == null ) return -1;
 		int h = -1;
 		for ( int i=0;i<arr.Length;i++) {
-			h ^= arr[i]*3221;
+			h ^= (arr[i]^i)*3221;
 		}
 		return h;
 	}
-	public void SaveGraphsAndUndo (EventType et = EventType.Used) {
+	
+	public void SaveGraphsAndUndo (EventType et = EventType.Used, string eventCommand = "" ) {
 		//Serialize the settings of the graphs
 
 		//Dont process undo events in editor, we don't want to reset graphs
@@ -2137,7 +2251,20 @@ public class AstarPathEditor : Editor {
 			return;
 		}
 
-		if ( et == EventType.Layout && Event.current.commandName == "UndoRedoPerformed" ) {
+#if !UNITY_LE_4_3
+		// For some reason unity sends undo events while dragging stuff
+		// Ignore those
+		// Pretty hacky, but I haven't been able to find another way
+		if ( et == EventType.DragPerform || et == EventType.DragUpdated ) {
+			lastDragFrame = Time.frameCount;
+		}
+#endif
+
+		// Capture undo events
+		// The frame thing at the end is a workaround for
+		// Unity sending undo events when dragging to assign things to object fields
+		if ( et == EventType.Layout && eventCommand == "UndoRedoPerformed" && Time.frameCount - lastDragFrame > 2 ) {
+
 			uint checksum;
 			byte[] bytes = SerializeGraphs (out checksum);
 
@@ -2153,8 +2280,51 @@ public class AstarPathEditor : Editor {
 			// this is (probably) because editor settings are not saved all the time
 			// so we explicitly ignore the new hash
 			bytes = SerializeGraphs (out checksum);
-			ignoreUndoHash = hash(bytes);
+			ignoredChecksum = checksum;
 			return;
+		}
+
+#if UNITY_LE_4_3
+		Event e = Event.current;
+		if ((e.button == 0 && (et == EventType.MouseDown || et == EventType.MouseUp)) || (e.isKey && (e.keyCode == KeyCode.Tab || e.keyCode == KeyCode.Return)) || et == EventType.ExecuteCommand)
+#else
+		if ( Undo.GetCurrentGroup () != lastUndoGroup && eventCommand != "UndoRedoPerformed" )
+#endif
+		{
+			
+			//To serialize settings for a grid graph takes from 0.00 ms to 7.8 ms (usually 0.0, but sometimes jumps up to 7.8 (no values in between)
+			
+			uint checksum;
+			byte[] bytes = SerializeGraphs (out checksum);
+			
+			int byteHash = hash(bytes);
+			int dataHash = hash(script.astarData.GetData());
+			//Check if the data is different than the previous data, use checksums
+			bool isDifferent = checksum != ignoredChecksum && dataHash != byteHash;//script.astarData.dataChecksum != checksum;
+
+			//Only save undo if the data was different from the last saved undo
+			if (isDifferent) {
+#if UNITY_LE_4_3
+				//This flag is set to true so we can detect if the object has been reverted
+				script.astarData.hasBeenReverted = true;
+				Undo.RegisterUndo (script,"A* inspector");
+#else
+				Undo.RegisterCompleteObjectUndo (script, "A* Graph Settings");
+#endif
+				
+				//Assign the new data
+				script.astarData.SetData (bytes, checksum);
+
+#if UNITY_LE_4_3
+				script.astarData.hasBeenReverted = false;
+#endif
+
+				EditorUtility.SetDirty (script);
+			}
+			
+#if !UNITY_LE_4_3
+			lastUndoGroup = Undo.GetCurrentGroup ();
+#endif
 		}
 
 		if (Event.current == null || script.astarData.GetData() == null) {
@@ -2171,49 +2341,7 @@ public class AstarPathEditor : Editor {
 		}
 #endif
 
-#if UNITY_LE_4_3
-		Event e = Event.current;
-		if ((e.button == 0 && (et == EventType.MouseDown || et == EventType.MouseUp)) || (e.isKey && (e.keyCode == KeyCode.Tab || e.keyCode == KeyCode.Return)) || et == EventType.ExecuteCommand)
-#else
-		if ( Undo.GetCurrentGroup () != lastUndoGroup )
-#endif
-		{
 
-			//To serialize settings for a grid graph takes from 0.00 ms to 7.8 ms (usually 0.0, but sometimes jumps up to 7.8 (no values in between)
-			
-			uint checksum;
-			byte[] bytes = SerializeGraphs (out checksum);
-				
-			int byteHash = hash(bytes);
-			//Check if the data is different than the previous data, use checksums
-			bool isDifferent = byteHash != ignoreUndoHash && hash(script.astarData.GetData()) != hash(bytes);//script.astarData.dataChecksum != checksum;
-
-			//Only save undo if the data was different from the last saved undo
-			if (isDifferent) {
-				//This flag is set to true so we can detect if the object has been reverted
-#if UNITY_LE_4_3
-				script.astarData.hasBeenReverted = true;
-				Undo.RegisterUndo (script,"A* inspector");
-#else
-				Undo.RegisterCompleteObjectUndo (script, "A* Graph Settings");
-				//Undo.IncrementCurrentGroup ();
-#endif
-				
-				//Assign the new data
-				script.astarData.SetData (bytes, checksum);
-				//Debug.Log ("Set: " + hash (script.astarData.GetData()) + " " + Event.current.commandName + " " + et);
-#if UNITY_LE_4_3				
-				script.astarData.hasBeenReverted = false;
-#endif
-				//stopWatch.Stop();
-
-				EditorUtility.SetDirty (script);
-			}
-			
-#if !UNITY_LE_4_3
-			lastUndoGroup = Undo.GetCurrentGroup ();
-#endif
-		}
 		
 		
 	}
@@ -2285,7 +2413,7 @@ public class AstarPathEditor : Editor {
 				
 				sr.CloseDeserialize();
 			} else {
-				Debug.Log ("Invalid data file (cannot read zip).\nThe data is either corrupt or it was saved using a 3.0.x or earlier version of the system");
+				Debug.LogWarning ("Invalid data file (cannot read zip).\nThe data is either corrupt or it was saved using a 3.0.x or earlier version of the system");
 				//Make sure every graph has a graph editor
 				CheckGraphEditors ();
 			}

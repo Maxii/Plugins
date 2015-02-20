@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -256,6 +256,8 @@ public static class EventDelegateEditor
 
 	static public void Field (Object undoObject, List<EventDelegate> list, string noTarget, string notValid, bool minimalistic)
 	{
+		if (list == null) return;
+
 		bool targetPresent = false;
 		bool isValid = false;
 

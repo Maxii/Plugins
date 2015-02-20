@@ -54,7 +54,11 @@ namespace Pathfinding {
 		[JsonMember]
 		/** Use raycasts to check connections */
 		public bool raycast = true;
-		
+
+		[JsonMember]
+		/** Use the 2D Physics API */
+		public bool use2DPhysics = false;
+
 		[JsonMember]
 		/** Use thick raycast */
 		public bool thickRaycast = false;
@@ -74,14 +78,7 @@ namespace Pathfinding {
 		/** Layer mask to use for raycast */
 		public LayerMask mask;
 		
-		
-		/** GameObjects which defined the node in the #nodes array.
-		 * Entries are permitted to be null in case no GameObject was used to define a node.
-		 * 
-		 * \note Set, but not used at the moment. Does not work after deserialization.
-		 */
-		GameObject[] nodeGameObjects;
-		
+
 		/** All nodes in this graph.
 		 * Note that only the first #nodeCount will be non-null.
 		 * 
@@ -197,9 +194,7 @@ namespace Pathfinding {
 			foreach (Transform child in tr) {
 				(nodes[c] as PointNode).SetPosition ((Int3)child.position);
 				nodes[c].Walkable = true;
-				
-				nodeGameObjects[c] = child.gameObject;
-				
+				nodes[c].gameObject = child.gameObject;
 				
 				c++;
 				AddChildren (ref c,child);
@@ -228,8 +223,7 @@ namespace Pathfinding {
 			if (root == null) {
 				//If there is no root object, try to find nodes with the specified tag instead
 				GameObject[] gos = GameObject.FindGameObjectsWithTag (searchTag);
-				nodeGameObjects = gos;
-				
+
 				if (gos == null) {
 					nodes = new PointNode[0];
 					nodeCount = 0;
@@ -246,7 +240,8 @@ namespace Pathfinding {
 				for (int i=0;i<gos.Length;i++) {
 					(nodes[i] as PointNode).SetPosition ((Int3)gos[i].transform.position);
 					nodes[i].Walkable = true;
-					
+					nodes[i].gameObject = gos[i].gameObject;
+
 					
 				}
 			} else {
@@ -257,16 +252,13 @@ namespace Pathfinding {
 					nodeCount = nodes.Length;
 
 					for (int i=0;i<nodes.Length;i++) nodes[i] = new PointNode(active);
-					
-					nodeGameObjects = new GameObject[nodes.Length];
-					
+
 					int c = 0;
 					foreach (Transform child in root) {
 						(nodes[c] as PointNode).SetPosition ((Int3)child.position);
 						nodes[c].Walkable = true;
-						
-						nodeGameObjects[c] = child.gameObject;
-						
+						nodes[c].gameObject = child.gameObject;
+
 						
 						c++;
 					}
@@ -276,8 +268,7 @@ namespace Pathfinding {
 
 					for (int i=0;i<nodes.Length;i++) nodes[i] = new PointNode(active);
 						//CreateNodes (CountChildren (root));
-					nodeGameObjects = new GameObject[nodes.Length];
-					
+
 					int startID = 0;
 					AddChildren (ref startID,root);
 				}
@@ -315,9 +306,6 @@ namespace Pathfinding {
 					node.connectionCosts = costs.ToArray();
 				}
 			}
-
-			//GC can clear this up now.
-			nodeGameObjects = null;
 		}
 		
 		/** Returns if the connection between \a a and \a b is valid.
@@ -345,14 +333,33 @@ namespace Pathfinding {
 					
 					Ray ray = new Ray ((Vector3)a.position,(Vector3)(b.position-a.position));
 					Ray invertRay = new Ray ((Vector3)b.position,(Vector3)(a.position-b.position));
-					
-					if (thickRaycast) {
-						if (!Physics.SphereCast (ray,thickRaycastRadius,dist,mask) && !Physics.SphereCast (invertRay,thickRaycastRadius,dist,mask)) {
+
+					if (use2DPhysics) {
+						if (thickRaycast) {
+#if UNITY_4_4 || UNITY_4_3 || UNITY_4_2 || UNITY_4_1 || UNITY_4_0
+							// These version do not support this API
 							return true;
+#else
+							if (!Physics2D.CircleCast (ray.origin, thickRaycastRadius, ray.direction, dist,mask) &&
+							    !Physics2D.CircleCast (invertRay.origin,thickRaycastRadius, invertRay.direction, dist,mask)) {
+								return true;
+							}
+#endif
+						} else {
+							if (!Physics2D.Linecast ((Vector2)(Vector3)a.position,(Vector2)(Vector3)b.position,mask) &&
+							    !Physics2D.Linecast ((Vector2)(Vector3)b.position,(Vector2)(Vector3)a.position,mask)) {
+								return true;
+							}
 						}
 					} else {
-						if (!Physics.Raycast (ray,dist,mask) && !Physics.Raycast (invertRay,dist,mask)) {
-							return true;
+						if (thickRaycast) {
+							if (!Physics.SphereCast (ray,thickRaycastRadius,dist,mask) && !Physics.SphereCast (invertRay,thickRaycastRadius,dist,mask)) {
+								return true;
+							}
+						} else {
+							if (!Physics.Linecast ((Vector3)a.position,(Vector3)b.position,mask) && !Physics.Linecast ((Vector3)b.position,(Vector3)a.position,mask)) {
+								return true;
+							}
 						}
 					}
 				} else {

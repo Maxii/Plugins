@@ -146,7 +146,7 @@ namespace Pathfinding {
 			GUILayout.BeginHorizontal ();
 			GUILayout.Space (14*EditorGUI.indentLevel);
 			GUILayout.BeginHorizontal (AstarPathEditor.helpBox);
-			GUILayout.Label (label, EditorStyles.miniLabel,GUILayout.ExpandWidth (true));
+			GUILayout.Label (label, EditorGUIUtility.isProSkin ? EditorStyles.whiteMiniLabel : EditorStyles.miniLabel,GUILayout.ExpandWidth (true));
 			if (GUILayout.Button (buttonLabel,EditorStyles.miniButton,GUILayout.Width (buttonWidth))) {
 				returnValue = true;
 			}

@@ -1,5 +1,5 @@
 //#define ASTAR_MORE_PATH_IDS
-//#define ASTAR_NO_LOGGING //Disables path error logging totally. This also reduces memory allocations because the logging strings will not be allocated. It does not affect normal logging calls, only error calls since they are allocated even though they are not logged
+//#define ASTAR_NO_LOGGING //@SHOWINEDITOR Disables path error logging totally. This also reduces memory allocations because the logging strings will not be allocated. It does not affect normal logging calls, only error calls since they are allocated even though they are not logged
 //#define ASTAR_LOCK_FREE_PATH_STATE
 //#define ASTARDEBUG
 
@@ -208,6 +208,7 @@ namespace Pathfinding {
 				// Note, other methods assume hTarget is (Int3)endPoint
 				hTarget = (Int3)endPoint;
 				endNode = endNNInfo.node;
+				hTargetNode = endNode;
 			}
 			
 			AstarProfiler.EndProfile ();

@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -38,8 +38,8 @@ public class UIFontMaker : EditorWindow
 		Custom,		// Only explicitly specified characters will be included
 	}
 
-	FontType mType = FontType.GeneratedBitmap;
-	int mFaceIndex = 0;
+	[System.NonSerialized] FontType mType = FontType.GeneratedBitmap;
+	[System.NonSerialized] int mFaceIndex = 0;
 
 	/// <summary>
 	/// Type of character map chosen for export.
@@ -57,16 +57,18 @@ public class UIFontMaker : EditorWindow
 
 	void MarkAsChanged ()
 	{
-		if (NGUISettings.ambigiousFont != null)
+		Object obj = (Object)NGUISettings.FMFont ?? (Object)NGUISettings.BMFont;
+
+		if (obj != null)
 		{
 			List<UILabel> labels = NGUIEditorTools.FindAll<UILabel>();
 
 			foreach (UILabel lbl in labels)
 			{
-				if (lbl.ambigiousFont == NGUISettings.ambigiousFont)
+				if (lbl.ambigiousFont == obj)
 				{
 					lbl.ambigiousFont = null;
-					lbl.ambigiousFont = NGUISettings.ambigiousFont;
+					lbl.ambigiousFont = obj;
 				}
 			}
 		}
@@ -90,7 +92,12 @@ public class UIFontMaker : EditorWindow
 	/// </summary>
 
 	void OnSelectionChange () { Repaint(); }
-	void OnUnityFont (Object obj) { NGUISettings.ambigiousFont = obj; }
+
+	void OnUnityFont (Object obj)
+	{
+		NGUISettings.FMFont = (Font)obj;
+		Repaint();
+	}
 
 	/// <summary>
 	/// Draw the UI for this tool.
@@ -98,7 +105,7 @@ public class UIFontMaker : EditorWindow
 
 	void OnGUI ()
 	{
-		Object fnt = NGUISettings.ambigiousFont;
+		Object fnt = (Object)NGUISettings.FMFont ?? (Object)NGUISettings.BMFont;
 		UIFont uiFont = (fnt as UIFont);
 
 		NGUIEditorTools.SetLabelWidth(80f);
@@ -161,12 +168,12 @@ public class UIFontMaker : EditorWindow
 			if (NGUIEditorTools.DrawPrefixButton("Source"))
 				ComponentSelector.Show<Font>(OnUnityFont, new string[] { ".ttf", ".otf" });
 
-			Font ttf = EditorGUILayout.ObjectField(NGUISettings.ambigiousFont as Font, typeof(Font), false) as Font;
+			Font ttf = EditorGUILayout.ObjectField(NGUISettings.FMFont, typeof(Font), false) as Font;
 			GUILayout.EndHorizontal();
 
 			GUILayout.BeginHorizontal();
 			{
-				NGUISettings.fontSize = EditorGUILayout.IntField("Size", NGUISettings.fontSize, GUILayout.Width(120f));
+				NGUISettings.FMSize = EditorGUILayout.IntField("Size", NGUISettings.FMSize, GUILayout.Width(120f));
 
 				if (mType == FontType.Dynamic)
 				{
@@ -181,8 +188,11 @@ public class UIFontMaker : EditorWindow
 			{
 				if (!FreeType.isPresent)
 				{
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
 					string filename = (Application.platform == RuntimePlatform.WindowsEditor) ? "FreeType.dll" : "FreeType.dylib";
-					
+#else
+					string filename = (Application.platform == RuntimePlatform.WindowsEditor) ? "FreeType64.dll" : "FreeType64.dylib";
+#endif
 					EditorGUILayout.HelpBox("Assets/NGUI/Editor/" + filename + " is missing", MessageType.Error);
 
 					GUILayout.BeginHorizontal();
@@ -411,9 +421,9 @@ public class UIFontMaker : EditorWindow
 		if (create == Create.Dynamic)
 		{
 			uiFont.atlas = null;
-			uiFont.dynamicFont = NGUISettings.dynamicFont;
+			uiFont.dynamicFont = NGUISettings.FMFont;
 			uiFont.dynamicFontStyle = NGUISettings.fontStyle;
-			uiFont.defaultSize = NGUISettings.fontSize;
+			uiFont.defaultSize = NGUISettings.FMSize;
 		}
 		else if (create == Create.Import)
 		{
@@ -460,7 +470,7 @@ public class UIFontMaker : EditorWindow
 				uiFont.spriteName = NGUISettings.fontTexture.name;
 				uiFont.atlas = NGUISettings.atlas;
 			}
-			NGUISettings.fontSize = uiFont.defaultSize;
+			NGUISettings.FMSize = uiFont.defaultSize;
 		}
 		else if (create == Create.Bitmap)
 		{
@@ -469,8 +479,8 @@ public class UIFontMaker : EditorWindow
 			Texture2D tex;
 
 			if (FreeType.CreateFont(
-				NGUISettings.dynamicFont,
-				NGUISettings.fontSize, mFaceIndex,
+				NGUISettings.FMFont,
+				NGUISettings.FMSize, mFaceIndex,
 				NGUISettings.fontKerning,
 				NGUISettings.charsToInclude, 1, out bmFont, out tex))
 			{
@@ -542,7 +552,11 @@ public class UIFontMaker : EditorWindow
 			uiFont = go.GetComponent<UIFont>();
 		}
 
-		if (uiFont != null) NGUISettings.ambigiousFont = uiFont;
+		if (uiFont != null)
+		{
+			NGUISettings.FMFont = null;
+			NGUISettings.BMFont = uiFont;
+		}
 		MarkAsChanged();
 		Selection.activeGameObject = go;
 	}
@@ -580,6 +594,6 @@ public class UIFontMaker : EditorWindow
 			font.spriteName = NGUISettings.fontTexture.name;
 			font.atlas = NGUISettings.atlas;
 		}
-		NGUISettings.fontSize = font.defaultSize;
+		NGUISettings.FMSize = font.defaultSize;
 	}
 }

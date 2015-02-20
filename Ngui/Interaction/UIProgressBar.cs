@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -355,6 +355,7 @@ public class UIProgressBar : UIWidgetContainer
 	public virtual void ForceUpdate ()
 	{
 		mIsDirty = false;
+		bool turnOff = false;
 
 		if (mFG != null)
 		{
@@ -377,7 +378,8 @@ public class UIProgressBar : UIWidgetContainer
 					mFG.drawRegion = isInverted ?
 						new Vector4(1f - value, 0f, 1f, 1f) :
 						new Vector4(0f, 0f, value, 1f);
-					mFG.enabled = value > 0.001f;
+					mFG.enabled = true;
+					turnOff = value < 0.001f;
 				}
 			}
 			else if (sprite != null && sprite.type == UIBasicSprite.Type.Filled)
@@ -395,7 +397,8 @@ public class UIProgressBar : UIWidgetContainer
 				mFG.drawRegion = isInverted ?
 					new Vector4(0f, 1f - value, 1f, 1f) :
 					new Vector4(0f, 0f, 1f, value);
-				mFG.enabled = value > 0.001f;
+				mFG.enabled = true;
+				turnOff = value < 0.001f;
 			}
 		}
 
@@ -430,6 +433,8 @@ public class UIProgressBar : UIWidgetContainer
 				SetThumbPosition(Vector3.Lerp(v0, v1, isInverted ? 1f - value : value));
 			}
 		}
+
+		if (turnOff) mFG.enabled = false;
 	}
 
 	/// <summary>

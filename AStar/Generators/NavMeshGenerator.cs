@@ -1,5 +1,5 @@
-//#define ASTARDEBUG    //Some debugging
-//#define ASTAR_NO_JSON
+//#define ASTARDEBUG
+//#define ASTAR_NO_JSON //@SHOWINEDITOR
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
@@ -350,7 +350,7 @@ and have a low memory footprint because of their smaller size to describe the sa
 		public void UpdateAreaInit (GraphUpdateObject o) {}
 		
 		public void UpdateArea (GraphUpdateObject o) {
-			
+			UpdateArea (o, this);
 		}
 		
 		
@@ -368,12 +368,7 @@ and have a low memory footprint because of their smaller size to describe the sa
 				Mathf.FloorToInt(bounds.max.x*Int3.Precision),
 				Mathf.FloorToInt(bounds.max.z*Int3.Precision)
 			);
-			
-			/*Vector3 a = new Vector3 (r.xMin,0,r.yMin);//	-1 	-1
-			Vector3 b = new Vector3 (r.xMin,0,r.yMax);//	-1	 1 
-			Vector3 c = new Vector3 (r.xMax,0,r.yMin);//	 1 	-1
-			Vector3 d = new Vector3 (r.xMax,0,r.yMax);//	 1 	 1
-			*/
+
 			Int3 a = new Int3(r2.xmin,0,r2.ymin);
 			Int3 b = new Int3(r2.xmin,0,r2.ymax);
 			Int3 c = new Int3(r2.xmax,0,r2.ymin);
@@ -412,11 +407,6 @@ and have a low memory footprint because of their smaller size to describe the sa
 					if (vert.x > r.xMax) allRight++;
 					if (vert.z < r.yMin) allTop++;
 					if (vert.z > r.yMax) allBottom++;
-					
-					//if (!bounds.Contains (node[v]) {
-					//	inside = false;
-					//	break;
-					//}
 				}
 				if (!inside) {
 					if (allLeft == 3 || allRight == 3 || allTop == 3 || allBottom == 3) {
@@ -528,7 +518,7 @@ and have a low memory footprint because of their smaller size to describe the sa
 		}
 		
 		/** Generates a navmesh. Based on the supplied vertices and triangles. Memory usage is about O(n) */
-		public void GenerateNodes (Vector3[] vectorVertices, int[] triangles, out Vector3[] originalVertices, out Int3[] vertices) {
+		void GenerateNodes (Vector3[] vectorVertices, int[] triangles, out Vector3[] originalVertices, out Int3[] vertices) {
 			
 			Profiler.BeginSample ("Init");
 
@@ -607,11 +597,17 @@ and have a low memory footprint because of their smaller size to describe the sa
 			//graph.CreateNodes (triangles.Length/3);//new Node[triangles.Length/3];
 			nodes = new TriangleMeshNode[triangles.Length/3];
 			
+			int graphIndex = active.astarData.GetGraphIndex(this); 
+
+			// Does not have to set this, it is set in ScanInternal
+			//TriangleMeshNode.SetNavmeshHolder ((int)graphIndex,this);
+
 			for (int i=0;i<nodes.Length;i++) {
 				
 				nodes[i] = new TriangleMeshNode(active);
 				TriangleMeshNode node = nodes[i];//new MeshNode ();
 				
+				node.GraphIndex = (uint)graphIndex;
 				node.Penalty = initialPenalty;
 				node.Walkable = true;
 				
@@ -868,5 +864,31 @@ and have a low memory footprint because of their smaller size to describe the sa
 			RebuildBBTree (graph);
 		}
 
+#if ASTAR_NO_JSON
+
+		public override void SerializeSettings ( GraphSerializationContext ctx ) {
+			base.SerializeSettings (ctx);
+
+			ctx.SerializeUnityObject ( sourceMesh );
+
+			ctx.SerializeVector3 (offset);
+			ctx.SerializeVector3 (rotation);
+
+			ctx.writer.Write(scale);
+			ctx.writer.Write(accurateNearestNode);
+		}
+		
+		public override void DeserializeSettings ( GraphSerializationContext ctx ) {
+
+			base.DeserializeSettings (ctx);
+			
+			sourceMesh = ctx.DeserializeUnityObject () as Mesh;
+
+			offset = ctx.DeserializeVector3 ();
+			rotation = ctx.DeserializeVector3 ();
+			scale = ctx.reader.ReadSingle();
+			accurateNearestNode = ctx.reader.ReadBoolean();
+		}
+#endif
 	}
 }

@@ -67,6 +67,7 @@ public class SmoothModifierEditor : Editor {
 			
 		} else if (ob.smoothType == SimpleSmoothModifier.SmoothType.CurvedNonuniform) {
 			ob.maxSegmentLength = EditorGUILayout.FloatField (new GUIContent ("Max Segment Length","The length of each segment in the smoothed path. A high value yields rough paths and low value yields very smooth paths, but is slower"),ob.maxSegmentLength);
+			ob.factor = EditorGUILayout.FloatField (new GUIContent ("Roundness Factor","How much to smooth the path. A higher value will give a smoother path, but might take the character far off the optimal path."),ob.factor);
 			ob.maxSegmentLength = ob.maxSegmentLength < 0 ? 0 : ob.maxSegmentLength;
 		} else {
 			DrawDefaultInspector ();

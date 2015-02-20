@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 // Dynamic font support contributed by the NGUI community members:
@@ -123,14 +123,14 @@ public class UIFont : MonoBehaviour
 			}
 			else if (mAtlas != value)
 			{
-				if (value == null)
-				{
-					if (mAtlas != null) mMat = mAtlas.spriteMaterial;
-					if (sprite != null) mUVRect = uvRect;
-				}
-
 				mPMA = -1;
 				mAtlas = value;
+
+				if (mAtlas != null)
+				{
+					mMat = mAtlas.spriteMaterial;
+					if (sprite != null) mUVRect = uvRect;
+				}
 				MarkAsChanged();
 			}
 		}

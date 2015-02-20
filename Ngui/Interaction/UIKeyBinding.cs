@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -98,53 +98,47 @@ public class UIKeyBinding : MonoBehaviour
 
 	protected virtual void Update ()
 	{
+		if (UICamera.inputHasFocus) return;
 		if (keyCode == KeyCode.None || !IsModifierActive()) return;
+
+		bool keyDown = Input.GetKeyDown(keyCode);
+		bool keyUp = Input.GetKeyUp(keyCode);
+
+		if (keyDown) mPress = true;
 
 		if (action == Action.PressAndClick || action == Action.All)
 		{
-			if (UICamera.inputHasFocus) return;
-
 			UICamera.currentTouch = UICamera.controller;
 			UICamera.currentScheme = UICamera.ControlScheme.Mouse;
 			UICamera.currentTouch.current = gameObject;
 
-			if (Input.GetKeyDown(keyCode))
-			{
-				mPress = true;
-				OnBindingPress(true);
-			}
+			if (keyDown) OnBindingPress(true);
 
-			if (Input.GetKeyUp(keyCode))
+			if (mPress && keyUp)
 			{
 				OnBindingPress(false);
-
-				if (mPress)
-				{
-					OnBindingClick();
-					mPress = false;
-				}
+				OnBindingClick();
 			}
 			UICamera.currentTouch.current = null;
 		}
 
 		if (action == Action.Select || action == Action.All)
 		{
-			if (Input.GetKeyUp(keyCode))
+			if (keyUp)
 			{
 				if (mIsInput)
 				{
 					if (!mIgnoreUp && !UICamera.inputHasFocus)
 					{
-						UICamera.selectedObject = gameObject;
+						if (mPress) UICamera.selectedObject = gameObject;
 					}
 					mIgnoreUp = false;
 				}
-				else
-				{
-					UICamera.selectedObject = gameObject;
-				}
+				else if (mPress) UICamera.selectedObject = gameObject;
 			}
 		}
+
+		if (keyUp) mPress = false;
 	}
 
 	protected virtual void OnBindingPress (bool pressed) { UICamera.Notify(gameObject, "OnPress", pressed); }

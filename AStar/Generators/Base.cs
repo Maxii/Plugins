@@ -2,7 +2,7 @@
 	#define UNITY_LE_4_3
 #endif
 
-//#define ASTAR_NO_JSON
+//#define ASTAR_NO_JSON //@SHOWINEDITOR
 
 using UnityEngine;
 using System.Collections;
@@ -237,7 +237,7 @@ namespace Pathfinding {
 		  * SafeOnDestroy should be used when there is a risk that the pathfinding is searching through this graph when called
 		  */
 		public void SafeOnDestroy () {
-			AstarPath.RegisterSafeUpdate (OnDestroy,false);
+			AstarPath.RegisterSafeUpdate (OnDestroy);
 		}
 		
 		
@@ -315,7 +315,7 @@ namespace Pathfinding {
 					colSet = true;
 					break;
 				case GraphDebugMode.Penalty:
-					c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)node.Penalty / (float)AstarPath.active.debugRoof);
+					c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, ((float)node.Penalty-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
 					colSet = true;
 					break;
 				case GraphDebugMode.Tags:
@@ -343,13 +343,13 @@ namespace Pathfinding {
 				switch (AstarPath.active.debugMode) {
 					case GraphDebugMode.G:
 						//c = Mathfx.IntToColor (node.g,0.5F);
-						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)nodeR.G / (float)AstarPath.active.debugRoof);
+						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, ((float)nodeR.G-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
 						break;
 					case GraphDebugMode.H:
-						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)nodeR.H / (float)AstarPath.active.debugRoof);
+						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, ((float)nodeR.H-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
 						break;
 					case GraphDebugMode.F:
-						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, (float)nodeR.F / (float)AstarPath.active.debugRoof);
+						c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, ((float)nodeR.F-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
 						break;
 				}
 			}
@@ -380,12 +380,47 @@ namespace Pathfinding {
 		public virtual void PostDeserialization () {
 		}
 
+#if ASTAR_NO_JSON
+		public virtual void SerializeSettings ( GraphSerializationContext ctx ) {
+
+			ctx.writer.Write (guid.ToByteArray());
+			ctx.writer.Write (initialPenalty);
+			ctx.writer.Write (open);
+			ctx.writer.Write (name);
+			ctx.writer.Write (drawGizmos);
+			ctx.writer.Write (infoScreenOpen);
+
+			for ( int i = 0; i < 4; i++ ) {
+				for ( int j = 0; j < 4; j++ ) {
+					ctx.writer.Write (matrix.GetRow(i)[j]);
+				}
+			}
+		}
+
+		public virtual void DeserializeSettings ( GraphSerializationContext ctx ) {
+
+			guid = new Guid(ctx.reader.ReadBytes (16));
+			initialPenalty = ctx.reader.ReadUInt32 ();
+			open = ctx.reader.ReadBoolean();
+			name = ctx.reader.ReadString();
+			drawGizmos = ctx.reader.ReadBoolean();
+			infoScreenOpen = ctx.reader.ReadBoolean();
+
+			for ( int i = 0; i < 4; i++ ) {
+				Vector4 row = Vector4.zero;
+				for ( int j = 0; j < 4; j++ ) {
+					row[j] = ctx.reader.ReadSingle ();
+				}
+				matrix.SetRow (i, row);
+			}
+		}
+#endif
 
 		/** Returns if the node is in the search tree of the path.
 		 * Only guaranteed to be correct if \a path is the latest path calculated.
 		 * Use for gizmo drawing only.
 		 */
-		public bool InSearchTree (GraphNode node, Path path) {
+		public static bool InSearchTree (GraphNode node, Path path) {
 			if (path == null || path.pathHandler == null) return true;
 			PathNode nodeR = path.pathHandler.GetPathNode (node);
 			return nodeR.pathID == path.pathID;
@@ -466,7 +501,16 @@ namespace Pathfinding {
 		/** Diameter of the thick raycast in nodes.
 		 * 1 equals \link Pathfinding.GridGraph.nodeSize nodeSize \endlink */
 		public float thickRaycastDiameter = 1;
-		
+
+		/** Make nodes unwalkable when no ground was found with the height raycast. If height raycast is turned off, this doesn't affect anything. */
+		public bool unwalkableWhenNoGround = true;
+
+		/** Use Unity 2D API */
+		public bool use2D = false;
+
+		public bool collisionCheck = true; /**< Toggle collision check */
+		public bool heightCheck = true; /**< Toggle height check. If false, the grid will be flat */
+
 		/** Direction to use as \a UP.
 		 * \see Initialize */
 		public Vector3 up;
@@ -485,15 +529,8 @@ namespace Pathfinding {
 		
 		/** Offset to apply after each raycast to make sure we don't hit the same point again in CheckHeightAll */
 		public const float RaycastErrorMargin = 0.005F;
-		
-		public bool collisionCheck = true; /**< Toggle collision check */
-		public bool heightCheck = true; /**< Toggle height check. If false, the grid will be flat */
 	
-		/** Make nodes unwalkable when no ground was found with the height raycast. If height raycast is turned off, this doesn't affect anything. */
-		public bool unwalkableWhenNoGround = true;
-		
-		/** Use Unity 2D API */
-		public bool use2D = false;
+
 		
 //#if !PhotonImplementation
 		
@@ -521,7 +558,7 @@ namespace Pathfinding {
 			if ( use2D ) {
 				switch (type) {
 					case ColliderType.Capsule:
-						throw new System.Exception ("Capsule mode cannot be used with 2D since capsules don't exist in 2D");
+						throw new System.Exception ("Capsule mode cannot be used with 2D since capsules don't exist in 2D. Please change the Physics Testing -> Collider Type setting.");
 					case ColliderType.Sphere:
 						return Physics2D.OverlapCircle (position, finalRadius, mask) == null;
 					default:
@@ -696,6 +733,42 @@ namespace Pathfinding {
 				}
 			}
 			return hits.ToArray ();
+		}
+
+		public void SerializeSettings ( GraphSerializationContext ctx ) {
+			ctx.writer.Write ((int)type);
+			ctx.writer.Write (diameter);
+			ctx.writer.Write (height);
+			ctx.writer.Write (collisionOffset);
+			ctx.writer.Write ((int)rayDirection);
+			ctx.writer.Write ((int)mask);
+			ctx.writer.Write ((int)heightMask);
+			ctx.writer.Write (fromHeight);
+			ctx.writer.Write (thickRaycast);
+			ctx.writer.Write (thickRaycastDiameter);
+
+			ctx.writer.Write (unwalkableWhenNoGround);
+			ctx.writer.Write (use2D);
+			ctx.writer.Write (collisionCheck);
+			ctx.writer.Write (heightCheck);
+		}
+
+		public void DeserializeSettings ( GraphSerializationContext ctx ) {
+			type = (ColliderType)ctx.reader.ReadInt32();
+			diameter = ctx.reader.ReadSingle ();
+			height = ctx.reader.ReadSingle ();
+			collisionOffset = ctx.reader.ReadSingle ();
+			rayDirection = (RayDirection)ctx.reader.ReadInt32 ();
+			mask = (LayerMask)ctx.reader.ReadInt32 ();
+			heightMask = (LayerMask)ctx.reader.ReadInt32 ();
+			fromHeight = ctx.reader.ReadSingle ();
+			thickRaycast = ctx.reader.ReadBoolean ();
+			thickRaycastDiameter = ctx.reader.ReadSingle ();
+
+			unwalkableWhenNoGround = ctx.reader.ReadBoolean();
+			use2D = ctx.reader.ReadBoolean();
+			collisionCheck = ctx.reader.ReadBoolean();
+			heightCheck = ctx.reader.ReadBoolean();
 		}
 	}
 

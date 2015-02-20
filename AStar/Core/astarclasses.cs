@@ -107,8 +107,6 @@ namespace Pathfinding {
 			_MeshEdgeColor = new Color (0,0,0,0.5F);
 			_MeshColor = new Color (0.125F, 0.686F, 0, 0.19F);
 		}
-		
-		//new Color (0.909F,0.937F,0.243F,0.6F);
 	}
 	
 	
@@ -155,17 +153,27 @@ namespace Pathfinding {
 		 * 
 		 * \see AstarPath.GetNearest */
 		public int graphMask = -1;
-		
-		public bool constrainArea = false; /**< Only treat nodes in the area #area as suitable. Does not affect anything if #area is less than 0 (zero) */ 
-		public int area = -1; /**< Area ID to constrain to. Will not affect anything if less than 0 (zero) or if #constrainArea is false */
-		
-		public bool constrainWalkability = true; /**< Only treat nodes with the walkable flag set to the same as #walkable as suitable */
-		public bool walkable = true; /**< What must the walkable flag on a node be for it to be suitable. Does not affect anything if #constrainWalkability if false */
-		
-		public bool distanceXZ = false; /**< if available, do an XZ check instead of checking on all axes. The RecastGraph supports this */
-		
-		public bool constrainTags = true; /**< Sets if tags should be constrained */
-		public int tags = -1; /**< Nodes which have any of these tags set are suitable. This is a bitmask, i.e bit 0 indicates that tag 0 is good, bit 3 indicates tag 3 is good etc. */
+
+		/** Only treat nodes in the area #area as suitable. Does not affect anything if #area is less than 0 (zero) */ 
+		public bool constrainArea = false;
+
+		/** Area ID to constrain to. Will not affect anything if less than 0 (zero) or if #constrainArea is false */
+		public int area = -1;
+
+		/** Only treat nodes with the walkable flag set to the same as #walkable as suitable */
+		public bool constrainWalkability = true;
+
+		/** What must the walkable flag on a node be for it to be suitable. Does not affect anything if #constrainWalkability if false */
+		public bool walkable = true;
+
+		/** if available, do an XZ check instead of checking on all axes. The RecastGraph supports this */
+		public bool distanceXZ = false;
+
+		/** Sets if tags should be constrained */
+		public bool constrainTags = true;
+
+		/** Nodes which have any of these tags set are suitable. This is a bitmask, i.e bit 0 indicates that tag 0 is good, bit 3 indicates tag 3 is good etc. */
+		public int tags = -1;
 		
 		/** Constrain distance to node.
 		 * Uses distance from AstarPath.maxNearestNodeDistance.
@@ -175,6 +183,9 @@ namespace Pathfinding {
 		public bool constrainDistance = true;
 		
 		/** Returns whether or not the graph conforms to this NNConstraint's rules.
+		  * Note that only the first 31 graphs are considered using this function.
+		  * If the graphMask has bit 31 set (i.e the last graph possible to fit in the mask), all graphs
+		  * above index 31 will also be considered suitable.
 		  */
 		public virtual bool SuitableGraph (int graphIndex, NavGraph graph) {
 			return ((graphMask >> graphIndex) & 1) != 0;
@@ -186,7 +197,7 @@ namespace Pathfinding {
 			
 			if (constrainArea && area >= 0 && node.Area != area) return false;
 			
-			if (constrainTags && (tags >> (int)node.Tag & 0x1) == 0) return false;
+			if (constrainTags && ((tags >> (int)node.Tag) & 0x1) == 0) return false;
 			
 			return true;
 		}
@@ -373,7 +384,9 @@ namespace Pathfinding {
 	 */
 	public class GraphUpdateObject {
 		
-		/** The bounds to update nodes within */
+		/** The bounds to update nodes within.
+		  * Defined in world space.
+		 */
 		public Bounds bounds;
 		
 		/** Performance boost.
@@ -447,7 +460,9 @@ namespace Pathfinding {
 		 * \astarpro */
 		public NNConstraint nnConstraint = NNConstraint.None;
 		
-		/** Penalty to add to the nodes */
+		/** Penalty to add to the nodes.
+		  * A penalty of 1000 is equivalent to the cost of moving 1 world unit.
+		 */
 		public int addPenalty = 0;
 		
 		public bool modifyWalkability = false; /**< If true, all nodes \a walkable variables will be set to #setWalkability */
@@ -460,9 +475,14 @@ namespace Pathfinding {
 		 * Used internally to revert changes if needed.
 		 */
 		public bool trackChangedNodes = false;
-		
-		private List<GraphNode> changedNodes;
-		private List<ulong> backupData;
+
+		/** Nodes which were updated by this GraphUpdateObject.
+		 * Will only be filled if #trackChangedNodes is true.
+		 * \note It might take a few frames for graph update objects to be applied.
+		 * If you need this info directly, use AstarPath.FlushGraphUpdates.
+		 */
+		public List<GraphNode> changedNodes;
+		private List<uint> backupData;
 		private List<Int3> backupPositionData;
 		
 		public GraphUpdateShape shape = null;
@@ -473,10 +493,13 @@ namespace Pathfinding {
 		  */
 		public virtual void WillUpdateNode (GraphNode node) {
 			if (trackChangedNodes && node != null) {
-				if (changedNodes == null) { changedNodes = ListPool<GraphNode>.Claim(); backupData = ListPool<ulong>.Claim(); backupPositionData = ListPool<Int3>.Claim(); }
+				if (changedNodes == null) { changedNodes = ListPool<GraphNode>.Claim(); backupData = ListPool<uint>.Claim(); backupPositionData = ListPool<Int3>.Claim(); }
 				changedNodes.Add (node);
 				backupPositionData.Add (node.position);
-				backupData.Add ((ulong)node.Penalty<<32 | (ulong)node.Flags);
+				backupData.Add (node.Penalty);
+				backupData.Add (node.Flags);
+				var gg = node as GridNode;
+				if ( gg != null ) backupData.Add (gg.InternalGridFlags);
 			}
 		}
 		
@@ -485,20 +508,24 @@ namespace Pathfinding {
 		public virtual void RevertFromBackup () {
 			if (trackChangedNodes) {
 				if (changedNodes == null) return;
-				
-				throw new System.NotSupportedException ("Positions not supported yet");
-				
-				/*for (int i=0;i<changedNodes.Count;i++) {
-					changedNodes[i].Penalty = (uint)(backupData[i]>>32);
-					changedNodes[i].Flags = (uint)(backupData[i] & 0xFFFFFFFF);
-					
-					ListPool<GraphNode>.Release (changedNodes);
-					ListPool<ulong>.Release(backupData);
-					ListPool<Int3>.Release(backupPositionData);
-					
-					
-					//changedNodes[i].Position = backupPositionData[i];
-				}*/
+
+				int counter = 0;
+				for (int i=0;i<changedNodes.Count;i++) {
+					changedNodes[i].Penalty = backupData[counter];
+					counter++;
+					changedNodes[i].Flags = backupData[counter];
+					counter++;
+					var gg = changedNodes[i] as GridNode;
+					if ( gg != null ) {
+						gg.InternalGridFlags = (ushort)backupData[counter];
+						counter++;
+					}
+					changedNodes[i].position = backupPositionData[i];
+				}
+
+				ListPool<GraphNode>.Release (changedNodes);
+				ListPool<uint>.Release(backupData);
+				ListPool<Int3>.Release(backupPositionData);
 			} else {
 				throw new System.InvalidOperationException ("Changed nodes have not been tracked, cannot revert from backup");
 			}

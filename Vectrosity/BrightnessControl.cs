@@ -1,4 +1,4 @@
-// Version 3.1
+// Version 4.0
 // ©2014 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;

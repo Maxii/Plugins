@@ -1,6 +1,6 @@
 //Uncomment the next line to enable debugging (also uncomment it in AstarPath.cs)
-//#define ProfileAstar
-//#define UNITY_PRO_PROFILER //Requires ProfileAstar, profiles section of astar code which will show up in the Unity Pro Profiler.
+//#define ProfileAstar //@SHOWINEDITOR
+//#define UNITY_PRO_PROFILER //@SHOWINEDITOR Requires ProfileAstar, profiles section of astar code which will show up in the Unity Pro Profiler.
 
 using System.Collections.Generic;
 using System;

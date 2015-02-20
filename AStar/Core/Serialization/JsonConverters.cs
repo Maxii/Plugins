@@ -3,9 +3,16 @@
 using System;
 using UnityEngine;
 using Pathfinding.Serialization.JsonFx;
-
+#if NETFX_CORE
+using System.Reflection;
+#endif
 using System.Collections.Generic;
+#if NETFX_CORE && !UNITY_EDITOR
+//using MarkerMetro.Unity.WinLegacy.IO;
+//using MarkerMetro.Unity.WinLegacy.Reflection;
+#endif
 
+#if !ASTAR_NO_JSON
 
 namespace Pathfinding.Serialization
 {
@@ -13,7 +20,11 @@ namespace Pathfinding.Serialization
 	public class UnityObjectConverter : JsonConverter {
 
 		public override bool CanConvert (Type type) {
+#if NETFX_CORE
+			return typeof(UnityEngine.Object).GetTypeInfo().IsAssignableFrom (type.GetTypeInfo());
+#else
 			return typeof(UnityEngine.Object).IsAssignableFrom (type);
+#endif
 		}
 		
 		public override object ReadJson ( Type objectType, Dictionary<string,object> values) {
@@ -24,7 +35,9 @@ namespace Pathfinding.Serialization
 			//int instanceID = (int)values["InstanceID"];
 			
 			string name = (string)values["Name"];
-			
+
+			if ( name == null ) return null;
+
 			string typename = (string)values["Type"];
 			Type type = Type.GetType (typename);
 			
@@ -67,9 +80,15 @@ namespace Pathfinding.Serialization
 			
 			
 			Dictionary<string, object> dict = new Dictionary<string, object>();
-			
-			dict.Add ("InstanceID",obj.GetInstanceID());
+
+
+			if ( value == null ) {
+				dict.Add ("Name",null);
+				return dict;
+			}
+
 			dict.Add ("Name",obj.name);
+
 			dict.Add ("Type",obj.GetType().AssemblyQualifiedName);
 			
 			//Write scene path if the object is a Component or GameObject
@@ -260,3 +279,5 @@ namespace Pathfinding.Serialization
         }
     }
 }
+
+#endif

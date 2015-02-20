@@ -105,7 +105,7 @@ public class AIPath : MonoBehaviour {
 	protected Transform tr;
 	
 	/** Time when the last path request was sent */
-	private float lastRepath = -9999;
+	protected float lastRepath = -9999;
 	
 	/** Current path which is followed */
 	protected Path path;
@@ -159,7 +159,7 @@ public class AIPath : MonoBehaviour {
 		//Cache some other components (not all are necessarily there)
 		controller = GetComponent<CharacterController>();
 		navController = GetComponent<NavmeshController>();
-		rigid = rigidbody;
+		rigid = GetComponent<Rigidbody>();
 	}
 	
 	/** Starts searching for paths.
@@ -323,7 +323,7 @@ public class AIPath : MonoBehaviour {
 		if (!canMove) { return; }
 		
 		Vector3 dir = CalculateVelocity (GetFeetPosition());
-		
+
 		//Rotate towards targetDirection (filled in by CalculateVelocity)
 		RotateTowards (targetDirection);
 	
@@ -366,7 +366,6 @@ public class AIPath : MonoBehaviour {
 		if (path == null || path.vectorPath == null || path.vectorPath.Count == 0) return Vector3.zero; 
 		
 		List<Vector3> vPath = path.vectorPath;
-		//Vector3 currentPosition = GetFeetPosition();
 		
 		if (vPath.Count == 1) {
 			vPath.Insert (0,currentPosition);
@@ -395,9 +394,7 @@ public class AIPath : MonoBehaviour {
 		
 		Vector3 dir = vPath[currentWaypointIndex] - vPath[currentWaypointIndex-1];
 		Vector3 targetPosition = CalculateTargetPoint (currentPosition,vPath[currentWaypointIndex-1] , vPath[currentWaypointIndex]);
-			//vPath[currentWaypointIndex] + Vector3.ClampMagnitude (dir,forwardLook);
-		
-		
+
 		
 		dir = targetPosition-currentPosition;
 		dir.y = 0;

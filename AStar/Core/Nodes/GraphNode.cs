@@ -1,5 +1,5 @@
-#define ASTAR_MORE_AREAS // Increases the number of areas to 65535 but reduces the maximum number of graphs to 4. Disabling gives a max number of areas of 1023 and 32 graphs.
-//#define ASTAR_NO_PENALTY // Enabling this disables the use of penalties. Reduces memory usage.
+//#define ASTAR_NO_PENALTY //@SHOWINEDITOR Enabling this disables the use of penalties. Reduces memory usage.
+#define ASTAR_CONSTANT_PENALTY
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
@@ -46,8 +46,7 @@ namespace Pathfinding {
 		
 		/** Constructor for a graph node. */
 		public GraphNode (AstarPath astar) {
-			//this.nodeIndex = NextNodeIndex++;
-			if (astar != null) {
+			if (!System.Object.ReferenceEquals (astar, null)) {
 				this.nodeIndex = astar.GetNewNodeIndex();
 				astar.InitializeNode (this);
 			} else {
@@ -96,19 +95,20 @@ namespace Pathfinding {
 		const int FlagsWalkableOffset = 0;
 		/** Mask of the walkable bit. \see Walkable */
 		const uint FlagsWalkableMask = 1 << FlagsWalkableOffset;
-		
+
 		/** Start of region bits. \see Area */
 		const int FlagsAreaOffset = 1;
 		/** Mask of region bits. \see Area */
-		const uint FlagsAreaMask = (1024-1) << FlagsAreaOffset;
+		const uint FlagsAreaMask = (131072-1) << FlagsAreaOffset;
 		
 		/** Start of graph index bits. \see GraphIndex */
-		const int FlagsGraphOffset = 11;
+		const int FlagsGraphOffset = 24;
 		/** Mask of graph index bits. \see GraphIndex */
-		const uint FlagsGraphMask = (32-1) << FlagsGraphOffset;
-		public const uint MaxRegionCount = FlagsAreaMask >> FlagsAreaOffset;
-		/** Max number of graphs */
-		public const uint MaxGraphCount = FlagsGraphMask >> FlagsGraphOffset;
+		const uint FlagsGraphMask = (256u-1) << FlagsGraphOffset;
+
+		public const uint MaxAreaIndex = FlagsAreaMask >> FlagsAreaOffset;
+		/** Max number of graphs-1 */
+		public const uint MaxGraphIndex = FlagsGraphMask >> FlagsGraphOffset;
 		
 		/** Start of tag bits. \see Tag */
 		const int FlagsTagOffset = 19;
@@ -137,7 +137,7 @@ namespace Pathfinding {
 				return penalty;
 			}
 			set {
-				if (value > 0xFFFFF)
+				if (value > 0xFFFFFF)
 					Debug.LogWarning ("Very high penalty applied. Are you sure negative values haven't underflowed?\n" +
 						"Penalty values this high could with long paths cause overflows and in some cases infinity loops because of that.\n" +
 						"Penalty value applied: "+value);
@@ -160,11 +160,10 @@ namespace Pathfinding {
 				return (flags & FlagsAreaMask) >> FlagsAreaOffset;
 			}
 			set {
-				//Awesome! No parentheses
-				flags = flags & ~FlagsAreaMask | value << FlagsAreaOffset;
+				flags = (flags & ~FlagsAreaMask) | (value << FlagsAreaOffset);
 			}
 		}
-		
+
 		public uint GraphIndex {
 			get {
 				return (flags & FlagsGraphMask) >> FlagsGraphOffset;
@@ -186,7 +185,7 @@ namespace Pathfinding {
 #endregion
 		
 		public void UpdateG (Path path, PathNode pathNode) {
-			pathNode.G = pathNode.parent.G + pathNode.cost + path.GetTraversalCost(this);
+			pathNode.G = pathNode.parent.G + pathNode.cost;
 		}
 		
 		public virtual void UpdateRecursiveG (Path path, PathNode pathNode, PathHandler handler) {

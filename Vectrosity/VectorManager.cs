@@ -1,4 +1,4 @@
-// Version 3.1
+// Version 4.0
 // ©2014 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -14,17 +14,17 @@ public class VectorManager {
 	static Color fogColor;
 	public static bool useDraw3D = false;
 	
-	public static void SetBrightnessParameters (float min, float max, int levels, float frequency, Color color) {
+	public static void SetBrightnessParameters (float fadeOutDistance, float fullBrightDistance, int levels, float frequency, Color color) {
 		// Since we're using sqrMagnitude for speed (instead of Vector3.Distance), we need the squared distances
-		minBrightnessDistance = min * min;
-		maxBrightnessDistance = max * max;
+		minBrightnessDistance = fadeOutDistance * fadeOutDistance;
+		maxBrightnessDistance = fullBrightDistance * fullBrightDistance;
 		brightnessLevels = levels;
 		distanceCheckFrequency = frequency;
 		fogColor = color;
 	}
 	
 	public static float GetBrightnessValue (Vector3 pos) {
-		return Mathf.InverseLerp(minBrightnessDistance, maxBrightnessDistance, (pos - VectorLine.camTransformPosition).sqrMagnitude);
+		return Mathf.InverseLerp (minBrightnessDistance, maxBrightnessDistance, (pos - VectorLine.camTransformPosition).sqrMagnitude);
 	}
 	
 	public static void ObjectSetup (GameObject go, VectorLine line, Visibility visibility, Brightness brightness) {
@@ -285,11 +285,11 @@ public class VectorManager {
 		return GetBounds (line.points3);
 	}
 	
-	public static Bounds GetBounds (Vector3[] points3) {
+	public static Bounds GetBounds (List<Vector3> points3) {
 		var bounds = new Bounds();
 		var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
 		var max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
-		var end = points3.Length;
+		int end = points3.Count;
 		
 		for (int i = 0; i < end; i++) {
 			if (points3[i].x < min.x) min.x = points3[i].x;
@@ -334,10 +334,10 @@ public class VectorManager {
 		if (meshTable == null) {
 			meshTable = new Dictionary<string, Mesh>();
 		}
-		if (!meshTable.ContainsKey(line.vectorObject.name)) {
-			meshTable.Add (line.vectorObject.name, MakeBoundsMesh (GetBounds (line)));
-			meshTable[line.vectorObject.name].name = line.vectorObject.name + " Bounds";
+		if (!meshTable.ContainsKey(line.name)) {
+			meshTable.Add (line.name, MakeBoundsMesh (GetBounds (line)));
+			meshTable[line.name].name = line.name + " Bounds";
 		}
-		meshFilter.mesh = meshTable[line.vectorObject.name];
+		meshFilter.mesh = meshTable[line.name];
 	}
 }

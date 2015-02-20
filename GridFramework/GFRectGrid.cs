@@ -18,16 +18,7 @@ public class GFRectGrid: GFGrid {
 	public Vector3 spacing {
 		get {return _spacing;}
 		set {
-			if (value == _spacing) {// needed because the editor fires the setter even if this wasn't changed
-				return;
-			}
-			_spacing = Vector3.Max(value, 0.1f * Vector3.one);
-			_matricesMustUpdate = true;
-			_drawPointsMustUpdate = true;
-			if (!relativeSize) {
-				_drawPointsCountMustUpdate = true;
-			}
-			GridChanged();
+			SetMember<Vector3>(value, ref _spacing, restrictor: Vector3.Max, limit: 0.1f*Vector3.one);
 		}
 	}
 
@@ -41,15 +32,7 @@ public class GFRectGrid: GFGrid {
 	public Vector6 shearing {
 		get {return _shearing;}
 		set {
-			if (value == _shearing) {
-				return;
-			}
-			//Debug.Log("ping");
-			_shearing = value;
-			_matricesMustUpdate = true;
-			_drawPointsMustUpdate = true;
-			//_drawPointsCountMustUpdate = true;
-			GridChanged();
+			SetMember<Vector6>(value, ref _shearing);
 		}
 	}
 
@@ -279,10 +262,10 @@ public class GFRectGrid: GFGrid {
 	/// the scale of a Transform would do above. By default it’s set to one on all axes, placing the point at the centre of a box. If a component of @c scale is odd that
 	/// component of the vector will be placed between edges, otherwise it will be placed on the nearest edge. The <c>lockAxis</c> parameter lets you ignore individual axes.
 	public override Vector3 AlignVector3(Vector3 pos, Vector3 scale, BoolVector3 ignoreAxis) {
-		Vector3 currentPosition = WorldToGrid(pos);
-		Vector3 newPositionB = WorldToGrid(NearestBoxW(pos));
-		Vector3 newPositionV = WorldToGrid(NearestVertexW(pos));
-		Vector3 newPosition = new Vector3();
+		var currentPosition = WorldToGrid(pos);
+		var newPositionB = WorldToGrid(NearestBoxW(pos));
+		var newPositionV = WorldToGrid(NearestVertexW(pos));
+		var newPosition = new Vector3();
 		
 		for (int i = 0; i <=2; i++) {
 			// vertex or box, depends on whether scale is a multiple of spacing
@@ -306,8 +289,9 @@ public class GFRectGrid: GFGrid {
 	/// 
 	/// Scales a size to the nearest multiple of the grid’s spacing. The parameter *ignoreAxis* makes the function not touch the corresponding coordinate.
 	public override Vector3 ScaleVector3(Vector3 scl, BoolVector3 ignoreAxis) {
-		Vector3 relScale = scl.GFModulo3(spacing);
-		Vector3 newScale = Vector3.zero;
+		//Vector3 relScale = scl.GFModulo3(spacing);
+		var relScale = new Vector3(scl.x % spacing.x, scl.y % spacing.y, scl.z % spacing.z);
+		var newScale = Vector3.zero;
 		
 		for (int i = 0; i <= 2; i++) {
 			newScale[i] = scl[i];

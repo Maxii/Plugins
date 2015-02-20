@@ -11,21 +11,6 @@ namespace Pathfinding {
 	 */
 	public class GraphUpdateScene : GraphModifier {
 		
-		/** Do some stuff at start */
-		public void Start () {
-			
-			//If firstApplied is true, that means the graph was scanned during Awake.
-			//So we shouldn't apply it again because then we would end up applying it two times
-			if (!firstApplied && applyOnStart) {
-				Apply ();
-			}
-		}
-		
-		public override void OnPostScan ()
-		{
-			if (applyOnScan) Apply ();
-		}
-		
 		/** Points which define the region to update */
 		public Vector3[] points;
 		
@@ -35,27 +20,33 @@ namespace Pathfinding {
 		[HideInInspector]
 		/** Use the convex hull (XZ space) of the points. */
 		public bool convex = true;
+
 		[HideInInspector]
 		/** Minumum height of the bounds of the resulting Graph Update Object.
 		 * Useful when all points are laid out on a plane but you still need a bounds with a height greater than zero since a
 		 * zero height graph update object would usually result in no nodes being updated.
 		 */
 		public float minBoundsHeight = 1;
+
 		[HideInInspector]
 		/** Penalty to add to nodes.
 		 * Be careful when setting negative values since if a node get's a negative penalty it will underflow and instead get
 		 * really large. In most cases a warning will be logged if that happens.
 		 */
 		public int penaltyDelta = 0;
+
 		[HideInInspector]
 		/** Set to true to set all targeted nodese walkability to #setWalkability */
 		public bool modifyWalkability = false;
+
 		[HideInInspector]
 		/** See #modifyWalkability */
 		public bool setWalkability = false;
+
 		[HideInInspector]
 		/** Apply this graph update object on start */
 		public bool applyOnStart = true;
+
 		[HideInInspector]
 		/** Apply this graph update object whenever a graph is rescanned */
 		public bool applyOnScan = true;
@@ -110,7 +101,21 @@ namespace Pathfinding {
 		/** Has apply been called yet.
 		 * Used to prevent applying twice when both applyOnScan and applyOnStart are enabled */
 		private bool firstApplied = false;
+
+		/** Do some stuff at start */
+		public void Start () {
+			
+			//If firstApplied is true, that means the graph was scanned during Awake.
+			//So we shouldn't apply it again because then we would end up applying it two times
+			if (!firstApplied && applyOnStart) {
+				Apply ();
+			}
+		}
 		
+		public override void OnPostScan () {
+			if (applyOnScan) Apply ();
+		}
+
 		/** Inverts all invertable settings for this GUS.
 		 * Namely: penalty delta, walkability, tags.
 		 * 
@@ -187,8 +192,11 @@ namespace Pathfinding {
 			Bounds b;
 			
 			if (points == null || points.Length == 0) {
-				if (collider != null) b = collider.bounds;
-				else if (renderer != null) b = renderer.bounds;
+				var coll = GetComponent<Collider>();
+				var rend = GetComponent<Renderer>();
+
+				if (coll != null) b = coll.bounds;
+				else if (rend != null) b = rend.bounds;
 				else {
 					//Debug.LogWarning ("Cannot apply GraphUpdateScene, no points defined and no renderer or collider attached");
 					return new Bounds(Vector3.zero, Vector3.zero);
@@ -230,10 +238,13 @@ namespace Pathfinding {
 			GraphUpdateObject guo;
 			
 			if (points == null || points.Length == 0) {
-				
+
+				var coll = GetComponent<Collider>();
+				var rend = GetComponent<Renderer>();
+
 				Bounds b;
-				if (collider != null) b = collider.bounds;
-				else if (renderer != null) b = renderer.bounds;
+				if (coll != null) b = coll.bounds;
+				else if (rend != null) b = rend.bounds;
 				else {
 					Debug.LogWarning ("Cannot apply GraphUpdateScene, no points defined and no renderer or collider attached");
 					return;

@@ -1,4 +1,4 @@
-//#define ASTAR_POOL_DEBUG //Enables debugging of path pooling. Will log warnings and info messages about paths not beeing pooled correctly.
+//#define ASTAR_POOL_DEBUG //@SHOWINEDITOR Enables debugging of path pooling. Will log warnings and info messages about paths not beeing pooled correctly.
 
 using UnityEngine;
 using System.Collections;
@@ -17,8 +17,14 @@ namespace Pathfinding {
 		 * This is usually sent to the Seeker component which post processes the path and then calls a callback to the script which requested the path 
 		*/
 		public OnPathDelegate callback;
-		
-		
+
+		/** Immediate callback to call when the path is complete.
+		 * \warning This may be called from a separate thread. Usually you do not want to use this one.
+		 * 
+		 * \see callback
+		*/
+		public OnPathDelegate immediateCallback;
+
 		private PathState state;
 		private System.Object stateLock = new object();
 		
@@ -135,7 +141,8 @@ namespace Pathfinding {
 		
 		/** ID of this path. Used to distinguish between different paths */
 		public ushort pathID;
-		
+
+		protected GraphNode hTargetNode; /** Target to use for H score calculation. Used alongside #hTarget. */
 		protected Int3 hTarget; /**< Target to use for H score calculations. \see Pathfinding.Node.H */
 		
 		/** Which graph tags are traversable.
@@ -152,11 +159,20 @@ namespace Pathfinding {
 		 * \see CanTraverse
 		 */
 		public int enabledTags = -1;
-		
-		/** Penalties for each tag.
+
+		static readonly int[] ZeroTagPenalties = new int[32];
+
+		/** The tag penalties that are actually used.
+		 * If manualTagPenalties is null, this will be ZeroTagPenalties
+		 * \see tagPenalties
 		 */
-		protected int[] _tagPenalties = new int[0];
-		
+		protected int[] internalTagPenalties = null;
+
+		/** Tag penalties set by other scripts
+		 * \see tagPenalties
+		 */
+		protected int[] manualTagPenalties = null;
+
 		/** Penalties for each tag.
 		 * Tag 0 which is the default tag, will have added a penalty of tagPenalties[0].
 		 * These should only be positive values since the A* algorithm cannot handle negative penalties.
@@ -169,14 +185,24 @@ namespace Pathfinding {
 		 */
 		public int[] tagPenalties {
 			get {
-				return _tagPenalties;
+				return manualTagPenalties;
 			}
 			set {
-				if (value == null || value.Length != 32) _tagPenalties = new int[0];
-				else _tagPenalties = value;
+				if (value == null || value.Length != 32) {
+					manualTagPenalties = null;
+					internalTagPenalties = ZeroTagPenalties;
+				} else {
+					manualTagPenalties = value;
+					internalTagPenalties = value;
+				}
 			}
 		}
-		
+		public virtual bool FloodingPath {
+			get {
+				return false;
+			}
+		}
+
 		/** Total Length of the path.
 		 * Calculates the total length of the #vectorPath.
 		 * Cache this rather than call this function every time since it will calculate the length every time, not just return a cached value.
@@ -213,12 +239,15 @@ yield return StartCoroutine (p.WaitForPath ());
 		}
 		
 		public uint CalculateHScore (GraphNode node) {
+			uint v1;
 			switch (heuristic) {
 			case Heuristic.Euclidean:
-				return (uint)(((GetHTarget () - node.position).costMagnitude)*heuristicScale);
+				v1 = (uint)(((GetHTarget () - node.position).costMagnitude)*heuristicScale);
+				return v1;
 			case Heuristic.Manhattan:
 				Int3 p2 = node.position;
-				return (uint)((System.Math.Abs (hTarget.x-p2.x) + System.Math.Abs (hTarget.y-p2.y) + System.Math.Abs (hTarget.z-p2.z))*heuristicScale);
+				v1 = (uint)((System.Math.Abs (hTarget.x-p2.x) + System.Math.Abs (hTarget.y-p2.y) + System.Math.Abs (hTarget.z-p2.z))*heuristicScale);
+				return v1;
 			case Heuristic.DiagonalManhattan:
 				Int3 p = GetHTarget () - node.position;
 				p.x = System.Math.Abs (p.x);
@@ -226,16 +255,17 @@ yield return StartCoroutine (p.WaitForPath ());
 				p.z = System.Math.Abs (p.z);
 				int diag = System.Math.Min (p.x,p.z);
 				int diag2 = System.Math.Max (p.x,p.z);
-				return (uint)((((14*diag)/10) + (diag2-diag) + p.y) * heuristicScale);
+				v1 = (uint)((((14*diag)/10) + (diag2-diag) + p.y) * heuristicScale);
+				return v1;
 			}
 			return 0U;
 		}
 		
 		/** Returns penalty for the given tag.
-		 * \param tag A value between 0 (inclusive) and 31 (inclusive).
+		 * \param tag A value between 0 (inclusive) and 32 (exclusive).
 		 */
 		public uint GetTagPenalty (int tag) {
-			return tag < _tagPenalties.Length ? (uint)_tagPenalties[tag] : 0;
+			return (uint)internalTagPenalties[tag];
 		}
 		
 		public Int3 GetHTarget () {
@@ -247,9 +277,9 @@ yield return StartCoroutine (p.WaitForPath ());
 		public bool CanTraverse (GraphNode node) {
 			unchecked { return node.Walkable && (enabledTags >> (int)node.Tag & 0x1) != 0; }
 		}
-		
+
 		public uint GetTraversalCost (GraphNode node) {
-			unchecked { return GetTagPenalty ((int)node.Tag ) + node.Penalty; }
+			unchecked { return GetTagPenalty ((int)node.Tag ) + node.Penalty ; }
 		}
 		
 		/** May be called by graph nodes to get a special cost for some connections.
@@ -318,7 +348,7 @@ yield return StartCoroutine (p.WaitForPath ());
 			}
 		}
 		
-		/** Logs an error and calls Error() to true.
+		/** Logs an error and calls Error().
 		 * This is called only if something is very wrong or the user is doing something he/she really should not be doing.
 		 */
 		public void ForceLogError (string msg) {
@@ -387,7 +417,7 @@ yield return StartCoroutine (p.WaitForPath ());
 		  */
 		public virtual void Reset () {
 				
-			if (AstarPath.active == null)
+			if (System.Object.ReferenceEquals (AstarPath.active, null))
 				throw new System.NullReferenceException ("No AstarPath object found in the scene. " +
 					"Make sure there is one or do not create paths in Awake");
 			
@@ -427,11 +457,12 @@ yield return StartCoroutine (p.WaitForPath ());
 			pathID = 0;
 			enabledTags = -1;
 			tagPenalties = null;
-			
+
 			callTime = System.DateTime.UtcNow;
 			pathID = AstarPath.active.GetNextPathID ();
 			
 			hTarget = Int3.zero;
+			hTargetNode = null;
 		}
 		
 		protected bool HasExceededTime (int searchedNodes, long targetTime) {
@@ -479,10 +510,12 @@ public override void Recycle () {
 		 * \see Recycle
 		 */
 		public void Claim (System.Object o) {
-			if (o == null) throw new System.ArgumentNullException ("o");
+			if (System.Object.ReferenceEquals (o, null)) throw new System.ArgumentNullException ("o");
 
-			if (claimed.Contains (o)) {
-				throw new System.ArgumentException ("You have already claimed the path with that object ("+o.ToString()+"). Are you claiming the path with the same object twice?");
+			for ( int i = 0; i < claimed.Count; i++ ) {
+				// Need to use ReferenceEquals because it might be called from another thread
+				if ( System.Object.ReferenceEquals (claimed[i], o) )
+					throw new System.ArgumentException ("You have already claimed the path with that object ("+o.ToString()+"). Are you claiming the path with the same object twice?");
 			}
 			
 			claimed.Add (o);
@@ -498,7 +531,8 @@ public override void Recycle () {
 			if (o == null) throw new System.ArgumentNullException ("o");
 			
 			for (int i=0;i<claimed.Count;i++) {
-				if (claimed[i] == o) {
+				// Need to use ReferenceEquals because it might be called from another thread
+				if (System.Object.ReferenceEquals (claimed[i], o)) {
 					claimed.RemoveAt (i);
 					if (releasedNotSilent && claimed.Count == 0) {
 						Recycle ();
@@ -525,7 +559,8 @@ public override void Recycle () {
 			if (o == null) throw new System.ArgumentNullException ("o");
 
 			for (int i=0;i<claimed.Count;i++) {
-				if (claimed[i] == o) {
+				// Need to use ReferenceEquals because it might be called from another thread
+				if (System.Object.ReferenceEquals (claimed[i], o)) {
 					claimed.RemoveAt (i);
 					releasedNotSilent = true;
 					if (claimed.Count == 0) {
@@ -666,6 +701,10 @@ public override void Recycle () {
 			this.pathHandler = pathHandler;
 			//Assign relevant path data to the pathHandler
 			pathHandler.InitializeForPath (this);
+
+			// Make sure that internalTagPenalties is an array which has the length 32
+			if (internalTagPenalties == null || internalTagPenalties.Length != 32)
+				internalTagPenalties = ZeroTagPenalties;
 
 			try {
 				ErrorCheck ();

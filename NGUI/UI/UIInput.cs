@@ -1,9 +1,9 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2014 Tasharen Entertainment
+// Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
 
-#if !UNITY_EDITOR && (UNITY_IPHONE || UNITY_ANDROID || UNITY_WP8 || UNITY_BLACKBERRY)
+#if !UNITY_EDITOR && (UNITY_IPHONE || UNITY_ANDROID || UNITY_WP8 || UNITY_WP_8_1 || UNITY_BLACKBERRY)
 #define MOBILE
 #endif
 
@@ -595,16 +595,17 @@ public class UIInput : MonoBehaviour
 				mSelectionStart = selectAllTextOnFocus ? 0 : mSelectionEnd;
 				label.color = activeTextColor;
 #if MOBILE
-				if (Application.platform == RuntimePlatform.IPhonePlayer
-					|| Application.platform == RuntimePlatform.Android
-				    || Application.platform == RuntimePlatform.WP8Player
+				RuntimePlatform pf = Application.platform;
+				if (pf == RuntimePlatform.IPhonePlayer
+					|| pf == RuntimePlatform.Android
+				    || pf == RuntimePlatform.WP8Player
  #if UNITY_4_3
-					|| Application.platform == RuntimePlatform.BB10Player
+					|| pf == RuntimePlatform.BB10Player
  #else
-					|| Application.platform == RuntimePlatform.BlackBerryPlayer
-					|| Application.platform == RuntimePlatform.MetroPlayerARM
-					|| Application.platform == RuntimePlatform.MetroPlayerX64
-					|| Application.platform == RuntimePlatform.MetroPlayerX86
+					|| pf == RuntimePlatform.BlackBerryPlayer
+					|| pf == RuntimePlatform.MetroPlayerARM
+					|| pf == RuntimePlatform.MetroPlayerX64
+					|| pf == RuntimePlatform.MetroPlayerX86
  #endif
 				)
 				{
@@ -744,6 +745,28 @@ public class UIInput : MonoBehaviour
 			// or the highlight widgets (which have their geometry set manually) won't update.
 			if (isSelected && mLastAlpha != label.finalAlpha)
 				UpdateLabel();
+
+			// Having this in OnGUI causes issues because Input.inputString gets updated *after* OnGUI, apparently...
+			if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+			{
+				bool newLine = (onReturnKey == OnReturnKey.NewLine) ||
+					(onReturnKey == OnReturnKey.Default &&
+					label.multiLine && !Input.GetKey(KeyCode.LeftControl) && !Input.GetKey(KeyCode.RightControl) &&
+					label.overflowMethod != UILabel.Overflow.ClampContent &&
+					validation == Validation.None);
+
+				if (newLine)
+				{
+					Insert("\n");
+				}
+				else
+				{
+					UICamera.currentScheme = UICamera.ControlScheme.Controller;
+					UICamera.currentKey = KeyCode.Return;
+					Submit();
+					UICamera.currentKey = KeyCode.None;
+				}
+			}
 		}
 	}
 
@@ -977,32 +1000,6 @@ public class UIInput : MonoBehaviour
 				}
 				return true;
 			}
-
-			// Submit
-			case KeyCode.Return:
-			case KeyCode.KeypadEnter:
-			{
-				ev.Use();
-
-				bool newLine = (onReturnKey == OnReturnKey.NewLine) ||
-					(onReturnKey == OnReturnKey.Default &&
-					label.multiLine && !ctrl &&
-					label.overflowMethod != UILabel.Overflow.ClampContent &&
-					validation == Validation.None);
-
-				if (newLine)
-				{
-					Insert("\n");
-				}
-				else
-				{
-					UICamera.currentScheme = UICamera.ControlScheme.Controller;
-					UICamera.currentKey = ev.keyCode;
-					Submit();
-					UICamera.currentKey = KeyCode.None;
-				}
-				return true;
-			}
 		}
 		return false;
 	}
@@ -1122,6 +1119,9 @@ public class UIInput : MonoBehaviour
 			(UICamera.currentScheme == UICamera.ControlScheme.Mouse ||
 			 UICamera.currentScheme == UICamera.ControlScheme.Touch))
 		{
+#if !UNITY_EDITOR && (UNITY_WP8 || UNITY_WP_8_1)
+			if (mKeyboard != null) mKeyboard.active = true;
+#endif
 			selectionEnd = GetCharUnderMouse();
 			if (!Input.GetKey(KeyCode.LeftShift) &&
 				!Input.GetKey(KeyCode.RightShift)) selectionStart = mSelectionEnd;
