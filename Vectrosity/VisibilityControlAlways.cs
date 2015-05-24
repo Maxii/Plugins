@@ -1,5 +1,5 @@
-// Version 4.0
-// ©2014 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 4.1
+// ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using Vectrosity;

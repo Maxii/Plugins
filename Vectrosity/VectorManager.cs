@@ -1,5 +1,5 @@
-// Version 4.0
-// ©2014 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 4.1
+// ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using System.Collections.Generic;
@@ -24,6 +24,9 @@ public class VectorManager {
 	}
 	
 	public static float GetBrightnessValue (Vector3 pos) {
+		if (!VectorLine.camTransformExists) {
+			VectorLine.SetCamera3D();
+		}
 		return Mathf.InverseLerp (minBrightnessDistance, maxBrightnessDistance, (pos - VectorLine.camTransformPosition).sqrMagnitude);
 	}
 	
@@ -36,7 +39,7 @@ public class VectorManager {
 		var vcs = go.GetComponent(typeof(VisibilityControlStatic)) as VisibilityControlStatic;
 		var vca = go.GetComponent(typeof(VisibilityControlAlways)) as VisibilityControlAlways;
 		var bc = go.GetComponent(typeof(BrightnessControl)) as BrightnessControl;
-		
+				
 		if (visibility == Visibility.None) {
 			if (vc) {
 				MonoBehaviour.Destroy(vc);

@@ -1,5 +1,5 @@
-// Version 4.0.5
-// ©2014 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 4.1.2
+// ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using System.Collections.Generic;
@@ -15,7 +15,7 @@ public enum Brightness {Fog, None}
 [System.Serializable]
 public class VectorLine {
 	public static string Version () {
-		return "Vectrosity version 4.0.5";
+		return "Vectrosity version 4.1.1";
 	}
 	
 	UIVertex[] m_UIVertices;
@@ -48,7 +48,7 @@ public class VectorLine {
 	public List<Vector2> points2 {
 		get {
 			if (!m_is2D) {
-				Debug.Log ("Line \"" + name + "\" uses points3 rather than points2");
+				Debug.LogError ("Line \"" + name + "\" uses points3 rather than points2");
 				return null;
 			}
 			return m_points2;
@@ -58,7 +58,7 @@ public class VectorLine {
 	public List<Vector3> points3 {
 		get {
 			if (m_is2D) {
-				Debug.Log ("Line \"" + name + "\" uses points2 rather than points3");
+				Debug.LogError ("Line \"" + name + "\" uses points2 rather than points3");
 				return null;
 			}
 			return m_points3;
@@ -73,17 +73,14 @@ public class VectorLine {
 	bool m_is2D;
 	Vector3[] m_screenPoints;
 	float[] m_lineWidths;
+	float m_lineWidth;
 	public float lineWidth {
-		get {return m_lineWidths[0] * 2;}
+		get {return m_lineWidth;}
 		set {
-			if (m_lineWidths.Length == 1) {
-				m_lineWidths[0] = value * .5f;
-			}
-			else {
-				float thisWidth = value * .5f;
-				for (int i = 0; i < m_lineWidths.Length; i++) {
-					m_lineWidths[i] = thisWidth;
-				}
+			m_lineWidth = value;
+			float thisWidth = value * .5f;
+			for (int i = 0; i < m_lineWidths.Length; i++) {
+				m_lineWidths[i] = thisWidth;
 			}
 			m_maxWeldDistance = (value*2) * (value*2);
 		}
@@ -345,26 +342,61 @@ public class VectorLine {
 			m_vectorObject.GetComponent<Collider2D>().sharedMaterial = value;
 		}
 	}
-	private Mesh m_mesh;
+	Mesh m_mesh;
+	int m_canvasID = 0;
+	public int canvasID {
+		get {return m_canvasID;}
+		set {
+			if (value < 0) {
+				Debug.LogError ("CanvasID must be >= 0");
+				return;
+			}
+			if (m_on2DCanvas) {
+				SetCanvas (value);
+				m_vectorObject.transform.SetParent (m_canvases[value].transform, false);
+			}
+			else {
+				SetCanvas3D (value);
+				m_vectorObject.transform.SetParent (m_canvases3D[value].transform, false);
+			}
+			m_canvasID = value;
+		}
+	}
 	
 	// Static VectorLine variables
 	static Vector3 v3zero = Vector3.zero;	// Faster than using Vector3.zero since that returns a new instance
-	static Canvas _canvas;
-	public static Canvas canvas {
+	static List<Canvas> m_canvases;
+	static List<Canvas> m_canvases3D;
+	public static List<Canvas> canvases {
 		get {
-			if (_canvas == null) {
-				SetCanvas();
+			if (m_canvases == null || m_canvases[0] == null) {
+				SetCanvas (0);
 			}
-			return _canvas;
+			return m_canvases;
 		}
 	}
-	static Canvas _canvas3D;
+	public static List<Canvas> canvases3D {
+		get {
+			if (m_canvases3D == null || m_canvases3D[0] == null) {
+				SetCanvas3D (0);
+			}
+			return m_canvases3D;
+		}
+	}
+	public static Canvas canvas {
+		get {
+			if (m_canvases == null || m_canvases[0] == null) {
+				SetCanvas (0);
+			}
+			return m_canvases[0];
+		}
+	}
 	public static Canvas canvas3D {
 		get {
-			if (_canvas3D == null) {
-				SetCanvas3D();
+			if (m_canvases3D == null || m_canvases3D[0] == null) {
+				SetCanvas3D (0);
 			}
-			return _canvas3D;
+			return m_canvases3D[0];
 		}
 	}
 	static Material defaultMaterial;
@@ -394,24 +426,6 @@ public class VectorLine {
 			return _lineManager;
 		}
 	}
-	static int _screenWidth = 0;
-	static int screenWidth {
-		get {
-			if (_screenWidth == 0) {
-				return Screen.width;
-			}
-			return _screenWidth;
-		}
-	}
-	static int _screenHeight = 0;
-	static int screenHeight {
-		get {
-			if (_screenHeight == 0) {
-				return Screen.height;
-			}
-			return _screenHeight;
-		}
-	}
 	static Dictionary<string, CapInfo> capDictionary;
 	
 	void AddColliderIfNeeded () {
@@ -427,7 +441,7 @@ public class VectorLine {
 		SetupLine (lineName, lineMaterial, width, LineType.Discrete, Joins.None, false, false, m_points3.Count);
 	}
 	public VectorLine (string lineName, List<Vector3> linePoints, Material lineMaterial, float width) {
-		m_points3 = new List<Vector3>(linePoints);
+		m_points3 = linePoints;
 		SetupLine (lineName, lineMaterial, width, LineType.Discrete, Joins.None, false, false, m_points3.Count);
 	}
 	
@@ -436,7 +450,7 @@ public class VectorLine {
 		SetupLine (lineName, lineMaterial, width, lineType, Joins.None, false, false, m_points3.Count);
 	}
 	public VectorLine (string lineName, List<Vector3> linePoints, Material lineMaterial, float width, LineType lineType) {
-		m_points3 = new List<Vector3>(linePoints);
+		m_points3 = linePoints;
 		SetupLine (lineName, lineMaterial, width, lineType, Joins.None, false, false, m_points3.Count);
 	}
 
@@ -445,7 +459,7 @@ public class VectorLine {
 		SetupLine (lineName, lineMaterial, width, lineType, joins, false, false, m_points3.Count);
 	}
 	public VectorLine (string lineName, List<Vector3> linePoints, Material lineMaterial, float width, LineType lineType, Joins joins) {
-		m_points3 = new List<Vector3>(linePoints);
+		m_points3 = linePoints;
 		SetupLine (lineName, lineMaterial, width, lineType, joins, false, false, m_points3.Count);
 	}
 
@@ -455,7 +469,7 @@ public class VectorLine {
 		SetupLine (lineName, lineMaterial, width, LineType.Discrete, Joins.None, true, false, m_points2.Count);
 	}
 	public VectorLine (string lineName, List<Vector2> linePoints, Material lineMaterial, float width) {
-		m_points2 = new List<Vector2>(linePoints);
+		m_points2 = linePoints;
 		SetupLine (lineName, lineMaterial, width, LineType.Discrete, Joins.None, true, false, m_points2.Count);
 	}
 
@@ -464,7 +478,7 @@ public class VectorLine {
 		SetupLine (lineName, lineMaterial, width, lineType, Joins.None, true, false, m_points2.Count);
 	}
 	public VectorLine (string lineName, List<Vector2> linePoints, Material lineMaterial, float width, LineType lineType) {
-		m_points2 = new List<Vector2>(linePoints);
+		m_points2 = linePoints;
 		SetupLine (lineName, lineMaterial, width, lineType, Joins.None, true, false, m_points2.Count);
 	}
 
@@ -473,7 +487,7 @@ public class VectorLine {
 		SetupLine (lineName, lineMaterial, width, lineType, joins, true, false, m_points2.Count);
 	}
 	public VectorLine (string lineName, List<Vector2> linePoints, Material lineMaterial, float width, LineType lineType, Joins joins) {
-		m_points2 = new List<Vector2>(linePoints);
+		m_points2 = linePoints;
 		SetupLine (lineName, lineMaterial, width, lineType, joins, true, false, m_points2.Count);
 	}
 
@@ -483,7 +497,7 @@ public class VectorLine {
 		SetupLine (lineName, lineMaterial, width, LineType.Continuous, Joins.None, false, true, m_points3.Count);
 	}
 	protected VectorLine (bool usePoints, string lineName, List<Vector3> linePoints, Material lineMaterial, float width) {
-		m_points3 = new List<Vector3>(linePoints);
+		m_points3 = linePoints;
 		SetupLine (lineName, lineMaterial, width, LineType.Continuous, Joins.None, false, true, m_points3.Count);
 	}
 	
@@ -492,7 +506,7 @@ public class VectorLine {
 		SetupLine (lineName, lineMaterial, width, LineType.Continuous, Joins.None, true, true, m_points2.Count);
 	}
 	protected VectorLine (bool usePoints, string lineName, List<Vector2> linePoints, Material lineMaterial, float width) {
-		m_points2 = new List<Vector2>(linePoints);
+		m_points2 = linePoints;
 		SetupLine (lineName, lineMaterial, width, LineType.Continuous, Joins.None, true, true, m_points2.Count);
 	}
 	
@@ -525,11 +539,11 @@ public class VectorLine {
 			m_material = useMaterial;
 		}
 		
-		if (_canvas == null) {
-			SetCanvas();
+		if (m_canvases == null || m_canvases[0] == null) {
+			SetCanvas (0);
 		}
 		m_vectorObject = new GameObject(name);
-		m_vectorObject.transform.SetParent (_canvas.transform, false);
+		m_vectorObject.transform.SetParent (m_canvases[0].transform, false);
 		m_on2DCanvas = true;
 		m_canvasRenderer = m_vectorObject.AddComponent<CanvasRenderer>();
 		m_canvasRenderer.SetMaterial (m_material, null);
@@ -543,6 +557,7 @@ public class VectorLine {
 		color = Color.white;
 		m_lineWidths = new float[1];
 		m_lineWidths[0] = width * .5f;
+		m_lineWidth = width;
 		if (!m_is2D) {
 			m_screenPoints = new Vector3[m_vertexCount];
 		}
@@ -651,7 +666,7 @@ public class VectorLine {
 		else {
 			if (newCount > m_pointsCount) {
 				for (int i = 0; i < newCount - m_pointsCount; i++) {
-					m_points3.Add (Vector3.zero);
+					m_points3.Add (v3zero);
 				}
 			}
 			else {
@@ -686,10 +701,17 @@ public class VectorLine {
 			if (!m_is2D) {
 				System.Array.Resize (ref m_screenPoints, baseArrayLength*4);
 			}
-			if (m_lineWidths.Length > 1 && originalCount > 1) {
-				System.Array.Resize (ref m_lineWidths, MaxSegmentIndex());
+		}
+		
+		if (m_lineWidths.Length > 1) {
+			if (!m_isPoints) {
+				baseArrayLength = m_continuous? baseArrayLength-1 : baseArrayLength/2;
+			}
+			if (baseArrayLength > m_lineWidths.Length) {
+				System.Array.Resize (ref m_lineWidths, baseArrayLength);
 			}
 		}
+		
 		if (adjustDrawEnd) {
 			m_drawEnd = m_pointsCount-1;
 		}
@@ -698,6 +720,9 @@ public class VectorLine {
 		if (m_pointsCount > originalCount) {
 			SetColor (m_color, originalCount, MaxSegmentIndex());
 			SetUVs (originalCount, MaxSegmentIndex());
+			if (m_lineWidths.Length > 1) {
+				SetWidth (m_lineWidth, originalCount, MaxSegmentIndex());
+			}
 		}
 	}
 	
@@ -840,18 +865,30 @@ public class VectorLine {
 		}
 	}
 	
-	static void SetCanvas () {
-		var go = new GameObject("VectorCanvas");
-		go.layer = LayerMask.NameToLayer ("UI");
-		var pos = go.transform.position;
-		go.transform.position = pos;
-		_canvas = go.AddComponent<Canvas>();
-		_canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-		_canvas.sortingOrder = 1;
-		MonoBehaviour.DontDestroyOnLoad (go);
+	static void SetCanvas (int id) {
+		if (m_canvases == null) {
+			m_canvases = new List<Canvas>();
+		}
+		// See if existing canvases are null, which can happen after loading a new level
+		for (int i = 0; i < m_canvases.Count; i++) {
+			if (m_canvases[i] == null) {
+				m_canvases = new List<Canvas>();
+				break;
+			}
+		}
+		while (m_canvases.Count < id+1) {
+			var go = new GameObject((m_canvases.Count == 0)? "VectorCanvas" : "VectorCanvas_"+(m_canvases.Count));
+			go.layer = LayerMask.NameToLayer ("UI");
+			var pos = go.transform.position;
+			go.transform.position = pos;
+			var canvas = go.AddComponent<Canvas>();
+			canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+			canvas.sortingOrder = 1;
+			m_canvases.Add (canvas);
+		}
 	}
 	
-	static void SetCanvas3D () {
+	static void SetCanvas3D (int id) {
 		if (!cam3D) {
 			SetCamera3D();
 			if (!cam3D) {
@@ -860,22 +897,43 @@ public class VectorLine {
 			}
 		}
 		
-		var go = new GameObject("VectorCanvas3D");
-		go.layer = LayerMask.NameToLayer ("UI");
-		_canvas3D = go.AddComponent<Canvas>();
-		_canvas3D.renderMode = RenderMode.WorldSpace;
-		_canvas3D.worldCamera = cam3D;
-		var rt = go.GetComponent<RectTransform>();
-		SetupTransform (rt);
-		MonoBehaviour.DontDestroyOnLoad (go);
+		if (m_canvases3D == null) {
+			m_canvases3D = new List<Canvas>();
+		}
+		// See if existing canvases are null, which can happen after loading a new level
+		for (int i = 0; i < m_canvases3D.Count; i++) {
+			if (m_canvases3D[i] == null) {
+				m_canvases3D = new List<Canvas>();
+				break;
+			}
+		}
+		
+		while (m_canvases3D.Count < id+1) {
+			var go = new GameObject((m_canvases3D.Count == 0)? "VectorCanvas3D" : "VectorCanvas3D_"+(m_canvases.Count));
+			go.layer = LayerMask.NameToLayer ("UI");
+			var canvas = go.AddComponent<Canvas>();
+			canvas.renderMode = RenderMode.WorldSpace;
+			canvas.worldCamera = cam3D;
+			var rt = go.GetComponent<RectTransform>();
+			SetupTransform (rt);
+			m_canvases3D.Add (canvas);
+		}
 	}
 	
 	public static void SetCanvasCamera (Camera cam) {
-		if (_canvas == null) {
-			SetCanvas();
+		SetCanvasCamera (cam, 0);
+	}	
+	
+	public static void SetCanvasCamera (Camera cam, int id) {
+		if (id < 0) {
+			Debug.LogError ("VectorLine.SetCanvasCamera: id must be >= 0");
+			return;
 		}
-		_canvas.renderMode = RenderMode.ScreenSpaceCamera;
-		_canvas.worldCamera = cam;
+		if (m_canvases == null || m_canvases.Count < id+1 || m_canvases[id] == null) {
+			SetCanvas (id);
+		}
+		m_canvases[id].renderMode = RenderMode.ScreenSpaceCamera;
+		m_canvases[id].worldCamera = cam;
 	}
 	
 	public static void SetCamera3D () {
@@ -891,8 +949,13 @@ public class VectorLine {
 		cam3D = thisCamera;
 		oldPosition = camTransform.position + Vector3.one;
 		oldRotation = camTransform.eulerAngles + Vector3.one;
-		if (_canvas3D != null) {
-			_canvas3D.worldCamera = cam3D;
+		if (m_canvases3D != null) {
+			for (int i = 0; i < m_canvases3D.Count; i++) {
+				if (m_canvases3D[i] == null) {
+					break;
+				}
+				m_canvases3D[i].worldCamera = cam3D;				
+			}
 		}
 	}
 	
@@ -1011,6 +1074,11 @@ public class VectorLine {
 		int max = MaxSegmentIndex();
 		startIndex = Mathf.Clamp (startIndex*4 + (smoothColor? 2 : 0), 0, max*4);
 		endIndex = Mathf.Clamp ((endIndex + 1)*4 + (smoothColor? 2 : 0), 0, max*4);
+		
+		if (pointsCount != m_pointsCount) {
+			Resize();
+		}
+		
 		for (int i = startIndex; i < endIndex; i++) {
 			m_UIVertices[i].color = color;
 		}
@@ -1140,37 +1208,31 @@ public class VectorLine {
 	}
 	
 	public void SetWidth (float width) {
-		SetWidth (width, 0, pointsCount, true);
+		m_lineWidth = width;
+		SetWidth (width, 0, pointsCount);
 	}
 	
 	public void SetWidth (float width, int index) {
-		SetWidth (width, index, index, false);
+		SetWidth (width, index, index);
 	}
 	
 	public void SetWidth (float width, int startIndex, int endIndex) {
-		SetWidth (width, startIndex, endIndex, false);
-	}
-	
-	private void SetWidth (float width, int startIndex, int endIndex, bool setAll) {
 		int max = MaxSegmentIndex();
-		startIndex = Mathf.Clamp (startIndex, 0, max);
-		endIndex = Mathf.Clamp (endIndex, 0, max);
-		if (m_lineWidths.Length == 1) {
-			if (setAll) {
-				m_lineWidths[0] = width * .5f;
-				return;
-			}
-			else {
-				float thisWidth = m_lineWidths[0];
-				m_lineWidths = new float[pointsCount];
-				for (int i = 0; i < pointsCount; i++) {
-					m_lineWidths[i] = thisWidth;
-				}
+		if (max >= 2 && m_lineWidths.Length == 1) {
+			System.Array.Resize (ref m_lineWidths, max);
+			for (int i = 0; i < max; i++) {
+				m_lineWidths[i] = m_lineWidth * .5f;
 			}
 		}
+		startIndex = Mathf.Clamp (startIndex, 0, Mathf.Max (max-1, 0));
+		endIndex = Mathf.Clamp (endIndex, 0, Mathf.Max (max-1, 0));
 		for (int i = startIndex; i <= endIndex; i++) {
 			m_lineWidths[i] = width * .5f;
 		}
+	}
+	
+	private void SetWidthArray (int size) {
+		
 	}
 
 	public void SetWidths (List<float> lineWidths) {
@@ -1204,7 +1266,10 @@ public class VectorLine {
 			return;
 		}
 		
-		m_lineWidths = new float[arrayLength];
+		if (m_lineWidths.Length != arrayLength) {
+			System.Array.Resize (ref m_lineWidths, arrayLength);
+		}
+		
 		if (doFloat) {
 			for (int i = 0; i < arrayLength; i++) {
 				m_lineWidths[i] = lineWidthsFloat[i] * .5f;
@@ -1222,10 +1287,6 @@ public class VectorLine {
 		if (index < 0 || index >= max) {
 			Debug.LogError ("VectorLine.GetWidth: index out of range...must be >= 0 and < " + max);
 			return 0;
-		}
-		
-		if (m_lineWidths.Length == 1) {
-			return m_lineWidths[0] * 2;
 		}
 		return m_lineWidths[index] * 2;
 	}
@@ -1603,7 +1664,7 @@ public class VectorLine {
 	
 	public void Draw () {
 		if (!m_on2DCanvas) {
-			m_vectorObject.transform.SetParent (_canvas.transform, false);
+			m_vectorObject.transform.SetParent (m_canvases[m_canvasID].transform, false);
 			m_on2DCanvas = true;
 		}
 		if (!CheckPointCount() || m_lineWidths == null) return;
@@ -1642,7 +1703,7 @@ public class VectorLine {
 	}
 	
 	private void Line2D (int start, int end, Matrix4x4 thisMatrix, bool useTransformMatrix) {
-		Vector3 p1 = Vector3.zero, p2 = Vector3.zero, v1 = Vector3.zero, px = Vector3.zero;
+		Vector3 p1 = v3zero, p2 = v3zero, v1 = v3zero, px = v3zero;
 		Vector2 scaleFactor = new Vector2(Screen.width, Screen.height);
 		
 		int add = 0, idx = 0, widthIdx = 0;
@@ -1670,7 +1731,7 @@ public class VectorLine {
 				p1.x = m_points2[i].x; p1.y = m_points2[i].y;
 				p2.x = m_points2[i+1].x; p2.y = m_points2[i+1].y;
 			}
-			if (useViewportCoords) {
+			if (m_viewportDraw) {
 				p1.x *= scaleFactor.x; p1.y *= scaleFactor.y;
 				p2.x *= scaleFactor.x; p2.y *= scaleFactor.y;
 			}
@@ -1714,6 +1775,9 @@ public class VectorLine {
 				WeldJoins (start*4 + (start == 0? 4 : 0), end*4, Approximately (m_points2[0], m_points2[m_pointsCount-1]));
 			}
 			else {
+				if ((end & 1) == 0) {	// end should be odd for discrete lines
+					end--;
+				}
 				WeldJoinsDiscrete (start + 1, end, Approximately (m_points2[0], m_points2[m_pointsCount-1]));
 			}
 		}
@@ -1728,7 +1792,7 @@ public class VectorLine {
 			}
 		}
 		
-		Vector3 pos1 = Vector3.zero, pos2 = Vector3.zero, px = Vector3.zero;
+		Vector3 pos1 = v3zero, pos2 = v3zero, px = v3zero;
 		float normalizedDistance = 0.0f;
 		int widthIdx = 0, widthIdxAdd = 0;
 		if (m_lineWidths.Length > 1) {
@@ -1763,7 +1827,7 @@ public class VectorLine {
 					pos2 = cam3D.WorldToScreenPoint (m_points3[i+1]);
 				}
 			}
-			if ((pos1.x == pos2.x && pos1.y == pos2.y) || (pos1.z < 0.0f && pos2.z < 0.0f) || (pos1.x > sw || pos2.x > sw || pos1.y > sh || pos2.y > sh)) {
+			if ((pos1.x == pos2.x && pos1.y == pos2.y) || (pos1.z < 0.0f && pos2.z < 0.0f) || (pos1.x > sw && pos2.x > sw) || (pos1.y > sh && pos2.y > sh)) {
 				SkipQuad (ref idx, ref widthIdx, ref widthIdxAdd);
 				continue;
 			}
@@ -1788,6 +1852,9 @@ public class VectorLine {
 				WeldJoins (start*4 + 4, end*4, Approximately (m_points3[0], m_points3[m_pointsCount-1]));
 			}
 			else {
+				if ((end & 1) == 0) {	// end should be odd for discrete lines
+					end--;
+				}
 				WeldJoinsDiscrete (start + 1, end, Approximately (m_points3[0], m_points3[m_pointsCount-1]));
 			}
 		}
@@ -1800,10 +1867,8 @@ public class VectorLine {
 		}
 		if (!CheckPointCount() || m_lineWidths == null) return;
 		if (m_on2DCanvas) {
-			if (_canvas3D == null) {
-				SetCanvas3D();
-			}
-			m_vectorObject.transform.SetParent (_canvas3D.transform, false);
+			SetCanvas3D (m_canvasID);
+			m_vectorObject.transform.SetParent (m_canvases3D[m_canvasID].transform, false);
 			m_on2DCanvas = false;
 		}
 		if (pointsCount != m_pointsCount) {
@@ -1837,7 +1902,9 @@ public class VectorLine {
 			add = 2;
 			idx = start*2;
 		}
-		Vector3 thisLine = Vector3.zero, px = Vector3.zero, pos1 = Vector3.zero, pos2 = Vector3.zero;
+		Vector3 thisLine = v3zero, px = v3zero, pos1 = v3zero, pos2 = v3zero;
+		float sw = Screen.width*2;
+		float sh = Screen.height*2;
 		for (int i = start; i < end; i += add) {
 			if (useMatrix) {
 				pos1 = cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4 (m_points3[i]));
@@ -1847,8 +1914,8 @@ public class VectorLine {
 				pos1 = cam3D.WorldToScreenPoint (m_points3[i]);
 				pos2 = cam3D.WorldToScreenPoint (m_points3[i+1]);
 			}
-			if (pos1.x == pos2.x && pos1.y == pos2.y && pos1.z == pos2.z) {
-				SkipQuad (ref idx, ref widthIdx, ref widthIdxAdd);
+			if ((pos1.x == pos2.x && pos1.y == pos2.y) || (pos1.z < 0.0f && pos2.z < 0.0f) || (pos1.x > sw && pos2.x > sw) || (pos1.y > sh && pos2.y > sh)) {
+				SkipQuad3D (ref idx, ref widthIdx, ref widthIdxAdd);
 				continue;
 			}
 			
@@ -1861,7 +1928,6 @@ public class VectorLine {
 			m_screenPoints[idx+3].x = pos1.x + px.x; m_screenPoints[idx+3].y = pos1.y + px.y; m_screenPoints[idx+3].z = pos1.z + px.z; 
 			m_UIVertices[idx  ].position = cam3D.ScreenToWorldPoint (m_screenPoints[idx]);
 			m_UIVertices[idx+3].position = cam3D.ScreenToWorldPoint (m_screenPoints[idx+3]);
-			
 			if (smoothWidth && i < end-add) {
 				px.x = thisLine.x * m_lineWidths[widthIdx+1]; px.y = thisLine.y * m_lineWidths[widthIdx+1];
 			}
@@ -1879,6 +1945,9 @@ public class VectorLine {
 				WeldJoins3D (start*4 + 4, end*4, Approximately (m_points3[0], m_points3[m_pointsCount-1]));
 			}
 			else {
+				if ((end & 1) == 0) {	// end should be odd for discrete lines
+					end--;
+				}
 				WeldJoinsDiscrete3D (start + 1, end, Approximately (m_points3[0], m_points3[m_pointsCount-1]));
 			}
 		}
@@ -1943,7 +2012,7 @@ public class VectorLine {
 		else {
 			for (int i = start; i <= end; i++) {
 				p1 = useMatrix? thisMatrix.MultiplyPoint3x4 (m_points2[i]) : (Vector3)m_points2[i];
-				if (useViewportCoords) {
+				if (m_viewportDraw) {
 					p1.x *= scaleFactor.x; p1.y *= scaleFactor.y;
 				}
 				
@@ -1978,7 +2047,7 @@ public class VectorLine {
 			widthIdx = start;
 			widthIdxAdd = 1;
 		}
-		Vector3 p1 = Vector3.zero, v1 = Vector3.zero, v2 = Vector3.zero;
+		Vector3 p1 = v3zero, v1 = v3zero, v2 = v3zero;
 		for (int i = start; i <= end; i++) {
 			p1 = useMatrix? cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4 (m_points3[i])) :
 							cam3D.WorldToScreenPoint (m_points3[i]);
@@ -2006,6 +2075,21 @@ public class VectorLine {
 		m_UIVertices[idx+1].position = v3zero;
 		m_UIVertices[idx+2].position = v3zero;
 		m_UIVertices[idx+3].position = v3zero;
+		
+		idx += 4;
+		widthIdx += widthIdxAdd;
+	}
+	
+	private void SkipQuad3D (ref int idx, ref int widthIdx, ref int widthIdxAdd) {
+		m_UIVertices[idx  ].position = v3zero;
+		m_UIVertices[idx+1].position = v3zero;
+		m_UIVertices[idx+2].position = v3zero;
+		m_UIVertices[idx+3].position = v3zero;
+		
+		m_screenPoints[idx  ] = v3zero;
+		m_screenPoints[idx+1] = v3zero;
+		m_screenPoints[idx+2] = v3zero;
+		m_screenPoints[idx+3] = v3zero;
 		
 		idx += 4;
 		widthIdx += widthIdxAdd;
@@ -2486,78 +2570,106 @@ public class VectorLine {
 	}
 
 	public void MakeCircle (Vector3 origin, float radius) {
-		MakeEllipse (origin, Vector3.forward, radius, radius, GetSegmentNumber(), 0.0f, 0);
+		MakeEllipse (origin, Vector3.forward, radius, radius, 0.0f, 0.0f, GetSegmentNumber(), 0.0f, 0);
 	}
 	
 	public void MakeCircle (Vector3 origin, float radius, int segments) {
-		MakeEllipse (origin, Vector3.forward, radius, radius, segments, 0.0f, 0);
+		MakeEllipse (origin, Vector3.forward, radius, radius, 0.0f, 0.0f, segments, 0.0f, 0);
 	}
 
 	public void MakeCircle (Vector3 origin, float radius, int segments, float pointRotation) {
-		MakeEllipse (origin, Vector3.forward, radius, radius, segments, pointRotation, 0);
+		MakeEllipse (origin, Vector3.forward, radius, radius, 0.0f, 0.0f, segments, pointRotation, 0);
 	}
 
 	public void MakeCircle (Vector3 origin, float radius, int segments, int index) {
-		MakeEllipse (origin, Vector3.forward, radius, radius, segments, 0.0f, index);
+		MakeEllipse (origin, Vector3.forward, radius, radius, 0.0f, 0.0f, segments, 0.0f, index);
 	}
 
 	public void MakeCircle (Vector3 origin, float radius, int segments, float pointRotation, int index) {
-		MakeEllipse (origin, Vector3.forward, radius, radius, segments, pointRotation, index);
+		MakeEllipse (origin, Vector3.forward, radius, radius, 0.0f, 0.0f, segments, pointRotation, index);
 	}
 
 	public void MakeCircle (Vector3 origin, Vector3 upVector, float radius) {
-		MakeEllipse (origin, upVector, radius, radius, GetSegmentNumber(), 0.0f, 0);
+		MakeEllipse (origin, upVector, radius, radius, 0.0f, 0.0f, GetSegmentNumber(), 0.0f, 0);
 	}
 	
 	public void MakeCircle (Vector3 origin, Vector3 upVector, float radius, int segments) {
-		MakeEllipse (origin, upVector, radius, radius, segments, 0.0f, 0);
+		MakeEllipse (origin, upVector, radius, radius, 0.0f, 0.0f, segments, 0.0f, 0);
 	}
 
 	public void MakeCircle (Vector3 origin, Vector3 upVector, float radius, int segments, float pointRotation) {
-		MakeEllipse (origin, upVector, radius, radius, segments, pointRotation, 0);
+		MakeEllipse (origin, upVector, radius, radius, 0.0f, 0.0f, segments, pointRotation, 0);
 	}
 
 	public void MakeCircle (Vector3 origin, Vector3 upVector, float radius, int segments, int index) {
-		MakeEllipse (origin, upVector, radius, radius, segments, 0.0f, index);
+		MakeEllipse (origin, upVector, radius, radius, 0.0f, 0.0f, segments, 0.0f, index);
 	}
 
 	public void MakeCircle (Vector3 origin, Vector3 upVector, float radius, int segments, float pointRotation, int index) {
-		MakeEllipse (origin, upVector, radius, radius, segments, pointRotation, index);
+		MakeEllipse (origin, upVector, radius, radius, 0.0f, 0.0f, segments, pointRotation, index);
 	}
 
 	public void MakeEllipse (Vector3 origin, float xRadius, float yRadius) {
-		MakeEllipse (origin, Vector3.forward, xRadius, yRadius, GetSegmentNumber(), 0.0f, 0);
+		MakeEllipse (origin, Vector3.forward, xRadius, yRadius, 0.0f, 0.0f, GetSegmentNumber(), 0.0f, 0);
 	}
 	
 	public void MakeEllipse (Vector3 origin, float xRadius, float yRadius, int segments) {
-		MakeEllipse (origin, Vector3.forward, xRadius, yRadius, segments, 0.0f, 0);
+		MakeEllipse (origin, Vector3.forward, xRadius, yRadius, 0.0f, 0.0f, segments, 0.0f, 0);
 	}
 	
 	public void MakeEllipse (Vector3 origin, float xRadius, float yRadius, int segments, int index) {
-		MakeEllipse (origin, Vector3.forward, xRadius, yRadius, segments, 0.0f, index);
+		MakeEllipse (origin, Vector3.forward, xRadius, yRadius, 0.0f, 0.0f, segments, 0.0f, index);
 	}
 
 	public void MakeEllipse (Vector3 origin, float xRadius, float yRadius, int segments, float pointRotation) {
-		MakeEllipse (origin, Vector3.forward, xRadius, yRadius, segments, pointRotation, 0);
+		MakeEllipse (origin, Vector3.forward, xRadius, yRadius, 0.0f, 0.0f, segments, pointRotation, 0);
 	}
 
 	public void MakeEllipse (Vector3 origin, Vector3 upVector, float xRadius, float yRadius) {
-		MakeEllipse (origin, upVector, xRadius, yRadius, GetSegmentNumber(), 0.0f, 0);
+		MakeEllipse (origin, upVector, xRadius, yRadius, 0.0f, 0.0f, GetSegmentNumber(), 0.0f, 0);
 	}
 
 	public void MakeEllipse (Vector3 origin, Vector3 upVector, float xRadius, float yRadius, int segments) {
-		MakeEllipse (origin, upVector, xRadius, yRadius, segments, 0.0f, 0);
+		MakeEllipse (origin, upVector, xRadius, yRadius, 0.0f, 0.0f, segments, 0.0f, 0);
 	}
 	
 	public void MakeEllipse (Vector3 origin, Vector3 upVector, float xRadius, float yRadius, int segments, int index) {
-		MakeEllipse (origin, upVector, xRadius, yRadius, segments, 0.0f, index);
+		MakeEllipse (origin, upVector, xRadius, yRadius, 0.0f, 0.0f, segments, 0.0f, index);
 	}
 
 	public void MakeEllipse (Vector3 origin, Vector3 upVector, float xRadius, float yRadius, int segments, float pointRotation) {
-		MakeEllipse (origin, upVector, xRadius, yRadius, segments, pointRotation, 0);
+		MakeEllipse (origin, upVector, xRadius, yRadius, 0.0f, 0.0f, segments, pointRotation, 0);
+	}
+
+	public void MakeEllipse (Vector3 origin, Vector3 upVector, float xRadius, float yRadius, int segments, float pointRotation, int index) {
+		MakeEllipse (origin, upVector, xRadius, yRadius, 0.0f, 0.0f, segments, pointRotation, index);
+	}
+
+	public void MakeArc (Vector3 origin, float xRadius, float yRadius, float startDegrees, float endDegrees) {
+		MakeEllipse (origin, Vector3.forward, xRadius, yRadius, startDegrees, endDegrees, GetSegmentNumber(), 0.0f, 0);
 	}
 	
-	public void MakeEllipse (Vector3 origin, Vector3 upVector, float xRadius, float yRadius, int segments, float pointRotation, int index) {
+	public void MakeArc (Vector3 origin, float xRadius, float yRadius, float startDegrees, float endDegrees, int segments) {
+		MakeEllipse (origin, Vector3.forward, xRadius, yRadius, startDegrees, endDegrees, segments, 0.0f, 0);
+	}
+	
+	public void MakeArc (Vector3 origin, float xRadius, float yRadius, float startDegrees, float endDegrees, int segments, int index) {
+		MakeEllipse (origin, Vector3.forward, xRadius, yRadius, startDegrees, endDegrees, segments, 0.0f, index);
+	}
+
+	public void MakeArc (Vector3 origin, Vector3 upVector, float xRadius, float yRadius, float startDegrees, float endDegrees) {
+		MakeEllipse (origin, upVector, xRadius, yRadius, startDegrees, endDegrees, GetSegmentNumber(), 0.0f, 0);
+	}
+
+	public void MakeArc (Vector3 origin, Vector3 upVector, float xRadius, float yRadius, float startDegrees, float endDegrees, int segments) {
+		MakeEllipse (origin, upVector, xRadius, yRadius, startDegrees, endDegrees, segments, 0.0f, 0);
+	}
+
+	public void MakeArc (Vector3 origin, Vector3 upVector, float xRadius, float yRadius, float startDegrees, float endDegrees, int segments, int index) {
+		MakeEllipse (origin, upVector, xRadius, yRadius, startDegrees, endDegrees, segments, 0.0f, index);
+	}
+	
+	private void MakeEllipse (Vector3 origin, Vector3 upVector, float xRadius, float yRadius, float startDegrees, float endDegrees, int segments, float pointRotation, int index) {
 		if (segments < 3) {
 			Debug.LogError ("VectorLine.MakeEllipse needs at least 3 segments");
 			return;
@@ -2566,50 +2678,63 @@ public class VectorLine {
 			return;
 		}
 		
-		float radians = 360.0f / segments*Mathf.Deg2Rad;
-		float p = -pointRotation*Mathf.Deg2Rad;
+		float totalDegrees, p;
+		startDegrees = Mathf.Repeat (startDegrees, 360.0f);
+		endDegrees = Mathf.Repeat (endDegrees, 360.0f);
+		if (startDegrees == endDegrees) {
+			totalDegrees = 360.0f;
+			p = -pointRotation * Mathf.Deg2Rad;
+		}
+		else {
+			totalDegrees = (endDegrees > startDegrees)? endDegrees - startDegrees : (360.0f - startDegrees) + endDegrees;
+			p = startDegrees * Mathf.Deg2Rad;
+		}
+		float radians = (totalDegrees / segments) * Mathf.Deg2Rad;
 		
 		if (m_continuous) {
+			if (startDegrees != endDegrees) {
+				segments++;
+			}
 			int i = 0;
 			if (m_is2D) {
 				Vector2 v2Origin = origin;
 				for (i = 0; i < segments; i++) {
-					m_points2[index+i] = v2Origin + new Vector2(.5f + Mathf.Cos(p)*xRadius, .5f + Mathf.Sin(p)*yRadius);
+					m_points2[index+i] = v2Origin + new Vector2(.5f + Mathf.Sin(p)*xRadius, .5f + Mathf.Cos(p)*yRadius);
 					p += radians;
 				}
-				if (!m_isPoints) {
+				if (!m_isPoints && startDegrees == endDegrees) {	// Copy point when making an ellipse so the shape is closed
 					m_points2[index+i] = m_points2[index+(i-segments)];
 				}
 			}
 			else {
 				var thisMatrix = Matrix4x4.TRS(Vector3.zero, Quaternion.LookRotation(-upVector, upVector), Vector3.one);
 				for (i = 0; i < segments; i++) {
-					m_points3[index+i] = origin + thisMatrix.MultiplyPoint3x4(new Vector3(Mathf.Cos(p)*xRadius, Mathf.Sin(p)*yRadius, 0.0f));
+					m_points3[index+i] = origin + thisMatrix.MultiplyPoint3x4(new Vector3(Mathf.Sin(p)*xRadius, Mathf.Cos(p)*yRadius, 0.0f));
 					p += radians;
 				}
-				if (!m_isPoints) {
+				if (!m_isPoints && startDegrees == endDegrees) {	// Copy point when making an ellipse so the shape is closed
 					m_points3[index+i] = m_points3[index+(i-segments)];
 				}
 			}
 		}
-		
+		// Discrete
 		else {
 			if (m_is2D) {
 				Vector2 v2Origin = origin;
 				for (int i = 0; i < segments*2; i++) {
-					m_points2[index+i] = v2Origin + new Vector2(.5f + Mathf.Cos(p)*xRadius, .5f + Mathf.Sin(p)*yRadius);
+					m_points2[index+i] = v2Origin + new Vector2(.5f + Mathf.Sin(p)*xRadius, .5f + Mathf.Cos(p)*yRadius);
 					p += radians;
 					i++;
-					m_points2[index+i] = v2Origin + new Vector2(.5f + Mathf.Cos(p)*xRadius, .5f + Mathf.Sin(p)*yRadius);
+					m_points2[index+i] = v2Origin + new Vector2(.5f + Mathf.Sin(p)*xRadius, .5f + Mathf.Cos(p)*yRadius);
 				}
 			}
 			else {
 				var thisMatrix = Matrix4x4.TRS(Vector3.zero, Quaternion.LookRotation(-upVector, upVector), Vector3.one);
 				for (int i = 0; i < segments*2; i++) {
-					m_points3[index+i] = origin + thisMatrix.MultiplyPoint3x4(new Vector3(Mathf.Cos(p)*xRadius, Mathf.Sin(p)*yRadius, 0.0f));
+					m_points3[index+i] = origin + thisMatrix.MultiplyPoint3x4(new Vector3(Mathf.Sin(p)*xRadius, Mathf.Cos(p)*yRadius, 0.0f));
 					p += radians;
 					i++;
-					m_points3[index+i] = origin + thisMatrix.MultiplyPoint3x4(new Vector3(Mathf.Cos(p)*xRadius, Mathf.Sin(p)*yRadius, 0.0f));
+					m_points3[index+i] = origin + thisMatrix.MultiplyPoint3x4(new Vector3(Mathf.Sin(p)*xRadius, Mathf.Cos(p)*yRadius, 0.0f));
 				}
 			}
 		}
@@ -3377,7 +3502,7 @@ public class VectorLine {
 					wIdx += wAdd;
 					float size = m_lineWidths[wIdx] + extraDistance;
 					thisPoint = useTransformMatrix? (Vector2)thisMatrix.MultiplyPoint3x4 (m_points2[i]) : m_points2[i];
-					if (useViewportCoords) {
+					if (m_viewportDraw) {
 						thisPoint.x *= scaleFactor.x;
 						thisPoint.y *= scaleFactor.y;
 					}
@@ -3421,7 +3546,7 @@ public class VectorLine {
 					p1.x = m_points2[i].x; p1.y = m_points2[i].y;
 					p2.x = m_points2[i+1].x; p2.y = m_points2[i+1].y;
 				}
-				if (useViewportCoords) {
+				if (m_viewportDraw) {
 					p1.x *= scaleFactor.x;
 					p1.y *= scaleFactor.y;
 					p2.x *= scaleFactor.x;
@@ -3451,7 +3576,7 @@ public class VectorLine {
 			return false;
 		}
 		
-		Vector3 screenPoint1, screenPoint2 = Vector3.zero;
+		Vector3 screenPoint1, screenPoint2 = v3zero;
 		for (int i = m_drawStart; i < end; i += add) {
 			wIdx += wAdd;
 			if (useTransformMatrix) {
