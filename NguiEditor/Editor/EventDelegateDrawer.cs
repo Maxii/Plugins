@@ -29,15 +29,36 @@ public class EventDelegateDrawer : PropertyDrawer
 		EventDelegate del = new EventDelegate();
 		del.target = targetProp.objectReferenceValue as MonoBehaviour;
 		del.methodName = methodProp.stringValue;
+
+		SerializedProperty paramArrayProp = prop.FindPropertyRelative("mParameters");
 		EventDelegate.Parameter[] ps = del.parameters;
 
 		if (ps != null)
 		{
-			for (int i = 0; i < ps.Length; ++i)
+			paramArrayProp.arraySize = ps.Length;
+			for (int i = 0; i < ps.Length; i++)
 			{
 				lines += lineHeight;
-				EventDelegate.Parameter param = ps[i];
-				if (param.obj != null) lines += lineHeight;
+
+				SerializedProperty paramProp = paramArrayProp.GetArrayElementAtIndex(i);
+				SerializedProperty objProp = paramProp.FindPropertyRelative("obj");
+				UnityEngine.Object obj = objProp.objectReferenceValue;
+
+				if (obj == null)
+					continue;
+
+				System.Type type = obj.GetType();
+
+				GameObject selGO = null;
+				if (type == typeof(GameObject)) selGO = obj as GameObject;
+				else if (type.IsSubclassOf(typeof(Component))) selGO = (obj as Component).gameObject;
+
+				if (selGO != null)
+					lines += lineHeight;
+
+				//				EventDelegate.Parameter param = ps[i];
+				//				if (param.obj != null)
+				//					lines += lineHeight;
 			}
 		}
 		return lines;
@@ -81,35 +102,42 @@ public class EventDelegateDrawer : PropertyDrawer
 			lineRect.yMax += lineHeight;
 			choice = EditorGUI.Popup(lineRect, "Method", index, names);
 
-			if (choice > 0)
+			if (choice > 0 && choice != index)
 			{
-				if (choice != index)
-				{
-					Entry entry = list[choice - 1];
-					target = entry.target as MonoBehaviour;
-					methodName = entry.name;
-					targetProp.objectReferenceValue = target;
-					methodProp.stringValue = methodName;
-				}
+				Entry entry = list[choice - 1];
+				target = entry.target as MonoBehaviour;
+				methodName = entry.name;
+				targetProp.objectReferenceValue = target;
+				methodProp.stringValue = methodName;
 			}
 
-			// Unfortunately Unity's property drawers only work with UnityEngine.Object-derived types.
-			// This means that arrays are not supported. And since EventDelegate is not derived from
-			// UnityEngine.Object either, it means that it's not possible to modify the parameter array.
-			EditorGUI.BeginDisabledGroup(true);
-
-			//SerializedProperty paramProp = prop.FindPropertyRelative("mParameters");
+			SerializedProperty paramArrayProp = prop.FindPropertyRelative("mParameters");
 			EventDelegate.Parameter[] ps = del.parameters;
 
 			if (ps != null)
 			{
-				for (int i = 0; i < ps.Length; ++i)
+				paramArrayProp.arraySize = ps.Length;
+				for (int i = 0; i < ps.Length; i++)
 				{
 					EventDelegate.Parameter param = ps[i];
+					SerializedProperty paramProp = paramArrayProp.GetArrayElementAtIndex(i);
+					SerializedProperty objProp = paramProp.FindPropertyRelative("obj");
+					SerializedProperty fieldProp = paramProp.FindPropertyRelative("field");
+
+					param.obj = objProp.objectReferenceValue;
+					param.field = fieldProp.stringValue;
+					Object obj = param.obj;
+
 					lineRect.yMin += lineHeight;
 					lineRect.yMax += lineHeight;
-					param.obj = EditorGUI.ObjectField(lineRect, "   Arg " + i, param.obj, typeof(Object), true);
-					if (param.obj == null) continue;
+
+					obj = EditorGUI.ObjectField(lineRect, "   Arg " + i, obj, typeof(Object), true);
+
+					objProp.objectReferenceValue = obj;
+					del.parameters[i].obj = obj;
+					param.obj = obj;
+
+					if (obj == null) continue;
 
 					GameObject selGO = null;
 					System.Type type = param.obj.GetType();
@@ -136,26 +164,27 @@ public class EventDelegateDrawer : PropertyDrawer
 							{
 								param.obj = selGO;
 								param.field = null;
+
+								objProp.objectReferenceValue = selGO;
+								fieldProp.stringValue = null;
 							}
 							else
 							{
 								param.obj = ents[newSel - 1].target;
 								param.field = ents[newSel - 1].name;
+
+								objProp.objectReferenceValue = param.obj;
+								fieldProp.stringValue = param.field;
 							}
 						}
 					}
 					else if (!string.IsNullOrEmpty(param.field))
-					{
 						param.field = null;
-					}
 
 					PropertyReferenceDrawer.filter = typeof(void);
 					PropertyReferenceDrawer.canConvert = true;
 				}
 			}
-
-			EditorGUI.EndDisabledGroup();
 		}
-		//else paramProp.objectReferenceValue = null;
 	}
 }

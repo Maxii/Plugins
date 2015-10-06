@@ -70,7 +70,7 @@ public class UIGeometry
 	/// Step 2: Transform the vertices by the provided matrix.
 	/// </summary>
 
-	public void ApplyTransform (Matrix4x4 widgetToPanel)
+	public void ApplyTransform (Matrix4x4 widgetToPanel, bool generateNormals = true)
 	{
 		if (verts.size > 0)
 		{
@@ -78,9 +78,12 @@ public class UIGeometry
 			for (int i = 0, imax = verts.size; i < imax; ++i) mRtpVerts.Add(widgetToPanel.MultiplyPoint3x4(verts[i]));
 
 			// Calculate the widget's normal and tangent
-			mRtpNormal = widgetToPanel.MultiplyVector(Vector3.back).normalized;
-			Vector3 tangent = widgetToPanel.MultiplyVector(Vector3.right).normalized;
-			mRtpTan = new Vector4(tangent.x, tangent.y, tangent.z, -1f);
+			if (generateNormals)
+			{
+				mRtpNormal = widgetToPanel.MultiplyVector(Vector3.back).normalized;
+				Vector3 tangent = widgetToPanel.MultiplyVector(Vector3.right).normalized;
+				mRtpTan = new Vector4(tangent.x, tangent.y, tangent.z, -1f);
+			}
 		}
 		else mRtpVerts.Clear();
 	}

@@ -37,8 +37,13 @@ public class UILabelInspector : UIWidgetInspector
 	void OnNGUIFont (Object obj)
 	{
 		serializedObject.Update();
+		
 		SerializedProperty sp = serializedObject.FindProperty("mFont");
 		sp.objectReferenceValue = obj;
+
+		sp = serializedObject.FindProperty("mTrueTypeFont");
+		sp.objectReferenceValue = null;
+		
 		serializedObject.ApplyModifiedProperties();
 		NGUISettings.ambigiousFont = obj;
 	}
@@ -46,8 +51,13 @@ public class UILabelInspector : UIWidgetInspector
 	void OnUnityFont (Object obj)
 	{
 		serializedObject.Update();
+		
 		SerializedProperty sp = serializedObject.FindProperty("mTrueTypeFont");
 		sp.objectReferenceValue = obj;
+
+		sp = serializedObject.FindProperty("mFont");
+		sp.objectReferenceValue = null;
+
 		serializedObject.ApplyModifiedProperties();
 		NGUISettings.ambigiousFont = obj;
 	}
@@ -86,20 +96,24 @@ public class UILabelInspector : UIWidgetInspector
 
 		if (mFontType == FontType.NGUI)
 		{
+			GUI.changed = false;
 			fnt = NGUIEditorTools.DrawProperty("", serializedObject, "mFont", GUILayout.MinWidth(40f));
 
 			if (fnt.objectReferenceValue != null)
 			{
+				if (GUI.changed) serializedObject.FindProperty("mTrueTypeFont").objectReferenceValue = null;
 				NGUISettings.ambigiousFont = fnt.objectReferenceValue;
 				isValid = true;
 			}
 		}
 		else
 		{
+			GUI.changed = false;
 			ttf = NGUIEditorTools.DrawProperty("", serializedObject, "mTrueTypeFont", GUILayout.MinWidth(40f));
 
 			if (ttf.objectReferenceValue != null)
 			{
+				if (GUI.changed) serializedObject.FindProperty("mFont").objectReferenceValue = null;
 				NGUISettings.ambigiousFont = ttf.objectReferenceValue;
 				isValid = true;
 			}

@@ -34,7 +34,6 @@ public class UIWidgetContainerEditor : Editor
 	{
 		//NGUIEditorTools.HideMoveTool(true);
 		if (!UIWidget.showHandles) return;
-		if (UnityEditor.Tools.current != Tool.Move) return;
 
 		MonoBehaviour mb = target as MonoBehaviour;
 		if (mb.GetComponent<UIWidget>() != null) return;

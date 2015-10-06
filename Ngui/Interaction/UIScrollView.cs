@@ -88,7 +88,13 @@ public class UIScrollView : MonoBehaviour
 	/// </summary>
 
 	public float momentumAmount = 35f;
-	
+
+	/// <summary>
+	/// Strength of the spring dampening effect.
+	/// </summary>
+
+	public float dampenStrength = 9f;
+
 	/// <summary>
 	/// Horizontal scrollbar used for visualization.
 	/// </summary>
@@ -368,12 +374,14 @@ public class UIScrollView : MonoBehaviour
 		if (horizontalScrollBar != null)
 		{
 			EventDelegate.Add(horizontalScrollBar.onChange, OnScrollBar);
+			horizontalScrollBar.BroadcastMessage("CacheDefaultColor", SendMessageOptions.DontRequireReceiver);
 			horizontalScrollBar.alpha = ((showScrollBars == ShowCondition.Always) || shouldMoveHorizontally) ? 1f : 0f;
 		}
 
 		if (verticalScrollBar != null)
 		{
 			EventDelegate.Add(verticalScrollBar.onChange, OnScrollBar);
+			verticalScrollBar.BroadcastMessage("CacheDefaultColor", SendMessageOptions.DontRequireReceiver);
 			verticalScrollBar.alpha = ((showScrollBars == ShowCondition.Always) || shouldMoveVertically) ? 1f : 0f;
 		}
 	}
@@ -392,6 +400,8 @@ public class UIScrollView : MonoBehaviour
 
 	public bool RestrictWithinBounds (bool instant, bool horizontal, bool vertical)
 	{
+		if (mPanel == null) return false;
+
 		Bounds b = bounds;
 		Vector3 constraint = mPanel.CalculateConstrainOffset(b.min, b.max);
 
@@ -953,7 +963,7 @@ public class UIScrollView : MonoBehaviour
 				mScroll = NGUIMath.SpringLerp(mScroll, 0f, 20f, delta);
 
 				// Move the scroll view
-				Vector3 offset = NGUIMath.SpringDampen(ref mMomentum, 9f, delta);
+				Vector3 offset = NGUIMath.SpringDampen(ref mMomentum, dampenStrength, delta);
 				MoveAbsolute(offset);
 
 				// Restrict the contents to be within the scroll view's bounds
@@ -995,6 +1005,22 @@ public class UIScrollView : MonoBehaviour
 			// Dampen the momentum
 			mScroll = 0f;
 			NGUIMath.SpringDampen(ref mMomentum, 9f, delta);
+		}
+	}
+
+	/// <summary>
+	/// Pan the scroll view.
+	/// </summary>
+
+	public void OnPan (Vector2 delta)
+	{
+		if (horizontalScrollBar != null) horizontalScrollBar.OnPan(delta);
+		if (verticalScrollBar != null) verticalScrollBar.OnPan(delta);
+
+		if (horizontalScrollBar == null && verticalScrollBar == null)
+		{
+			if (scale.x != 0f) Scroll(delta.x);
+			else if (scale.y != 0f) Scroll(delta.y);
 		}
 	}
 

@@ -254,7 +254,7 @@ public class UIRoot : MonoBehaviour
 			oc.enabled = false;
 			if (cam != null) cam.orthographicSize = 1f;
 		}
-		else Update();
+		else UpdateScale(false);
 	}
 
 	void Update ()
@@ -263,21 +263,31 @@ public class UIRoot : MonoBehaviour
 		if (!Application.isPlaying && gameObject.layer != 0)
 			UnityEditor.EditorPrefs.SetInt("NGUI Layer", gameObject.layer);
 #endif
+		UpdateScale();
+	}
+
+	/// <summary>
+	/// Immediately update the root's scale. Call this function after changing the min/max/manual height values.
+	/// </summary>
+
+	public void UpdateScale (bool updateAnchors = true)
+	{
 		if (mTrans != null)
 		{
 			float calcActiveHeight = activeHeight;
 
-			if (calcActiveHeight > 0f )
+			if (calcActiveHeight > 0f)
 			{
 				float size = 2f / calcActiveHeight;
-				
+
 				Vector3 ls = mTrans.localScale;
-	
+
 				if (!(Mathf.Abs(ls.x - size) <= float.Epsilon) ||
 					!(Mathf.Abs(ls.y - size) <= float.Epsilon) ||
 					!(Mathf.Abs(ls.z - size) <= float.Epsilon))
 				{
 					mTrans.localScale = new Vector3(size, size, size);
+					if (updateAnchors) BroadcastMessage("UpdateAnchors");
 				}
 			}
 		}

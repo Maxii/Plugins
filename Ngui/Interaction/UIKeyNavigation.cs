@@ -65,59 +65,111 @@ public class UIKeyNavigation : MonoBehaviour
 	public GameObject onClick;
 
 	/// <summary>
+	/// Which object will get selected on tab.
+	/// </summary>
+
+	public GameObject onTab;
+
+	/// <summary>
 	/// Whether the object this script is attached to will get selected as soon as this script is enabled.
 	/// </summary>
 
 	public bool startsSelected = false;
 
+	/// <summary>
+	/// Convenience function that returns the current key navigation selection.
+	/// </summary>
+
+	static public UIKeyNavigation current
+	{
+		get
+		{
+			GameObject go = UICamera.hoveredObject;
+			if (go == null) return null;
+			return go.GetComponent<UIKeyNavigation>();
+		}
+	}
+
+	/// <summary>
+	/// Whether the collider is enabled and the widget can be interacted with.
+	/// </summary>
+
+	public bool isColliderEnabled
+	{
+		get
+		{
+			if (enabled && gameObject.activeInHierarchy)
+			{
+				Collider c = GetComponent<Collider>();
+				if (c != null) return c.enabled;
+				Collider2D b = GetComponent<Collider2D>();
+				return (b != null && b.enabled);
+			}
+			return false;
+		}
+	}
+
+	[System.NonSerialized] bool mStarted = false;
+
 	protected virtual void OnEnable ()
 	{
 		list.Add(this);
+		if (mStarted) Start();
+	}
 
-		if (startsSelected)
-		{
+	void Start ()
+	{
 #if UNITY_EDITOR
-			if (!Application.isPlaying) return;
+		if (!Application.isPlaying) return;
 #endif
-			if (UICamera.selectedObject == null || !NGUITools.GetActive(UICamera.selectedObject))
-			{
-				UICamera.currentScheme = UICamera.ControlScheme.Controller;
-				UICamera.selectedObject = gameObject;
-			}
-		}
+		mStarted = true;
+		if (startsSelected && isColliderEnabled)
+			UICamera.hoveredObject = gameObject;
 	}
 
 	protected virtual void OnDisable () { list.Remove(this); }
 
-	protected GameObject GetLeft ()
+	static bool IsActive (GameObject go)
 	{
-		if (NGUITools.GetActive(onLeft)) return onLeft;
+		if (go && go.activeInHierarchy)
+		{
+			Collider c = go.GetComponent<Collider>();
+			if (c != null) return c.enabled;
+			Collider2D b = go.GetComponent<Collider2D>();
+			return (b != null && b.enabled);
+		}
+		return false;
+	}
+
+	public GameObject GetLeft ()
+	{
+		if (IsActive(onLeft)) return onLeft;
 		if (constraint == Constraint.Vertical || constraint == Constraint.Explicit) return null;
-		return Get(Vector3.left, true);
+		return Get(Vector3.left, 1f, 2f);
 	}
 
-	GameObject GetRight ()
+	public GameObject GetRight ()
 	{
-		if (NGUITools.GetActive(onRight)) return onRight;
+		if (IsActive(onRight)) return onRight;
 		if (constraint == Constraint.Vertical || constraint == Constraint.Explicit) return null;
-		return Get(Vector3.right, true);
+		return Get(Vector3.right, 1f, 2f);
 	}
 
-	protected GameObject GetUp ()
+	public GameObject GetUp ()
 	{
-		if (NGUITools.GetActive(onUp)) return onUp;
+		if (IsActive(onUp)) return onUp;
 		if (constraint == Constraint.Horizontal || constraint == Constraint.Explicit) return null;
-		return Get(Vector3.up, false);
+		return Get(Vector3.up, 2f, 1f);
 	}
 
-	protected GameObject GetDown ()
+	public GameObject GetDown ()
 	{
-		if (NGUITools.GetActive(onDown)) return onDown;
+		if (IsActive(onDown)) return onDown;
 		if (constraint == Constraint.Horizontal || constraint == Constraint.Explicit) return null;
-		return Get(Vector3.down, false);
+		return Get(Vector3.down, 2f, 1f);
 	}
 
-	protected GameObject Get (Vector3 myDir, bool horizontal)
+	public GameObject Get (Vector3 myDir, float x = 1f, float y = 1f)
 	{
 		Transform t = transform;
 		myDir = t.TransformDirection(myDir);
@@ -128,11 +180,11 @@ public class UIKeyNavigation : MonoBehaviour
 		for (int i = 0; i < list.size; ++i)
 		{
 			UIKeyNavigation nav = list[i];
-			if (nav == this) continue;
+			if (nav == this || nav.constraint == Constraint.Explicit || !nav.isColliderEnabled) continue;
 
-			// Ignore disabled buttons
-			UIButton btn = nav.GetComponent<UIButton>();
-			if (btn != null && !btn.isEnabled) continue;
+			// Ignore invisible widgets
+			UIWidget widget = nav.GetComponent<UIWidget>();
+			if (widget != null && widget.alpha == 0f) continue;
 
 			// Reject objects that are not within a 45 degree angle of the desired direction
 			Vector3 dir = GetCenter(nav.gameObject) - myCenter;
@@ -141,8 +193,8 @@ public class UIKeyNavigation : MonoBehaviour
 
 			// Exaggerate the movement in the undesired direction
 			dir = t.InverseTransformDirection(dir);
-			if (horizontal) dir.y *= 2f;
-			else dir.x *= 2f;
+			dir.x *= x;
+			dir.y *= y;
 
 			// Compare the distance
 			float mag = dir.sqrMagnitude;
@@ -180,50 +232,62 @@ public class UIKeyNavigation : MonoBehaviour
 		return go.transform.position;
 	}
 
-	protected virtual void OnKey (KeyCode key)
+	/// <summary>
+	/// React to navigation.
+	/// </summary>
+
+	public virtual void OnNavigate (KeyCode key)
 	{
-		if (!NGUITools.GetActive(this)) return;
+		if (UIPopupList.isOpen) return;
 
 		GameObject go = null;
 
 		switch (key)
 		{
-		case KeyCode.LeftArrow:
-			go = GetLeft();
-			break;
-		case KeyCode.RightArrow:
-			go = GetRight();
-			break;
-		case KeyCode.UpArrow:
-			go = GetUp();
-			break;
-		case KeyCode.DownArrow:
-			go = GetDown();
-			break;
-		case KeyCode.Tab:
-			if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
-			{
-				go = GetLeft();
-				if (go == null) go = GetUp();
-				if (go == null) go = GetDown();
-				if (go == null) go = GetRight();
-			}
-			else
-			{
-				go = GetRight();
-				if (go == null) go = GetDown();
-				if (go == null) go = GetUp();
-				if (go == null) go = GetLeft();
-			}
-			break;
+			case KeyCode.LeftArrow:		go = GetLeft();		break;
+			case KeyCode.RightArrow:	go = GetRight();	break;
+			case KeyCode.UpArrow:		go = GetUp();		break;
+			case KeyCode.DownArrow:		go = GetDown();		break;
 		}
 
-		if (go != null) UICamera.selectedObject = go;
+		if (go != null) UICamera.hoveredObject = go;
+	}
+
+	/// <summary>
+	/// React to any additional keys, such as Tab.
+	/// </summary>
+
+	public virtual void OnKey (KeyCode key)
+	{
+		if (key == KeyCode.Tab)
+		{
+			GameObject go = onTab;
+
+			if (go == null)
+			{
+				if (UICamera.GetKey(KeyCode.LeftShift) || UICamera.GetKey(KeyCode.RightShift))
+				{
+					go = GetLeft();
+					if (go == null) go = GetUp();
+					if (go == null) go = GetDown();
+					if (go == null) go = GetRight();
+				}
+				else
+				{
+					go = GetRight();
+					if (go == null) go = GetDown();
+					if (go == null) go = GetUp();
+					if (go == null) go = GetLeft();
+				}
+			}
+
+			if (go != null) UICamera.selectedObject = go;
+		}
 	}
 
 	protected virtual void OnClick ()
 	{
-		if (NGUITools.GetActive(this) && NGUITools.GetActive(onClick))
-			UICamera.selectedObject = onClick;
+		if (NGUITools.GetActive(onClick))
+			UICamera.hoveredObject = onClick;
 	}
 }

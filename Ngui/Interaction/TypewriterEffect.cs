@@ -122,6 +122,7 @@ public class TypewriterEffect : MonoBehaviour
 	}
 
 	void OnEnable () { mReset = true; mActive = true; }
+	void OnDisable () { Finish(); }
 
 	void Update ()
 	{
@@ -138,13 +139,17 @@ public class TypewriterEffect : MonoBehaviour
 			if (keepFullDimensions && scrollView != null) scrollView.UpdatePosition();
 		}
 
+		if (string.IsNullOrEmpty(mFullText)) return;
+
 		while (mCurrentOffset < mFullText.Length && mNextChar <= RealTime.time)
 		{
 			int lastOffset = mCurrentOffset;
 			charsPerSecond = Mathf.Max(1, charsPerSecond);
 
 			// Automatically skip all symbols
-			while (NGUIText.ParseSymbol(mFullText, ref mCurrentOffset)) { }
+			if (mLabel.supportEncoding)
+				while (NGUIText.ParseSymbol(mFullText, ref mCurrentOffset)) { }
+
 			++mCurrentOffset;
 
 			// Reached the end? We're done.
@@ -203,7 +208,11 @@ public class TypewriterEffect : MonoBehaviour
 		}
 
 		// Alpha-based fading
-		if (mFade.size != 0)
+		if (mCurrentOffset >= mFullText.Length)
+		{
+			mLabel.text = mFullText;
+		}
+		else if (mFade.size != 0)
 		{
 			for (int i = 0; i < mFade.size; )
 			{
@@ -220,7 +229,10 @@ public class TypewriterEffect : MonoBehaviour
 
 			if (mFade.size == 0)
 			{
-				if (keepFullDimensions) mLabel.text = mFullText.Substring(0, mCurrentOffset) + "[00]" + mFullText.Substring(mCurrentOffset);
+				if (keepFullDimensions)
+				{
+					mLabel.text = mFullText.Substring(0, mCurrentOffset) + "[00]" + mFullText.Substring(mCurrentOffset);
+				}
 				else mLabel.text = mFullText.Substring(0, mCurrentOffset);
 			}
 			else
@@ -251,7 +263,7 @@ public class TypewriterEffect : MonoBehaviour
 				mLabel.text = sb.ToString();
 			}
 		}
-		else if (mCurrentOffset == mFullText.Length)
+		else if (mCurrentOffset >= mFullText.Length)
 		{
 			current = this;
 			EventDelegate.Execute(onFinished);

@@ -29,11 +29,9 @@ public class NGUIDebug : MonoBehaviour
 		}
 		set
 		{
-			if (Application.isPlaying)
-			{
-				mRayDebug = value;
-				if (value) CreateInstance();
-			}
+			mRayDebug = value;
+			if (value && Application.isPlaying)
+				CreateInstance();
 		}
 	}
 
@@ -115,19 +113,74 @@ public class NGUIDebug : MonoBehaviour
 	
 	void OnGUI()
 	{
-		if (mLines.Count == 0)
+		Rect rect = new Rect(5f, 5f, 1000f, 18f);
+
+		if (mRayDebug)
 		{
-			if (mRayDebug && UICamera.hoveredObject != null && Application.isPlaying)
-			{
-				GUILayout.Label("Last Hit: " + NGUITools.GetHierarchy(UICamera.hoveredObject).Replace("\"", ""));
-			}
+			UICamera.ControlScheme scheme = UICamera.currentScheme;
+			string text = "Scheme: " + scheme;
+			GUI.color = Color.black;
+			GUI.Label(rect, text);
+			rect.y -= 1f;
+			rect.x -= 1f;
+			GUI.color = Color.white;
+			GUI.Label(rect, text);
+			rect.y += 18f;
+			rect.x += 1f;
+
+			text = "Hover: " + NGUITools.GetHierarchy(UICamera.hoveredObject).Replace("\"", "");
+			GUI.color = Color.black;
+			GUI.Label(rect, text);
+			rect.y -= 1f;
+			rect.x -= 1f;
+			GUI.color = Color.white;
+			GUI.Label(rect, text);
+			rect.y += 18f;
+			rect.x += 1f;
+
+			text = "Selection: " + NGUITools.GetHierarchy(UICamera.selectedObject).Replace("\"", "");
+			GUI.color = Color.black;
+			GUI.Label(rect, text);
+			rect.y -= 1f;
+			rect.x -= 1f;
+			GUI.color = Color.white;
+			GUI.Label(rect, text);
+			rect.y += 18f;
+			rect.x += 1f;
+
+			text = "Controller: " + NGUITools.GetHierarchy(UICamera.controllerNavigationObject).Replace("\"", "");
+			GUI.color = Color.black;
+			GUI.Label(rect, text);
+			rect.y -= 1f;
+			rect.x -= 1f;
+			GUI.color = Color.white;
+			GUI.Label(rect, text);
+			rect.y += 18f;
+			rect.x += 1f;
+
+			text = "Active events: " + UICamera.CountInputSources();
+			if (UICamera.disableController) text += ", disabled controller";
+			if (UICamera.inputHasFocus) text += ", input focus";
+			GUI.color = Color.black;
+			GUI.Label(rect, text);
+			rect.y -= 1f;
+			rect.x -= 1f;
+			GUI.color = Color.white;
+			GUI.Label(rect, text);
+			rect.y += 18f;
+			rect.x += 1f;
 		}
-		else
+
+		for (int i = 0, imax = mLines.Count; i < imax; ++i)
 		{
-			for (int i = 0, imax = mLines.Count; i < imax; ++i)
-			{
-				GUILayout.Label(mLines[i]);
-			}
+			GUI.color = Color.black;
+			GUI.Label(rect, mLines[i]);
+			rect.y -= 1f;
+			rect.x -= 1f;
+			GUI.color = Color.white;
+			GUI.Label(rect, mLines[i]);
+			rect.y += 18f;
+			rect.x += 1f;
 		}
 	}
 }

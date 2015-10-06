@@ -182,7 +182,7 @@ public class UIPlayAnimation : MonoBehaviour
 	void OnPress (bool isPressed)
 	{
 		if (!enabled) return;
-		if (UICamera.currentTouchID < -1) return;
+		if (UICamera.currentTouchID < -1 && UICamera.currentScheme != UICamera.ControlScheme.Controller) return;
 		if ( trigger == Trigger.OnPress ||
 			(trigger == Trigger.OnPressTrue && isPressed) ||
 			(trigger == Trigger.OnPressFalse && !isPressed))
@@ -191,13 +191,13 @@ public class UIPlayAnimation : MonoBehaviour
 
 	void OnClick ()
 	{
-		if (UICamera.currentTouchID < -1) return;
+		if (UICamera.currentTouchID < -1 && UICamera.currentScheme != UICamera.ControlScheme.Controller) return;
 		if (enabled && trigger == Trigger.OnClick) Play(true, false);
 	}
 
 	void OnDoubleClick ()
 	{
-		if (UICamera.currentTouchID < -1) return;
+		if (UICamera.currentTouchID < -1 && UICamera.currentScheme != UICamera.ControlScheme.Controller) return;
 		if (enabled && trigger == Trigger.OnDoubleClick) Play(true, false);
 	}
 
@@ -277,6 +277,18 @@ public class UIPlayAnimation : MonoBehaviour
 			}
 		}
 	}
+
+	/// <summary>
+	/// Play the tween forward.
+	/// </summary>
+
+	public void PlayForward () { Play(true); }
+
+	/// <summary>
+	/// Play the tween in reverse.
+	/// </summary>
+
+	public void PlayReverse () { Play(false); }
 
 	/// <summary>
 	/// Callback triggered when each tween executed by this script finishes.

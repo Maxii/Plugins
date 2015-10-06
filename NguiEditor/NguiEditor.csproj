@@ -84,6 +84,7 @@
     <Compile Include="Editor\TweenTransformEditor.cs" />
     <Compile Include="Editor\TweenVolumeEditor.cs" />
     <Compile Include="Editor\TweenWidthEditor.cs" />
+    <Compile Include="Editor\TypewriterEffectEditor.cs" />
     <Compile Include="Editor\UI2DSpriteEditor.cs" />
     <Compile Include="Editor\UIAnchorEditor.cs" />
     <Compile Include="Editor\UIAtlasInspector.cs" />
@@ -95,6 +96,7 @@
     <Compile Include="Editor\UIButtonMessageEditor.cs" />
     <Compile Include="Editor\UICameraEditor.cs" />
     <Compile Include="Editor\UICameraTool.cs" />
+    <Compile Include="Editor\UIColorPickerEditor.cs" />
     <Compile Include="Editor\UICreateNewUIWizard.cs" />
     <Compile Include="Editor\UICreateWidgetWizard.cs" />
     <Compile Include="Editor\UIDragObjectEditor.cs" />

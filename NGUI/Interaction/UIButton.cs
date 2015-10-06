@@ -109,7 +109,8 @@ public class UIButton : UIButtonColor
 				if (col != null)
 				{
 					col.enabled = value;
-					SetState(value ? State.Normal : State.Disabled, false);
+					UIButton[] buttons = GetComponents<UIButton>();
+					foreach (UIButton btn in buttons) btn.SetState(value ? State.Normal : State.Disabled, false);
 				}
 				else
 				{
@@ -118,7 +119,8 @@ public class UIButton : UIButtonColor
 					if (c2d != null)
 					{
 						c2d.enabled = value;
-						SetState(value ? State.Normal : State.Disabled, false);
+						UIButton[] buttons = GetComponents<UIButton>();
+						foreach (UIButton btn in buttons) btn.SetState(value ? State.Normal : State.Disabled, false);
 					}
 					else enabled = value;
 				}
@@ -209,18 +211,7 @@ public class UIButton : UIButtonColor
 #endif
 		if (isEnabled)
 		{
-			if (mInitDone)
-			{
-				if (UICamera.currentScheme == UICamera.ControlScheme.Controller)
-				{
-					OnHover(UICamera.selectedObject == gameObject);
-				}
-				else if (UICamera.currentScheme == UICamera.ControlScheme.Mouse)
-				{
-					OnHover(UICamera.hoveredObject == gameObject);
-				}
-				else SetState(State.Normal, false);
-			}
+			if (mInitDone) OnHover(UICamera.hoveredObject == gameObject);
 		}
 		else SetState(State.Disabled, true);
 	}

@@ -468,43 +468,7 @@ public abstract class UIRect : MonoBehaviour
 #else
 			if (updateAnchors == AnchorUpdate.OnUpdate || mUpdateAnchors)
 #endif
-			{
-				mUpdateFrame = frame;
-				mUpdateAnchors = false;
-
-				bool anchored = false;
-
-				if (leftAnchor.target)
-				{
-					anchored = true;
-					if (leftAnchor.rect != null && leftAnchor.rect.mUpdateFrame != frame)
-						leftAnchor.rect.Update();
-				}
-
-				if (bottomAnchor.target)
-				{
-					anchored = true;
-					if (bottomAnchor.rect != null && bottomAnchor.rect.mUpdateFrame != frame)
-						bottomAnchor.rect.Update();
-				}
-
-				if (rightAnchor.target)
-				{
-					anchored = true;
-					if (rightAnchor.rect != null && rightAnchor.rect.mUpdateFrame != frame)
-						rightAnchor.rect.Update();
-				}
-
-				if (topAnchor.target)
-				{
-					anchored = true;
-					if (topAnchor.rect != null && topAnchor.rect.mUpdateFrame != frame)
-						topAnchor.rect.Update();
-				}
-
-				// Update the dimensions using anchors
-				if (anchored) OnAnchor();
-			}
+				UpdateAnchorsInternal(frame);
 
 			// Continue with the update
 			OnUpdate();
@@ -512,10 +476,61 @@ public abstract class UIRect : MonoBehaviour
 	}
 
 	/// <summary>
+	/// Update anchors.
+	/// </summary>
+
+	protected void UpdateAnchorsInternal (int frame)
+	{
+		mUpdateFrame = frame;
+		mUpdateAnchors = false;
+
+		bool anchored = false;
+
+		if (leftAnchor.target)
+		{
+			anchored = true;
+			if (leftAnchor.rect != null && leftAnchor.rect.mUpdateFrame != frame)
+				leftAnchor.rect.Update();
+		}
+
+		if (bottomAnchor.target)
+		{
+			anchored = true;
+			if (bottomAnchor.rect != null && bottomAnchor.rect.mUpdateFrame != frame)
+				bottomAnchor.rect.Update();
+		}
+
+		if (rightAnchor.target)
+		{
+			anchored = true;
+			if (rightAnchor.rect != null && rightAnchor.rect.mUpdateFrame != frame)
+				rightAnchor.rect.Update();
+		}
+
+		if (topAnchor.target)
+		{
+			anchored = true;
+			if (topAnchor.rect != null && topAnchor.rect.mUpdateFrame != frame)
+				topAnchor.rect.Update();
+		}
+
+		// Update the dimensions using anchors
+		if (anchored) OnAnchor();
+	}
+
+	/// <summary>
 	/// Manually update anchored sides.
 	/// </summary>
 
-	public void UpdateAnchors () { if (isAnchored && updateAnchors != AnchorUpdate.OnStart) OnAnchor(); }
+	public void UpdateAnchors ()
+	{
+		if (isAnchored)
+		{
+			mUpdateFrame = -1;
+			mUpdateAnchors = true;
+			UpdateAnchorsInternal(Time.frameCount);
+		}
+	}
 
 	/// <summary>
 	/// Update the dimensions of the rectangle using anchor points.

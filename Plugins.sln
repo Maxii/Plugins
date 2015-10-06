@@ -47,6 +47,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoundManagerPro", "SoundMan
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoundManagerProEditor", "SoundManagerProEditor\SoundManagerProEditor.csproj", "{5BA50046-E8DC-454E-AA41-DA6F2EE80741}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmoothTurret", "SmoothTurret\SmoothTurret.csproj", "{6AA71C16-BB38-49E0-AF2E-3A623951E2EB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -121,6 +123,10 @@ Global
 		{5BA50046-E8DC-454E-AA41-DA6F2EE80741}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5BA50046-E8DC-454E-AA41-DA6F2EE80741}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5BA50046-E8DC-454E-AA41-DA6F2EE80741}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6AA71C16-BB38-49E0-AF2E-3A623951E2EB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6AA71C16-BB38-49E0-AF2E-3A623951E2EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6AA71C16-BB38-49E0-AF2E-3A623951E2EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6AA71C16-BB38-49E0-AF2E-3A623951E2EB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

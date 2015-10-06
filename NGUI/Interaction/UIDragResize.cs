@@ -48,6 +48,12 @@ public class UIDragResize : MonoBehaviour
 
 	public int maxHeight = 100000;
 
+	/// <summary>
+	/// If set to 'true', the target object's anchors will be refreshed after each dragging operation.
+	/// </summary>
+
+	public bool updateAnchors = false;
+
 	Plane mPlane;
 	Vector3 mRayPos;
 	Vector3 mLocalPos;
@@ -109,6 +115,9 @@ public class UIDragResize : MonoBehaviour
 
 				// Adjust the widget
 				NGUIMath.ResizeWidget(target, pivot, localDelta.x, localDelta.y, minWidth, minHeight, maxWidth, maxHeight);
+
+				// Update all anchors
+				if (updateAnchors) target.BroadcastMessage("UpdateAnchors");
 			}
 		}
 	}

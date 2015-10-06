@@ -294,9 +294,9 @@ public abstract class UIBasicSprite : UIWidget
 
 			if (QualitySettings.activeColorSpace == ColorSpace.Linear)
 			{
-				colF.r = Mathf.Pow(colF.r, 2.2f);
-				colF.g = Mathf.Pow(colF.g, 2.2f);
-				colF.b = Mathf.Pow(colF.b, 2.2f);
+				colF.r = Mathf.GammaToLinearSpace(colF.r);
+				colF.g = Mathf.GammaToLinearSpace(colF.g);
+				colF.b = Mathf.GammaToLinearSpace(colF.b);
 			}
 			return colF;
 		}

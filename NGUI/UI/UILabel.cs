@@ -227,7 +227,7 @@ public class UILabel : UIWidget
 	{
 		get
 		{
-			return (mFont != null) ? (UnityEngine.Object)mFont : (UnityEngine.Object)mTrueTypeFont;
+			return (UnityEngine.Object)mFont ?? (UnityEngine.Object)mTrueTypeFont;
 		}
 		set
 		{
@@ -1089,8 +1089,8 @@ public class UILabel : UIWidget
 
 #if UNITY_EDITOR
 	// Used to ensure that we don't process font more than once inside OnValidate function below
-	bool mAllowProcessing = true;
-	bool mUsingTTF = true;
+	[System.NonSerialized] bool mAllowProcessing = true;
+	[System.NonSerialized] bool mUsingTTF = true;
 
 	/// <summary>
 	/// Validate the properties.
@@ -1275,7 +1275,7 @@ public class UILabel : UIWidget
 				NGUIText.Update(false);
 
 				// Wrap the text
-				bool fits = NGUIText.WrapText(mText, out mProcessedText, true);
+				bool fits = NGUIText.WrapText(mText, out mProcessedText, true, false);
 
 				if (mOverflow == Overflow.ShrinkContent && !fits)
 				{
@@ -1370,6 +1370,9 @@ public class UILabel : UIWidget
 
 				minX = Mathf.Max(minX, base.minWidth);
 				minY = Mathf.Max(minY, base.minHeight);
+
+				if ((minX & 1) == 1) ++minX;
+				if ((minY & 1) == 1) ++minY;
 
 				mWidth = Mathf.Max(w, minX);
 				mHeight = Mathf.Max(h, minY);
@@ -1728,9 +1731,9 @@ public class UILabel : UIWidget
 
 		if (QualitySettings.activeColorSpace == ColorSpace.Linear)
 		{
-			col.r = Mathf.Pow(col.r, 2.2f);
-			col.g = Mathf.Pow(col.g, 2.2f);
-			col.b = Mathf.Pow(col.b, 2.2f);
+			col.r = Mathf.GammaToLinearSpace(col.r);
+			col.g = Mathf.GammaToLinearSpace(col.g);
+			col.b = Mathf.GammaToLinearSpace(col.b);
 		}
 
 		string text = processedText;
@@ -2038,5 +2041,10 @@ public class UILabel : UIWidget
 		else NGUIText.alignment = alignment;
 
 		NGUIText.Update();
+	}
+
+	void OnApplicationPause (bool paused)
+	{
+		if (!paused && mTrueTypeFont != null) Invalidate(false);
 	}
 }

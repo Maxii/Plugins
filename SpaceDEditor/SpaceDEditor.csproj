@@ -69,7 +69,7 @@
       <Name>Ngui</Name>
     </ProjectReference>
     <ProjectReference Include="..\SpaceD\SpaceD.csproj">
-      <Project>{84ab84fa-983b-4fb8-bfd9-34d3b93d8000}</Project>
+      <Project>{d1d9e6da-d2ac-4cdc-b8a8-3b749d41ca5e}</Project>
       <Name>SpaceD</Name>
     </ProjectReference>
   </ItemGroup>

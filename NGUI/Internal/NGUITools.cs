@@ -80,7 +80,7 @@ static public class NGUITools
 
 	static public AudioSource PlaySound (AudioClip clip, float volume, float pitch)
 	{
-		float time = Time.time;
+		float time = RealTime.time;
 		if (mLastClip == clip && mLastTimestamp + 0.1f > time) return null;
 
 		mLastClip = clip;
@@ -545,11 +545,15 @@ static public class NGUITools
 
 	static public int CalculateNextDepth (GameObject go)
 	{
-		int depth = -1;
-		UIWidget[] widgets = go.GetComponentsInChildren<UIWidget>();
-		for (int i = 0, imax = widgets.Length; i < imax; ++i)
-			depth = Mathf.Max(depth, widgets[i].depth);
-		return depth + 1;
+		if (go)
+		{
+			int depth = -1;
+			UIWidget[] widgets = go.GetComponentsInChildren<UIWidget>();
+			for (int i = 0, imax = widgets.Length; i < imax; ++i)
+				depth = Mathf.Max(depth, widgets[i].depth);
+			return depth + 1;
+		}
+		return 0;
 	}
 
 	/// <summary>
@@ -558,7 +562,7 @@ static public class NGUITools
 
 	static public int CalculateNextDepth (GameObject go, bool ignoreChildrenWithColliders)
 	{
-		if (ignoreChildrenWithColliders)
+		if (go && ignoreChildrenWithColliders)
 		{
 			int depth = -1;
 			UIWidget[] widgets = go.GetComponentsInChildren<UIWidget>();
@@ -769,6 +773,23 @@ static public class NGUITools
 				{
 					root = r;
 					break;
+				}
+			}
+		}
+
+		// Try to find an existing panel
+		if (root == null)
+		{
+			for (int i = 0, imax = UIPanel.list.Count; i < imax; ++i)
+			{
+				UIPanel p = UIPanel.list[i];
+				GameObject go = p.gameObject;
+
+				if (go.hideFlags == HideFlags.None && go.layer == layer)
+				{
+					trans.parent = p.transform;
+					trans.localScale = Vector3.one;
+					return p;
 				}
 			}
 		}
@@ -1068,21 +1089,55 @@ static public class NGUITools
 
 	static public void Destroy (UnityEngine.Object obj)
 	{
-		if (obj != null)
+		if (obj)
 		{
-			if (obj is Transform) obj = (obj as Transform).gameObject;
-
-			if (Application.isPlaying)
+			if (obj is Transform)
 			{
-				if (obj is GameObject)
-				{
-					GameObject go = obj as GameObject;
-					go.transform.parent = null;
-				}
+				Transform t = (obj as Transform);
+				GameObject go = t.gameObject;
 
-				UnityEngine.Object.Destroy(obj);
+				if (Application.isPlaying)
+				{
+					t.parent = null;
+					UnityEngine.Object.Destroy(go);
+				}
+				else UnityEngine.Object.DestroyImmediate(go);
 			}
+			else if (obj is GameObject)
+			{
+				GameObject go = obj as GameObject;
+				Transform t = go.transform;
+
+				if (Application.isPlaying)
+				{
+					t.parent = null;
+					UnityEngine.Object.Destroy(go);
+				}
+				else UnityEngine.Object.DestroyImmediate(go);
+			}
+			else if (Application.isPlaying) UnityEngine.Object.Destroy(obj);
 			else UnityEngine.Object.DestroyImmediate(obj);
+		}
+	}
+
+	/// <summary>
+	/// Convenience extension that destroys all children of the transform.
+	/// </summary>
+
+	static public void DestroyChildren (this Transform t)
+	{
+		bool isPlaying = Application.isPlaying;
+
+		while (t.childCount != 0)
+		{
+			Transform child = t.GetChild(0);
+
+			if (isPlaying)
+			{
+				child.parent = null;
+				UnityEngine.Object.Destroy(child.gameObject);
+			}
+			else UnityEngine.Object.DestroyImmediate(child.gameObject);
 		}
 	}
 
@@ -1527,6 +1582,7 @@ static public class NGUITools
 
 			Rect rect = cam.rect;
 			Vector2 size = screenSize;
+
 			float aspect = size.x / size.y;
 			aspect *= rect.width / rect.height;
 			x0 *= aspect;
@@ -1536,6 +1592,12 @@ static public class NGUITools
 			Transform t = cam.transform;
 			Quaternion rot = t.rotation;
 			Vector3 pos = t.position;
+
+			int w = Mathf.RoundToInt(size.x);
+			int h = Mathf.RoundToInt(size.y);
+
+			if ((w & 1) == 1) pos.x -= 1f / size.x;
+			if ((h & 1) == 1) pos.y += 1f / size.y;
 
 			mSides[0] = rot * (new Vector3(x0, 0f, depth)) + pos;
 			mSides[1] = rot * (new Vector3(0f, y1, depth)) + pos;
@@ -1734,4 +1796,321 @@ static public class NGUITools
 
 	static public Vector2 screenSize { get { return new Vector2(Screen.width, Screen.height); } }
 #endif
+
+	/// <summary>
+	/// List of keys that can be checked.
+	/// </summary>
+
+	static public KeyCode[] keys = new KeyCode[]
+	{
+		KeyCode.Backspace, // 8,
+		KeyCode.Tab, // 9,
+		KeyCode.Clear, // 12,
+		KeyCode.Return, // 13,
+		KeyCode.Pause, // 19,
+		KeyCode.Escape, // 27,
+		KeyCode.Space, // 32,
+		KeyCode.Exclaim, // 33,
+		KeyCode.DoubleQuote, // 34,
+		KeyCode.Hash, // 35,
+		KeyCode.Dollar, // 36,
+		KeyCode.Ampersand, // 38,
+		KeyCode.Quote, // 39,
+		KeyCode.LeftParen, // 40,
+		KeyCode.RightParen, // 41,
+		KeyCode.Asterisk, // 42,
+		KeyCode.Plus, // 43,
+		KeyCode.Comma, // 44,
+		KeyCode.Minus, // 45,
+		KeyCode.Period, // 46,
+		KeyCode.Slash, // 47,
+		KeyCode.Alpha0, // 48,
+		KeyCode.Alpha1, // 49,
+		KeyCode.Alpha2, // 50,
+		KeyCode.Alpha3, // 51,
+		KeyCode.Alpha4, // 52,
+		KeyCode.Alpha5, // 53,
+		KeyCode.Alpha6, // 54,
+		KeyCode.Alpha7, // 55,
+		KeyCode.Alpha8, // 56,
+		KeyCode.Alpha9, // 57,
+		KeyCode.Colon, // 58,
+		KeyCode.Semicolon, // 59,
+		KeyCode.Less, // 60,
+		KeyCode.Equals, // 61,
+		KeyCode.Greater, // 62,
+		KeyCode.Question, // 63,
+		KeyCode.At, // 64,
+		KeyCode.LeftBracket, // 91,
+		KeyCode.Backslash, // 92,
+		KeyCode.RightBracket, // 93,
+		KeyCode.Caret, // 94,
+		KeyCode.Underscore, // 95,
+		KeyCode.BackQuote, // 96,
+		KeyCode.A, // 97,
+		KeyCode.B, // 98,
+		KeyCode.C, // 99,
+		KeyCode.D, // 100,
+		KeyCode.E, // 101,
+		KeyCode.F, // 102,
+		KeyCode.G, // 103,
+		KeyCode.H, // 104,
+		KeyCode.I, // 105,
+		KeyCode.J, // 106,
+		KeyCode.K, // 107,
+		KeyCode.L, // 108,
+		KeyCode.M, // 109,
+		KeyCode.N, // 110,
+		KeyCode.O, // 111,
+		KeyCode.P, // 112,
+		KeyCode.Q, // 113,
+		KeyCode.R, // 114,
+		KeyCode.S, // 115,
+		KeyCode.T, // 116,
+		KeyCode.U, // 117,
+		KeyCode.V, // 118,
+		KeyCode.W, // 119,
+		KeyCode.X, // 120,
+		KeyCode.Y, // 121,
+		KeyCode.Z, // 122,
+		KeyCode.Delete, // 127,
+		KeyCode.Keypad0, // 256,
+		KeyCode.Keypad1, // 257,
+		KeyCode.Keypad2, // 258,
+		KeyCode.Keypad3, // 259,
+		KeyCode.Keypad4, // 260,
+		KeyCode.Keypad5, // 261,
+		KeyCode.Keypad6, // 262,
+		KeyCode.Keypad7, // 263,
+		KeyCode.Keypad8, // 264,
+		KeyCode.Keypad9, // 265,
+		KeyCode.KeypadPeriod, // 266,
+		KeyCode.KeypadDivide, // 267,
+		KeyCode.KeypadMultiply, // 268,
+		KeyCode.KeypadMinus, // 269,
+		KeyCode.KeypadPlus, // 270,
+		KeyCode.KeypadEnter, // 271,
+		KeyCode.KeypadEquals, // 272,
+		KeyCode.UpArrow, // 273,
+		KeyCode.DownArrow, // 274,
+		KeyCode.RightArrow, // 275,
+		KeyCode.LeftArrow, // 276,
+		KeyCode.Insert, // 277,
+		KeyCode.Home, // 278,
+		KeyCode.End, // 279,
+		KeyCode.PageUp, // 280,
+		KeyCode.PageDown, // 281,
+		KeyCode.F1, // 282,
+		KeyCode.F2, // 283,
+		KeyCode.F3, // 284,
+		KeyCode.F4, // 285,
+		KeyCode.F5, // 286,
+		KeyCode.F6, // 287,
+		KeyCode.F7, // 288,
+		KeyCode.F8, // 289,
+		KeyCode.F9, // 290,
+		KeyCode.F10, // 291,
+		KeyCode.F11, // 292,
+		KeyCode.F12, // 293,
+		KeyCode.F13, // 294,
+		KeyCode.F14, // 295,
+		KeyCode.F15, // 296,
+		KeyCode.Numlock, // 300,
+		KeyCode.CapsLock, // 301,
+		KeyCode.ScrollLock, // 302,
+		KeyCode.RightShift, // 303,
+		KeyCode.LeftShift, // 304,
+		KeyCode.RightControl, // 305,
+		KeyCode.LeftControl, // 306,
+		KeyCode.RightAlt, // 307,
+		KeyCode.LeftAlt, // 308,
+		//KeyCode.Mouse0, // 323,
+		//KeyCode.Mouse1, // 324,
+		//KeyCode.Mouse2, // 325,
+		KeyCode.Mouse3, // 326,
+		KeyCode.Mouse4, // 327,
+		KeyCode.Mouse5, // 328,
+		KeyCode.Mouse6, // 329,
+		KeyCode.JoystickButton0, // 330,
+		KeyCode.JoystickButton1, // 331,
+		KeyCode.JoystickButton2, // 332,
+		KeyCode.JoystickButton3, // 333,
+		KeyCode.JoystickButton4, // 334,
+		KeyCode.JoystickButton5, // 335,
+		KeyCode.JoystickButton6, // 336,
+		KeyCode.JoystickButton7, // 337,
+		KeyCode.JoystickButton8, // 338,
+		KeyCode.JoystickButton9, // 339,
+		KeyCode.JoystickButton10, // 340,
+		KeyCode.JoystickButton11, // 341,
+		KeyCode.JoystickButton12, // 342,
+		KeyCode.JoystickButton13, // 343,
+		KeyCode.JoystickButton14, // 344,
+		KeyCode.JoystickButton15, // 345,
+		KeyCode.JoystickButton16, // 346,
+		KeyCode.JoystickButton17, // 347,
+		KeyCode.JoystickButton18, // 348,
+		KeyCode.JoystickButton19, // 349,
+	};
+
+	/// <summary>
+	/// Helper function that converts the specified key to a 3-character key identifier for captions.
+	/// </summary>
+
+	static public string KeyToCaption (KeyCode key)
+	{
+		switch (key)
+		{
+			case KeyCode.None: return null;
+			case KeyCode.Backspace: return "BS";
+			case KeyCode.Tab: return "Tab";
+			case KeyCode.Clear: return "Clr";
+			case KeyCode.Return: return "NT";
+			case KeyCode.Pause: return "PS";
+			case KeyCode.Escape: return "Esc";
+			case KeyCode.Space: return "SP";
+			case KeyCode.Exclaim: return "!";
+			case KeyCode.DoubleQuote: return "\"";
+			case KeyCode.Hash: return "#";
+			case KeyCode.Dollar: return "$";
+			case KeyCode.Ampersand: return "&";
+			case KeyCode.Quote: return "'";
+			case KeyCode.LeftParen: return "(";
+			case KeyCode.RightParen: return ")";
+			case KeyCode.Asterisk: return "*";
+			case KeyCode.Plus: return "+";
+			case KeyCode.Comma: return ",";
+			case KeyCode.Minus: return "-";
+			case KeyCode.Period: return ".";
+			case KeyCode.Slash: return "/";
+			case KeyCode.Alpha0: return "0";
+			case KeyCode.Alpha1: return "1";
+			case KeyCode.Alpha2: return "2";
+			case KeyCode.Alpha3: return "3";
+			case KeyCode.Alpha4: return "4";
+			case KeyCode.Alpha5: return "5";
+			case KeyCode.Alpha6: return "6";
+			case KeyCode.Alpha7: return "7";
+			case KeyCode.Alpha8: return "8";
+			case KeyCode.Alpha9: return "9";
+			case KeyCode.Colon: return ":";
+			case KeyCode.Semicolon: return ";";
+			case KeyCode.Less: return "<";
+			case KeyCode.Equals: return "=";
+			case KeyCode.Greater: return ">";
+			case KeyCode.Question: return "?";
+			case KeyCode.At: return "@";
+			case KeyCode.LeftBracket: return "[";
+			case KeyCode.Backslash: return "\\";
+			case KeyCode.RightBracket: return "]";
+			case KeyCode.Caret: return "^";
+			case KeyCode.Underscore: return "_";
+			case KeyCode.BackQuote: return "`";
+			case KeyCode.A: return "A";
+			case KeyCode.B: return "B";
+			case KeyCode.C: return "C";
+			case KeyCode.D: return "D";
+			case KeyCode.E: return "E";
+			case KeyCode.F: return "F";
+			case KeyCode.G: return "G";
+			case KeyCode.H: return "H";
+			case KeyCode.I: return "I";
+			case KeyCode.J: return "J";
+			case KeyCode.K: return "K";
+			case KeyCode.L: return "L";
+			case KeyCode.M: return "M";
+			case KeyCode.N: return "N0";
+			case KeyCode.O: return "O";
+			case KeyCode.P: return "P";
+			case KeyCode.Q: return "Q";
+			case KeyCode.R: return "R";
+			case KeyCode.S: return "S";
+			case KeyCode.T: return "T";
+			case KeyCode.U: return "U";
+			case KeyCode.V: return "V";
+			case KeyCode.W: return "W";
+			case KeyCode.X: return "X";
+			case KeyCode.Y: return "Y";
+			case KeyCode.Z: return "Z";
+			case KeyCode.Delete: return "Del";
+			case KeyCode.Keypad0: return "K0";
+			case KeyCode.Keypad1: return "K1";
+			case KeyCode.Keypad2: return "K2";
+			case KeyCode.Keypad3: return "K3";
+			case KeyCode.Keypad4: return "K4";
+			case KeyCode.Keypad5: return "K5";
+			case KeyCode.Keypad6: return "K6";
+			case KeyCode.Keypad7: return "K7";
+			case KeyCode.Keypad8: return "K8";
+			case KeyCode.Keypad9: return "K9";
+			case KeyCode.KeypadPeriod: return ".";
+			case KeyCode.KeypadDivide: return "/";
+			case KeyCode.KeypadMultiply: return "*";
+			case KeyCode.KeypadMinus: return "-";
+			case KeyCode.KeypadPlus: return "+";
+			case KeyCode.KeypadEnter: return "NT";
+			case KeyCode.KeypadEquals: return "=";
+			case KeyCode.UpArrow: return "UP";
+			case KeyCode.DownArrow: return "DN";
+			case KeyCode.RightArrow: return "LT";
+			case KeyCode.LeftArrow: return "RT";
+			case KeyCode.Insert: return "Ins";
+			case KeyCode.Home: return "Home";
+			case KeyCode.End: return "End";
+			case KeyCode.PageUp: return "PU";
+			case KeyCode.PageDown: return "PD";
+			case KeyCode.F1: return "F1";
+			case KeyCode.F2: return "F2";
+			case KeyCode.F3: return "F3";
+			case KeyCode.F4: return "F4";
+			case KeyCode.F5: return "F5";
+			case KeyCode.F6: return "F6";
+			case KeyCode.F7: return "F7";
+			case KeyCode.F8: return "F8";
+			case KeyCode.F9: return "F9";
+			case KeyCode.F10: return "F10";
+			case KeyCode.F11: return "F11";
+			case KeyCode.F12: return "F12";
+			case KeyCode.F13: return "F13";
+			case KeyCode.F14: return "F14";
+			case KeyCode.F15: return "F15";
+			case KeyCode.Numlock: return "Num";
+			case KeyCode.CapsLock: return "Cap";
+			case KeyCode.ScrollLock: return "Scr";
+			case KeyCode.RightShift: return "RS";
+			case KeyCode.LeftShift: return "LS";
+			case KeyCode.RightControl: return "RC";
+			case KeyCode.LeftControl: return "LC";
+			case KeyCode.RightAlt: return "RA";
+			case KeyCode.LeftAlt: return "LA";
+			case KeyCode.Mouse0: return "M0";
+			case KeyCode.Mouse1: return "M1";
+			case KeyCode.Mouse2: return "M2";
+			case KeyCode.Mouse3: return "M3";
+			case KeyCode.Mouse4: return "M4";
+			case KeyCode.Mouse5: return "M5";
+			case KeyCode.Mouse6: return "M6";
+			case KeyCode.JoystickButton0: return "(A)";
+			case KeyCode.JoystickButton1: return "(B)";
+			case KeyCode.JoystickButton2: return "(X)";
+			case KeyCode.JoystickButton3: return "(Y)";
+			case KeyCode.JoystickButton4: return "(RB)";
+			case KeyCode.JoystickButton5: return "(LB)";
+			case KeyCode.JoystickButton6: return "(Back)";
+			case KeyCode.JoystickButton7: return "(Start)";
+			case KeyCode.JoystickButton8: return "(LS)";
+			case KeyCode.JoystickButton9: return "(RS)";
+			case KeyCode.JoystickButton10: return "J10";
+			case KeyCode.JoystickButton11: return "J11";
+			case KeyCode.JoystickButton12: return "J12";
+			case KeyCode.JoystickButton13: return "J13";
+			case KeyCode.JoystickButton14: return "J14";
+			case KeyCode.JoystickButton15: return "J15";
+			case KeyCode.JoystickButton16: return "J16";
+			case KeyCode.JoystickButton17: return "J17";
+			case KeyCode.JoystickButton18: return "J18";
+			case KeyCode.JoystickButton19: return "J19";
+		}
+		return null;
+	}
 }

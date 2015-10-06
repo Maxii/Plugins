@@ -29,9 +29,24 @@ public class UIEventTrigger : MonoBehaviour
 	public List<EventDelegate> onDragOut = new List<EventDelegate>();
 	public List<EventDelegate> onDrag = new List<EventDelegate>();
 
+	/// <summary>
+	/// Whether the collider is enabled and the widget can be interacted with.
+	/// </summary>
+
+	public bool isColliderEnabled
+	{
+		get
+		{
+			Collider c = GetComponent<Collider>();
+			if (c != null) return c.enabled;
+			Collider2D b = GetComponent<Collider2D>();
+			return (b != null && b.enabled);
+		}
+	}
+
 	void OnHover (bool isOver)
 	{
-		if (current != null) return;
+		if (current != null || !isColliderEnabled) return;
 		current = this;
 		if (isOver) EventDelegate.Execute(onHoverOver);
 		else EventDelegate.Execute(onHoverOut);
@@ -40,7 +55,7 @@ public class UIEventTrigger : MonoBehaviour
 
 	void OnPress (bool pressed)
 	{
-		if (current != null) return;
+		if (current != null || !isColliderEnabled) return;
 		current = this;
 		if (pressed) EventDelegate.Execute(onPress);
 		else EventDelegate.Execute(onRelease);
@@ -49,7 +64,7 @@ public class UIEventTrigger : MonoBehaviour
 
 	void OnSelect (bool selected)
 	{
-		if (current != null) return;
+		if (current != null || !isColliderEnabled) return;
 		current = this;
 		if (selected) EventDelegate.Execute(onSelect);
 		else EventDelegate.Execute(onDeselect);
@@ -58,7 +73,7 @@ public class UIEventTrigger : MonoBehaviour
 
 	void OnClick ()
 	{
-		if (current != null) return;
+		if (current != null || !isColliderEnabled) return;
 		current = this;
 		EventDelegate.Execute(onClick);
 		current = null;
@@ -66,7 +81,7 @@ public class UIEventTrigger : MonoBehaviour
 
 	void OnDoubleClick ()
 	{
-		if (current != null) return;
+		if (current != null || !isColliderEnabled) return;
 		current = this;
 		EventDelegate.Execute(onDoubleClick);
 		current = null;
@@ -90,7 +105,7 @@ public class UIEventTrigger : MonoBehaviour
 
 	void OnDragOver (GameObject go)
 	{
-		if (current != null) return;
+		if (current != null || !isColliderEnabled) return;
 		current = this;
 		EventDelegate.Execute(onDragOver);
 		current = null;
@@ -98,7 +113,7 @@ public class UIEventTrigger : MonoBehaviour
 
 	void OnDragOut (GameObject go)
 	{
-		if (current != null) return;
+		if (current != null || !isColliderEnabled) return;
 		current = this;
 		EventDelegate.Execute(onDragOut);
 		current = null;

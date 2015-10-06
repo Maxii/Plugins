@@ -17,8 +17,9 @@ public class UIButtonOffset : MonoBehaviour
 	public Vector3 pressed = new Vector3(2f, -2f);
 	public float duration = 0.2f;
 
-	Vector3 mPos;
-	bool mStarted = false;
+	[System.NonSerialized] Vector3 mPos;
+	[System.NonSerialized] bool mStarted = false;
+	[System.NonSerialized] bool mPressed = false;
 
 	void Start ()
 	{
@@ -48,6 +49,8 @@ public class UIButtonOffset : MonoBehaviour
 
 	void OnPress (bool isPressed)
 	{
+		mPressed = isPressed;
+
 		if (enabled)
 		{
 			if (!mStarted) Start();
@@ -63,6 +66,16 @@ public class UIButtonOffset : MonoBehaviour
 			if (!mStarted) Start();
 			TweenPosition.Begin(tweenTarget.gameObject, duration, isOver ? mPos + hover : mPos).method = UITweener.Method.EaseInOut;
 		}
+	}
+
+	void OnDragOver ()
+	{
+		if (mPressed) TweenPosition.Begin(tweenTarget.gameObject, duration, mPos + hover).method = UITweener.Method.EaseInOut;
+	}
+
+	void OnDragOut ()
+	{
+		if (mPressed) TweenPosition.Begin(tweenTarget.gameObject, duration, mPos).method = UITweener.Method.EaseInOut;
 	}
 
 	void OnSelect (bool isSelected)

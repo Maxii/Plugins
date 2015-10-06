@@ -16,7 +16,7 @@ public class UITooltip : MonoBehaviour
 	public float appearSpeed = 10f;
 	public bool scalingTransitions = true;
 
-	protected GameObject mHover;
+	protected GameObject mTooltip;
 	protected Transform mTrans;
 	protected float mTarget = 0f;
 	protected float mCurrent = 0f;
@@ -53,9 +53,9 @@ public class UITooltip : MonoBehaviour
 
 	protected virtual void Update ()
 	{
-		if (mHover != UICamera.hoveredObject)
+		if (mTooltip != UICamera.tooltipObject)
 		{
-			mHover = null;
+			mTooltip = null;
 			mTarget = 0f;
 		}
 
@@ -103,11 +103,11 @@ public class UITooltip : MonoBehaviour
 		if (text != null && !string.IsNullOrEmpty(tooltipText))
 		{
 			mTarget = 1f;
-			mHover = UICamera.hoveredObject;
+			mTooltip = UICamera.tooltipObject;
 			text.text = tooltipText;
 
 			// Orthographic camera positioning is trivial
-			mPos = Input.mousePosition;
+			mPos = UICamera.lastEventPosition;
 
 			Transform textTrans = text.transform;
 			Vector3 offset = textTrans.localPosition;
@@ -168,7 +168,7 @@ public class UITooltip : MonoBehaviour
 		}
 		else
 		{
-			mHover = null;
+			mTooltip = null;
 			mTarget = 0f;
 		}
 	}
@@ -190,5 +190,5 @@ public class UITooltip : MonoBehaviour
 	/// Hide the tooltip.
 	/// </summary>
 
-	static public void Hide () { if (mInstance != null) { mInstance.mHover = null; mInstance.mTarget = 0f; } }
+	static public void Hide () { if (mInstance != null) { mInstance.mTooltip = null; mInstance.mTarget = 0f; } }
 }

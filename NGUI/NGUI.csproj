@@ -88,6 +88,7 @@
     <Compile Include="Interaction\UISavedOption.cs" />
     <Compile Include="Interaction\UIScrollBar.cs" />
     <Compile Include="Interaction\UIScrollView.cs" />
+    <Compile Include="Interaction\UIShowControlScheme.cs" />
     <Compile Include="Interaction\UISlider.cs" />
     <Compile Include="Interaction\UISoundVolume.cs" />
     <Compile Include="Interaction\UITable.cs" />
@@ -142,6 +143,7 @@
     <Compile Include="UI\UIAnchor.cs" />
     <Compile Include="UI\UIAtlas.cs" />
     <Compile Include="UI\UICamera.cs" />
+    <Compile Include="UI\UIColorPicker.cs" />
     <Compile Include="UI\UIFont.cs" />
     <Compile Include="UI\UIInput.cs" />
     <Compile Include="UI\UIInputOnGUI.cs" />

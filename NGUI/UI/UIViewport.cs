@@ -1,4 +1,4 @@
-﻿//----------------------------------------------
+//----------------------------------------------
 //            NGUI: Next-Gen UI kit
 // Copyright © 2011-2015 Tasharen Entertainment
 //----------------------------------------------
@@ -35,16 +35,21 @@ public class UIViewport : MonoBehaviour
 	{
 		if (topLeft != null && bottomRight != null)
 		{
-			Vector3 tl = sourceCamera.WorldToScreenPoint(topLeft.position);
-			Vector3 br = sourceCamera.WorldToScreenPoint(bottomRight.position);
+			if (topLeft.gameObject.activeInHierarchy)
+			{
+				Vector3 tl = sourceCamera.WorldToScreenPoint(topLeft.position);
+				Vector3 br = sourceCamera.WorldToScreenPoint(bottomRight.position);
 
-			Rect rect = new Rect(tl.x / Screen.width, br.y / Screen.height,
-				(br.x - tl.x) / Screen.width, (tl.y - br.y) / Screen.height);
+				Rect rect = new Rect(tl.x / Screen.width, br.y / Screen.height,
+					(br.x - tl.x) / Screen.width, (tl.y - br.y) / Screen.height);
 
-			float size = fullSize * rect.height;
+				float size = fullSize * rect.height;
 
-			if (rect != mCam.rect) mCam.rect = rect;
-			if (mCam.orthographicSize != size) mCam.orthographicSize = size;
+				if (rect != mCam.rect) mCam.rect = rect;
+				if (mCam.orthographicSize != size) mCam.orthographicSize = size;
+				mCam.enabled = true;
+			}
+			else mCam.enabled = false;
 		}
 	}
 }

@@ -33,6 +33,7 @@ public class UIInput : MonoBehaviour
 		Alphanumeric,
 		Username,
 		Name,
+		Filename,
 	}
 
 	public enum KeyboardType
@@ -195,6 +196,7 @@ public class UIInput : MonoBehaviour
 	[System.NonSerialized] protected float mLastAlpha = 0f;
 	[System.NonSerialized] protected string mCached = "";
 	[System.NonSerialized] protected int mSelectMe = -1;
+	[System.NonSerialized] protected int mSelectTime = -1;
 
 	/// <summary>
 	/// Default text used by the input's label.
@@ -490,6 +492,7 @@ public class UIInput : MonoBehaviour
 #if !MOBILE
 	[System.NonSerialized] UIInputOnGUI mOnGUI;
 #endif
+	[System.NonSerialized] UICamera mCam;
 	/// <summary>
 	/// Selection event, sent by the EventSystem.
 	/// </summary>
@@ -523,6 +526,7 @@ public class UIInput : MonoBehaviour
 
 	protected void OnSelectEvent ()
 	{
+		mSelectTime = Time.frameCount;
 		selection = this;
 		if (mDoInit) Init();
 
@@ -574,180 +578,185 @@ public class UIInput : MonoBehaviour
 #if UNITY_EDITOR
 		if (!Application.isPlaying) return;
 #endif
-		if (isSelected)
+		if (!isSelected || mSelectTime == Time.frameCount) return;
+
+		if (mDoInit) Init();
+#if MOBILE
+		// Wait for the keyboard to open. Apparently mKeyboard.active will return 'false' for a while in some cases.
+		if (mWaitForKeyboard)
 		{
-			if (mDoInit) Init();
-#if MOBILE
-			// Wait for the keyboard to open. Apparently mKeyboard.active will return 'false' for a while in some cases.
-			if (mWaitForKeyboard)
-			{
-				if (mKeyboard != null && !mKeyboard.active) return;
-				mWaitForKeyboard = false;
-			}
+			if (mKeyboard != null && !mKeyboard.active) return;
+			mWaitForKeyboard = false;
+		}
 #endif
-			// Unity has issues bringing up the keyboard properly if it's in "hideInput" mode and you happen
-			// to select one input in the same Update as de-selecting another.
-			if (mSelectMe != -1 && mSelectMe != Time.frameCount)
-			{
-				mSelectMe = -1;
-				mSelectionEnd = string.IsNullOrEmpty(mValue) ? 0 : mValue.Length;
-				mDrawStart = 0;
-				mSelectionStart = selectAllTextOnFocus ? 0 : mSelectionEnd;
-				label.color = activeTextColor;
+		// Unity has issues bringing up the keyboard properly if it's in "hideInput" mode and you happen
+		// to select one input in the same Update as de-selecting another.
+		if (mSelectMe != -1 && mSelectMe != Time.frameCount)
+		{
+			mSelectMe = -1;
+			mSelectionEnd = string.IsNullOrEmpty(mValue) ? 0 : mValue.Length;
+			mDrawStart = 0;
+			mSelectionStart = selectAllTextOnFocus ? 0 : mSelectionEnd;
+			label.color = activeTextColor;
 #if MOBILE
-				RuntimePlatform pf = Application.platform;
-				if (pf == RuntimePlatform.IPhonePlayer
-					|| pf == RuntimePlatform.Android
-				    || pf == RuntimePlatform.WP8Player
+			RuntimePlatform pf = Application.platform;
+			if (pf == RuntimePlatform.IPhonePlayer
+				|| pf == RuntimePlatform.Android
+				|| pf == RuntimePlatform.WP8Player
  #if UNITY_4_3
-					|| pf == RuntimePlatform.BB10Player
+				|| pf == RuntimePlatform.BB10Player
  #else
-					|| pf == RuntimePlatform.BlackBerryPlayer
-					|| pf == RuntimePlatform.MetroPlayerARM
-					|| pf == RuntimePlatform.MetroPlayerX64
-					|| pf == RuntimePlatform.MetroPlayerX86
+				|| pf == RuntimePlatform.BlackBerryPlayer
+				|| pf == RuntimePlatform.MetroPlayerARM
+				|| pf == RuntimePlatform.MetroPlayerX64
+				|| pf == RuntimePlatform.MetroPlayerX86
  #endif
-				)
-				{
-					string val;
-					TouchScreenKeyboardType kt;
-
-					if (inputShouldBeHidden)
-					{
-						TouchScreenKeyboard.hideInput = true;
-						kt = (TouchScreenKeyboardType)((int)keyboardType);
- #if UNITY_METRO
-						val = "";
- #else
-						val = "|";
- #endif
-					}
-					else if (inputType == InputType.Password)
-					{
-						TouchScreenKeyboard.hideInput = false;
-						kt = TouchScreenKeyboardType.Default;
-						val = mValue;
-						mSelectionStart = mSelectionEnd;
-					}
-					else
-					{
-						TouchScreenKeyboard.hideInput = false;
-						kt = (TouchScreenKeyboardType)((int)keyboardType);
-						val = mValue;
-						mSelectionStart = mSelectionEnd;
-					}
-
-					mWaitForKeyboard = true;
-					mKeyboard = (inputType == InputType.Password) ?
-						TouchScreenKeyboard.Open(val, kt, false, false, true) :
-						TouchScreenKeyboard.Open(val, kt, !inputShouldBeHidden && inputType == InputType.AutoCorrect,
-							label.multiLine && !hideInput, false, false, defaultText);
- #if UNITY_METRO
-					mKeyboard.active = true;
- #endif
-				}
-				else
-#endif // MOBILE
-				{
-					Vector2 pos = (UICamera.current != null && UICamera.current.cachedCamera != null) ?
-						UICamera.current.cachedCamera.WorldToScreenPoint(label.worldCorners[0]) :
-						label.worldCorners[0];
-					pos.y = Screen.height - pos.y;
-					Input.imeCompositionMode = IMECompositionMode.On;
-					Input.compositionCursorPos = pos;
-				}
-
-				UpdateLabel();
-				if (string.IsNullOrEmpty(Input.inputString)) return;
-			}
-#if MOBILE
-			if (mKeyboard != null)
+			)
 			{
- #if UNITY_METRO
-				string text = Input.inputString;
-				if (!string.IsNullOrEmpty(text)) Insert(text);
- #else
-				string text = mKeyboard.text;
- 
+				string val;
+				TouchScreenKeyboardType kt;
+
 				if (inputShouldBeHidden)
 				{
-					if (text != "|")
-					{
-						if (!string.IsNullOrEmpty(text))
-						{
-							Insert(text.Substring(1));
-						}
-						else DoBackspace();
+					TouchScreenKeyboard.hideInput = true;
+					kt = (TouchScreenKeyboardType)((int)keyboardType);
+ #if UNITY_METRO
+					val = "";
+ #else
+					val = "|";
+ #endif
+				}
+				else if (inputType == InputType.Password)
+				{
+					TouchScreenKeyboard.hideInput = false;
+					kt = TouchScreenKeyboardType.Default;
+					val = mValue;
+					mSelectionStart = mSelectionEnd;
+				}
+				else
+				{
+					TouchScreenKeyboard.hideInput = false;
+					kt = (TouchScreenKeyboardType)((int)keyboardType);
+					val = mValue;
+					mSelectionStart = mSelectionEnd;
+				}
 
-						mKeyboard.text = "|";
-					}
-				}
-				else if (mCached != text)
-				{
-					mCached = text;
-					value = text;
-				}
- #endif // UNITY_METRO
-				if (mKeyboard.done || !mKeyboard.active)
-				{
-					if (!mKeyboard.wasCanceled) Submit();
-					mKeyboard = null;
-					isSelected = false;
-					mCached = "";
-				}
+				mWaitForKeyboard = true;
+				mKeyboard = (inputType == InputType.Password) ?
+					TouchScreenKeyboard.Open(val, kt, false, false, true) :
+					TouchScreenKeyboard.Open(val, kt, !inputShouldBeHidden && inputType == InputType.AutoCorrect,
+						label.multiLine && !hideInput, false, false, defaultText);
+ #if UNITY_METRO
+				mKeyboard.active = true;
+ #endif
 			}
 			else
 #endif // MOBILE
 			{
-				string ime = Input.compositionString;
-
-				// There seems to be an inconsistency between IME on Windows, and IME on OSX.
-				// On Windows, Input.inputString is always empty while IME is active. On the OSX it is not.
-				if (string.IsNullOrEmpty(ime) && !string.IsNullOrEmpty(Input.inputString))
-				{
-					// Process input ignoring non-printable characters as they are not consistent.
-					// Windows has them, OSX may not. They get handled inside OnGUI() instead.
-					string s = Input.inputString;
-
-					for (int i = 0; i < s.Length; ++i)
-					{
-						char ch = s[i];
-						if (ch < ' ') continue;
-
-						// OSX inserts these characters for arrow keys
-						if (ch == '\uF700') continue;
-						if (ch == '\uF701') continue;
-						if (ch == '\uF702') continue;
-						if (ch == '\uF703') continue;
-
-						Insert(ch.ToString());
-					}
-				}
-
-				// Append IME composition
-				if (mLastIME != ime)
-				{
-					mSelectionEnd = string.IsNullOrEmpty(ime) ? mSelectionStart : mValue.Length + ime.Length;
-					mLastIME = ime;
-					UpdateLabel();
-					ExecuteOnChange();
-				}
+				Vector2 pos = (UICamera.current != null && UICamera.current.cachedCamera != null) ?
+					UICamera.current.cachedCamera.WorldToScreenPoint(label.worldCorners[0]) :
+					label.worldCorners[0];
+				pos.y = Screen.height - pos.y;
+				Input.imeCompositionMode = IMECompositionMode.On;
+				Input.compositionCursorPos = pos;
 			}
 
-			// Blink the caret
-			if (mCaret != null && mNextBlink < RealTime.time)
+			UpdateLabel();
+			if (string.IsNullOrEmpty(Input.inputString)) return;
+		}
+#if MOBILE
+		if (mKeyboard != null)
+		{
+ #if UNITY_METRO
+			string text = Input.inputString;
+			if (!string.IsNullOrEmpty(text)) Insert(text);
+ #else
+			string text = (mKeyboard.done || !mKeyboard.active) ? mCached : mKeyboard.text;
+ 
+			if (inputShouldBeHidden)
 			{
-				mNextBlink = RealTime.time + 0.5f;
-				mCaret.enabled = !mCaret.enabled;
+				if (text != "|")
+				{
+					if (!string.IsNullOrEmpty(text))
+					{
+						Insert(text.Substring(1));
+					}
+					else DoBackspace();
+
+					mKeyboard.text = "|";
+				}
+			}
+			else if (mCached != text)
+			{
+				mCached = text;
+				if (!mKeyboard.done && mKeyboard.active) value = text;
+			}
+ #endif // UNITY_METRO
+			if (mKeyboard.done || !mKeyboard.active)
+			{
+				if (!mKeyboard.wasCanceled) Submit();
+				mKeyboard = null;
+				isSelected = false;
+				mCached = "";
+			}
+		}
+		else
+#endif // MOBILE
+		{
+			string ime = Input.compositionString;
+
+			// There seems to be an inconsistency between IME on Windows, and IME on OSX.
+			// On Windows, Input.inputString is always empty while IME is active. On the OSX it is not.
+			if (string.IsNullOrEmpty(ime) && !string.IsNullOrEmpty(Input.inputString))
+			{
+				// Process input ignoring non-printable characters as they are not consistent.
+				// Windows has them, OSX may not. They get handled inside OnGUI() instead.
+				string s = Input.inputString;
+
+				for (int i = 0; i < s.Length; ++i)
+				{
+					char ch = s[i];
+					if (ch < ' ') continue;
+
+					// OSX inserts these characters for arrow keys
+					if (ch == '\uF700') continue;
+					if (ch == '\uF701') continue;
+					if (ch == '\uF702') continue;
+					if (ch == '\uF703') continue;
+
+					Insert(ch.ToString());
+				}
 			}
 
-			// If the label's final alpha changes, we need to update the drawn geometry,
-			// or the highlight widgets (which have their geometry set manually) won't update.
-			if (isSelected && mLastAlpha != label.finalAlpha)
+			// Append IME composition
+			if (mLastIME != ime)
+			{
+				mSelectionEnd = string.IsNullOrEmpty(ime) ? mSelectionStart : mValue.Length + ime.Length;
+				mLastIME = ime;
 				UpdateLabel();
+				ExecuteOnChange();
+			}
+		}
 
-			// Having this in OnGUI causes issues because Input.inputString gets updated *after* OnGUI, apparently...
-			if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+		// Blink the caret
+		if (mCaret != null && mNextBlink < RealTime.time)
+		{
+			mNextBlink = RealTime.time + 0.5f;
+			mCaret.enabled = !mCaret.enabled;
+		}
+
+		// If the label's final alpha changes, we need to update the drawn geometry,
+		// or the highlight widgets (which have their geometry set manually) won't update.
+		if (isSelected && mLastAlpha != label.finalAlpha)
+			UpdateLabel();
+
+		// Cache the camera
+		if (mCam == null) mCam = UICamera.FindCameraForLayer(gameObject.layer);
+
+		// Having this in OnGUI causes issues because Input.inputString gets updated *after* OnGUI, apparently...
+		if (mCam != null)
+		{
+			if (UICamera.GetKeyDown(mCam.submitKey0))
 			{
 				bool newLine = (onReturnKey == OnReturnKey.NewLine) ||
 					(onReturnKey == OnReturnKey.Default &&
@@ -761,12 +770,58 @@ public class UIInput : MonoBehaviour
 				}
 				else
 				{
-					UICamera.currentScheme = UICamera.ControlScheme.Controller;
-					UICamera.currentKey = KeyCode.Return;
+					if (UICamera.controller.current != null)
+						UICamera.controller.clickNotification = UICamera.ClickNotification.None;
+					UICamera.currentKey = mCam.submitKey0;
 					Submit();
-					UICamera.currentKey = KeyCode.None;
 				}
 			}
+
+			if (UICamera.GetKeyDown(mCam.submitKey1))
+			{
+				bool newLine = (onReturnKey == OnReturnKey.NewLine) ||
+					(onReturnKey == OnReturnKey.Default &&
+					label.multiLine && !Input.GetKey(KeyCode.LeftControl) && !Input.GetKey(KeyCode.RightControl) &&
+					label.overflowMethod != UILabel.Overflow.ClampContent &&
+					validation == Validation.None);
+
+				if (newLine)
+				{
+					Insert("\n");
+				}
+				else
+				{
+					if (UICamera.controller.current != null)
+						UICamera.controller.clickNotification = UICamera.ClickNotification.None;
+					UICamera.currentKey = mCam.submitKey1;
+					Submit();
+				}
+			}
+
+			if (!mCam.useKeyboard && UICamera.GetKeyUp(KeyCode.Tab))
+				OnKey(KeyCode.Tab);
+		}
+	}
+
+	static int mIgnoreKey = 0;
+
+	void OnKey (KeyCode key)
+	{
+		int frame = Time.frameCount;
+
+		if (mIgnoreKey == frame) return;
+		
+		if (key == mCam.cancelKey0 || key == mCam.cancelKey1)
+		{
+			mIgnoreKey = frame;
+			isSelected = false;
+		}
+		else if (key == KeyCode.Tab)
+		{
+			mIgnoreKey = frame;
+			isSelected = false;
+			UIKeyNavigation nav = GetComponent<UIKeyNavigation>();
+			if (nav != null) nav.OnKey(KeyCode.Tab);
 		}
 	}
 
@@ -1417,6 +1472,23 @@ public class UIInput : MonoBehaviour
 			if (ch >= 'A' && ch <= 'Z') return (char)(ch - 'A' + 'a');
 			if (ch >= 'a' && ch <= 'z') return ch;
 			if (ch >= '0' && ch <= '9') return ch;
+		}
+		else if (validation == Validation.Filename)
+		{
+			if (ch == ':') return (char)0;
+			if (ch == '/') return (char)0;
+			if (ch == '\\') return (char)0;
+			if (ch == '<') return (char)0;
+			if (ch == '>') return (char)0;
+			if (ch == '|') return (char)0;
+			if (ch == '^') return (char)0;
+			if (ch == '*') return (char)0;
+			if (ch == ';') return (char)0;
+			if (ch == '"') return (char)0;
+			if (ch == '`') return (char)0;
+			if (ch == '\t') return (char)0;
+			if (ch == '\n') return (char)0;
+			return ch;
 		}
 		else if (validation == Validation.Name)
 		{

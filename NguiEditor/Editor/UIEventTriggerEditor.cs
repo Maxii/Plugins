@@ -23,8 +23,10 @@ public class UIEventTriggerEditor : Editor
 		EditorPrefs.SetBool("ET5", EventDelegate.IsValid(mTrigger.onDeselect));
 		EditorPrefs.SetBool("ET6", EventDelegate.IsValid(mTrigger.onClick));
 		EditorPrefs.SetBool("ET7", EventDelegate.IsValid(mTrigger.onDoubleClick));
+		EditorPrefs.SetBool("ETA", EventDelegate.IsValid(mTrigger.onDragStart));
 		EditorPrefs.SetBool("ET8", EventDelegate.IsValid(mTrigger.onDragOver));
 		EditorPrefs.SetBool("ET9", EventDelegate.IsValid(mTrigger.onDragOut));
+		EditorPrefs.SetBool("ETB", EventDelegate.IsValid(mTrigger.onDragEnd));
 	}
 
 	public override void OnInspectorGUI ()
@@ -40,8 +42,10 @@ public class UIEventTriggerEditor : Editor
 		DrawEvents("ET5", "On Deselect", mTrigger.onDeselect, minimalistic);
 		DrawEvents("ET6", "On Click/Tap", mTrigger.onClick, minimalistic);
 		DrawEvents("ET7", "On Double-Click/Tap", mTrigger.onDoubleClick, minimalistic);
+		DrawEvents("ETA", "On Drag Start", mTrigger.onDragStart, minimalistic);
 		DrawEvents("ET8", "On Drag Over", mTrigger.onDragOver, minimalistic);
 		DrawEvents("ET9", "On Drag Out", mTrigger.onDragOut, minimalistic);
+		DrawEvents("ETB", "On Drag End", mTrigger.onDragEnd, minimalistic);
 	}
 
 	void DrawEvents (string key, string text, List<EventDelegate> list, bool minimalistic)

@@ -80,7 +80,7 @@
     <Compile Include="Examples\Other\OpenURLOnClick.cs" />
     <Compile Include="Examples\Other\PanWithMouse.cs" />
     <Compile Include="Examples\Other\PlayIdleAnimations.cs" />
-    <Compile Include="Examples\Other\SetColorOnSelection.cs" />
+    <Compile Include="Examples\Other\SetColorPickerColor.cs" />
     <Compile Include="Examples\Other\Spin.cs" />
     <Compile Include="Examples\Other\SpinWithMouse.cs" />
     <Compile Include="Examples\Other\Tutorial5.cs" />

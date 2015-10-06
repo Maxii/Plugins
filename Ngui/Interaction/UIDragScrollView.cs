@@ -121,4 +121,14 @@ public class UIDragScrollView : MonoBehaviour
 		if (scrollView && NGUITools.GetActive(this))
 			scrollView.Scroll(delta);
 	}
+
+	/// <summary>
+	/// Pan the scroll view.
+	/// </summary>
+
+	public void OnPan (Vector2 delta)
+	{
+		if (scrollView && NGUITools.GetActive(this))
+			scrollView.OnPan(delta);
+	}
 }
