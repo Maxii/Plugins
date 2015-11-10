@@ -5,20 +5,19 @@ public class MFcompute {
 		
 	public static float SmoothRateChange ( float distance, float closureRate, float curRate, float rateAccel, float decelMult, float rateMax ) {
 		int _goalFactor = distance >= 0 ? 1 : -1; // which way is goal?
-		int _curTurnFactor = curRate >= 0 ? 1 : -1; // which currently turning?
-		float _rateDecel = rateAccel * decelMult * 2; // decelerate faster than accelerating (*2 to make it a little more agressive as default)
+		int _curTurnFactor = curRate >= 0 ? 1 : -1; // which way currently turning?
 		
 		// if goal is within accelleration, reduce accel to match goal. This minimizes jitter at high acceleration speeds
-		// this solution isn't perfect and has trouble dealing with very high rates and low framerates. Working on a way to make this better
-		if ( (distance <= _rateDecel * _curTurnFactor * Time.deltaTime && distance >= 0) ||
-		    (distance >= _rateDecel * _curTurnFactor * Time.deltaTime && distance <= 0) ) {
-			_rateDecel = Mathf.Abs(distance) / Time.deltaTime;
+		if ( (distance <= rateAccel * _curTurnFactor * Time.deltaTime && distance >= 0) 	||		(distance >= rateAccel * _curTurnFactor * Time.deltaTime && distance <= 0) ) {
+			rateAccel = Mathf.Abs(distance) / Time.deltaTime;
 		}
+
+		float _rateDecel = rateAccel * decelMult * 2; // decelerate faster than accelerating (*2 to make it a little more agressive as default)
 		
 		// determine which way to accelerate
 		if (_goalFactor * _curTurnFactor > 0) {
 			// positive: moving towards goal
-			if ( distance * _goalFactor >= MFcompute.DistanceToStop(closureRate, _rateDecel ) * _goalFactor) { 
+			if ( distance * _goalFactor >= MFcompute.DistanceToStop(closureRate, _rateDecel ) * _goalFactor ) { 
 				// turn faster
 				curRate = Mathf.Clamp(   curRate + (rateAccel * _curTurnFactor * Time.deltaTime)   , -rateMax, rateMax);
 			} else {
@@ -84,7 +83,7 @@ public class MFcompute {
 		}
 	}
 
-	public static float? BallisticAimAngle ( Vector3 targetLoc, Vector3 exitLoc, float shotSpeed, bool highArc ) {
+	public static float? BallisticAimAngle ( Vector3 targetLoc, Vector3 exitLoc, float shotSpeed, MFnum.ArcType arc ) {
 		int _factor = -Physics.gravity.y > 0 ? 1 : -1;
 		float _gravityY = _factor == 1 ? -Physics.gravity.y : Physics.gravity.y; // if reverse gravity, calculate it as normal gravity, but with invert heightDif and angle
 		Vector3 _targetLoc = targetLoc;
@@ -97,14 +96,14 @@ public class MFcompute {
 		float _rad1 = Mathf.Atan( ( (shotSpeed*shotSpeed) + a ) / (_gravityY * _targetRangeXZ) );
 		float _rad2 = Mathf.Atan( ( (shotSpeed*shotSpeed) - a ) / (_gravityY * _targetRangeXZ) );
 		
-		if ( float.IsNaN(_rad1) == true && float.IsNaN(_rad2) == true ) {
+		if ( float.IsNaN(_rad1) == true && float.IsNaN(_rad2) == true ) { 
 			return null; // no solution
-		} else if ( float.IsNaN(_rad1) == true ) {
+		} else if ( float.IsNaN(_rad1) == true ) { // should this ever happen?
 			_aimRad = _rad2;
-		} else if ( float.IsNaN(_rad2) == true ) {
+		} else if ( float.IsNaN(_rad2) == true ) { // should this ever happen?
 			_aimRad = _rad1;
 		} else {
-			if ( highArc == true ) {
+			if ( arc == MFnum.ArcType.High ) {
 				_aimRad = Mathf.Max( _rad1, _rad2 ); // pick highest arc
 			} else {
 				_aimRad = Mathf.Min( _rad1, _rad2 ); // pick lowest arc
@@ -113,24 +112,20 @@ public class MFcompute {
 		return _aimRad;
 	}
 	
-	public static float? BallisticFlightTime ( Vector3 targetLoc, Vector3 exitLoc, float shotSpeed, float aimRad, bool highArc ) {
+	public static float? BallisticFlightTime ( Vector3 targetLoc, Vector3 exitLoc, float shotSpeed, float aimRad, MFnum.ArcType arc ) {
 		float? _flightTime = null;
 		float _speedY = shotSpeed * Mathf.Sin(aimRad);
-		int _factor = -Physics.gravity.y > 0 ? 1 : -1;
+		int _factor = -Physics.gravity.y > 0 ? 1 : -1; 
 		float _gravityY = _factor == 1 ? -Physics.gravity.y : Physics.gravity.y; // if reverse gravity, calculate it as normal gravity, but with invert heightDif and angle
 		float _heightDif = targetLoc.y - exitLoc.y;
-		float _targetRangeXZ = Vector2.Distance( new Vector2(exitLoc.x, exitLoc.z), new Vector2(targetLoc.x, targetLoc.z) );
-		
 		float a = Mathf.Sqrt( ( (_speedY*_speedY) / (_gravityY*_gravityY) ) - ( ( _factor * 2 * _heightDif ) / _gravityY ) );
 		float t1 = ( _speedY / _gravityY ) + a;
 		float t2 = ( _speedY / _gravityY ) - a;
-		
-		float _maxRange = Mathf.Abs( ( (shotSpeed*shotSpeed) * Mathf.Sin( 2 * aimRad ) ) / _gravityY );
-		
+
 		if ( t1 < 0 && t2 < 0 ) {
 			return null; // no solution
 		}
-		if ( highArc == true || _targetRangeXZ > _maxRange / 2 ) {
+		if ( arc == MFnum.ArcType.High ) { 
 			_flightTime = Mathf.Max( t1, t2 );
 		} else {
 			if ( t1 < 0 ) {

@@ -1,6 +1,5 @@
 //#define ASTAR_NO_POOLING //@SHOWINEDITOR Disable pooling for some reason. Could be debugging or just for measuring the difference.
 
-using System;
 using System.Collections.Generic;
 
 namespace Pathfinding.Util
@@ -24,7 +23,7 @@ namespace Pathfinding.Util
 	public static class StackPool<T>
 	{
 		/** Internal pool */
-		static List<Stack<T>> pool;
+		static readonly List<Stack<T>> pool;
 		
 		/** Static constructor */
 		static StackPool ()
@@ -42,16 +41,16 @@ namespace Pathfinding.Util
 				Stack<T> ls = pool[pool.Count-1];
 				pool.RemoveAt(pool.Count-1);
 				return ls;
-			} else {
-				return new Stack<T>();
 			}
+
+			return new Stack<T>();
 		}
 		
 		/** Makes sure the pool contains at least \a count pooled items.
 		 * This is good if you want to do all allocations at start.
 		 */
 		public static void Warmup (int count) {
-			Stack<T>[] tmp = new Stack<T>[count];
+			var tmp = new Stack<T>[count];
 			for (int i=0;i<count;i++) tmp[i] = Claim ();
 			for (int i=0;i<count;i++) Release (tmp[i]);
 		}

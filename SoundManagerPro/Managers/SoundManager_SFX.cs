@@ -112,7 +112,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
             
 		if (!SoundManager.ClipNameIsValid(clipName))
             return null;
-		
+
 		if(volume == float.MaxValue)
 			volume = Instance.volumeSFX;
 		
@@ -486,7 +486,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
         if ((clip == null) || (gO == null))
             return null;
         
-        if (gO.audio == null)
+		if (gO.GetComponent<AudioSource>() == null)
             gO.AddComponent<AudioSource>();
 		
 		if(volume == float.MaxValue)
@@ -495,7 +495,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 		if(pitch == float.MaxValue)
 			pitch = Instance.pitchSFX;
 		
-		return PlaySFX(gO.audio, clip, looping, delay, volume, pitch, runOnEndFunction, duckingSetting, duckVolume, duckPitch);
+		return PlaySFX(gO.GetComponent<AudioSource>(), clip, looping, delay, volume, pitch, runOnEndFunction, duckingSetting, duckVolume, duckPitch);
     }
 	
 	/// <summary>
@@ -542,7 +542,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
         if ((!SoundManager.ClipNameIsValid(clipName)) || (gO == null))
             return null;
         
-        if (gO.audio == null)
+        if (gO.GetComponent<AudioSource>() == null)
             gO.AddComponent<AudioSource>();
 		
 		if(volume == float.MaxValue)
@@ -551,7 +551,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 		if(pitch == float.MaxValue)
 			pitch = Instance.pitchSFX;
 		
-		return PlaySFX(gO.audio, SoundManager.Load(clipName), looping, delay, volume, pitch, runOnEndFunction, duckingSetting, duckVolume, duckPitch);
+		return PlaySFX(gO.GetComponent<AudioSource>(), SoundManager.Load(clipName), looping, delay, volume, pitch, runOnEndFunction, duckingSetting, duckVolume, duckPitch);
     }
 	
 	/// <summary>
@@ -565,7 +565,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
         if (gO == null)
             return;
         
-        StopSFXObject(gO.audio);
+        StopSFXObject(gO.GetComponent<AudioSource>());
     }
 	
 	/// <summary>
@@ -736,7 +736,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
         if ((clip == null) || (gO == null))
             return null;
 		
-		if (gO.audio == null)
+		if (gO.GetComponent<AudioSource>() == null)
             gO.AddComponent<AudioSource>();
 		
 		if(volume == float.MaxValue)
@@ -745,9 +745,9 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 		if(pitch == float.MaxValue)
 			pitch = Instance.pitchSFX;
 		
-		Instance.CheckInsertionIntoUnownedSFXObjects(gO.audio);
+		Instance.CheckInsertionIntoUnownedSFXObjects(gO.GetComponent<AudioSource>());
 		
-		return Instance.PlaySFXLoopOn(gO.audio, clip, tillDestroy, volume, pitch, maxDuration, runOnEndFunction, duckingSetting, duckVolume, duckPitch);
+		return Instance.PlaySFXLoopOn(gO.GetComponent<AudioSource>(), clip, tillDestroy, volume, pitch, maxDuration, runOnEndFunction, duckingSetting, duckVolume, duckPitch);
     }
 	
 	/// <summary>
@@ -796,7 +796,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
         if ((!SoundManager.ClipNameIsValid(clipName)) || (gO == null))
             return null;
 		
-		if (gO.audio == null)
+		if (gO.GetComponent<AudioSource>() == null)
             gO.AddComponent<AudioSource>();
 		
 		if(volume == float.MaxValue)
@@ -805,9 +805,9 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 		if(pitch == float.MaxValue)
 			pitch = Instance.pitchSFX;
 		
-		Instance.CheckInsertionIntoUnownedSFXObjects(gO.audio);
+		Instance.CheckInsertionIntoUnownedSFXObjects(gO.GetComponent<AudioSource>());
 		
-		return Instance.PlaySFXLoopOn(gO.audio, SoundManager.Load(clipName), tillDestroy, volume, pitch, maxDuration, runOnEndFunction, duckingSetting, duckVolume, duckPitch);
+		return Instance.PlaySFXLoopOn(gO.GetComponent<AudioSource>(), SoundManager.Load(clipName), tillDestroy, volume, pitch, maxDuration, runOnEndFunction, duckingSetting, duckVolume, duckPitch);
     }
 	
 	/// <summary>
@@ -911,7 +911,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 		float newVolume = ignoreMaxSFXVolume ? setVolume : (setVolume * Instance.maxSFXVolume);
 		
 		foreach(GameObject sfxObject in sfxObjects)
-			sfxObject.audio.volume = newVolume;
+			sfxObject.GetComponent<AudioSource>().volume = newVolume;
 	}
 	
 	/// <summary>
@@ -967,7 +967,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 	public static void SetPitchSFX(float setPitch, params GameObject[] sfxObjects)
 	{
 		foreach(GameObject sfxObject in sfxObjects)
-			sfxObject.audio.pitch = setPitch;
+			sfxObject.GetComponent<AudioSource>().pitch = setPitch;
 	}
 	
 	/// <summary>
@@ -1451,26 +1451,30 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 	/// </param>
 	public static void ResetSFXObject(GameObject sfxObj)
 	{
-		if(sfxObj.audio == null)
+		AudioSource sfxAudio = sfxObj.GetComponent<AudioSource>();
+		if(sfxAudio == null)
 			return;
+
+		sfxAudio.outputAudioMixerGroup = null;
+		sfxAudio.mute = false;
+		sfxAudio.bypassEffects = false;
+		sfxAudio.bypassListenerEffects = false;
+		sfxAudio.bypassReverbZones = false;
+		sfxAudio.playOnAwake = false;
+		sfxAudio.loop = false;
 		
-		sfxObj.audio.mute = false;
-		sfxObj.audio.bypassEffects = false;
-		sfxObj.audio.playOnAwake = false;
-		sfxObj.audio.loop = false;
+		sfxAudio.priority = 128;
+		sfxAudio.volume = 1f;
+		sfxAudio.pitch = 1f;
+		sfxAudio.panStereo = 0f;
+		sfxAudio.reverbZoneMix = 1f;
 		
-		sfxObj.audio.priority = 128;
-		sfxObj.audio.volume = 1f;
-		sfxObj.audio.pitch = 1f;
-		
-		sfxObj.audio.dopplerLevel = 1f;
-		sfxObj.audio.rolloffMode = AudioRolloffMode.Logarithmic;
-		sfxObj.audio.minDistance = 1f;
-		sfxObj.audio.panLevel = 1f;
-		sfxObj.audio.spread = 0f;
-		sfxObj.audio.maxDistance = 500f;
-		
-		sfxObj.audio.pan = 0f;
+		sfxAudio.dopplerLevel = 1f;
+		sfxAudio.rolloffMode = AudioRolloffMode.Logarithmic;
+		sfxAudio.minDistance = 1f;
+		sfxAudio.spatialBlend = Instance.defaultSFXSpatialBlend;
+		sfxAudio.spread = 0f;
+		sfxAudio.maxDistance = 500f;
 	}
 	/// <summary>
 	/// Crossfade between two AudioSources.
@@ -1508,7 +1512,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 	/// </param>
 	public static void Crossfade(float duration, GameObject fromSFXObject, GameObject toSFXObject, SongCallBack runOnEndFunction=null)
 	{
-		Crossfade(duration, fromSFXObject.audio, toSFXObject.audio, runOnEndFunction);
+		Crossfade(duration, fromSFXObject.GetComponent<AudioSource>(), toSFXObject.GetComponent<AudioSource>(), runOnEndFunction);
 	}
 	/// <summary>
 	/// Cross in an AudioSource.
@@ -1540,7 +1544,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 	/// </param>
 	public static void CrossIn(float duration, GameObject sfxObject, SongCallBack runOnEndFunction=null)
 	{
-		CrossIn(duration, sfxObject.audio, runOnEndFunction);
+		CrossIn(duration, sfxObject.GetComponent<AudioSource>(), runOnEndFunction);
 	}
 	/// <summary>
 	/// Cross out an AudioSource.
@@ -1572,6 +1576,6 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 	/// </param>
 	public static void CrossOut(float duration, GameObject sfxObject, SongCallBack runOnEndFunction=null)
 	{
-		CrossOut(duration, sfxObject.audio, runOnEndFunction);
+		CrossOut(duration, sfxObject.GetComponent<AudioSource>(), runOnEndFunction);
 	}
 }

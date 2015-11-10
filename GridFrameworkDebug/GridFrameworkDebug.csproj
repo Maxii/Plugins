@@ -38,7 +38,7 @@
     <Reference Include="System.Data" />
     <Reference Include="System.XML" />
     <Reference Include="UnityEngine">
-      <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
@@ -56,7 +56,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GridFramework\GridFramework.csproj">
-      <Project>{84ab84fa-983b-4fb8-bfd9-34d3b93d8000}</Project>
+      <Project>{2f5a6d85-040f-4ee6-a77f-d3e3b107a524}</Project>
       <Name>GridFramework</Name>
     </ProjectReference>
   </ItemGroup>

@@ -4,7 +4,8 @@ using GridFramework.Vectors;
 
 /// <summary>A standard three-dimensional rectangular grid.</summary>
 /// 
-/// Your standard rectangular grid, the characterising values is its spacing, which can be set for each axis individually.
+/// Your standard rectangular grid, the characterising values is its spacing,
+/// which can be set for each axis individually.
 public class GFRectGrid: GFGrid {
 	
 	#region Class Members
@@ -13,12 +14,14 @@ public class GFRectGrid: GFGrid {
 
 	/// <summary>How large the grid boxes are.</summary>
 	/// <value>The spacing of the grid.</value>
-	/// How far apart the lines of the grid are. You can set each axis separately, but none may be less than 0.1, in order
-	/// to prevent values that don't make any sense.
+	///
+	/// How far apart the lines of the grid are. You can set each axis
+	/// separately, but none may be less than `Mathf.Epsilon`, in order to
+	/// prevent values that don't make any sense.
 	public Vector3 spacing {
 		get {return _spacing;}
 		set {
-			SetMember<Vector3>(value, ref _spacing, restrictor: Vector3.Max, limit: 0.1f*Vector3.one);
+			SetMember<Vector3>(value, ref _spacing, restrictor: Vector3.Max, limit: Mathf.Epsilon*Vector3.one);
 		}
 	}
 
@@ -26,9 +29,12 @@ public class GFRectGrid: GFGrid {
 	public Vector6 _shearing = Vector6.zero;
 	/// <summary>How the axes are sheared.</summary>
 	/// <value>Shearing vector of the grid.</value>
-	/// How much the individual axes of the grid are skewed towards each other. For instance, this means the if _XY_ is set
-	/// to _2_, then for each point with grid coordinates _(x, y)_ will be mapped to _(x, y + 2x)_, while the uninvolved _Z_
-	/// coordinate remains the same. For more information refer to the manual.
+	///
+	/// How much the individual axes of the grid are skewed towards each other.
+	/// For instance, this means the if _XY_ is set to _2_, then for each point
+	/// with grid coordinates _(x, y)_ will be mapped to _(x, y + 2x)_, while
+	/// the uninvolved _Z_ coordinate remains the same. For more information
+	/// refer to the manual.
 	public Vector6 shearing {
 		get {return _shearing;}
 		set {
@@ -40,19 +46,22 @@ public class GFRectGrid: GFGrid {
 	/// <summary>Direction along the X-axis of the grid in world space.</summary>
 	/// <value>Unit vector in grid scale along the grid's X-axis.</value>
 	/// 
-	/// The X-axis of the grid in world space. This is a shorthand writing for <c>spacing.x * transform.right</c>. The value is read-only.
+	/// The X-axis of the grid in world space. This is a shorthand writing for
+	/// <c>spacing.x * transform.right</c>. The value is read-only.
 	public Vector3 right {get{MatricesUpdate(); return _right;}}
 
 	/// <summary>Direction along the Y-axis of the grid in world space.</summary>
 	/// <value>Unit vector in grid scale along the grid's Y-axis.</value>
 	/// 
-	/// The Y-axis of the grid in world space. This is a shorthand writing for <c>spacing.y * transform.up</c>. The value is read-only.
+	/// The Y-axis of the grid in world space. This is a shorthand writing for
+	/// <c>spacing.y * transform.up</c>. The value is read-only.
 	public Vector3 up {get{MatricesUpdate(); return _up;}}
 
 	/// <summary>Direction along the Z-axis of the grid in world space.</summary>
 	/// <value>Unit vector in grid scale along the grid's Z-axis.</value>
 	/// 
-	/// The Z-axis of the grid in world space. This is a shorthand writing for <c>spacing.z * transform.forward</c>. The value is read-only.
+	/// The Z-axis of the grid in world space. This is a shorthand writing for
+	/// <c>spacing.z * transform.forward</c>. The value is read-only.
 	public Vector3 forward {get{MatricesUpdate(); return _forward;}}
 	#endregion
 	#endregion
@@ -69,7 +78,7 @@ public class GFRectGrid: GFGrid {
 	/// <para>After updating the matrices the <c>_matricesMustUpdate</c> is set back to <c>false</c>.</para>
 	protected override void MatricesUpdate() {
 		if (_TransformNeedsUpdate() || _matricesMustUpdate) {
-			Matrix4x4 shearMatrix = new Matrix4x4();
+			var shearMatrix = new Matrix4x4();
 			shearMatrix.SetRow(0, new Vector4(1          , shearing.yx, shearing.zx, 0));
 			shearMatrix.SetRow(1, new Vector4(shearing.xy, 1          , shearing.zy, 0));
 			shearMatrix.SetRow(2, new Vector4(shearing.xz, shearing.yz, 1          , 0));
@@ -119,8 +128,10 @@ public class GFRectGrid: GFGrid {
 	/// <returns>Grid coordinates of the world point.</returns>
 	/// <param name="worldPoint">Point in world space.</param>
 	/// 
-	/// Takes in a position in wold space and calculates where in the grid that position is. The origin of the grid is the world position of its GameObject and its axes
-	/// lie on the corresponding axes of the Transform. Rotation is taken into account for this operation.
+	/// Takes in a position in wold space and calculates where in the grid that
+	/// position is. The origin of the grid is the world position of its
+	/// GameObject and its axes lie on the corresponding axes of the Transform.
+	/// Rotation is taken into account for this operation.
 	public override Vector3 WorldToGrid(Vector3 worldPoint) {
 		return wgMatrix.MultiplyPoint3x4(worldPoint);
 	}
@@ -129,8 +140,10 @@ public class GFRectGrid: GFGrid {
 	/// <returns>World coordinates of the Grid point.</returns>
 	/// <param name="gridPoint">Point in grid space.</param>
 	/// 
-	/// The opposite of <see cref="WorldToGrid"/>, this returns the world position of a point in the grid. The origin of the grid is the world position of its GameObject
-	/// and its axes lie on the corresponding axes of the Transform. Rotation is taken into account for this operation.
+	/// The opposite of <see cref="WorldToGrid"/>, this returns the world
+	/// position of a point in the grid. The origin of the grid is the world
+	/// position of its GameObject and its axes lie on the corresponding axes
+	/// of the Transform. Rotation is taken into account for this operation.
 	public override Vector3 GridToWorld(Vector3 gridPoint) {
 		return gwMatrix.MultiplyPoint3x4(gridPoint);
 	}
@@ -138,8 +151,9 @@ public class GFRectGrid: GFGrid {
 
 	#region nearest in world space
 
-	/// Returns the world position of the nearest vertex from a given point in world space. If <c>doDebug</c> is set a small gizmo sphere will be drawn at the vertex
-	/// position.
+	/// Returns the world position of the nearest vertex from a given point in
+	/// world space. If <c>doDebug</c> is set a small gizmo sphere will be
+	/// drawn at the vertex position.
 	public override Vector3 NearestVertexW(Vector3 worldPoint, bool doDebug) {
 		if (doDebug) {
 			Gizmos.DrawSphere(GridToWorld(NearestVertexG(worldPoint)), 0.3f);
@@ -154,9 +168,11 @@ public class GFRectGrid: GFGrid {
 	/// <param name="plane">Plane on which the face lies.</param>
 	/// <param name="doDebug">Whether to draw a small debug sphere at the vertex.</param>
 	/// 
-	/// Similar to <see cref="NearestVertexW"/>, it returns the world coordinates of a face on the grid. Since the face is enclosed by four vertices, the returned value
-	/// is the point in between all four of the vertices. You also need to specify on which plane the face lies. If <c>doDebug</c> is set a small gizmo face will drawn
-	/// inside the face.
+	/// Similar to <see cref="NearestVertexW"/>, it returns the world
+	/// coordinates of a face on the grid. Since the face is enclosed by four
+	/// vertices, the returned value is the point in between all four of the
+	/// vertices. You also need to specify on which plane the face lies. If
+	/// <c>doDebug</c> is set a small gizmo face will drawn inside the face.
 	public override Vector3 NearestFaceW(Vector3 worldPoint, GridPlane plane, bool doDebug) {
 		//debugging
 		if (doDebug) {
@@ -182,8 +198,10 @@ public class GFRectGrid: GFGrid {
 	/// <param name="worldPoint">Point in world space.</param>
 	/// <param name="doDebug">Whether to draw a small debug sphere at the box.</param>
 	/// 
-	/// Similar to <see cref="NearestVertexW"/>, it returns the world coordinates of a box in the grid. Since the box is enclosed by eight vertices, the returned value is the
-	/// point in between all eight of them. If <c>doDebug</c> is set a small gizmo box will drawn inside the box.
+	/// Similar to <see cref="NearestVertexW"/>, it returns the world
+	/// coordinates of a box in the grid. Since the box is enclosed by eight
+	/// vertices, the returned value is the point in between all eight of them.
+	/// If <c>doDebug</c> is set a small gizmo box will drawn inside the box.
 	public override Vector3 NearestBoxW(Vector3 worldPoint, bool doDebug) {		
 		if (doDebug) {
 			//store the old matrix and create a new one based on the grid's roation and the point's position
@@ -208,7 +226,8 @@ public class GFRectGrid: GFGrid {
 	/// <returns>Grid position of the nearest vertex.</returns>
 	/// <param name="worldPoint">Point in world space.</param>
 	/// 
-	/// Similar to @c #NearestVertexW, except you get grid coordinates instead of world coordinates.
+	/// Similar to @c #NearestVertexW, except you get grid coordinates instead
+	/// of world coordinates.
 	public override Vector3 NearestVertexG(Vector3 worldPoint) {
 		return RoundPoint(WorldToGrid(worldPoint));
 	}
@@ -218,8 +237,10 @@ public class GFRectGrid: GFGrid {
 	/// <param name="worldPoint">Point in world space.</param>
 	/// <param name="plane">Plane on which the face lies.</param>
 	/// 
-	/// Similar to <see cref="NearestFaceW"/>, except you get grid coordinates instead of world coordinates. Since faces lie between vertices two values will always have
-	/// +0.5 compared to vertex coordinates, while the values that lies on the plane will have a round number.
+	/// Similar to <see cref="NearestFaceW"/>, except you get grid coordinates
+	/// instead of world coordinates. Since faces lie between vertices two
+	/// values will always have +0.5 compared to vertex coordinates, while the
+	/// values that lies on the plane will have a round number.
 	/// <example>
 	/// Example:
 	/// <code>
@@ -229,15 +250,16 @@ public class GFRectGrid: GFGrid {
 	/// </code>
 	/// </example>
 	public override Vector3 NearestFaceG(Vector3 worldPoint, GridPlane plane) {
-		return RoundPoint(WorldToGrid(worldPoint) - 0.5f * Vector3.one + 0.5f * units[(int)plane]) + 0.5f * Vector3.one - 0.5f * units[(int)plane];
+		return RoundPoint(WorldToGrid(worldPoint) - 0.5f * Vector3.one + 0.5f * Units[(int)plane]) + 0.5f * Vector3.one - 0.5f * Units[(int)plane];
 	}
 
 	/// <summary>Returns the grid position of the nearest box.</summary>
 	/// <returns>Grid position of the nearest box.</returns>
 	/// <param name="worldPoint">Point in world space.</param>
 	/// 
-	/// Similar to @c #NearestBoxW, except you get grid coordinates instead of world coordinates. Since faces lie between vertices all three values will always have +0.5
-	/// compared to vertex coordinates.
+	/// Similar to @c #NearestBoxW, except you get grid coordinates instead of
+	/// world coordinates. Since faces lie between vertices all three values
+	/// will always have +0.5 compared to vertex coordinates.
 	/// <example>
 	/// Example:
 	/// <code>
@@ -258,9 +280,13 @@ public class GFRectGrid: GFGrid {
 	/// <param name="scale">A simulated scale to decide how exactly to fit the poistion into the grid.</param>
 	/// <param name="ignoreAxis">Which axes should be ignored.</param>
 	/// 
-	/// This method aligns a point to the grid. The *scale* parameter is needed to simulate the “size” of point, which influences the resulting position like
-	/// the scale of a Transform would do above. By default it’s set to one on all axes, placing the point at the centre of a box. If a component of @c scale is odd that
-	/// component of the vector will be placed between edges, otherwise it will be placed on the nearest edge. The <c>lockAxis</c> parameter lets you ignore individual axes.
+	/// This method aligns a point to the grid. The *scale* parameter is needed
+	/// to simulate the “size” of point, which influences the resulting
+	/// position like the scale of a Transform would do above. By default it’s
+	/// set to one on all axes, placing the point at the centre of a box. If a
+	/// component of @c scale is odd that component of the vector will be
+	/// placed between edges, otherwise it will be placed on the nearest edge.
+	/// The <c>lockAxis</c> parameter lets you ignore individual axes.
 	public override Vector3 AlignVector3(Vector3 pos, Vector3 scale, BoolVector3 ignoreAxis) {
 		var currentPosition = WorldToGrid(pos);
 		var newPositionB = WorldToGrid(NearestBoxW(pos));
@@ -287,7 +313,9 @@ public class GFRectGrid: GFGrid {
 	/// <param name="scl">The vector to scale.</param>
 	/// <param name="ignoreAxis">The axes to ignore.</param>
 	/// 
-	/// Scales a size to the nearest multiple of the grid’s spacing. The parameter *ignoreAxis* makes the function not touch the corresponding coordinate.
+	/// Scales a size to the nearest multiple of the grid’s spacing. The
+	/// parameter *ignoreAxis* makes the function not touch the corresponding
+	/// coordinate.
 	public override Vector3 ScaleVector3(Vector3 scl, BoolVector3 ignoreAxis) {
 		//Vector3 relScale = scl.GFModulo3(spacing);
 		var relScale = new Vector3(scl.x % spacing.x, scl.y % spacing.y, scl.z % spacing.z);
@@ -318,7 +346,7 @@ public class GFRectGrid: GFGrid {
 	#endregion
 	
 	#region Calculate draw points
-	protected override void drawPointsCount(ref int countX, ref int countY, ref int countZ, ref Vector3 from, ref Vector3 to, bool condition = true) {
+	protected override void DrawPointsCount(ref int countX, ref int countY, ref int countZ, ref Vector3 from, ref Vector3 to, bool condition = true) {
 		if (!condition)
 			return;
 		from = relativeSize ? from : new Vector3(from.x / spacing.x, from.y / spacing.y, from.z / spacing.z);
@@ -333,32 +361,33 @@ public class GFRectGrid: GFGrid {
 		countZ = x * y    ;
 	}
 
-	protected override void drawPointsCalculate(ref Vector3[][][] points, ref int[] amount, Vector3 from, Vector3 to) {
+	protected override void DrawPointsCalculate(Vector3[][][] points, ref int[] amount, Vector3 from, Vector3 to) {
 		int maxWidth = Mathf.CeilToInt(from.x), maxHeight = Mathf.CeilToInt(from.y), maxDepth = Mathf.CeilToInt(from.z);
 
 		// Amount of lines perpendicular to each axis
-		int[] lines = new int[3] {
+		int[] lines = {
 			Mathf.FloorToInt(to.x) - maxWidth  + 1,
 			Mathf.FloorToInt(to.y) - maxHeight + 1,
 			Mathf.FloorToInt(to.z) - maxDepth  + 1
 		};
 
-		//The starting point of the first pair (an iteration vector will be added to this), everything in the left bottom back.
-		Vector3[] startPoint = new Vector3[3]{
+		//The starting point of the first pair (an iteration vector will be
+		//added to this), everything in the left bottom back.
+		Vector3[] startPoint = {
 			GridToWorld(new Vector3(from.x  , maxHeight, maxDepth)),
 			GridToWorld(new Vector3(maxWidth, from.y   , maxDepth )),
 			GridToWorld(new Vector3(maxWidth, maxHeight, from.z   ))
 		};
 		
 		//this will be added to each first point in a pair
-		Vector3[] endDirection = new Vector3[3]{
+		Vector3[] endDirection = {
 			GridToWorld(new Vector3(to.x, maxHeight, maxDepth)) - startPoint[0],
 			GridToWorld(new Vector3(maxWidth, to.y, maxDepth)) - startPoint[1],
 			GridToWorld(new Vector3(maxWidth, maxHeight, to.z)) - startPoint[2]
 		};
 
 		//a multiple of this will be added to the starting point for iteration
-		Vector3[] iterationVector = new Vector3[3] {right, up, forward};
+		Vector3[] iterationVector = {right, up, forward};
 		
 		// assemble the array
 		for (int i = 0; i < 3; ++i) {			

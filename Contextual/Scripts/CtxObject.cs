@@ -1,6 +1,6 @@
 //=========================================================
 // Contextual: Context Menus for Unity & NGUI
-// Copyright © 2013 Troy Heere
+// Copyright Â© 2013 Troy Heere
 //=========================================================
 using UnityEngine;
 using System.Collections;
@@ -300,7 +300,7 @@ public class CtxObject : MonoBehaviour
 	{
 		get 
 		{
-			if (! offsetMenu || collider == null || (contextMenu != null && contextMenu.style == CtxMenu.Style.Pie))
+			if (! offsetMenu || GetComponent<Collider>() == null || (contextMenu != null && contextMenu.style == CtxMenu.Style.Pie))
 			{
 				// In the simplest case the menu pivot is just positioned on the
 				// object's origin position. This may be fine in some cases.
@@ -313,7 +313,7 @@ public class CtxObject : MonoBehaviour
 				// object bounds. Note that CtxMenu itself may adjust the
 				// position in order to keep the menu contents on screen.
 				return CtxHelper.ComputeMenuPosition(contextMenu, 
-					CtxHelper.ComputeScreenSpaceBounds(collider.bounds, Camera.main), false);
+					CtxHelper.ComputeScreenSpaceBounds(GetComponent<Collider>().bounds, Camera.main), false);
 			}
 		}
 	}

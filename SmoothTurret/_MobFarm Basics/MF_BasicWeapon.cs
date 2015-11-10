@@ -3,6 +3,8 @@ using System.Collections;
 
 public class MF_BasicWeapon : MonoBehaviour {
 
+	public enum GravityUsage { Default, Gravity, No_Gravity }
+
 	[Header("Shot settings:")]
 	public GameObject shot;
 	public AudioSource shotSound;
@@ -32,8 +34,12 @@ public class MF_BasicWeapon : MonoBehaviour {
 	public float reloadTime;
 	public bool dontReload;
 	[Header("Other Settings:")]
+	[Tooltip("May be used to selectively activate/deactivate weapons.")]
+	public bool active = true;
 	[Tooltip("(deg radius)\nIncrease to apparent target size. Used to cause a weapon to begin firing before completely aimed at target.")]
 	public float aimTolerance; 
+	[Tooltip("True: Change all shots to use gravity.\nFalse: Will use gravity only if shot rigidbody uses gravity.")]
+	public GravityUsage gravity;
 	[Header("Exit point(s) of shots")]
 	[Tooltip("If multiple exits, they will be used sequentially. (Usefull for a missile rack, or multi-barrel weapons)")]
 	public GunExit[] exits;
@@ -43,11 +49,12 @@ public class MF_BasicWeapon : MonoBehaviour {
 	[HideInInspector] public int curBurstCount;
 	[HideInInspector] public int curExit;
 	[HideInInspector] public float curInaccuracy;
-	
-	float delay;
+	[HideInInspector] public bool bursting;
+	[HideInInspector] public float delay;
+
 	float lastLosCheck;
 	bool losClear;
-	bool useGravity;
+	bool usingGravity;
 	bool error;
 
 	[System.Serializable]
@@ -63,7 +70,15 @@ public class MF_BasicWeapon : MonoBehaviour {
 
 	public void Initialize () { // call this method if shot prefab changes, or if shotSpeed, maxRange, or shotDurarion change
 		curInaccuracy = inaccuracy; // initialize
-		useGravity = shot.rigidbody.useGravity;
+
+		usingGravity = false; // remains false if forceing no gravity or if projectil doesn't use it
+		if ( shot.GetComponent<Rigidbody>() ) { // verify rigidbody
+			if ( gravity == GravityUsage.Gravity ) { // force gravity
+				usingGravity = true;
+			} else if ( shot.GetComponent<Rigidbody>().useGravity == true && gravity == GravityUsage.Default ) { // use gravity if projectile does
+				usingGravity = true;
+			}
+		}
 		
 		// compute missing value: shotSpeed, maxRange, shotDuration
 		if (shotSpeed <= 0) {
@@ -79,34 +94,89 @@ public class MF_BasicWeapon : MonoBehaviour {
 		if (CheckErrors() == true) { return; }
 		
 		curAmmoCount = maxAmmoCount;
+		curBurstCount = burstAmount;
 		
 		// find muzzle flash particle systems
-		for (int f=0; f < exits.Length; f++) {
-			if ( exits[f].transform.childCount == 1 ) { // check for child
-				exits[f].flare = exits[f].transform.GetChild(0).gameObject;
-				exits[f].particleComponent = exits[f].flare.GetComponent<ParticleSystem>();
-				exits[f].particleComponent.Stop(true);
+		for (int e=0; e < exits.Length; e++) {
+			if ( exits[e].transform ) {
+				for ( int f=0; f < exits[e].transform.childCount; f++ ) {
+					if ( exits[e].transform.GetChild(f).GetComponent<ParticleSystem>() ) {
+						exits[e].flare = exits[e].transform.GetChild(f).gameObject;
+						exits[e].particleComponent = exits[f].flare.GetComponent<ParticleSystem>();
+						exits[e].particleComponent.Stop(true);
+						break;
+					}
+				}
 			}
 		}
 	}
-	
+
 	// use this to fire weapon
 	public void Shoot () {
+		if ( active == false && bursting == false ) { return; }
 		if ( ReadyCheck() == true ) {
 			DoFire();
 		}
+	}
+
+	// once started, will fire a full weapon burst
+	public void ShootBurst () {
+		if ( active == false || bursting == true ) { return; }
+		if ( burstAmount > 0 ) {
+			StartCoroutine(DoBurst());
+		} else {
+			Shoot();
+		}
+	}
+
+	IEnumerator DoBurst () {
+		if ( PrivateReadyCheck() == true ) { // handle single shots and burstReset
+			DoFire();
+
+			// fire until burst runs out
+			bursting = true;
+			while ( curBurstCount > 0 ) {
+
+				yield return null;
+
+				if ( PrivateReadyCheck() == true ) {
+					DoFire();
+				}
+			}
+			bursting = false;
+		}
+	}
+
+	// use to determine if weapon is ready to fire. (not realoding, waiting for cycleTime, etc.) Seperate function to allow other scripts to check ready status.
+	public virtual bool ReadyCheck () {
+		if ( active == false || bursting == true ) { return false; }
+		return PrivateReadyCheck();
+	}
+
+	private bool PrivateReadyCheck () {
+		if ( curAmmoCount <= 0 && dontReload == true && unlimitedAmmo == false) {
+			// out of ammo
+		} else {
+			if ( Time.time >= delay ) {
+				// reset burst and ammo
+				if (curAmmoCount <= 0) {
+					curAmmoCount = maxAmmoCount;
+					curBurstCount = burstAmount;
+					curExit = 0;
+				}
+				if (curBurstCount <= 0) {
+					curBurstCount = burstAmount;
+				}
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	// use this only if already checked if weapon is ready to fire
 	public virtual void DoFire () {
 		if (error == true) { return; }
-		// reset burst and ammo, delay has already happened
-		if (curAmmoCount <= 0) {
-			curAmmoCount = maxAmmoCount;
-			curBurstCount = burstAmount;
-			curExit = 0;
-		}
-		if (curBurstCount <= 0) { curBurstCount = burstAmount; }
+		if (active == false) { return; }
 		
 		// fire weapon
 		// create shot
@@ -114,10 +184,9 @@ public class MF_BasicWeapon : MonoBehaviour {
 			GameObject myShot = (GameObject) Instantiate(shot, exits[curExit].transform.position, exits[curExit].transform.rotation);
 			Vector2 errorV2 = Random.insideUnitCircle * curInaccuracy;
 			myShot.transform.rotation *= Quaternion.Euler(errorV2.x, errorV2.y, 0);
-			myShot.rigidbody.velocity = platformVelocity + (myShot.transform.forward * shotSpeed);
-			if ( useGravity == true ) {
-				myShot.rigidbody.useGravity = true;
-			}
+			Rigidbody _rb = myShot.GetComponent<Rigidbody>();
+			_rb.velocity = platformVelocity + (myShot.transform.forward * shotSpeed);
+			_rb.useGravity = usingGravity;
 			MF_BasicProjectile shotScript = myShot.GetComponent<MF_BasicProjectile>();
 			shotScript.duration = shotDuration;
 		}
@@ -131,33 +200,25 @@ public class MF_BasicWeapon : MonoBehaviour {
 		}
 		
 		if (unlimitedAmmo == false) { curAmmoCount--; } // only use ammo if not unlimited
-		curBurstCount--; 
+		if (curBurstCount > 0) { curBurstCount--; } // don't go below 0
 		curExit = MFmath.Mod(curExit+1, exits.Length); // next exit
 		
-		// find net delay
+		// find next delay
 		delay = Time.time + cycleTime;
-		if (curBurstCount <= 0 && burstAmount != 0) { // 0 = unlimited burst
-			delay = Time.time + Mathf.Max(cycleTime, burstResetTime); // burstResetTime cannot be < cycleTime
-		}
-		if (curAmmoCount <= 0 ) { 
-			delay = Time.time + reloadTime;
-		}
-	}
-	
-	// use to determine if weapon is ready to fire. (not realoding, waiting for cycleTime, etc.) Seperate function to allow other scripts to check ready status.
-	public virtual bool ReadyCheck () {
-		if ( curAmmoCount <= 0 && dontReload == true && unlimitedAmmo == false) {
-			// out of ammo
-		} else {
-			if ( Time.time >= delay ) {
-				return true;
+		if (curBurstCount <= 0) { 
+			bursting = false;
+			if ( burstAmount != 0 ) { // 0 = unlimited burst, don't use burstResetTime
+				delay = Time.time + Mathf.Max(cycleTime, burstResetTime); // burstResetTime cannot be < cycleTime
 			}
 		}
-		return false;
+		if (curAmmoCount <= 0 ) { 
+			delay = Time.time + Mathf.Max(cycleTime, reloadTime); // reloadTime cannot be < cycleTime
+		}
 	}
 	
 	// check if the weapons is aimed at the target location - does not account for shot intercept point. Use the AimCheck in the SmoothTurret script for intercept. This is here to use the weapon script without a turret.
 	public virtual bool AimCheck ( Transform target, float targetSize ) {
+		if (active == false) { return false; }
 		float _targetRange = Vector3.Distance(exits[curExit].transform.position, target.position);
 		float _targetFovRadius = Mathf.Clamp(   (Mathf.Atan( (targetSize / 2) / _targetRange ) * Mathf.Rad2Deg) + aimTolerance,    0, 180 );
 		if ( Vector3.Angle(exits[curExit].transform.forward, target.position - exits[curExit].transform.position) <= _targetFovRadius ) {
@@ -168,13 +229,14 @@ public class MF_BasicWeapon : MonoBehaviour {
 	}
 
 	public virtual bool RangeCheck ( Transform target ) {
+		if (active == false) { return false; }
 		float _sqRange = (exits[curExit].transform.position - target.position).sqrMagnitude;
-		if ( useGravity == true ) {
+		if ( usingGravity == true ) { // ballistic range **** does not account for height ?
 			float _ballRange = (shotSpeed*shotSpeed) / -Physics.gravity.y;
 			if ( _sqRange <= (_ballRange*_ballRange) ) {
 				return true;
 			}
-		} else {
+		} else { // standard range
 			if ( _sqRange <= (maxRange*maxRange) ) {
 				return true;
 			}
@@ -199,15 +261,6 @@ public class MF_BasicWeapon : MonoBehaviour {
 			maxRange = 1f; // prevent div 0 error if another script accesses maxRange
 			Debug.Log(_object+": 2 of 3 need to be > 0: shotSpeed, maxRange, shotDuration");
 			error = true;
-		}
-		for (int f=0; f < exits.Length; f++) {
-			if ( exits[f].transform ) {
-				if ( exits[f].transform.childCount > 1 ) { Debug.Log(_object+": Weapon exits index "+f+" must not have more than 1 child."); error = true; }
-				if ( exits[f].transform.childCount > 0 ) {
-					exits[f].flare = exits[f].transform.GetChild(0).gameObject;
-					if ( !exits[f].flare.GetComponent<ParticleSystem>() ) { Debug.Log(_object+": Weapon exits index "+f+" child has no ParticleSystem."); error = true; }
-				}
-			}
 		}
 		
 		return error;

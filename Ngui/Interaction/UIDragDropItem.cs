@@ -196,6 +196,7 @@ public class UIDragDropItem : MonoBehaviour
 				item.mPressed = true;
 				item.mDragging = true;
 				item.Start();
+				item.OnClone(gameObject);
 				item.OnDragDropStart();
 
 				if (UICamera.currentTouch == null)
@@ -213,6 +214,12 @@ public class UIDragDropItem : MonoBehaviour
 			}
 		}
 	}
+
+	/// <summary>
+	/// Called on the cloned object when it was duplicated.
+	/// </summary>
+
+	protected virtual void OnClone (GameObject original) { }
 
 	/// <summary>
 	/// Perform the dragging.
@@ -348,11 +355,11 @@ public class UIDragDropItem : MonoBehaviour
 
 			if (mTable != null) mTable.repositionNow = true;
 			if (mGrid != null) mGrid.repositionNow = true;
-
-			// We're now done
-			OnDragDropEnd();
 		}
 		else NGUITools.Destroy(gameObject);
+
+		// We're now done
+		OnDragDropEnd();
 	}
 
 	/// <summary>

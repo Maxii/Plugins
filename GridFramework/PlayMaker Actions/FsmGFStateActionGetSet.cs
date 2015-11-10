@@ -36,18 +36,18 @@ namespace HutongGames.PlayMaker.Actions {
 	#region useSeparateRenderColor
 	public abstract class FsmGFUseSeparateRenderColor : FsmGFStateActionGetSet<GFGrid> {
 		[RequiredField]
-		[Tooltip("Whether to use separate colour for bothe rendering and drawing the grid.")]
+		[Tooltip("Whether to use separate colour for both rendering and drawing the grid.")]
 		public FsmBool useSeparateRenderColor;
 	}
 
-	[Tooltip("Sets whether to use separate colour for bothe rendering and drawing the grid.")]
+	[Tooltip("Sets whether to use separate colour for both rendering and drawing the grid.")]
 	public class SetUseSeparateRenderColor : FsmGFUseSeparateRenderColor {
 		protected override void DoAction () {
 			grid.useSeparateRenderColor = useSeparateRenderColor.Value;
 		}
 	}
 
-	[Tooltip("Gets whether to use separate colour for bothe rendering and drawing the grid.")]
+	[Tooltip("Gets whether to use separate colour for both rendering and drawing the grid.")]
 	public class GetUseSeparateRenderColor : FsmGFUseSeparateRenderColor {
 		protected override void DoAction () {
 			useSeparateRenderColor.Value = grid.useSeparateRenderColor;
@@ -182,7 +182,7 @@ namespace HutongGames.PlayMaker.Actions {
 
 	#region originOffset
 	public abstract class FsmGFOriginOffset : FsmGFStateActionGetSet<GFGrid> {
-		[Tooltip("Offests the grid's origin from its `transform.position`.")]
+		[Tooltip("Offsets the grid's origin from its `transform.position`.")]
 		[RequiredField]
 		public FsmVector3 originOffset;
 	}
@@ -336,19 +336,19 @@ namespace HutongGames.PlayMaker.Actions {
 
 	#region useCustomRenderRange
 	public abstract class FsmGFCustomRenderingRange : FsmGFStateActionGetSet<GFGrid> {
-		[Tooltip("Whether to use the the custom rendering range.")]
+		[Tooltip("Whether to use the custom rendering range.")]
 		[RequiredField]
 		public FsmBool useCustomRenderingRange;
 	}
 
-	[Tooltip("Sets whether to use the the custom rendering range.")]
+	[Tooltip("Sets whether to use the custom rendering range.")]
 	public class SetCustomRenderingRange : FsmGFCustomRenderingRange {
 		protected override void DoAction() {
 			grid.useCustomRenderRange = useCustomRenderingRange.Value;
 		}
 	}
 
-	[Tooltip("Gets whether to use the the custom rendering range.")]
+	[Tooltip("Gets whether to use the custom rendering range.")]
 	public class GetCustomRenderingRange : FsmGFCustomRenderingRange {
 		protected override void DoAction() {
 			useCustomRenderingRange.Value = grid.useCustomRenderRange;
@@ -547,6 +547,28 @@ namespace HutongGames.PlayMaker.Actions {
 
 	#region gridStyle
 	/// @todo Implement gridStyle
+	#endregion
+
+	#region renderAround
+	public abstract class FsmGFHRenderAround : FsmGFStateActionGetSetHex {
+		[Tooltip("The hex to render the circular shape around.")]
+		[RequiredField]
+		public FsmVector3 renderAround;
+	}
+
+	[Tooltip("Sets the hex to render the circular shape around.")]
+	public class SetRenderAround : FsmGFHRenderAround {
+		protected override void DoAction () {
+			grid.renderAround = renderAround.Value;
+		}
+	}
+
+	[Tooltip("Gets the hex to render the circular shape around.")]
+	public class GetRenderAround : FsmGFHRenderAround {
+		protected override void DoAction () {
+			renderAround.Value = grid.renderAround;
+		}
+	}
 	#endregion
 	#endregion
 

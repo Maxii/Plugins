@@ -208,7 +208,7 @@ public abstract class UITweener : MonoBehaviour
 			Sample(mFactor, true);
 			enabled = false;
 
-			if (current == null)
+			if (current != this)
 			{
 				UITweener before = current;
 				current = this;

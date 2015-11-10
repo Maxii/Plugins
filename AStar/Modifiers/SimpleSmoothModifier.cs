@@ -235,7 +235,7 @@ namespace Pathfinding {
 				subdivided = subdivided2;
 				subdivided2 = tmp;
 				
-				float nextMultiplier = 1F;
+				const float nextMultiplier = 1F;
 				
 				for (int i=0;i<currentPathLength-1;i++) {
 					Vector3 current = subdivided2[i];
@@ -386,12 +386,11 @@ namespace Pathfinding {
 			
 			int subMult = 1 << subdivisions;
 			List<Vector3> subdivided = ListPool<Vector3>.Claim ();
-			//new Vector3[(path.Length-1)*(int)subMult+1];
 			
 			for (int i=0;i<path.Count-1;i++) {
 				
-				Vector3 tangent1 = Vector3.zero;
-				Vector3 tangent2 = Vector3.zero;
+				Vector3 tangent1;
+				Vector3 tangent2;
 				if (i == 0) {
 					tangent1 = path[i+1]-path[i];
 				} else {

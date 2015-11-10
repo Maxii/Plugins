@@ -139,6 +139,7 @@ public class PropertyReferenceDrawer
 			if (index == 0 && string.Equals(del, choice))
 				index = i;
 		}
+		//Array.Sort(names);
 		return names;
 	}
 

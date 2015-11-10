@@ -4,7 +4,7 @@ using System.Collections;
 public class MF_BasicScanner : MonoBehaviour {
 
 	[Header("Location of Target List:")]
-	[Tooltip("If blank: looks on same object, then looks at root object.")]
+	[Tooltip("If blank: recursively searches parents until a target list is found.")]
 	public GameObject targetListObject;
 	[Header("Targeting Settings:")]
 	[Tooltip("Targets can be matched by Tags (no collider needed) or Layers (collider required)")]
@@ -12,11 +12,15 @@ public class MF_BasicScanner : MonoBehaviour {
 	public FactionType[] targetableFactions;
 	[Header("Detector Settings:")]
 	//public bool detectorActive = true;
+	[Tooltip("True: Always resolves a target to its root object.\nFalse: Each object with the proper tag/layer can be a target" +
+		"(Use to target seperate parts of an object heirarchy)")]
+	public bool targetRootObject = true;
 	[Tooltip("(meters)")]
 	public float detectorRange;
 	[Tooltip("(seconds)\nHow often to refresh the target list. 0 = every frame.")]
 	public float detectorInterval;
 	public bool requireLos;
+	[Tooltip("Starts the los raycast check some distance from the scanner. Use this to avoid other geometry that would block the raycast.")]
 	public float losMinRange;
 	
 	[HideInInspector] float lastDetect;
@@ -29,9 +33,9 @@ public class MF_BasicScanner : MonoBehaviour {
 		if ( CheckErrors() == true ) { return; }
 		
 		targetListScript = targetListObject.GetComponent<MF_TargetList>();
-		lastDetect = Random.Range( -detectorInterval * 1.0f, 0.0f ); // add random time to stager scan pulses that would otherwise be on the same frame
+		lastDetect = Random.Range( -detectorInterval * 1.0f, 0.0f ); // add random time to stagger scan pulses that would otherwise be on the same frame
 		
-		// **** need to be able to rebuild this on the fly !!
+		// **** eventually need to be able to rebuild this on the fly !!
 		// build the layermask of targetable factions. Only needed for layer faction method
 		string[] _layerNames = new string[ targetableFactions.Length ]; // array to hold layer names
 		for (int f=0; f < targetableFactions.Length; f++) { // for each targetable faction
@@ -70,11 +74,12 @@ public class MF_BasicScanner : MonoBehaviour {
 					_targets[t] = null; // out of range
 					continue;
 				}
-				// **** avoids a bug where unity leaves an invisible empty object after editing a prefab when playing a scene without clicking off the edited prefab.
-				if ( _targets[t].transform.root.GetComponent<MF_AbstractStatus>() == null ) {
-					_targets[t] = null;
-					continue;
-				}
+				// **** avoids a bug where unity leaves an invisible empty object after editing a prefab when playing a scene without first clicking off the edited prefab.
+				// **** but this also then requires each target to inherit MF_AbstractStatus (the 'ghost' objects don't have a script, so checking for one is the easiest way to weed them out)
+//				if ( _targets[t].transform.root.GetComponent<MF_AbstractStatus>() == null ) {
+//					_targets[t] = null;
+//					continue;
+//				}
 			}
 		}
 
@@ -91,8 +96,13 @@ public class MF_BasicScanner : MonoBehaviour {
 			if ( _targets[d] == gameObject ) { continue; } // skip self
 			if ( _targets[d] == null ) { continue; } // skip null 
 
-			_targets[d] = _targets[d].transform.root.gameObject; // make sure accessing root level
-			int key = _targets[d].GetInstanceID();
+			int key;
+			if ( targetRootObject == true ) {
+				_targets[d] = _targets[d].transform.root.gameObject; // make sure accessing root level
+				key = _targets[d].transform.root.gameObject.GetInstanceID();
+			} else {
+				key = _targets[d].GetInstanceID();
+			}
 
 			if ( requireLos == true && (transform.position - _targets[d].transform.position).sqrMagnitude > losMinRange * losMinRange ) {
 				RaycastHit _hit;
@@ -111,7 +121,7 @@ public class MF_BasicScanner : MonoBehaviour {
 				// new record
 				targetListScript.targetList.Add( key, new TargetData() );
 				targetListScript.targetList[key].transform = _targets[d].transform;
-				targetListScript.targetList[key].script = _targets[d].GetComponent<MF_AbstractStatus>();;
+				targetListScript.targetList[key].script = _targets[d].GetComponent<MF_AbstractStatus>();
 			}
 			// update record
 			targetListScript.targetList[key].lastDetected = Time.time;
@@ -125,19 +135,17 @@ public class MF_BasicScanner : MonoBehaviour {
 	
 	private bool CheckErrors() {
 		string _object = gameObject.name;
+		Transform rps;
 		if ( targetListObject ) {
 			if ( !targetListObject.GetComponent<MF_TargetList>() ) {
 				Debug.Log(_object+": Target list not found on defined object: "+targetListObject); error = true;
 			}
 		} else {
-			if ( GetComponent<MF_TargetList>() ) {
-				targetListObject = gameObject;
+			rps = UtilityMF.RecursiveParentSearch( "MF_TargetList", transform );
+			if ( rps != null ) {
+				targetListObject = rps.gameObject;
 			} else {
-				if ( transform.root.GetComponent<MF_TargetList>() ) {
-					targetListObject = transform.root.gameObject;
-				} else {
-					Debug.Log(_object+": Target list location not defined."); error = true;
-				}
+				Debug.Log(_object+": Target list location not found."); error = true;
 			}
 		}
 		return error;

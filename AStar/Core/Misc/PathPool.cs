@@ -2,14 +2,13 @@
 using System;
 using System.Collections.Generic;
 
-namespace Pathfinding
-{
-	public static class PathPool<T> where T : Path, new()
-	{
-		private static Stack<T> pool;
-		
+namespace Pathfinding {
+	/** Pools path objects to reduce load on the garbage collector */
+	public static class PathPool<T> where T : Path, new() {
+		private static readonly Stack<T> pool;
+
 		private static int totalCreated;
-		
+
 		static PathPool () {
 			pool = new Stack<T>();
 		}
@@ -42,7 +41,7 @@ namespace Pathfinding
 			Pathfinding.Util.ListPool<GraphNode>.Warmup (count, length);
 			Pathfinding.Util.ListPool<UnityEngine.Vector3>.Warmup (count, length);
 			
-			Path[] tmp = new Path[count];
+			var tmp = new Path[count];
 			for (int i=0;i<count;i++)	{ tmp[i] = GetPath (); tmp[i].Claim (tmp); }
 			for (int i=0;i<count;i++) 	tmp[i].Release (tmp);
 		}

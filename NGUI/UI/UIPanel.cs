@@ -893,10 +893,9 @@ public class UIPanel : UIRect
 	/// Cache components.
 	/// </summary>
 
-	void Awake ()
+	protected override void Awake ()
 	{
-		mGo = gameObject;
-		mTrans = transform;
+		base.Awake();
 
 		mHalfPixelOffset = (Application.platform == RuntimePlatform.WindowsPlayer ||
 			Application.platform == RuntimePlatform.XBOX360 ||
@@ -934,7 +933,7 @@ public class UIPanel : UIRect
 
 	protected override void OnStart ()
 	{
-		mLayer = mGo.layer;
+		mLayer = cachedGameObject.layer;
 	}
 
 	/// <summary>
@@ -1030,10 +1029,16 @@ public class UIPanel : UIRect
 	{
 		int fc = Time.frameCount;
 
+		if (cachedTransform.hasChanged)
+		{
+			mTrans.hasChanged = false;
+			mMatrixFrame = -1;
+		}
+
 		if (mMatrixFrame != fc)
 		{
 			mMatrixFrame = fc;
-			worldToLocal = cachedTransform.worldToLocalMatrix;
+			worldToLocal = mTrans.worldToLocalMatrix;
 
 			Vector2 size = GetViewSize() * 0.5f;
 
@@ -1367,7 +1372,7 @@ public class UIPanel : UIRect
 	/// Fill the geometry for the specified draw call.
 	/// </summary>
 
-	bool FillDrawCall (UIDrawCall dc)
+	public bool FillDrawCall (UIDrawCall dc)
 	{
 		if (dc != null)
 		{
@@ -1710,8 +1715,6 @@ public class UIPanel : UIRect
 		mUpdateFrame = -1;
 		if (list.Count > 0) list[0].LateUpdate();
 	}
-
-	
 
 	/// <summary>
 	/// Calculate the offset needed to be constrained within the panel's bounds.

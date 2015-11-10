@@ -36,6 +36,9 @@ public partial class SoundManagerEditor : Editor {
 	private string defaultName = "-enter name-";
 	private bool repaintNextFrame = false;
 	private bool indent4_3_up = false;
+
+	private string[] options = new string[] {"2D", "3D", "CUSTOM"};
+	private int optionsIndex = 0;
 	#endregion
 	
 	private void OnEnable()
@@ -52,11 +55,11 @@ public partial class SoundManagerEditor : Editor {
 		InitSFX();
 		
 		if(!titleBar)
-			titleBar = Resources.LoadAssetAtPath ("Assets/Gizmos/TitleBar.png", typeof(Texture2D)) as Texture2D;
+			titleBar = AssetDatabase.LoadAssetAtPath ("Assets/Gizmos/TitleBar.png", typeof(Texture2D)) as Texture2D;
 		if(!footer)
-			footer = Resources.LoadAssetAtPath ("Assets/Gizmos/AntiLunchBox Logo.png", typeof(Texture2D)) as Texture2D;
+			footer = AssetDatabase.LoadAssetAtPath ("Assets/Gizmos/AntiLunchBox Logo.png", typeof(Texture2D)) as Texture2D;
 		if(!icon)
-			icon = Resources.LoadAssetAtPath ("Assets/Gizmos/SoundManager Icon.png", typeof(Texture2D)) as Texture2D;
+			icon = AssetDatabase.LoadAssetAtPath ("Assets/Gizmos/SoundManager Icon.png", typeof(Texture2D)) as Texture2D;
 	}
 	
 	private void OnDisable()
@@ -126,6 +129,14 @@ public partial class SoundManagerEditor : Editor {
 			while(script.soundConnections[i].soundsToPlay.Count > script.soundConnections[i].baseVolumes.Count)
 				script.soundConnections[i].baseVolumes.Add(1f);
 		}
+
+		float defaultSFXSpatialBlend = script.defaultSFXSpatialBlend;
+		if(defaultSFXSpatialBlend == 0f)
+			optionsIndex = 0;
+		else if(defaultSFXSpatialBlend == 1f)
+			optionsIndex = 1;
+		else
+			optionsIndex = 2;
 	}
 	
 	private GUIStyle CreateFoldoutGUI()
@@ -980,6 +991,21 @@ public partial class SoundManagerEditor : Editor {
 			{
 				SoundManagerEditorTools.RegisterObjectChange("Toggle SFX", script);
 				script.offTheSFX = offTheSFX;
+				EditorUtility.SetDirty(script);
+			}
+
+			float defaultSFXSpatialBlend = script.defaultSFXSpatialBlend;
+			optionsIndex = EditorGUILayout.Popup("Default SFX Setting:", optionsIndex, options, GUILayout.ExpandWidth(false));
+			if(optionsIndex == 0)
+				defaultSFXSpatialBlend = 0f;
+			else if(optionsIndex == 1)
+				defaultSFXSpatialBlend = 1f;
+			else
+				defaultSFXSpatialBlend = EditorGUILayout.Slider("Custom Spatial Blend:", defaultSFXSpatialBlend,0f,1f);
+			if(defaultSFXSpatialBlend != script.defaultSFXSpatialBlend)
+			{
+				SoundManagerEditorTools.RegisterObjectChange("Change Default SFX Spatial Blend", script);
+				script.defaultSFXSpatialBlend = defaultSFXSpatialBlend;
 				EditorUtility.SetDirty(script);
 			}
 		

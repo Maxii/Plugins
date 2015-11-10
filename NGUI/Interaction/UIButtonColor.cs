@@ -114,7 +114,7 @@ public class UIButtonColor : UIWidgetContainer
 	protected virtual void OnInit ()
 	{
 		mInitDone = true;
-		if (tweenTarget == null) tweenTarget = gameObject;
+		if (tweenTarget == null && !Application.isPlaying) tweenTarget = gameObject;
 		if (tweenTarget != null) mWidget = tweenTarget.GetComponent<UIWidget>();
 
 		if (mWidget != null)

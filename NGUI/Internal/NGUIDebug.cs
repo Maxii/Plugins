@@ -113,7 +113,7 @@ public class NGUIDebug : MonoBehaviour
 	
 	void OnGUI()
 	{
-		Rect rect = new Rect(5f, 5f, 1000f, 18f);
+		Rect rect = new Rect(5f, 5f, 1000f, 22f);
 
 		if (mRayDebug)
 		{

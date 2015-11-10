@@ -1,4 +1,4 @@
-// Version 4.1
+// Version 5.0
 // ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -14,12 +14,12 @@ public class LineManager : MonoBehaviour {
 	static int lineCount = 0;
 	bool destroyed = false;
 
-	void Awake () {
+	private void Awake () {
 		Initialize();
 		DontDestroyOnLoad(this);
 	}
 	
-	void Initialize () {
+	private void Initialize () {
 		lines = new List<VectorLine>();
 		transforms = new List<Transform>();
 		lineCount = 0;
@@ -59,7 +59,7 @@ public class LineManager : MonoBehaviour {
 		vectorLine = null;
 	}
 
-	void LateUpdate () {
+	private void LateUpdate () {
 		if (!VectorLine.camTransformExists) return;
 		
 		// Draw3DAuto lines
@@ -83,7 +83,7 @@ public class LineManager : MonoBehaviour {
 		VectorManager.DrawArrayLines2();
 	}
 	
-	void RemoveLine (int i) {
+	private void RemoveLine (int i) {
 		lines.RemoveAt (i);
 		transforms.RemoveAt (i);
 		--lineCount;
@@ -117,15 +117,15 @@ public class LineManager : MonoBehaviour {
 		InvokeRepeating("CheckDistance", .01f, VectorManager.distanceCheckFrequency);
 	}
 	
-	void CheckDistance () {
+	private void CheckDistance () {
 		VectorManager.CheckDistance();
 	}
 	
-	void OnDestroy () {
+	private void OnDestroy () {
 		destroyed = true;
 	}
 	
-	void OnLevelWasLoaded () {
+	private void OnLevelWasLoaded () {
 		Initialize();
 	}
 }

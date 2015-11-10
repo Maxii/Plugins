@@ -11,6 +11,12 @@ public class GFHexGridEditor : GFGridEditor {
 		_hGrid.gridPlane = (GridPlane) EditorGUILayout.EnumPopup("Grid Plane", _hGrid.gridPlane);
 		_hGrid.hexSideMode = (GFHexGrid.HexOrientation) EditorGUILayout.EnumPopup("Hex Side Mode", _hGrid.hexSideMode);
 		_hGrid.gridStyle = (GFHexGrid.HexGridShape)EditorGUILayout.EnumPopup("Grid Style", _hGrid.gridStyle);
+		if (_hGrid.gridStyle == GFHexGrid.HexGridShape.Circle) {
+			++EditorGUI.indentLevel; {
+				_hGrid.renderAround = EditorGUILayout.Vector3Field("Render Around", _hGrid.renderAround);
+			}
+			--EditorGUI.indentLevel;
+		}
 	}
 
 	[MenuItem ("CONTEXT/GFHexGrid/Help")]

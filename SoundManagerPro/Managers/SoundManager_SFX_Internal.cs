@@ -169,11 +169,11 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 #else
 				if(ownedSFXObject != null && ownedSFXObject.activeSelf)
 #endif
-					if(ownedSFXObject.audio != null)
+					if(ownedSFXObject.GetComponent<AudioSource>() != null)
 						if(pause)
-							ownedSFXObject.audio.Pause();
+							ownedSFXObject.GetComponent<AudioSource>().Pause();
 						else
-							ownedSFXObject.audio.Play();
+							ownedSFXObject.GetComponent<AudioSource>().Play();
 			}
 		}
 		foreach(GameObject unOwnedSFXObject in unOwnedSFXObjects)
@@ -183,11 +183,11 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 #else
 			if(unOwnedSFXObject != null && unOwnedSFXObject.activeSelf)
 #endif
-				if(unOwnedSFXObject.audio != null)
+				if(unOwnedSFXObject.GetComponent<AudioSource>() != null)
 					if(pause)
-						unOwnedSFXObject.audio.Pause();
+						unOwnedSFXObject.GetComponent<AudioSource>().Pause();
 					else
-						unOwnedSFXObject.audio.Play();
+						unOwnedSFXObject.GetComponent<AudioSource>().Play();
 		}
 	}
 	
@@ -207,7 +207,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 				if(pair.Value.ownedAudioClipPool[i].activeSelf)
 #endif
 				{
-					AudioSource thisAudio = pair.Value.ownedAudioClipPool[i].audio;
+					AudioSource thisAudio = pair.Value.ownedAudioClipPool[i].GetComponent<AudioSource>();
 	                if (!thisAudio.isPlaying) // if not playing
 				    {
 						if(delayedAudioSources.ContainsKey(thisAudio)) // skip if delayed still
@@ -248,9 +248,9 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 		{
 			if(unOwnedSFXObjects[i] != null)
 			{
-				if(unOwnedSFXObjects[i].audio != null)
+				if(unOwnedSFXObjects[i].GetComponent<AudioSource>() != null)
 				{
-					AudioSource thisAudio = unOwnedSFXObjects[i].audio;
+					AudioSource thisAudio = unOwnedSFXObjects[i].GetComponent<AudioSource>();
 					if(thisAudio.isPlaying) // if playign or muted and playing
 					{
 						if(delayedAudioSources.ContainsKey(thisAudio)) // if delayed but is playign now, remove from delayed list
@@ -300,7 +300,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 		GameObject SFXObject = new GameObject("SFX-["+clip.name+"]", typeof(AudioSource));
 		SFXObject.transform.parent = transform;
 		SFXObject.name += "(" + SFXObject.GetInstanceID() + ")";
-		SFXObject.audio.playOnAwake = false;
+		SFXObject.GetComponent<AudioSource>().playOnAwake = false;
 		GameObject.DontDestroyOnLoad(SFXObject);
 		
 		if(ownedPools.ContainsKey(clip))
@@ -324,7 +324,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 			ownedPools.Add(clip, new SFXPoolInfo(0,thisPrepoolAmount,new List<float>(){0f},new List<GameObject>(){SFXObject},thisBaseVolume,thisVolumeVariation,thisPitchVariation));
 		}
 		ResetSFXObject(SFXObject);
-		SFXObject.audio.clip = clip;
+		SFXObject.GetComponent<AudioSource>().clip = clip;
 		return SFXObject;
 	}
 
@@ -334,7 +334,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
         if (tempGO == null)
             return null;
 		
-		AudioSource aSource = tempGO.audio;
+		AudioSource aSource = tempGO.GetComponent<AudioSource>();
 		
 		aSource.transform.position = location;
 #if UNITY_3_4 || UNITY_3_5
@@ -468,8 +468,8 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 #else
 				if(ownedSFXObject != null && ownedSFXObject.activeSelf)
 #endif
-					if(ownedSFXObject.audio != null)
-						ownedSFXObject.audio.Stop();
+					if(ownedSFXObject.GetComponent<AudioSource>() != null)
+						ownedSFXObject.GetComponent<AudioSource>().Stop();
 		}
 		
 		foreach(GameObject unOwnedSFXObject in unOwnedSFXObjects)
@@ -478,8 +478,8 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 #else
 			if(unOwnedSFXObject != null && unOwnedSFXObject.activeSelf)
 #endif
-				if(unOwnedSFXObject.audio != null)
-					unOwnedSFXObject.audio.Stop();
+				if(unOwnedSFXObject.GetComponent<AudioSource>() != null)
+					unOwnedSFXObject.GetComponent<AudioSource>().Stop();
 		
 		delayedAudioSources.Clear();
 	}
@@ -556,7 +556,7 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 	
 	private bool IsOwnedSFXObject(GameObject obj)
 	{
-		return IsOwnedSFXObject(obj.audio);
+		return IsOwnedSFXObject(obj.GetComponent<AudioSource>());
 	}
 	
 	private SFXGroup GetGroupForClipName(string clipName)

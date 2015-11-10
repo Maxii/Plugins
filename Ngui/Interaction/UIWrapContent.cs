@@ -55,12 +55,12 @@ public class UIWrapContent : MonoBehaviour
 
 	public OnInitializeItem onInitializeItem;
 
-	Transform mTrans;
-	UIPanel mPanel;
-	UIScrollView mScroll;
-	bool mHorizontal = false;
-	bool mFirstTime = true;
-	List<Transform> mChildren = new List<Transform>();
+	protected Transform mTrans;
+	protected UIPanel mPanel;
+	protected UIScrollView mScroll;
+	protected bool mHorizontal = false;
+	protected bool mFirstTime = true;
+	protected List<Transform> mChildren = new List<Transform>();
 
 	/// <summary>
 	/// Initialize everything and register a callback with the UIPanel to be notified when the clipping region moves.
@@ -85,7 +85,7 @@ public class UIWrapContent : MonoBehaviour
 	/// </summary>
 
 	[ContextMenu("Sort Based on Scroll Movement")]
-	public void SortBasedOnScrollMovement ()
+	public virtual void SortBasedOnScrollMovement ()
 	{
 		if (!CacheScrollView()) return;
 
@@ -105,7 +105,7 @@ public class UIWrapContent : MonoBehaviour
 	/// </summary>
 
 	[ContextMenu("Sort Alphabetically")]
-	public void SortAlphabetically ()
+	public virtual void SortAlphabetically ()
 	{
 		if (!CacheScrollView()) return;
 
@@ -139,7 +139,7 @@ public class UIWrapContent : MonoBehaviour
 	/// Helper function that resets the position of all the children.
 	/// </summary>
 
-	void ResetChildPositions ()
+	protected virtual void ResetChildPositions ()
 	{
 		for (int i = 0, imax = mChildren.Count; i < imax; ++i)
 		{
@@ -153,7 +153,7 @@ public class UIWrapContent : MonoBehaviour
 	/// Wrap all content, repositioning all children as needed.
 	/// </summary>
 
-	public void WrapContent ()
+	public virtual void WrapContent ()
 	{
 		float extents = itemSize * mChildren.Count * 0.5f;
 		Vector3[] corners = mPanel.worldCorners;

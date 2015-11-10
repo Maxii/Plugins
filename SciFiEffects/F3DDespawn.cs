@@ -16,7 +16,7 @@ public class F3DDespawn : MonoBehaviour {
 
     // OnSpawned called by pool manager 
     public void OnSpawned()
-    {
+    {        
         // Invokes despawn using timer delay
         if (!DespawnOnMouseUp)
             F3DTime.time.AddTimer(DespawnDelay, 1, DespawnOnTimer);

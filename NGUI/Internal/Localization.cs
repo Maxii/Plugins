@@ -301,7 +301,13 @@ public static class Localization
 				if (!HasLanguage(header[i]))
 				{
 					int newSize = mLanguages.Length + 1;
+#if UNITY_FLASH
+					string[] temp = new string[newSize];
+					for (int b = 0, bmax = arr.Length; b < bmax; ++b) temp[b] = mLanguages[b];
+					mLanguages = temp;
+#else
 					System.Array.Resize(ref mLanguages, newSize);
+#endif
 					mLanguages[newSize - 1] = header[i];
 
 					Dictionary<string, string[]> newDict = new Dictionary<string, string[]>();
@@ -310,7 +316,7 @@ public static class Localization
 					{
 						string[] arr = pair.Value;
 #if UNITY_FLASH
-						string[] temp = new string[newSize];
+						temp = new string[newSize];
 						for (int b = 0, bmax = arr.Length; b < bmax; ++b) temp[b] = arr[b];
 						arr = temp;
 #else

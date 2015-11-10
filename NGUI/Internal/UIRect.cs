@@ -166,13 +166,11 @@ public abstract class UIRect : MonoBehaviour
 
 	public AnchorUpdate updateAnchors = AnchorUpdate.OnUpdate;
 
-	protected GameObject mGo;
-	protected Transform mTrans;
-	protected BetterList<UIRect> mChildren = new BetterList<UIRect>();
-	protected bool mChanged = true;
-	protected bool mStarted = false;
-	protected bool mParentFound = false;
-
+	[System.NonSerialized] protected GameObject mGo;
+	[System.NonSerialized] protected Transform mTrans;
+	[System.NonSerialized] protected BetterList<UIRect> mChildren = new BetterList<UIRect>();
+	[System.NonSerialized] protected bool mChanged = true;
+	[System.NonSerialized] protected bool mParentFound = false;
 	[System.NonSerialized] bool mUpdateAnchors = true;
 	[System.NonSerialized] int mUpdateFrame = -1;
 	[System.NonSerialized] bool mAnchorsCached = false;
@@ -180,6 +178,9 @@ public abstract class UIRect : MonoBehaviour
 	[System.NonSerialized] UIRect mParent;
 	[System.NonSerialized] bool mRootSet = false;
 	[System.NonSerialized] protected Camera mCam;
+
+	// Marking it as NonSerialized will cause widgets to disappear when code recompiles in edit mode
+	protected bool mStarted = false;
 
 	/// <summary>
 	/// Final calculated alpha.
@@ -433,6 +434,18 @@ public abstract class UIRect : MonoBehaviour
 		mRoot = null;
 		mRootSet = false;
 		mParentFound = false;
+	}
+
+	/// <summary>
+	/// Reset 'mStarted' as Unity remembers its value. It can't be marked as [NonSerialized] because then
+	/// Unity edit mode stops working properly and code recompile causes widgets to disappear.
+	/// </summary>
+
+	protected virtual void Awake ()
+	{
+		mStarted = false;
+		mGo = gameObject;
+		mTrans = transform;
 	}
 
 	/// <summary>

@@ -13,6 +13,7 @@ public class MF_BasicNavigation : MonoBehaviour {
 	public int curWpt;
 	
 	bool reachedLastWpt;
+	Rigidbody myRigidbody;
 	
 	void Start () {
 		if (waypointGroup) { // build waypoint list from children
@@ -20,6 +21,9 @@ public class MF_BasicNavigation : MonoBehaviour {
 			for ( int i=0; i < waypointGroup.transform.childCount; i++ ) {
 				waypoints[i] = waypointGroup.transform.GetChild(i);
 			}
+		}
+		if (GetComponent<Rigidbody>()) {
+			myRigidbody = GetComponent<Rigidbody>();
 		}
 	}
 	
@@ -42,12 +46,18 @@ public class MF_BasicNavigation : MonoBehaviour {
 					}
 
 					//turn
-					Quaternion _rot = Quaternion.LookRotation( waypoints[curWpt].position - rigidbody.position, transform.up );
-					rigidbody.MoveRotation( Quaternion.RotateTowards( rigidbody.rotation, _rot, turnRate * Time.fixedDeltaTime ) );
+					Quaternion _rot;
+					if (myRigidbody) {
+						_rot = Quaternion.LookRotation( waypoints[curWpt].position - myRigidbody.position, transform.up );
+						myRigidbody.MoveRotation( Quaternion.RotateTowards( myRigidbody.rotation, _rot, turnRate * Time.fixedDeltaTime ) );
+					} else {
+						_rot = Quaternion.LookRotation( waypoints[curWpt].position - transform.position, transform.up );
+						transform.rotation = Quaternion.RotateTowards( transform.rotation, _rot, turnRate * Time.fixedDeltaTime );
+					}
 
 					//move
-					if (rigidbody) {
-						rigidbody.AddForce( transform.forward * thrust * Time.fixedDeltaTime);
+					if (myRigidbody) {
+						myRigidbody.AddForce( transform.forward * thrust * Time.fixedDeltaTime);
 					} else {
 						transform.position = transform.position + (transform.forward * thrust * Time.fixedDeltaTime);
 					}

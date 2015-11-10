@@ -3,7 +3,8 @@ using System.Collections;
 
 public abstract class MF_AbstractStatus : MonoBehaviour {
 
-	public float health = 10;
+	public float _health;
+	public abstract float health { get; set; }
 	public float signature;
-	
+
 }

@@ -80,6 +80,12 @@ public class UICameraEditor : Editor
 			}
 			EditorGUI.EndDisabledGroup();
 
+			EditorGUI.BeginDisabledGroup(!(mouse.boolValue && (touch.boolValue || controller.boolValue)));
+			{
+				EditorGUILayout.PropertyField(serializedObject.FindProperty("autoHideCursor"));
+			}
+			EditorGUI.EndDisabledGroup();
+
 			EditorGUI.BeginDisabledGroup(!mouse.boolValue);
 			EditorGUILayout.PropertyField(serializedObject.FindProperty("stickyTooltip"));
 			EditorGUI.EndDisabledGroup();

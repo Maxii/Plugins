@@ -138,9 +138,9 @@ public class SaucerBaseHandler : MonoBehaviour
 		int result = 0;
 		
 		Transform hull = transform.FindChild("Hull");
-		if (hull != null && hull.renderer != null)
+		if (hull != null && hull.GetComponent<Renderer>() != null)
 		{
-			Material mat = hull.renderer.sharedMaterial;
+			Material mat = hull.GetComponent<Renderer>().sharedMaterial;
 			Material[] hullMaterials = SaucerScene.Instance.hullMaterials;
 			
 			for (int i=0, cnt = hullMaterials.Length; i<cnt; i++)

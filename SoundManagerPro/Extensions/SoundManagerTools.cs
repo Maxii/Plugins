@@ -74,7 +74,7 @@ public static class SoundManagerTools {
 	/// </param>
 	public static void make2D ( ref AudioSource theAudioSource )
 	{
-		theAudioSource.panLevel = 0f;
+		theAudioSource.spatialBlend = 0f;
 	}
 	/// <summary>
 	/// Make an <a href="http://docs.unity3d.com/ScriptReference/AudioSource.html">AudioSource</a> play any clip like it's 3D.
@@ -84,7 +84,7 @@ public static class SoundManagerTools {
 	/// </param>
 	public static void make3D ( ref AudioSource theAudioSource )
 	{
-		theAudioSource.panLevel = 1f;
+		theAudioSource.spatialBlend = 1f;
 	}
 	/// <summary>
 	/// Vary a float with restrictions.

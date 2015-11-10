@@ -1,4 +1,3 @@
-//#define ASTARDEBUG		//"NavmeshController debug" Enables debugging lines
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;

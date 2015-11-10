@@ -41,11 +41,11 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="UnityEditor">
-      <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
@@ -58,7 +58,9 @@
     </Compile>
     <Compile Include="AnimationLinkEditor.cs" />
     <Compile Include="AstarPathEditor.cs" />
+    <Compile Include="AstarUpdateChecker.cs" />
     <Compile Include="AstarUpdateWindow.cs" />
+    <Compile Include="CustomGraphEditorAttribute.cs" />
     <Compile Include="EditorGUIx.cs" />
     <Compile Include="EditorUtilities.cs" />
     <Compile Include="GraphEditors\GraphEditor.cs" />

@@ -24,7 +24,7 @@ public class SpritePositioner : MonoBehaviour
 		
 		Vector3 screenPos;
 		
-		Collider collider = targetObject.collider;
+		Collider collider = targetObject.GetComponent<Collider>();
 		if (collider != null)
 		{
 			Vector3 pos = collider.bounds.center;

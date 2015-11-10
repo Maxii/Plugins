@@ -9,6 +9,7 @@ namespace Pathfinding
 	 * for path calculation, but which are not part of the graph structure.
 	 * 
 	 * \see Pathfinding.PathHandler
+	 * \see https://en.wikipedia.org/wiki/A*_search_algorithm
 	 */
 	public class PathNode {
 		/** Reference to the actual graph node */
@@ -99,7 +100,10 @@ namespace Pathfinding
 		public readonly int threadID;
 		public readonly int totalThreadCount;
 
-		/** Binary heap to keep nodes on the "Open list" */
+		/**
+		 * Binary heap to keep track of nodes on the "Open list".
+		 * \see https://en.wikipedia.org/wiki/A*_search_algorithm
+		 */
 		private BinaryHeapM heap = new BinaryHeapM(128);
 		
 		/** ID for the path currently being calculated or last path that was calculated */
@@ -110,13 +114,17 @@ namespace Pathfinding
 			heap.Add (node);
 		}
 		
-		/** Pop the node with the lowest F score off the heap */
+		/** Pop the node with the lowest F score from the heap */
 		public PathNode PopNode () {
 			return heap.Remove ();
 		}
 		
-		/** Get the internal heap.
-		 * \note Most things can be accomplished with the methods on this class instead.
+		/** The internal heap.
+		 * \note Most things can be accomplished with other methods on this class instead.
+		 *
+		 * \see PushNode
+		 * \see PopNode
+		 * \see HeapEmpty
 		 */
 		public BinaryHeapM GetHeap () {
 			return heap;
@@ -124,7 +132,7 @@ namespace Pathfinding
 		
 		/** Rebuild the heap to account for changed node values.
 		 * Some path types change the target for the H score in the middle of the path calculation,
-		 * that requires rebuilding the heap to keep it correctly sorted
+		 * that requires rebuilding the heap to keep it correctly sorted.
 		 */
 		public void RebuildHeap () {
 			heap.Rebuild ();
@@ -152,10 +160,10 @@ namespace Pathfinding
 		
 		private Stack<PathNode[]> bucketCache = new Stack<PathNode[]> ();
 		
-		private int filledBuckets = 0;
+		private int filledBuckets;
 		
 		/** StringBuilder that paths can use to build debug strings.
-		 * Better to use a single StringBuilder instead of each path creating its own
+		 * Better for performance and memory usage to use a single StringBuilder instead of each path creating its own
 		 */
 		public readonly System.Text.StringBuilder DebugStringBuilder = new System.Text.StringBuilder();
 		
@@ -189,20 +197,19 @@ namespace Pathfinding
 			int bucketIndex = ind & BucketIndexMask;
 			
 			if (bucketNumber >= nodes.Length) {
-				//At least increase the size to:
-				//Current size * 1.5
-				//Current size + 2 or
-				//bucketNumber
+				// A resize is required
+				// At least increase the size to:
+				// Current size * 1.5
+				// Current size + 2 or
+				// bucketNumber+1
 				
-				PathNode[][] newNodes = new PathNode[System.Math.Max (System.Math.Max (nodes.Length*3 / 2,bucketNumber+1), nodes.Length+2)][];
+				var newNodes = new PathNode[System.Math.Max (System.Math.Max (nodes.Length*3 / 2,bucketNumber+1), nodes.Length+2)][];
 				for (int i=0;i<nodes.Length;i++) newNodes[i] = nodes[i];
-				//Debug.Log ("Resizing Bucket List from " + nodes.Length + " to " + newNodes.Length + " (bucketNumber="+bucketNumber+")");
 				
-				bool[] newBucketNew = new bool[newNodes.Length];
+				var newBucketNew = new bool[newNodes.Length];
 				for (int i=0;i<nodes.Length;i++) newBucketNew[i] = bucketNew[i];
 				
-				
-				bool[] newBucketCreated = new bool[newNodes.Length];
+				var newBucketCreated = new bool[newNodes.Length];
 				for (int i=0;i<nodes.Length;i++) newBucketCreated[i] = bucketCreated[i];
 				
 				nodes = newNodes;
@@ -236,21 +243,25 @@ namespace Pathfinding
 			return nodes[nodeIndex >> BucketSizeLog2][nodeIndex & BucketIndexMask];	
 		}
 
+		/** Returns the PathNode corresponding to the specified node.
+		 * The PathNode is specific to this PathHandler since multiple PathHandlers
+		 * are used at the same time if multithreading is enabled.
+		 */
 		public PathNode GetPathNode ( GraphNode node ) {
-			//Get the index of the node
+			// Get the index of the node
 			int ind = node.NodeIndex;
 			
 			return nodes[ind >> BucketSizeLog2][ind & BucketIndexMask];	
 		}
 		
-		/** Set all node's pathIDs to 0.
+		/** Set all nodes' pathIDs to 0.
 		 * \see Pathfinding.PathNode.pathID
 		 */
 		public void ClearPathIDs () {
 			
 			for (int i=0;i<nodes.Length;i++) {
 				PathNode[] ns = nodes[i];
-				if (nodes[i] != null) for (int j=0;j<BucketSize;j++) ns[j].pathID = 0;
+				if (ns != null) for (int j=0;j<BucketSize;j++) ns[j].pathID = 0;
 			}
 		}
 	}

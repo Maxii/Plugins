@@ -2,13 +2,18 @@ using UnityEngine;
 
 namespace GridFramework {
 	namespace Vectors {
-	/// <summary>A class that holds three colours as X-, Y- and Z-value.</summary>
-		/// This class groups three colours together, similar to how Vector3 groups three float numbers together.
-		/// Just like Vector3 you can read and assign values using x, y, or an indexer.
+		/// <summary>A class that holds three colours as X-, Y- and Z-value.</summary>
+		/// This class groups three colours together, similar to how Vector3
+		/// groups three float numbers together.  Just like `Vector3` you can
+		/// read and assign values using x, y, or an indexer.
 		[System.Serializable]
 		public class ColorVector3{
 			[SerializeField]
-			private Color[] values = new Color[3] {new Color(1.0f, 0.0f, 0.0f, 0.5f), new Color(0.0f, 1.0f, 0.0f, 0.5f), new Color(0.0f, 0.0f, 1.0f, 0.5f)};
+			private Color[] values = {
+				new Color(1.0f, 0.0f, 0.0f, 0.5f),
+				new Color(0.0f, 1.0f, 0.0f, 0.5f),
+				new Color(0.0f, 0.0f, 1.0f, 0.5f)
+			};
 			
 			/// <summary>X component of the colour vector.</summary>
 			public Color x {
@@ -51,7 +56,8 @@ namespace GridFramework {
 			}
 			
 			///<summary>Creates a standard RGB ColorVector3.</summary>
-			/// Creates a new standard RGB <see cref="ColorVector3"/> where all three colours have their alpha set to 0.5.
+			/// Creates a new standard RGB <see cref="ColorVector3"/> where all
+			/// three colours have their alpha set to 0.5.
 			public ColorVector3(){ //default
 				values [0] = new Color(1.0f, 0.0f, 0.0f, 0.5f);
 				values [1] = new Color(0.0f, 1.0f, 0.0f, 0.5f);
@@ -60,7 +66,8 @@ namespace GridFramework {
 			
 			/// <summary>Creates a one-colour ColorVector3.</summary>
 			/// <param name="color">The colur for all ccomponents.</param>
-			/// Creates a new <see cref="ColorVector3"/> where all components are set to the same colour.
+			/// Creates a new <see cref="ColorVector3"/> where all components
+			/// are set to the same colour.
 			public ColorVector3(Color color){
 				values [0] = color;
 				values [1] = color;
@@ -69,10 +76,30 @@ namespace GridFramework {
 
 			/// <summary>Shorthand writing for <c>ColorVector3()</c></summary>
 			public static ColorVector3 RGB {get{return new ColorVector3();}} // standard RGB Colour Vector
-			/// <summary>Shorthand writing for <c>ColorVector3(Color(0,1,1,0.5), Color(1,0,1,0.5), Color(1,1,0,0.5))</c></summary>
-			public static ColorVector3 CMY {get{return new ColorVector3(new Color(0, 1, 1, 0.5f), new Color(1, 0, 1, 0.5f), new Color(1, 1, 0, 0.5f));}}
-			/// <summary>Shorthand writing for <c>ColorVector3(Color(0,0,0,0.5), Color(0.5,0.5,0.5,0.5), Color(1,1,1,0.5))</c></summary>
-			public static ColorVector3 BGW {get{return new ColorVector3(new Color(0, 0, 0, 0.5f), new Color(0.5f, 0.5f, 0.5f, 0.5f), new Color(1, 1, 1, 0.5f));}}
+			/// <summary>Shorthand writing for
+			/// <c>ColorVector3(Color(0,1,1,0.5), Color(1,0,1,0.5),
+			/// Color(1,1,0,0.5))</c></summary>
+			public static ColorVector3 CMY {
+				get{
+					return new ColorVector3(
+						new Color(0, 1, 1, 0.5f),
+						new Color(1, 0, 1, 0.5f),
+						new Color(1, 1, 0, 0.5f)
+					);
+				}
+			}
+			/// <summary>Shorthand writing for
+			/// <c>ColorVector3(Color(0,0,0,0.5), Color(0.5,0.5,0.5,0.5),
+			/// Color(1,1,1,0.5))</c></summary>
+			public static ColorVector3 BGW {
+				get{
+					return new ColorVector3(
+						new Color(0.0f, 0.0f, 0.0f, 0.5f),
+						new Color(0.5f, 0.5f, 0.5f, 0.5f),
+						new Color(1.0f, 1.0f, 1.0f, 0.5f)
+					);
+				}
+			}
 		}
 	}
 }

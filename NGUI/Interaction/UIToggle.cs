@@ -52,6 +52,12 @@ public class UIToggle : UIWidgetContainer
 	public Animator animator;
 
 	/// <summary>
+	/// Tween to use, if any.
+	/// </summary>
+
+	public UITweener tween;
+
+	/// <summary>
 	/// Whether the toggle starts checked.
 	/// </summary>
 
@@ -287,6 +293,31 @@ public class UIToggle : UIWidgetContainer
 					EnableCondition.IgnoreDisabledState,
 					DisableCondition.DoNotDisable);
 				if (aa != null && (instantTween || !NGUITools.GetActive(this))) aa.Finish();
+			}
+			else if (tween != null)
+			{
+				bool isActive = NGUITools.GetActive(this);
+
+				if (tween.tweenGroup != 0)
+				{
+					UITweener[] tws = tween.GetComponentsInChildren<UITweener>();
+
+					for (int i = 0, imax = tws.Length; i < imax; ++i)
+					{
+						UITweener t = tws[i];
+
+						if (t.tweenGroup == tween.tweenGroup)
+						{
+							t.Play(state);
+							if (instantTween || !isActive) t.tweenFactor = state ? 1f : 0f;
+						}
+					}
+				}
+				else
+				{
+					tween.Play(state);
+					if (instantTween || !isActive) tween.tweenFactor = state ? 1f : 0f;
+				}
 			}
 		}
 	}

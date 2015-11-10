@@ -1,10 +1,9 @@
 using UnityEngine;
-using System.Collections;
 
 public class GFGridRenderCamera : MonoBehaviour {
 	private Camera cam;
 	private Transform camTransform;
-	public bool renderAlways = false;
+	public bool renderAlways; // false
 	
 	void Start(){
 		cam = GetComponent<Camera>();

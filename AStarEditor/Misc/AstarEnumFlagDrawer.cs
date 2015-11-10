@@ -8,6 +8,7 @@ using Pathfinding;
 public class AstarEnumFlagDrawer : PropertyDrawer {
 	public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 	{
+
 		AstarEnumFlagAttribute flagSettings = (AstarEnumFlagAttribute)attribute;
 		Enum targetEnum = GetBaseProperty<Enum>(property);
 		
@@ -16,8 +17,12 @@ public class AstarEnumFlagDrawer : PropertyDrawer {
 			propName = ObjectNames.NicifyVariableName (property.name);
 
 		EditorGUI.BeginProperty(position, label, property);
+		EditorGUI.BeginChangeCheck();
 		Enum enumNew = EditorGUI.EnumMaskField(position, propName, targetEnum);
-		property.intValue = (int) Convert.ChangeType(enumNew, targetEnum.GetType());
+		bool changed = EditorGUI.EndChangeCheck();
+		if (!property.hasMultipleDifferentValues || changed) {
+			property.intValue = (int) Convert.ChangeType(enumNew, targetEnum.GetType());
+		}
 		EditorGUI.EndProperty();
 	}
 	

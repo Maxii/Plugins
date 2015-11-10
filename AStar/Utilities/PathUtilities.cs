@@ -1,5 +1,3 @@
-//#define ASTAR_PROFILE
-
 using Pathfinding;
 using Pathfinding.Util;
 using System.Collections.Generic;
@@ -30,14 +28,60 @@ namespace Pathfinding
 		 * If you are making changes to the graph, areas must first be recaculated using FloodFill()
 		 * \note This might return true for small areas even if there is no possible path if AstarPath.minAreaSize is greater than zero (0).
 		 * So when using this, it is recommended to set AstarPath.minAreaSize to 0. (A* Inspector -> Settings -> Pathfinding)
+		 * 
+		 * Returns true for empty lists
+		 * 
 		 * \see AstarPath.GetNearest
 		 */
 		public static bool IsPathPossible (List<GraphNode> nodes) {
+			if (nodes.Count == 0) return true;
+
 			uint area = nodes[0].Area;
 			for (int i=0;i<nodes.Count;i++) if (!nodes[i].Walkable || nodes[i].Area != area) return false;
 			return true;
 		}
 		
+		/** Returns if there are walkable paths between all nodes.
+		 * If you are making changes to the graph, areas should first be recaculated using FloodFill()
+		 *
+		 * This method will actually only check if the first node can reach all other nodes. However this is
+		 * equivalent in 99% of the cases since almost always the graph connections are bidirectional.
+		 * If you are not aware of any cases where you explicitly create unidirectional connections
+		 * this method can be used without worries.
+		 * 
+		 * Returns true for empty lists
+		 * 
+		 * \warning This method is significantly slower than the IsPathPossible method which does not take a tagMask
+		 *
+		 * \see AstarPath.GetNearest
+		 */
+		public static bool IsPathPossible (List<GraphNode> nodes, int tagMask) {
+			if (nodes.Count == 0) return true;
+
+			// Make sure that the first node has a valid tag
+			if (((tagMask >> (int)nodes[0].Tag) & 1) == 0) return false;
+
+			// Fast check first
+			if (!IsPathPossible(nodes)) return false;
+
+			// Make sure that the first node can reach all other nodes
+			var reachable = GetReachableNodes(nodes[0], tagMask);
+			bool result = true;
+
+			// Make sure that the first node can reach all other nodes
+			for (int i=1;i<nodes.Count;i++) {
+				if (!reachable.Contains(nodes[i])) {
+					result = false;
+					break;
+				}
+			}
+
+			// Pool the temporary list
+			ListPool<GraphNode>.Release(reachable);
+
+			return result;
+		}
+
 		/** Returns all nodes reachable from the seed node.
 		 * This function performs a BFS (breadth-first-search) or flood fill of the graph and returns all nodes which can be reached from
 		 * the seed node. In almost all cases this will be identical to returning all nodes which have the same area as the seed node.
@@ -59,11 +103,11 @@ namespace Pathfinding
 		 * For better memory management the returned list should be pooled, see Pathfinding.Util.ListPool
 		 */
 		public static List<GraphNode> GetReachableNodes (GraphNode seed, int tagMask = -1) {
-			Stack<GraphNode> stack = Pathfinding.Util.StackPool<GraphNode>.Claim ();
-			List<GraphNode> list = Pathfinding.Util.ListPool<GraphNode>.Claim ();
+			Stack<GraphNode> stack = StackPool<GraphNode>.Claim ();
+			List<GraphNode> list = ListPool<GraphNode>.Claim ();
 			
 			/** \todo Pool */
-			HashSet<GraphNode> map = new HashSet<GraphNode>();
+			var map = new HashSet<GraphNode>();
 			
 			GraphNodeDelegate callback;
 			if (tagMask == -1) {
@@ -88,7 +132,7 @@ namespace Pathfinding
 				stack.Pop ().GetConnections (callback);
 			}
 			
-			Pathfinding.Util.StackPool<GraphNode>.Release (stack);
+			StackPool<GraphNode>.Release (stack);
 			
 			return list;
 		}
@@ -121,10 +165,10 @@ namespace Pathfinding
 		 */
 		public static List<GraphNode> BFS (GraphNode seed, int depth, int tagMask = -1) {
 
-			if ( BFSQueue == null ) BFSQueue = new Queue<GraphNode>();
+			BFSQueue = BFSQueue ?? new Queue<GraphNode>();
 			var que = BFSQueue;
 
-			if ( BFSMap == null ) BFSMap = new Dictionary<GraphNode,int>();
+			BFSMap = BFSMap ?? new Dictionary<GraphNode,int>();
 			var map = BFSMap;
 
 			// Even though we clear at the end of this function, it is good to
@@ -134,12 +178,12 @@ namespace Pathfinding
 			que.Clear ();
 			map.Clear ();
 
-			List<GraphNode> result = Pathfinding.Util.ListPool<GraphNode>.Claim ();
+			List<GraphNode> result = ListPool<GraphNode>.Claim ();
 
 			int currentDist = -1;
 			GraphNodeDelegate callback;
 			if (tagMask == -1) {
-				callback = delegate (GraphNode node) {
+				callback = node => {
 					if (node.Walkable && !map.ContainsKey (node)) {
 						map.Add (node, currentDist+1);
 						result.Add (node);
@@ -147,7 +191,7 @@ namespace Pathfinding
 					}
 				};
 			} else {
-				callback = delegate (GraphNode node) {
+				callback = node => {
 					if (node.Walkable && ((tagMask >> (int)node.Tag) & 0x1) != 0 && !map.ContainsKey (node)) {
 						map.Add (node, currentDist+1);
 						result.Add (node);
@@ -186,7 +230,7 @@ namespace Pathfinding
 		 */
 		public static List<Vector3> GetSpiralPoints (int count, float clearance) {
 			
-			List<Vector3> pts = Pathfinding.Util.ListPool<Vector3>.Claim(count);
+			List<Vector3> pts = ListPool<Vector3>.Claim(count);
 			
 			// The radius of the smaller circle used for generating the involute of a circle
 			// Calculated from the separation distance between the turns
@@ -253,15 +297,18 @@ namespace Pathfinding
 		 * this method will return target points so that the units move very little within the group, this is often aesthetically pleasing and reduces jitter if using
 		 * some kind of local avoidance.
 		 * 
+		 * \param p The point to generate points around
 		 * \param g The graph to use for linecasting. If you are only using one graph, you can get this by AstarPath.active.graphs[0] as IRaycastableGraph.
 		 * Note that not all graphs are raycastable, recast, navmesh and grid graphs are raycastable. On recast and navmesh it works the best.
 		 * \param previousPoints The points to use for reference. Note that these should not be in world space. They are treated as relative to \a p.
+		 * \param radius The final points will be at most this distance from \a p.
+		 * \param clearanceRadius The points will if possible be at least this distance from each other.
 		 */
 		public static void GetPointsAroundPoint (Vector3 p, IRaycastableGraph g, List<Vector3> previousPoints, float radius, float clearanceRadius) {
 			
 			if (g == null) throw new System.ArgumentNullException ("g");
 			
-			NavGraph graph = g as NavGraph;
+			var graph = g as NavGraph;
 			
 			if (graph == null) throw new System.ArgumentException ("g is not a NavGraph");
 			
@@ -346,29 +393,32 @@ namespace Pathfinding
 			if (nodes == null) throw new System.ArgumentNullException ("nodes");
 			if (nodes.Count == 0) throw new System.ArgumentException ("no nodes passed");
 			
-			System.Random rnd = new System.Random();
+			var rnd = new System.Random();
 			
-			List<Vector3> pts = Pathfinding.Util.ListPool<Vector3>.Claim(count);
+			List<Vector3> pts = ListPool<Vector3>.Claim(count);
 			
 			// Square
 			clearanceRadius *= clearanceRadius;
 			
-			if (nodes[0] is TriangleMeshNode || nodes[0] is GridNode) {
+			if (nodes[0] is TriangleMeshNode
+			    || nodes[0] is GridNode
+			    ) {
 				//Assume all nodes are triangle nodes or grid nodes
 				
-				List<float> accs = Pathfinding.Util.ListPool<float>.Claim(nodes.Count);
+				List<float> accs = ListPool<float>.Claim(nodes.Count);
 					
 				float tot = 0;
 				
 				for (int i=0;i<nodes.Count;i++) {
-					TriangleMeshNode tnode = nodes[i] as TriangleMeshNode;
+					var tnode = nodes[i] as TriangleMeshNode;
 					if (tnode != null) {
-						float a = System.Math.Abs(Polygon.TriangleArea(tnode.GetVertex(0), tnode.GetVertex(1), tnode.GetVertex(2)));
+						/** \bug Doesn't this need to be divided by 2? */
+						float a = System.Math.Abs(Polygon.TriangleArea2(tnode.GetVertex(0), tnode.GetVertex(1), tnode.GetVertex(2)));
 						tot += a;
 						accs.Add (tot);
 					}
 					 else {
-						GridNode gnode = nodes[i] as GridNode;
+						var gnode = nodes[i] as GridNode;
 						
 						if (gnode != null) {
 							GridGraph gg = GridNode.GetGridGraph (gnode.GraphIndex);
@@ -408,7 +458,7 @@ namespace Pathfinding
 							continue;
 						}
 						
-						TriangleMeshNode node = nodes[v] as TriangleMeshNode;
+						var node = nodes[v] as TriangleMeshNode;
 						
 						Vector3 p;
 						
@@ -423,7 +473,7 @@ namespace Pathfinding
 							
 							p = ((Vector3)(node.GetVertex(1)-node.GetVertex(0)))*v1 + ((Vector3)(node.GetVertex(2)-node.GetVertex(0)))*v2 + (Vector3)node.GetVertex(0);
 						} else {
-							GridNode gnode = nodes[v] as GridNode;
+							var gnode = nodes[v] as GridNode;
 							
 							if (gnode != null) {
 								GridGraph gg = GridNode.GetGridGraph (gnode.GraphIndex);
@@ -452,13 +502,12 @@ namespace Pathfinding
 						if (worked) {
 							pts.Add (p);
 							break;
-						} else {
-							testCount++;
 						}
+						testCount++;
 					}
 				}
 				
-				Pathfinding.Util.ListPool<float>.Release(accs);
+				ListPool<float>.Release(accs);
 				
 			} else {
 				for (int i=0;i<count;i++) {

@@ -63,7 +63,7 @@ namespace HutongGames.PlayMaker.Actions {
 		protected override void DoAction() { box.Value = grid.NearestBoxG (worldPoint.Value); }
 	}
 
-	[Tooltip("Aligns a position `Vector3` to the gird's \"spacing\"")]
+	[Tooltip("Aligns a position `Vector3` to the grid's \"spacing\"")]
 	public class GridAlignVector3 : FsmGFStateActionMethodGrid {
 		[RequiredField]
 		public FsmVector3 pos, scale;
@@ -74,7 +74,7 @@ namespace HutongGames.PlayMaker.Actions {
 		protected override void DoAction() { result.Value = grid.AlignVector3 (pos.Value, scale.Value, new BoolVector3 (ignoreX.Value, ignoreY.Value, ignoreZ.Value)); }
 	}
 
-	[Tooltip("Aligns a `Transform`'s position to the gird's \"spacing\"")]
+	[Tooltip("Aligns a `Transform`'s position to the grid's \"spacing\"")]
 	public class GridAlignTransform : FsmGFStateActionMethodGrid {
 		[RequiredField]
 		[CheckForComponent(typeof(Transform))]
@@ -92,7 +92,7 @@ namespace HutongGames.PlayMaker.Actions {
 		}
 	}
 
-	[Tooltip("Scales a direction `Vector3` to the gird's \"spacing\"")]
+	[Tooltip("Scales a direction `Vector3` to the grid's \"spacing\"")]
 	public class GridScaleVector3 : FsmGFStateActionMethodGrid {
 		[RequiredField]
 		public FsmVector3 scl;
@@ -103,7 +103,7 @@ namespace HutongGames.PlayMaker.Actions {
 		protected override void DoAction() { result.Value = grid.ScaleVector3 (scl.Value, new BoolVector3 (ignoreX.Value, ignoreY.Value, ignoreZ.Value)); }
 	}
 
-	[Tooltip("Scales a `Transform`'s scale to the gird's \"spacing\"")]
+	[Tooltip("Scales a `Transform`'s scale to the grid's \"spacing\"")]
 	public class GridScaleTransform : FsmGFStateActionMethodGrid {
 		[RequiredField]
 		[CheckForComponent(typeof(Transform))]

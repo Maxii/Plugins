@@ -164,7 +164,11 @@ public class UILabelInspector : UIWidgetInspector
 
 				EditorGUI.BeginDisabledGroup(true);
 				if (!serializedObject.isEditingMultipleObjects)
-					GUILayout.Label(" Default: " + mLabel.defaultFontSize);
+				{
+					if (mLabel.overflowMethod == UILabel.Overflow.ShrinkContent)
+						GUILayout.Label(" Actual: " + mLabel.finalFontSize + "/" + mLabel.defaultFontSize);
+					else GUILayout.Label(" Default: " + mLabel.defaultFontSize);
+				}
 				EditorGUI.EndDisabledGroup();
 
 				NGUISettings.fontSize = prop.intValue;
@@ -218,6 +222,8 @@ public class UILabelInspector : UIWidgetInspector
 
 			SerializedProperty ov = NGUIEditorTools.DrawPaddedProperty("Overflow", serializedObject, "mOverflow");
 			NGUISettings.overflowStyle = (UILabel.Overflow)ov.intValue;
+			if (NGUISettings.overflowStyle == UILabel.Overflow.ClampContent)
+				NGUIEditorTools.DrawProperty("Use Ellipsis", serializedObject, "mOverflowEllipsis", GUILayout.Width(110f));
 
 			NGUIEditorTools.DrawPaddedProperty("Alignment", serializedObject, "mAlignment");
 

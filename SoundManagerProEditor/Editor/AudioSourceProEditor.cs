@@ -12,8 +12,9 @@ public class AudioSourceProEditor : Editor {
 	private AudioSourcePro script;
 	private AudioSource source;
 	private AnimationCurve curve;
-	private AnimationCurve panCurve;
+	private AnimationCurve spatialCurve;
 	private AnimationCurve spreadCurve;
+	private AnimationCurve reverbCurve;
 	private float rollOffScale = 1f;
 	private bool notAvailable = false;
 	private string nullEvent = "--None--";
@@ -76,8 +77,9 @@ public class AudioSourceProEditor : Editor {
 		{
 			curve = AnimationCurve.Linear(source.minDistance, (1f/(1f+rollOffScale*(source.minDistance-1f))), source.maxDistance, (1f/(1f+rollOffScale*(source.maxDistance-1f))));
 		}
-		panCurve = AnimationCurve.Linear(0f,source.panLevel,0f,source.panLevel);
+		spatialCurve = AnimationCurve.Linear(0f,source.spatialBlend,0f,source.spatialBlend);
 		spreadCurve = AnimationCurve.Linear(0f,source.spread,0f,source.spread);
+		reverbCurve = AnimationCurve.Linear(0f,source.reverbZoneMix,0f,source.reverbZoneMix);
 	}
 	
 	private bool IsColliderEvent(AudioSourceStandardEvent evt)
@@ -147,26 +149,38 @@ public class AudioSourceProEditor : Editor {
 				source.clip = clip;
 				EditorUtility.SetDirty(script);
 			}
-			if(source.clip != null)
-			{
-				AudioImporter importerInfo = AudioImporter.GetAtPath(AssetDatabase.GetAssetPath(source.clip)) as AudioImporter;
-				EditorGUILayout.HelpBox("This is a " + (importerInfo.threeD ? "3D" : "2D") + " Sound.",MessageType.None, false);
-			}
 			break;
 		}
 		#endregion
 		
 		#region audio source settings
 		EditorGUILayout.Space();
+		UnityEngine.Audio.AudioMixerGroup outputAudioMixerGroup = source.outputAudioMixerGroup;
+		outputAudioMixerGroup = EditorGUILayout.ObjectField("Output", outputAudioMixerGroup, typeof(UnityEngine.Audio.AudioMixerGroup),false) as UnityEngine.Audio.AudioMixerGroup;
+		if(outputAudioMixerGroup != source.outputAudioMixerGroup)
+		{
+			SoundManagerEditorTools.RegisterObjectChange("Change Output AudioMixerGroup", script);
+			source.outputAudioMixerGroup = outputAudioMixerGroup;
+			EditorUtility.SetDirty(script);
+		}
 		source.mute = EditorGUILayout.Toggle("Mute", source.mute);
 		source.bypassEffects = EditorGUILayout.Toggle("Bypass Effects", source.bypassEffects);
+		source.bypassListenerEffects = EditorGUILayout.Toggle("Bypass Listener Effects", source.bypassListenerEffects);
+		source.bypassReverbZones = EditorGUILayout.Toggle("Bypass Reverb Zones", source.bypassReverbZones);
 		source.playOnAwake = EditorGUILayout.Toggle("Play On Awake", source.playOnAwake);
 		source.loop = EditorGUILayout.Toggle("Loop", source.loop);
 		EditorGUILayout.Space();
-		source.priority = EditorGUILayout.IntSlider("Priority",source.priority,0,255);
+		source.priority = EditorGUILayout.IntSlider("Priority",source.priority,0,256);
 		EditorGUILayout.Space();
 		source.volume = EditorGUILayout.Slider("Volume",source.volume,0f,1f);
+		EditorGUILayout.Space();
 		source.pitch = EditorGUILayout.Slider("Pitch",source.pitch,-3f,3f);
+		EditorGUILayout.Space();
+		source.panStereo = EditorGUILayout.Slider("Stereo Pan",source.panStereo,-1f,1f);
+		EditorGUILayout.Space();
+		source.spatialBlend = EditorGUILayout.Slider("Spatial Blend",source.spatialBlend,0f,1f);
+		EditorGUILayout.Space();
+		source.reverbZoneMix = EditorGUILayout.Slider("Reverb Zone Mix",source.reverbZoneMix,0f,1.1f);
 		EditorGUILayout.Space();
 		
 		script.ShowEditor3D = EditorGUILayout.Foldout(script.ShowEditor3D, "3D Sound Settings");
@@ -206,7 +220,6 @@ public class AudioSourceProEditor : Editor {
 					source.minDistance = minD;
 				}
 				EditorGUI.indentLevel--;
-				source.panLevel = EditorGUILayout.Slider("Pan Level",source.panLevel,0f,1f);
 				source.spread = EditorGUILayout.Slider("Spread",source.spread,0f,360f);
 				
 				float maxD = source.maxDistance;
@@ -221,35 +234,58 @@ public class AudioSourceProEditor : Editor {
 				GUI.enabled = false;
 				EditorGUILayout.BeginHorizontal();
 				{
-					curve = EditorGUILayout.CurveField(curve, Color.red,new Rect(0f,0f,source.maxDistance,1f), GUILayout.Height(100f), GUILayout.ExpandWidth(true));
-					panCurve = EditorGUILayout.CurveField(panCurve,Color.green,new Rect(0f,0f,source.maxDistance,1f), GUILayout.Height(100f), GUILayout.ExpandWidth(true));
-					spreadCurve = EditorGUILayout.CurveField(spreadCurve,Color.blue,new Rect(0f,0f,source.maxDistance,360f), GUILayout.Height(100f), GUILayout.ExpandWidth(true));
+					curve = EditorGUILayout.CurveField(curve, Color.red,new Rect(0f,0f,source.maxDistance,1f), GUILayout.Height(100f), GUILayout.ExpandWidth(false));
+					spatialCurve = EditorGUILayout.CurveField(spatialCurve,Color.green,new Rect(0f,0f,source.maxDistance,1f), GUILayout.Height(100f), GUILayout.ExpandWidth(false));
 				}
 				EditorGUILayout.EndHorizontal();
-				GUI.enabled = true;
-				
+
 				EditorGUILayout.BeginHorizontal();
 				{
 					GUI.color = Color.red;
-					EditorGUILayout.LabelField("Volume", EditorStyles.whiteLabel, GUILayout.ExpandWidth(true));
+					EditorGUILayout.TextArea("", EditorStyles.miniButton, GUILayout.Width(30f), GUILayout.Height(15f), GUILayout.ExpandWidth(false));
+					GUI.color = Color.white;
+					GUI.enabled = true;
+					GUILayout.Label("Volume");
+					GUI.enabled = false;
+
 					GUI.color = Color.green;
-					EditorGUILayout.LabelField("Pan", EditorStyles.whiteLabel, GUILayout.ExpandWidth(true));
-					GUI.color = Color.blue;
-					EditorGUILayout.LabelField("Spread", EditorStyles.whiteLabel, GUILayout.ExpandWidth(true));
+					EditorGUILayout.TextArea("", EditorStyles.miniButton, GUILayout.Width(30f), GUILayout.Height(15f), GUILayout.ExpandWidth(false));
+					GUI.color = Color.white;
+					GUI.enabled = true;
+					GUILayout.Label("Spatial");
+					GUI.enabled = false;
+
 					GUI.color = Color.white;
 				}
 				EditorGUILayout.EndHorizontal();
-			}
-			EditorGUI.indentLevel--;
-		}
-		EditorGUILayout.Space();
-		script.ShowEditor2D = EditorGUILayout.Foldout(script.ShowEditor2D, "2D Sound Settings");
-		if(script.ShowEditor2D)
-		{
-			EditorGUI.indentLevel++;
-			{
-				source.pan = EditorGUILayout.Slider("Pan 2D",source.pan,-1f,1f);
-				EditorGUILayout.Space();
+
+				EditorGUILayout.BeginHorizontal();
+				{
+					spreadCurve = EditorGUILayout.CurveField(spreadCurve,Color.blue,new Rect(0f,0f,source.maxDistance,360f), GUILayout.Height(100f), GUILayout.ExpandWidth(false));
+					reverbCurve = EditorGUILayout.CurveField(reverbCurve,Color.yellow,new Rect(0f,0f,source.maxDistance,1.1f), GUILayout.Height(100f), GUILayout.ExpandWidth(false));
+				}
+				EditorGUILayout.EndHorizontal();
+
+				EditorGUILayout.BeginHorizontal();
+				{
+					GUI.color = Color.blue;
+					EditorGUILayout.TextArea("", EditorStyles.miniButton, GUILayout.Width(30f), GUILayout.Height(15f), GUILayout.ExpandWidth(false));
+					GUI.color = Color.white;
+					GUI.enabled = true;
+					GUILayout.Label("Spread");
+					GUI.enabled = false;
+
+					GUI.color = Color.yellow;
+					EditorGUILayout.TextArea("", EditorStyles.miniButton, GUILayout.Width(30f), GUILayout.Height(15f), GUILayout.ExpandWidth(false));
+					GUI.color = Color.white;
+					GUI.enabled = true;
+					GUILayout.Label("Reverb");
+					GUI.enabled = false;
+
+					GUI.color = Color.white;
+				}
+				EditorGUILayout.EndHorizontal();
+				GUI.enabled = true;
 			}
 			EditorGUI.indentLevel--;
 		}

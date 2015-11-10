@@ -1,6 +1,4 @@
 using UnityEngine;
-using System.Collections;
-using System.Collections.Generic;
 
 namespace Pathfinding {
 	/** GraphModifier for modifying graphs or processing graph data based on events.
@@ -19,7 +17,7 @@ namespace Pathfinding {
 		private GraphModifier next;
 		
 		public static void FindAllModifiers () {
-			GraphModifier[] arr = FindObjectsOfType(typeof(GraphModifier)) as GraphModifier[];
+			var arr = FindObjectsOfType(typeof(GraphModifier)) as GraphModifier[];
 			for (int i=0;i<arr.Length;i++) {
 				arr[i].OnEnable();
 			}
@@ -74,7 +72,7 @@ namespace Pathfinding {
 			if (root == null) {
 				root = this;
 			} else {
-				this.next = root;
+				next = root;
 				root.prev = this;
 				root = this;
 			}
@@ -83,7 +81,7 @@ namespace Pathfinding {
 		/** Removes this modifier from list of active modifiers */
 		protected virtual void OnDisable () {
 			if (root == this) {
-				root = this.next;
+				root = next;
 				if (root != null) root.prev = null;
 			} else {
 				if (prev != null) prev.next = next;

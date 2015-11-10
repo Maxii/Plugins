@@ -6,7 +6,7 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}</ProjectGuid>
+    <ProjectGuid>{52F03259-41A7-445F-8D51-1BCDD5AE7520}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>SciFiEffects</RootNamespace>
@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_5_0</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -36,8 +36,13 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
-    <Reference Include="UnityEngine">
-      <HintPath>$(ProgramFiles)\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
+    <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\UnityExtensions\Unity\GUISystem\UnityEngine.UI.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -47,17 +52,27 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Examples\F3DBurnoutExample.cs" />
+    <Compile Include="Examples\F3DDummyEvent.cs" />
+    <Compile Include="Examples\F3DMissileLauncher.cs" />
+    <Compile Include="Examples\F3DNebula.cs" />
+    <Compile Include="Examples\F3DTrailExample.cs" />
+    <Compile Include="Examples\F3DTurnTable.cs" />
     <Compile Include="F3DAudioController.cs" />
     <Compile Include="F3DBeam.cs" />
+    <Compile Include="F3DCurvedBeam.cs" />
     <Compile Include="F3DDespawn.cs" />
     <Compile Include="F3DFlameThrower.cs" />
     <Compile Include="F3DFXController.cs" />
     <Compile Include="F3DLightning.cs" />
+    <Compile Include="F3DMissile.cs" />
     <Compile Include="F3DParticleScale.cs" />
     <Compile Include="F3DPool.cs" />
+    <Compile Include="F3DPredictTrajectory.cs" />
     <Compile Include="F3DProjectile.cs" />
     <Compile Include="F3DPulsewave.cs" />
     <Compile Include="F3DRandomize.cs" />
+    <Compile Include="F3DRift.cs" />
     <Compile Include="F3DShotgun.cs" />
     <Compile Include="F3DTime.cs" />
     <Compile Include="F3DTurret.cs" />

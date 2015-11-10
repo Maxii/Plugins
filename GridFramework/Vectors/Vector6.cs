@@ -4,42 +4,55 @@ using System;
 namespace GridFramework {
 	namespace Vectors {
 		/// <summary>Enumeration of the possible axis combinations.</summary>
-		/// The enumeraion's corresponding integer numers start at 0 and increment by one.
+		/// The enumeration's corresponding integer numbers start at 0 and increment by one.
 		public enum Axis2 {
-			xy, ///< integer value 0
-			xz, ///< integer value 1
-			yx, ///< integer value 2
-			yz, ///< integer value 3
-			zx, ///< integer value 4
-			zy  ///< integer value 5
+			xy, ///< Integer value 0.
+			xz, ///< Integer value 1.
+			yx, ///< Integer value 2.
+			yz, ///< Integer value 3.
+			zx, ///< Integer value 4.
+			zy  ///< Integer value 5.
 		};
 
 		/// <summary>Enumeration of the three possible axes.</summary>
 		public enum Axis {
-			x, ///< integer value 0
-			y, ///< integer value 1
-			z  ///< integer value 2
+			x, ///< Integer value 0.
+			y, ///< Integer value 1.
+			z  ///< Integer value 2.
 		};
 		
-		/// <summary>Class representing six adjacent float values for the shearing of a rectangular grid.</summary>
-		/// This class is based on Unity's own _Vector3_ struct and can be used in a similar way. It resides in Grid
-		/// Framework's own namespace to prevent collision with similar types from other plugins or a future official
-		/// Unity _Vector6_ type.
+		/// <summary>
+		///   Class representing six adjacent float values for the shearing of
+		///   a rectangular grid.
+		/// </summary>
+		/// This class is based on Unity's own _Vector3_ struct and can be used
+		/// in a similar way. It resides in Grid Framework's own namespace to
+		/// prevent collision with similar types from other plugins or a future
+		/// official Unity _Vector6_ type.
 		/// 
-		/// The API is mostly the same as for _Vector3_, except in places where it wouldn't make sense. The individual
-		/// components are named to reflect their shearing nature accorrding to the following pattern: "ab" where _a_
-		/// is either _x_, _y_ or _z_ and _b_ is another axis different from _a_. Two adjacent values belonging to the
-		/// same axis can also be accessed as a _Vector2_, like for example _yx_ and _yz_, but not _xz_ and _yx_.
+		/// The API is mostly the same as for _Vector3_, except in places where
+		/// it wouldn't make sense. The individual components are named to
+		/// reflect their shearing nature according to the following pattern:
+		/// "ab" where _a_ is either _x_, _y_ or _z_ and _b_ is another axis
+		/// different from _a_. Two adjacent values belonging to the same axis
+		/// can also be accessed as a _Vector2_, like for example _yx_ and
+		/// _yz_, but not _xz_ and _yx_.
 		/// 
-		/// Note that _Vector6_ is a class, not a struct, unlike Unity's Vector3. This was done for technical reasons due
-		/// to Unity. It is generally not an issue, but you should avoid throwing out _Vector6_ left and right like you can
-		/// do with _Vector3_. Also, keep in mind that classes are always passed by reference, while structs are passed by
-		/// value. If you need to assign new values use the `Set` methods instead of assigning a new instance to a variable.
-		/// If you need arithmetic or comparison methods there are always two available: one that operates on an instance
-		/// and mutates it rather than creating a new instance, and a static one that does return a new instance but does
-		/// not mutate its arguments. Also note that the operators create new instances rather than mutating existing ones.
+		/// Note that _Vector6_ is a class, not a struct, unlike Unity's
+		/// _Vector3_. This was done for technical reasons due to Unity. It is
+		/// generally not an issue, but you should avoid throwing out _Vector6_
+		/// left and right like you can do with _Vector3_. Also, keep in mind
+		/// that classes are always passed by reference, while structs are
+		/// passed by value. If you need to assign new values use the `Set`
+		/// methods instead of assigning a new instance to a variable.  If you
+		/// need arithmetic or comparison methods there are always two
+		/// available: one that operates on an instance and mutates it rather
+		/// than creating a new instance, and a static one that does return a
+		/// new instance but does not mutate its arguments. Also note that the
+		/// operators create new instances rather than mutating existing ones.
 		///
-		/// The individual components are indexed as follows: _xy_=0, _xz_=1, _yx_=2, _yz_=3, _zx_=4, _zy_=5.
+		/// The individual components are indexed as follows: _xy_=0, _xz_=1,
+		/// _yx_=2, _yz_=3, _zx_=4, _zy_=5.
 		[System.Serializable]
 		public class Vector6 : IEquatable<Vector6> {
 	
@@ -189,7 +202,7 @@ namespace GridFramework {
 			}
 			/// <summary>Adds two vectors and returns the result as a new vector.</summary>
 			public static Vector6 Add(Vector6 summand1, Vector6 summand2) {
-				Vector6 sum = new Vector6(summand1);
+				var sum = new Vector6(summand1);
 				sum.Add(summand2);
 				return sum;
 			}
@@ -201,7 +214,7 @@ namespace GridFramework {
 			}
 			/// <summary>Subtracts two vectors and returns the result as a new vector.</summary>
 			public static Vector6 Subtract(Vector6 minuend, Vector6 subtrahend) {
-				Vector6 difference = new Vector6(minuend);
+				var difference = new Vector6(minuend);
 				difference.Subtract(subtrahend);
 				return difference;
 			}
@@ -213,7 +226,7 @@ namespace GridFramework {
 			}
 			/// <summary>Negates a vector and returns the result as a new vector.</summary>
 			public static Vector6 Negate(Vector6 value) {
-				Vector6 negative = new Vector6(value);
+				var negative = new Vector6(value);
 				negative.Negate();
 				return negative;
 			}
@@ -230,15 +243,21 @@ namespace GridFramework {
 					values[i] *= factor;
 				}
 			}
-			/// <summary>Scales a vector component-wise with another vector and returns the result as a new vector.</summary>
+			/// <summary>
+			///   Scales a vector component-wise with another vector and
+			///   returns the result as a new vector.
+			/// </summary>
 			public static Vector6 Scale(Vector6 factor1, Vector6 factor2) {
-				Vector6 product = new Vector6(factor1);
+				var product = new Vector6(factor1);
 				product.Scale(factor2);
 				return product;
 			}
-			/// <summary>Scales a vector component-wise with a scalar factor and returns the result as a new vector.</summary>
+			/// <summary>
+			///   Scales a vector component-wise with a scalar factor and
+			///   returns the result as a new vector.
+			/// </summary>
 			public static Vector6 Scale(Vector6 vector, float factor) {
-				Vector6 product = new Vector6(vector);
+				var product = new Vector6(vector);
 				product.Scale(factor);
 				return product;
 			}
@@ -252,7 +271,7 @@ namespace GridFramework {
 			}
 			/// <summary>Creates a new vector as the component-wise maximum of two vectors.</summary>
 			public static Vector6 Max(Vector6 lhs, Vector6 rhs) {
-				Vector6 max = new Vector6(lhs);
+				var max = new Vector6(lhs);
 				max.Max(rhs);
 				return max;
 			}
@@ -265,7 +284,7 @@ namespace GridFramework {
 			}
 			/// <summary>Creates a new vector as the component-wise minimum of two vectors.</summary>
 			public static Vector6 Min(Vector6 lhs, Vector6 rhs) {
-				Vector6 min = new Vector6(lhs);
+				var min = new Vector6(lhs);
 				min.Min(rhs);
 				return min;
 			}
@@ -277,9 +296,12 @@ namespace GridFramework {
 					values[i] = Mathf.Lerp(values[i], towards[i], t);
 				}
 			}
-			/// <summary>Linearly interpolates two vectors and returns the result as a new vector.</summary>
+			/// <summary>
+			///   Linearly interpolates two vectors and returns the result as a
+			///   new vector.
+			/// </summary>
 			public static Vector6 Lerp(Vector6 from, Vector6 to, float t) {
-				Vector6 lerp = new Vector6(from);
+				var lerp = new Vector6(from);
 				lerp.Lerp(to, t);
 				return lerp;
 			}
@@ -305,7 +327,7 @@ namespace GridFramework {
 					return false;
 				}
 				// If parameter cannot be cast to Vector6 return false.
-				Vector6 v = obj as Vector6;
+				var v = obj as Vector6;
 				if ((System.Object)v == null) {
 					return false;
 				}
@@ -333,7 +355,7 @@ namespace GridFramework {
 			public static Vector6 operator -(Vector6 lhs, Vector6 rhs) {
 				return Vector6.Subtract(lhs, rhs);
 			}
-			/// <summary>Creates a new vector as the negationn of a vector.</summary>
+			/// <summary>Creates a new vector as the negation of a vector.</summary>
 			public static Vector6 operator -(Vector6 value) {
 				return Vector6.Negate(value);
 			}
@@ -341,11 +363,17 @@ namespace GridFramework {
 			public static Vector6 operator *(Vector6 vector, float scalar) {
 				return Vector6.Scale(vector, scalar);
 			}
-			/// <summary>Creates a new vector as the component-wise product of a vector and a scalar.</summary>
+			/// <summary>
+			///   Creates a new vector as the component-wise product of a
+			///   vector and a scalar.
+			/// </summary>
 			public static Vector6 operator *(float scalar, Vector6 vector) {
 				return Vector6.Scale(vector, scalar);
 			}
-			/// <summary>Creates a new vector as the component-wise quotient of two vectors.</summary>
+			/// <summary>
+			///   Creates a new vector as the component-wise quotient of two
+			///   vectors.
+			/// </summary>
 			public static Vector6 operator /(Vector6 vector, float scalar) {
 				return Vector6.Scale(vector, 1.0f / scalar);
 			}

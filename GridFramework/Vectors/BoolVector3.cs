@@ -2,13 +2,14 @@ using UnityEngine;
 
 namespace GridFramework {
 	namespace Vectors {
-	/// <summary>A class that holds three booleans as X-, Y- and Z-value.</summary>
-		/// This class groups three booleans together, similar to how Vector3 groups three float numbers together.
-		/// Just like Vector3 you can read and assign values using x, y, or an indexer.
+		/// <summary>A class that holds three booleans as X-, Y- and Z-value.</summary>
+		/// This class groups three booleans together, similar to how Vector3
+		/// groups three float numbers together.  Just like Vector3 you can
+		/// read and assign values using x, y, or an indexer.
 		[System.Serializable]
 		public class BoolVector3 {
 			[SerializeField]
-			private bool[] values = new bool[3] {false, false, false};
+			private bool[] values = {false, false, false};
 			
 			/// <summary>X component of the bool vector.</summary>
 			public bool x {
@@ -31,7 +32,7 @@ namespace GridFramework {
 			/// Access the x, y, z components using [0], [1], [2] respectively. Example:
 			/// <code>
 			/// BoolVector3 b = new BoolVector3();
-			/// b[1] = true; // the same as b.y = true
+			/// b[1] = true; // the same as `b.y = true`
 			/// </code>
 			public bool this[int index]{
 				get {return values [index];}
@@ -43,7 +44,6 @@ namespace GridFramework {
 			/// <param name="y">Y value.</param>
 			/// <param name="z">Z value.</param>
 			public BoolVector3(bool x, bool y, bool z){
-				//values = new bool[3] { x, y, z };
 				values [0] = x;
 				values [1] = y;
 				values [2] = z;
@@ -59,7 +59,7 @@ namespace GridFramework {
 			
 			/// <summary>Creates a new BoolVector3 set to a condition.</summary>
 			/// <param name="condition">The value to be used for all components.</param>
-			/// reates a new BoolVector3 set to <c>condition</c>.
+			/// Creates a new BoolVector3 set to <c>condition</c>.
 			public BoolVector3(bool condition){
 				values [0] = condition;
 				values [1] = condition;

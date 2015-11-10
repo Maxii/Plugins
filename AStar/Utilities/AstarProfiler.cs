@@ -1,6 +1,6 @@
 //Uncomment the next line to enable debugging (also uncomment it in AstarPath.cs)
 //#define ProfileAstar //@SHOWINEDITOR
-//#define UNITY_PRO_PROFILER //@SHOWINEDITOR Requires ProfileAstar, profiles section of astar code which will show up in the Unity Pro Profiler.
+//#define ASTAR_UNITY_PRO_PROFILER //@SHOWINEDITOR Requires ProfileAstar, profiles section of astar code which will show up in the Unity Pro Profiler.
 
 using System.Collections.Generic;
 using System;
@@ -63,7 +63,7 @@ namespace Pathfinding {
 			//fastProfiles[tag] = point;
 		}
 		
-		[System.Diagnostics.Conditional ("UNITY_PRO_PROFILER")]
+		[System.Diagnostics.Conditional ("ASTAR_UNITY_PRO_PROFILER")]
 		public static void EndProfile () {
 			Profiler.EndSample ();
 		}

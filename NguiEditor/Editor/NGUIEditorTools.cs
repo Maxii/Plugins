@@ -1460,8 +1460,9 @@ public static class NGUIEditorTools
 			if (NGUISettings.minimalisticLook) padding = false;
 
 			if (padding) EditorGUILayout.BeginHorizontal();
-			
-			if (label != null) EditorGUILayout.PropertyField(sp, new GUIContent(label), options);
+
+			if (sp.isArray && sp.type != "string") DrawArray(serializedObject, property, label ?? property);
+			else if (label != null) EditorGUILayout.PropertyField(sp, new GUIContent(label), options);
 			else EditorGUILayout.PropertyField(sp, options);
 
 			if (padding) 
@@ -1471,6 +1472,33 @@ public static class NGUIEditorTools
 			}
 		}
 		return sp;
+	}
+
+	/// <summary>
+	/// Helper function that draws an array property.
+	/// </summary>
+
+	static public void DrawArray (SerializedObject obj, string property, string title)
+	{
+		SerializedProperty sp = obj.FindProperty(property + ".Array.size");
+
+		if (sp != null && NGUIEditorTools.DrawHeader(title))
+		{
+			NGUIEditorTools.BeginContents();
+			int size = sp.intValue;
+			int newSize = EditorGUILayout.IntField("Size", size);
+			if (newSize != size) obj.FindProperty(property + ".Array.size").intValue = newSize;
+
+			EditorGUI.indentLevel = 1;
+
+			for (int i = 0; i < newSize; i++)
+			{
+				SerializedProperty p = obj.FindProperty(string.Format("{0}.Array.data[{1}]", property, i));
+				EditorGUILayout.PropertyField(p);
+			}
+			EditorGUI.indentLevel = 0;
+			NGUIEditorTools.EndContents();
+		}
 	}
 
 	/// <summary>

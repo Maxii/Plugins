@@ -51,7 +51,7 @@ public abstract class GFGridEditor : Editor {
 	#endregion
 	
 	#region groups of common fields
-	protected virtual void SizeFields () {
+	protected void SizeFields () {
 		_grid.useCustomRenderRange = EditorGUILayout.Toggle("Custom Render Range", _grid.useCustomRenderRange);
 		if (_grid.useCustomRenderRange) {
 			_grid.renderFrom = EditorGUILayout.Vector3Field("Render From", _grid.renderFrom);

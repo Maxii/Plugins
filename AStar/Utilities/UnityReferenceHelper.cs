@@ -1,5 +1,4 @@
 using UnityEngine;
-using System.Collections;
 using Pathfinding;
 
 namespace Pathfinding {
@@ -22,7 +21,7 @@ namespace Pathfinding {
 		}
 		
 		public void Reset () {
-			if (guid == null || guid == "") {
+			if (string.IsNullOrEmpty (guid)) {
 				guid = Pathfinding.Util.Guid.NewGuid ().ToString ();
 				Debug.Log ("Created new GUID - "+guid);
 			} else {

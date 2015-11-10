@@ -957,24 +957,10 @@ static public class NGUITools
 	/// Add a new widget of specified type.
 	/// </summary>
 
-	static public T AddWidget<T> (GameObject go) where T : UIWidget
+	static public T AddWidget<T> (GameObject go, int depth = int.MaxValue) where T : UIWidget
 	{
-		int depth = CalculateNextDepth(go);
+		if (depth == int.MaxValue) depth = CalculateNextDepth(go);
 
-		// Create the widget and place it above other widgets
-		T widget = AddChild<T>(go);
-		widget.width = 100;
-		widget.height = 100;
-		widget.depth = depth;
-		return widget;
-	}
-
-	/// <summary>
-	/// Add a new widget of specified type.
-	/// </summary>
-
-	static public T AddWidget<T> (GameObject go, int depth) where T : UIWidget
-	{
 		// Create the widget and place it above other widgets
 		T widget = AddChild<T>(go);
 		widget.width = 100;
@@ -988,10 +974,10 @@ static public class NGUITools
 	/// It will be sliced if the sprite has an inner rect, and a regular sprite otherwise.
 	/// </summary>
 
-	static public UISprite AddSprite (GameObject go, UIAtlas atlas, string spriteName)
+	static public UISprite AddSprite (GameObject go, UIAtlas atlas, string spriteName, int depth = int.MaxValue)
 	{
 		UISpriteData sp = (atlas != null) ? atlas.GetSprite(spriteName) : null;
-		UISprite sprite = AddWidget<UISprite>(go);
+		UISprite sprite = AddWidget<UISprite>(go, depth);
 		sprite.type = (sp == null || !sp.hasBorder) ? UISprite.Type.Simple : UISprite.Type.Sliced;
 		sprite.atlas = atlas;
 		sprite.spriteName = spriteName;

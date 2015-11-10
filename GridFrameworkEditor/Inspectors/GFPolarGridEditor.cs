@@ -6,11 +6,6 @@ using GridFramework;
 public class GFPolarGridEditor : GFGridEditor {
 	protected GFPolarGrid _pGrid {get{return (GFPolarGrid)_grid;}}
 	
-	protected override void SizeFields (){
-		_grid.relativeSize = EditorGUILayout.Toggle("Relative Size", _grid.relativeSize);
-		_grid.size = EditorGUILayout.Vector3Field("Size", _grid.size);
-	}
-	
 	protected override void SpacingFields () {
 		_pGrid.radius  = EditorGUILayout.FloatField("Radius", _pGrid.radius);
 		_pGrid.sectors = EditorGUILayout.IntField("Sectors", _pGrid.sectors);

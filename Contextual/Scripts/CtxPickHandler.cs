@@ -1,6 +1,6 @@
 //=========================================================
 // Contextual: Context Menus for Unity & NGUI
-// Copyright © 2013 Troy Heere
+// Copyright Â© 2013 Troy Heere
 //=========================================================
 using UnityEngine;
 using System.Collections;
@@ -108,14 +108,14 @@ public class CtxPickHandler : MonoBehaviour
 	
 	CtxObject Pick(Vector3 mousePos)
 	{
-		Camera cam = camera;
+		Camera cam = GetComponent<Camera>();
 		if (cam == null)
 			cam = Camera.main;
 		
 		Ray ray = cam.ScreenPointToRay(mousePos);
 
 		RaycastHit hit = new RaycastHit();
-		int layerMask = (pickLayers != 0) ? pickLayers : Physics.kDefaultRaycastLayers;
+		int layerMask = (pickLayers != 0) ? pickLayers : Physics.DefaultRaycastLayers;
 		
 		if (Physics.Raycast(ray, out hit, float.PositiveInfinity, layerMask))
 		{

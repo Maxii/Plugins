@@ -1,5 +1,4 @@
 using UnityEngine;
-using System.Collections;
 using Pathfinding;
 
 namespace Pathfinding {
@@ -64,26 +63,7 @@ namespace Pathfinding {
 		}
 		
 		public bool Contains (GraphNode node) {
-			
-			Vector3 point = (Vector3)node.position;
-			
-			//Debug.DrawRay (node.position,-Vector3.up*2,Color.magenta);
-			
-			if (convex) {
-				if (_convexPoints == null) return false;
-				
-				for (int i=0,j=_convexPoints.Length-1;i<_convexPoints.Length;j=i,i++) {
-					if (Polygon.Left (_convexPoints[i],_convexPoints[j],point)) return false;
-				}
-			} else {
-				if (_points	== null) return false;
-				
-				return Polygon.ContainsPoint (_points,point);
-			}
-			
-			//Debug.DrawRay (node.position,Vector3.up*2,Color.blue);
-			
-			return true;
+			return Contains((Vector3)node.position);
 		}
 		
 		public bool Contains (Vector3 point) {
@@ -93,13 +73,10 @@ namespace Pathfinding {
 				for (int i=0,j=_convexPoints.Length-1;i<_convexPoints.Length;j=i,i++) {
 					if (Polygon.Left (_convexPoints[i],_convexPoints[j],point)) return false;
 				}
+				return true;
 			} else {
-				if (_points	== null) return false;
-				
-				return Polygon.ContainsPoint (_points,point);
+				return _points != null && Polygon.ContainsPoint (_points,point);
 			}
-			
-			return true;
 		}
 	}
 }

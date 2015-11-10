@@ -1,16 +1,5 @@
-//#define ASTAR_NoTagPenalty		//Enables or disables tag penalties. Can give small performance boost
-
-#if UNITY_4_0 || UNITY_4_1 || UNITY_4_2 || UNITY_3_5 || UNITY_3_4 || UNITY_3_3
-#define UNITY_LE_4_3
-#endif
-
-#if !UNITY_3_5 && !UNITY_3_4 && !UNITY_3_3
-#define UNITY_4
-#endif
-
 using UnityEngine;
 using UnityEditor;
-using System.Collections;
 using System.Collections.Generic;
 using Pathfinding;
 
@@ -18,21 +7,22 @@ using Pathfinding;
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(Seeker))]
 public class SeekerEditor : Editor {
-	
-	public static bool modifiersOpen = false;
-	public static bool tagPenaltiesOpen = false;
-	
-	List<IPathModifier> mods = null;
+
+	static bool modifiersOpen;
+	static bool tagPenaltiesOpen;
+
+	List<IPathModifier> mods;
+
 	public override void OnInspectorGUI () {
 		DrawDefaultInspector ();
-		
-		Seeker script = target as Seeker;
 
-#if !UNITY_LE_4_3
+		var script = target as Seeker;
+
 		Undo.RecordObject ( script, "modify settings on Seeker");
-#endif
 
-		EditorGUILayoutx.SetTagField (new GUIContent ("Valid Tags"),ref script.traversableTags);
+		// Show a dropdown selector for the tags that this seeker can traverse
+		// A callback is necessary because Unity's GenericMenu uses callbacks
+		EditorGUILayoutx.TagMaskField (new GUIContent ("Valid Tags"), script.traversableTags, result => script.traversableTags = result);
 
 		EditorGUI.indentLevel=0;
 		tagPenaltiesOpen = EditorGUILayout.Foldout (tagPenaltiesOpen,new GUIContent ("Tag Penalties","Penalties for each tag"));
@@ -42,29 +32,26 @@ public class SeekerEditor : Editor {
 			for (int i=0;i<script.tagPenalties.Length;i++) {
 				int tmp = EditorGUILayout.IntField ((i < tagNames.Length ? tagNames[i] : "Tag "+i),(int)script.tagPenalties[i]);
 				if (tmp < 0) tmp = 0;
-				script.tagPenalties[i] = tmp;
+
+				// If the new value is different than the old one
+				// Update the value and mark the script as dirty
+				if (script.tagPenalties[i] != tmp) {
+					script.tagPenalties[i] = tmp;
+					EditorUtility.SetDirty (target);
+				}
 			}
 			if (GUILayout.Button ("Edit Tag Names...")) {
 				AstarPathEditor.EditTags ();
 			}
 		}
 		EditorGUI.indentLevel=1;
-		
+
 		//Do some loading and checking
 		if (!AstarPathEditor.stylesLoaded) {
-			if (!AstarPathEditor.LoadStyles ()) {
-				
-				if (AstarPathEditor.upArrow == null) {
-					AstarPathEditor.upArrow = GUI.skin.FindStyle ("Button");
-					AstarPathEditor.downArrow = AstarPathEditor.upArrow;
-				}
-			} else {
-				AstarPathEditor.stylesLoaded = true;
-			}
+			AstarPathEditor.LoadStyles ();
 		}
 
 		GUIStyle helpBox = GUI.skin.GetStyle ("helpBox");
-
 
 		if (mods == null) {
 			mods = new List<IPathModifier>(script.GetComponents<MonoModifier>() as IPathModifier[]);
@@ -72,9 +59,9 @@ public class SeekerEditor : Editor {
 			mods.Clear ();
 			mods.AddRange (script.GetComponents<MonoModifier>() as IPathModifier[]);
 		}
-		
-		mods.Add (script.startEndModifier as IPathModifier);
-		
+
+		mods.Add (script.startEndModifier);
+
 		bool changed = true;
 		while (changed) {
 			changed = false;
@@ -87,88 +74,71 @@ public class SeekerEditor : Editor {
 				}
 			}
 		}
-		
+
 		for (int i=0;i<mods.Count;i++) {
 			if (mods.Count-i != mods[i].Priority) {
 				mods[i].Priority = mods.Count-i;
 				GUI.changed = true;
 				EditorUtility.SetDirty (target);
+
+				SetModifierDirty (mods[i]);
 			}
 		}
-		
+
 		bool modifierErrors = false;
-		
+
 		IPathModifier prevMod = mods[0];
-		
+
 		//Loops through all modifiers and checks if there are any errors in converting output between modifiers
 		for (int i=1;i<mods.Count;i++) {
-			MonoModifier monoMod = mods[i] as MonoModifier;
+			var monoMod = mods[i] as MonoModifier;
 			if ((prevMod as MonoModifier) != null && !(prevMod as MonoModifier).enabled) {
 				if (monoMod == null || monoMod.enabled) prevMod = mods[i];
 				continue;
 			}
-			
+
 			if ((monoMod == null || monoMod.enabled) && prevMod != mods[i] && !ModifierConverter.CanConvert (prevMod.output, mods[i].input)) {
 				modifierErrors = true;
 			}
-			
+
 			if (monoMod == null || monoMod.enabled) {
 				prevMod = mods[i];
 			}
 		}
-		
-		EditorGUI.indentLevel = 0;
-		
-#if UNITY_LE_4_3
-		modifiersOpen = EditorGUILayout.Foldout (modifiersOpen, "Modifiers Priorities"+(modifierErrors ? " - Errors in modifiers!" : ""),EditorStyles.foldout);
-#else
-		modifiersOpen = EditorGUILayout.Foldout (modifiersOpen, "Modifiers Priorities"+(modifierErrors ? " - Errors in modifiers!" : ""));
-#endif
 
-#if UNITY_LE_4_3
-		EditorGUI.indentLevel = 1;
-#endif
+		EditorGUI.indentLevel = 0;
+
+		modifiersOpen = EditorGUILayout.Foldout (modifiersOpen, "Modifiers Priorities"+(modifierErrors ? " - Errors in modifiers!" : ""));
 
 		if (modifiersOpen) {
-#if UNITY_LE_4_3
-			EditorGUI.indentLevel+= 2;
-#endif
-
-			//GUILayout.BeginHorizontal ();
-			//GUILayout.Space (28);
 			if (GUILayout.Button ("Modifiers attached to this gameObject are listed here.\nModifiers with a higher priority (higher up in the list) will be executed first.\nClick here for more info",helpBox)) {
-				Application.OpenURL (AstarPathEditor.GetURL ("modifiers"));
+				Application.OpenURL (AstarUpdateChecker.GetURL ("modifiers"));
 			}
-
 
 			EditorGUILayout.HelpBox ("Original or All can be converted to anything\n" +
 			    "NodePath can be converted to VectorPath\n"+
 				"VectorPath can only be used as VectorPath\n"+
 			    "Vector takes both VectorPath and StrictVectorPath\n"+
 			    "Strict... can be converted to the non-strict variant", MessageType.None );
-			//GUILayout.EndHorizontal ();
-			
+
 			prevMod = mods[0];
-			
+
 			for (int i=0;i<mods.Count;i++) {
-				
-				//EditorGUILayout.LabelField (mods[i].GetType ().ToString (),mods[i].Priority.ToString ());
-				MonoModifier monoMod = mods[i] as MonoModifier;
-				
+
+				var monoMod = mods[i] as MonoModifier;
+
 				Color prevCol = GUI.color;
 				if (monoMod != null && !monoMod.enabled) {
 					GUI.color *= new Color (1,1,1,0.5F);
 				}
-				
+
 				GUILayout.BeginVertical (GUI.skin.box);
-				
+
 				if (i > 0) {
-					
-					
 					if ((prevMod as MonoModifier) != null && !(prevMod as MonoModifier).enabled) {
 						prevMod = mods[i];
 					} else {
-						
+
 						if ((monoMod == null || monoMod.enabled) && !ModifierConverter.CanConvert (prevMod.output, mods[i].input)) {
 							//GUILayout.BeginHorizontal ();
 							//GUILayout.Space (28);
@@ -177,36 +147,56 @@ public class SeekerEditor : Editor {
 							GUIUtilityx.ResetColor ();
 							//GUILayout.EndHorizontal ();
 						}
-						
+
 						if (monoMod == null || monoMod.enabled) {
 							prevMod = mods[i];
 						}
 					}
 				}
-				
+
 				GUILayout.Label ("Input: "+mods[i].input,EditorStyles.wordWrappedMiniLabel);
 				int newPrio = EditorGUILayoutx.UpDownArrows (new GUIContent (ObjectNames.NicifyVariableName (mods[i].GetType ().ToString ())),mods[i].Priority, EditorStyles.label, AstarPathEditor.upArrow,AstarPathEditor.downArrow);
-				
+
 				GUILayout.Label ("Output: "+mods[i].output,EditorStyles.wordWrappedMiniLabel);
-				
+
 				GUILayout.EndVertical ();
-				
+
 				int diff = newPrio - mods[i].Priority;
-				
+
 				if (i > 0 && diff > 0) {
 					mods[i-1].Priority = mods[i].Priority;
+					SetModifierDirty (mods[i-1]);
 				} else if (i < mods.Count-1 && diff < 0) {
 					mods[i+1].Priority = mods[i].Priority;
+					SetModifierDirty (mods[i+1]);
 				}
-				
-				mods[i].Priority = newPrio;
-				
+
+				if (mods[i].Priority != newPrio) {
+					mods[i].Priority = newPrio;
+					SetModifierDirty (mods[i]);
+				}
+
+
 				GUI.color = prevCol;
 			}
 
-#if UNITY_LE_4_3
 			EditorGUI.indentLevel-= 2;
-#endif
+
+		}
+
+		if (GUI.changed) {
+			EditorUtility.SetDirty (target);
+		}
+	}
+
+	/** Calls EditorUtility.SetDirty on the modifier */
+	static void SetModifierDirty (IPathModifier modifier) {
+		var unityObj = modifier as UnityEngine.Object;
+
+		// Try to mark the modifier as dirty
+		// Not all modifiers are unity objects
+		if (unityObj != null) {
+			EditorUtility.SetDirty (unityObj);
 		}
 	}
 }

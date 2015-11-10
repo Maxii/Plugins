@@ -16,7 +16,7 @@ namespace HutongGames.PlayMaker.Actions {
 		[RequiredField]
 		[CheckForComponent(typeof(GFGrid))]
 		[Tooltip("GameObject that carries the grid, defaults to the owner of the FSM.")]
-		/// <summary>The GameObject that carries the grid this action will refert to.</summary>
+		/// <summary>The GameObject that carries the grid this action will refer to.</summary>
 		public FsmOwnerDefault gridGameObject;
 		/// <summary>The actual grid component used for all actions.</summary>
 		protected T grid;
@@ -50,21 +50,20 @@ namespace HutongGames.PlayMaker.Actions {
 		}
 
 		/// <summary>Makes sure the `grid` is set to something.</summary>
-		/// The method assigns a gid component to the `grid` instance variable. If is fails in finding the 
+		/// The method assigns a grid component to the `grid` instance variable. If is fails in finding the 
 		/// component it will return `false`, preventing null exceptions.
 		/// 
 		/// First the method tries if there is already a variable to the grid component. If not, then it tries 
 		/// to find a component on the given gameObject (by default the owner). If yes, then it uses that.
 		protected bool SetupCaches () {
-			//if (!Fsm.GetOwnerDefaultTarget (gridGameObject))
-			//	return false;
 			grid = Fsm.GetOwnerDefaultTarget (gridGameObject).GetComponent<T> ();
 			return (grid != null);
 		}
 		#endregion
 	}
 
-	// The following inheritance steps are not really necessary, but they make it easier to categorize actions based on their types.
+	// The following inheritance steps are not really necessary, but they make
+	// it easier to categorize actions based on their types.
 	#region Get & Set actions
 	/// <summary>Abstract class for all Grid Framework Playmaker Get&Set actions.</summary>
 	public abstract class FsmGFStateActionGetSet<T> : FsmGFStateAction<T> where T : GFGrid {}

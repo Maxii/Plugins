@@ -2,7 +2,6 @@
 using UnityEngine;
 using System.Collections;
 using Pathfinding;
-using Pathfinding.Nodes;
 using System.Collections.Generic;
 using Pathfinding.Serialization;
 

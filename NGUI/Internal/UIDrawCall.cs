@@ -257,7 +257,7 @@ public class UIDrawCall : MonoBehaviour
 	{
 		mTextureClip = false;
 		mLegacyShader = false;
-		mClipCount = panel.clipCount;
+		mClipCount = (panel != null) ? panel.clipCount : 0;
 
 		string shaderName = (mShader != null) ? mShader.name :
 			((mMaterial != null) ? mMaterial.shader.name : "Unlit/Transparent Colored");
@@ -284,7 +284,7 @@ public class UIDrawCall : MonoBehaviour
 		const string textureClip = " (TextureClip)";
 		shaderName = shaderName.Replace(textureClip, "");
 
-		if (panel.clipping == Clipping.TextureMask)
+		if (panel != null && panel.clipping == Clipping.TextureMask)
 		{
 			mTextureClip = true;
 			shader = Shader.Find("Hidden/" + shaderName + textureClip);
@@ -362,6 +362,8 @@ public class UIDrawCall : MonoBehaviour
 
 	void UpdateMaterials ()
 	{
+		if (panel == null) return;
+
 		// If clipping should be used, we need to find a replacement shader
 		if (mRebuildMat || mDynamicMat == null || mClipCount != panel.clipCount || mTextureClip != (panel.clipping == Clipping.TextureMask))
 		{
@@ -416,7 +418,7 @@ public class UIDrawCall : MonoBehaviour
 					(tans.buffer != null && tans.buffer.Length != verts.buffer.Length);
 
 				// Non-automatic render queues rely on Z position, so it's a good idea to trim everything
-				if (!trim && panel.renderQueue != UIPanel.RenderQueue.Automatic)
+				if (!trim && panel != null && panel.renderQueue != UIPanel.RenderQueue.Automatic)
 					trim = (mMesh == null || mMesh.vertexCount != verts.buffer.Length);
 
 				// NOTE: Apparently there is a bug with Adreno devices:

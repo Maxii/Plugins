@@ -1,5 +1,3 @@
-using UnityEngine;
-using System.Collections;
 using System;
 #if NETFX_CORE
 using System.Threading;
@@ -11,7 +9,7 @@ using TP = System.Type;
 #endif
 
 namespace Pathfinding.WindowsStore {
-	public class WindowsStoreCompatibility {
+	public static class WindowsStoreCompatibility {
 		public static System.Type GetTypeFromInfo ( TP type ) {
 #if NETFX_CORE
 			return type.AsType();
