@@ -3,11 +3,16 @@
 #endif
 
 #if UNITY_4_0 || UNITY_4_0_1 || UNITY_4_1 || UNITY_4_2 || UNITY_4_3 || UNITY_4_4 || UNITY_4_5 || UNITY_4_6
-#define UNITY_3_API
+#define UNITY_4_API
 #endif
+
+// This turns on Vectrosity support
+/* #define GRID_FRAMEWORK_VECTROSITY */
+
 
 using UnityEngine;
 using System;
+using System.Collections.Generic;
 using GridFramework;
 using GridFramework.Vectors;
 
@@ -440,8 +445,9 @@ using GridFramework.Vectors;
 		get {
 			#if UNITY_2_6 || UNITY_2_6_1 ||  UNITY_3_API || UNITY_4_API
 			return new Material(DefaultShader);
-			#endif
+			#else
 			return new Material(Shader.Find("GridFramework/DefaultShader"));
+			#endif
 		}
 	}
 	#endregion
@@ -704,7 +710,7 @@ using GridFramework.Vectors;
 	/// parameter <c>lockAxis</c> makes the function not touch the
 	/// corresponding coordinate.
 	/// 
-	/// The resulting position depends on <cref name="AlignVector3"/>, so
+	/// The resulting position depends on <see cref="AlignVector3"/>, so
 	/// please look up how that method works.
 	public void AlignTransform(Transform theTransform, bool rotate, BoolVector3 ignoreAxis) {
 		theTransform.position = AlignVector3(theTransform.position, theTransform.lossyScale, ignoreAxis);
@@ -958,7 +964,7 @@ using GridFramework.Vectors;
 	#endregion
 	
 	#region Vectrosity Methods
-	/// <summary>Returns an array of Vector3 points ready for use with Vectrosity.</summary>
+	/// <summary>Returns a collection of Vector3 points ready for use with Vectrosity.</summary>
 	/// <returns>Array of points in local space.</returns>
 	/// <param name="from">Lower limit for the points.</param>
 	/// <param name="to">Upper limit for the points.</param>
@@ -967,24 +973,24 @@ using GridFramework.Vectors;
 	/// line in Vectrosity. One entry is the starting point, the next entry is
 	/// the end point, the next entry is the starting point of the next line
 	/// and so on.
-	public Vector3[] GetVectrosityPoints(Vector3 from, Vector3 to) {
-		Vector3[][] seperatePoints = GetVectrosityPointsSeparate(from, to); 
-		var returnedPoints = new Vector3[seperatePoints[0].Length + seperatePoints[1].Length + seperatePoints[2].Length];
-		seperatePoints[0].CopyTo(returnedPoints, 0);
-		seperatePoints[1].CopyTo(returnedPoints, seperatePoints[0].Length);
-		seperatePoints[2].CopyTo(returnedPoints, seperatePoints[0].Length + seperatePoints[1].Length);
+	public List<Vector3> GetVectrosityPoints(Vector3 from, Vector3 to) {
+		var seperatePoints = GetVectrosityPointsSeparate(from, to);
+		var returnedPoints = new List<Vector3>();
+		returnedPoints.AddRange(seperatePoints[0]);
+		returnedPoints.AddRange(seperatePoints[1]);
+		returnedPoints.AddRange(seperatePoints[2]);
 		return returnedPoints;
 	}
-		
+
 	/// @overload
 	/// Uses the grid's @c #size or @c #renderFrom and @c #renderTo as limits, equal to
 	/// <code>useCustomRenderRange ? GetVectrosityPoints(renderFrom, renderTo) : GetVectrosityPoints(-size, size);</code>
-	public Vector3[] GetVectrosityPoints() {
+	public List<Vector3> GetVectrosityPoints() {
 		return useCustomRenderRange ? GetVectrosityPoints(renderFrom, renderTo) : GetVectrosityPoints(-size, size);
 	}
-
-	/// <summary>Returns an array of arrays of Vector3 points ready for use with Vectrosity.</summary>
-	/// <returns>Jagged array of three arrays, each containing the points of a single axis.</returns>
+		
+	/// <summary>Returns a collection of collections of Vector3 points ready for use with Vectrosity.</summary>
+	/// <returns>Jagged array of three arrays or a list of lists, each containing the points of a single axis.</returns>
 	/// <param name="from">Lower limit for the points.</param>
 	/// <param name="to">Upper limit for the points.</param>
 	/// 
@@ -992,7 +998,30 @@ using GridFramework.Vectors;
 	/// points are in separate arrays for each axis. This is useful if you want
 	/// to treat the lines of each axis differently, like having different
 	/// colours.
-	public Vector3[][] GetVectrosityPointsSeparate(Vector3 from, Vector3 to) {
+	public List<List<Vector3>> GetVectrosityPointsSeparate(Vector3 from, Vector3 to) {
+		var lines = GetVectrosityLinesSeparate(from, to);
+
+		// Make lines into points
+		var points = new List<List<Vector3>>();
+		for (int i = 0; i < 3; ++i) {
+			points.Add(new List<Vector3>());
+			foreach (var line in lines[i]) {
+				points[i].Add(line[0]);
+				points[i].Add(line[1]);
+			}
+		}
+		return points;
+	}
+
+
+	/// @overload
+	/// Uses the grid's @c #size or @c #renderFrom and @c #renderTo as limits, equal to
+	/// <code>useCustomRenderRange ? GetVectrosityPointsSeparate(renderFrom, renderTo) : GetVectrosityPointsSeparate(-size, size);</code>
+	public List<List<Vector3>> GetVectrosityPointsSeparate() {
+		return useCustomRenderRange ? GetVectrosityPointsSeparate(renderFrom, renderTo) : GetVectrosityPointsSeparate(-size, size);
+	}
+
+	private Vector3[][][] GetVectrosityLinesSeparate(Vector3 from, Vector3 to) {
 		// Count the amount of points
 		int lengthX = 0, lengthY = 0, lengthZ = 0;
 		DrawPointsCount(ref lengthX, ref lengthY, ref lengthZ, ref from, ref to);
@@ -1007,26 +1036,7 @@ using GridFramework.Vectors;
 			}
 		}
 		DrawPointsCalculate(lines, ref lengths, from, to);
-
-		// Make lines into points
-		var points = new Vector3[3][];
-		for (int i = 0; i < 3; ++i) {
-			points[i] = new Vector3[2 * lengths[i]];
-			for (int j = 0; j < lengths[i]; ++j) {
-				points[i][2 * j + 0] = lines[i][j][0];
-				points[i][2 * j + 1] = lines[i][j][1];
-			}
-		}
-		
-		//return returnedPoints;
-		return points;
-	}
-		
-	/// @overload
-	/// Uses the grid's @c #size or @c #renderFrom and @c #renderTo as limits, equal to
-	/// <code>useCustomRenderRange ? GetVectrosityPointsSeparate(renderFrom, renderTo) : GetVectrosityPointsSeparate(-size, size);</code>
-	public Vector3[][] GetVectrosityPointsSeparate() {
-		return useCustomRenderRange ? GetVectrosityPointsSeparate(renderFrom, renderTo) : GetVectrosityPointsSeparate(-size, size);
+		return lines;
 	}
 	#endregion
 	

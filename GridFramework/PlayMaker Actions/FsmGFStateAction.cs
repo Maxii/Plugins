@@ -1,9 +1,4 @@
-// ! DO NOT MESS WITH THE PREPROCESSOR FLAGS !
-// The flag will be uncommented and commented by the menu items editor script. Do not change it manually, or you will break things.
-
-//#define PLAYMAKER_PRESENT
-
-#if PLAYMAKER_PRESENT
+#if GRID_FRAMEWORK_PLAYMAKER
 using UnityEngine;
 using System.Collections;
 using HutongGames.PlayMaker.Actions;
@@ -104,4 +99,5 @@ namespace HutongGames.PlayMaker.Actions {
 	public abstract class FsmGFStateActionMethodPolar : FsmGFStateActionMethodLayered<GFPolarGrid>{}
 	#endregion
 }
-#endif // PLAYMAKER_PRESENT
+#endif // GRID_FRAMEWORK_PLAYMAKER
+
