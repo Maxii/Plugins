@@ -1,4 +1,4 @@
-// Version 5.1
+// Version 5.2
 // ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -66,14 +66,18 @@ public class VectorObject2DEditor : Editor {
 	bool usePartialLine;
 	bool oldUsePartialLine;
 	
-	bool showStyle = true;
-	bool showTexture = true;
-	bool showPartial = true;
-	bool showPoints = false;
-	bool showPoints3D = false;
-	bool showColors = false;
-	bool showWidths = false;
-	bool showPointCoords = false;
+	static bool showStyle = true;
+	static bool showTexture = true;
+	static bool showPartial = true;
+	static bool showPoints = false;
+	static bool showPoints3D = false;
+	static bool showColors = false;
+	static bool showWidths = false;
+	
+	static bool showPointCoords;
+	static bool oldShowPointCoords;
+	static float scenePointSize;
+	static float oldScenePointSize;
 		
 	static Vector3 v3right = Vector3.right;
 	static Vector3 v3up = Vector3.up;
@@ -81,7 +85,6 @@ public class VectorObject2DEditor : Editor {
 	static GUILayoutOption width40 = GUILayout.Width(40);
 	static GUILayoutOption width60 = GUILayout.Width(60);
 	static GUILayoutOption height19 = GUILayout.Height(19);
-	static float scenePointSize = 15.0f;
 	static GUIStyle sceneLabel;
 	static GUIStyle infoLabel;
 	static GUIStyle wrapLabel;
@@ -117,6 +120,9 @@ public class VectorObject2DEditor : Editor {
 		textureScale = vline.textureScale;
 		textureOffset = vline.textureOffset;
 		collider = vline.collider;
+		
+		showPointCoords = oldShowPointCoords = EditorPrefs.GetBool ("VectrosityShowPointCoords", false);
+		scenePointSize = oldScenePointSize = EditorPrefs.GetFloat ("VectrosityScenePointSize", 15.0f);
 		
 		useTextureScale = oldUseTextureScale = (vline.textureScale > 0.0f);
 		if (useTextureScale) {
@@ -692,9 +698,9 @@ public class VectorObject2DEditor : Editor {
 		else if (evt.type == EventType.MouseUp && evt.button == 0 && !controlActive) {
 			mouseDown = false;
 		}
-				
+		
 		Handles.BeginGUI ();
-		GUILayout.BeginArea (new Rect(Screen.width - 190, Screen.height - 130, 180, 82), "", "box");
+		GUILayout.BeginArea (new Rect(Screen.width - 180, Screen.height - 150, 170, 102), "", "box");
 		GUILayout.Label (nameString, EditorStyles.boldLabel);
 		if (showWarning) {
 			GUILayout.Label (warnMessage, wrapLabel);
@@ -702,10 +708,27 @@ public class VectorObject2DEditor : Editor {
 		else {
 			GUILayout.Label (info, infoLabel);
 			GUILayout.Space (5);
+			
+			GUILayout.BeginHorizontal();
+			EditorGUIUtility.labelWidth = 60;
+			EditorGUIUtility.fieldWidth = 35;
+			scenePointSize = EditorGUILayout.Slider ("Point size", scenePointSize, .01f, 50.0f);
+			if (oldScenePointSize != scenePointSize) {
+				oldScenePointSize = scenePointSize = Mathf.Clamp (scenePointSize, .01f, 100.0f);
+				EditorPrefs.SetFloat ("VectrosityScenePointSize", scenePointSize);
+			}
+			GUILayout.Space (60);	// The line point gizmos can't be selected for some reason if the actual slider is visible
+			GUILayout.FlexibleSpace();
+			GUILayout.EndHorizontal();
+			
 			GUILayout.BeginHorizontal();
 			showPointCoords = EditorGUILayout.Toggle ("", showPointCoords, GUILayout.Width(15));
 			if (GUILayout.Button ("Show point coords", "label")) {
 				showPointCoords = !showPointCoords;
+			}
+			if (oldShowPointCoords != showPointCoords) {
+				oldShowPointCoords = showPointCoords;
+				EditorPrefs.SetBool ("VectrosityShowPointCoords", showPointCoords);
 			}
 			GUILayout.EndHorizontal();
 		}
@@ -865,6 +888,10 @@ public class VectorObject2DEditor : Editor {
 		drawStart = vline.drawStart;
 		drawEnd = vline.drawEnd;
 		EditorUtility.SetDirty (vobject);
+#if UNITY_5_2
 		EditorApplication.MarkSceneDirty();
+#else
+		UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty (UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
+#endif
 	}
 }

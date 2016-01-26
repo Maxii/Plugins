@@ -1,4 +1,4 @@
-// Version 5.0
+// Version 5.2
 // ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -6,6 +6,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Vectrosity;
 
+namespace Vectrosity {
 [AddComponentMenu("Vectrosity/LineManager")]
 public class LineManager : MonoBehaviour {
 	
@@ -16,7 +17,7 @@ public class LineManager : MonoBehaviour {
 
 	private void Awake () {
 		Initialize();
-		DontDestroyOnLoad(this);
+		DontDestroyOnLoad (this);
 	}
 	
 	private void Initialize () {
@@ -114,7 +115,7 @@ public class LineManager : MonoBehaviour {
 	}
 	
 	public void StartCheckDistance () {
-		InvokeRepeating("CheckDistance", .01f, VectorManager.distanceCheckFrequency);
+		InvokeRepeating ("CheckDistance", .01f, VectorManager.distanceCheckFrequency);
 	}
 	
 	private void CheckDistance () {
@@ -128,4 +129,5 @@ public class LineManager : MonoBehaviour {
 	private void OnLevelWasLoaded () {
 		Initialize();
 	}
+}
 }

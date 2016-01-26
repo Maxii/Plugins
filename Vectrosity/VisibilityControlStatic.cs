@@ -1,8 +1,9 @@
-// Version 5.0
+// Version 5.2
 // ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 using Vectrosity;
 
 [AddComponentMenu("Vectrosity/VisibilityControlStatic")]
@@ -21,14 +22,17 @@ public class VisibilityControlStatic : MonoBehaviour {
 			VectorManager.SetupBoundsMesh (gameObject, line);
 		}
 		// Adjust points to this position, so the line doesn't have to be updated with the transform of this object
+		// Also make sure the points are unique by creating a new list and copying the points over
 		var thisMatrix = transform.localToWorldMatrix;
-		for (int i = 0; i < line.points3.Count; i++) {
-			line.points3[i] = thisMatrix.MultiplyPoint3x4 (line.points3[i]);
+		var thisPoints = new List<Vector3>(line.points3);
+		for (int i = 0; i < thisPoints.Count; i++) {
+			thisPoints[i] = thisMatrix.MultiplyPoint3x4 (thisPoints[i]);
 		}
+		line.points3 = thisPoints;
 		m_vectorLine = line;
 		
 		VectorManager.VisibilityStaticSetup (line, out m_objectNumber);
-		StartCoroutine(WaitCheck());
+		StartCoroutine (WaitCheck());
 	}
 	
 	IEnumerator WaitCheck () {

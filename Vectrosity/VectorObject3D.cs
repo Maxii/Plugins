@@ -1,4 +1,4 @@
-// Version 5.0
+// Version 5.2
 // ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -12,6 +12,8 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 	bool m_updateVerts = true;
 	bool m_updateUVs = true;
 	bool m_updateColors = true;
+	bool m_updateNormals = false;
+	bool m_updateTangents = false;
 	bool m_updateTris = true;
 	Mesh m_mesh;
 	VectorLine m_vectorLine;
@@ -33,7 +35,7 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 	public void SetTexture (Texture tex) {
 		GetComponent<MeshRenderer>().material.mainTexture = tex;
 	}
-
+	
 	public void SetMaterial (Material mat) {
 		GetComponent<MeshRenderer>().material = mat;
 		GetComponent<MeshRenderer>().material.mainTexture = m_vectorLine.texture;
@@ -48,9 +50,7 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 	
 	void LateUpdate () {
 		if (m_updateVerts) {
-			m_mesh.vertices = m_vectorLine.lineVertices;
-			m_updateVerts = false;
-			m_mesh.RecalculateBounds();
+			SetVerts();
 		}
 		if (m_updateUVs) {
 			m_mesh.uv = m_vectorLine.lineUVs;
@@ -64,6 +64,20 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 			m_mesh.SetTriangles (m_vectorLine.lineTriangles, 0);
 			m_updateTris = false;
 		}
+		if (m_updateNormals) {
+			m_mesh.RecalculateNormals();
+			m_updateNormals = false;
+		}
+		if (m_updateTangents) {
+			m_mesh.tangents = m_vectorLine.CalculateTangents (m_mesh.normals);
+			m_updateTangents = false;
+		}
+	}
+	
+	void SetVerts() {
+		m_mesh.vertices = m_vectorLine.lineVertices;
+		m_updateVerts = false;
+		m_mesh.RecalculateBounds();
 	}
 	
 	public void SetName (string name) {
@@ -82,6 +96,14 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 	public void UpdateColors () {
 		m_updateColors = true;
 	}
+
+	public void UpdateNormals () {
+		m_updateNormals = true;
+	}
+	
+	public void UpdateTangents () {
+		m_updateTangents = true;
+	}
 	
 	public void UpdateTris () {
 		m_updateTris = true;
@@ -95,21 +117,13 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 		m_updateTris = true;
 	}
 	
-	public void CalculateNormals () {
-		m_mesh.RecalculateNormals();
-	}
-	
-	public Vector3[] GetNormals () {
-		return m_mesh.normals;
-	}
-	
-	public void SetTangents (Vector4[] tangents) {
-		m_mesh.tangents = tangents;
-	}
-	
 	public void ClearMesh () {
 		if (m_mesh == null) return;
 		m_mesh.Clear();
+	}
+	
+	public int VertexCount () {
+		return m_mesh.vertexCount;
 	}
 }
 

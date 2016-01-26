@@ -13,14 +13,12 @@ interface IVectorObject {
 	
 	void UpdateTris ();
 	
+	void UpdateNormals ();
+	
+	void UpdateTangents ();
+	
 	void UpdateMeshAttributes ();
-	
-	void CalculateNormals ();
-	
-	Vector3[] GetNormals ();
-	
-	void SetTangents (Vector4[] tangents);
-	
+		
 	void ClearMesh ();
 	
 	void SetMaterial (Material material);
@@ -30,6 +28,8 @@ interface IVectorObject {
 	void Enable (bool enable);
 	
 	void SetVectorLine (VectorLine vectorLine, Texture texture, Material material);
+
+	int VertexCount ();
 }
 
 }

@@ -1,10 +1,11 @@
-// Version 5.0
+// Version 5.2
 // ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using System.Collections.Generic;
 using Vectrosity;
 
+namespace Vectrosity {
 public class VectorManager {
 
 	public static float minBrightnessDistance = 500.0f;
@@ -343,4 +344,5 @@ public class VectorManager {
 		}
 		meshFilter.mesh = meshTable[line.name];
 	}
+}
 }

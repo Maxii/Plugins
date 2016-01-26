@@ -1,4 +1,4 @@
-// Version 5.1
+// Version 5.2
 // ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -13,6 +13,8 @@ public class VectorObject2D : RawImage, IVectorObject {
 	bool m_updateVerts = true;
 	bool m_updateUVs = true;
 	bool m_updateColors = true;
+	bool m_updateNormals = false;
+	bool m_updateTangents = false;
 	bool m_updateTris = true;
 	Mesh m_mesh;
 	public VectorLine vectorLine;
@@ -26,6 +28,7 @@ public class VectorObject2D : RawImage, IVectorObject {
 	}
 	
 	public void Enable (bool enable) {
+		if (this == null) return;	// Prevent random null ref error when stopping play in editor
 		enabled = enable;
 	}
 	
@@ -79,6 +82,15 @@ public class VectorObject2D : RawImage, IVectorObject {
 			m_updateTris = false;
 			SetMeshBounds();
 		}
+		if (m_updateNormals && m_mesh != null) {
+			m_mesh.RecalculateNormals();
+			UpdateGeometry();
+			m_updateNormals = false;
+		}
+		if (m_updateTangents && m_mesh != null) {
+			m_mesh.tangents = vectorLine.CalculateTangents (m_mesh.normals);
+			m_updateTangents = false;
+		}
 	}
 	
 	public void SetName (string name) {
@@ -100,6 +112,16 @@ public class VectorObject2D : RawImage, IVectorObject {
 		m_updateColors = true;
 		SetVerticesDirty();
 	}
+
+	public void UpdateNormals () {
+		m_updateNormals = true;
+		SetVerticesDirty();
+	}
+	
+	public void UpdateTangents () {
+		m_updateTangents = true;
+		SetVerticesDirty();
+	}
 	
 	public void UpdateTris () {
 		m_updateTris = true;
@@ -118,29 +140,14 @@ public class VectorObject2D : RawImage, IVectorObject {
 		SetMeshBounds();
 	}
 	
-	public void CalculateNormals () {
-		if (m_mesh != null) {
-			m_mesh.RecalculateNormals();
-			UpdateGeometry();
-		}
-	}
-	
-	public Vector3[] GetNormals () {
-		if (m_mesh != null) {
-			return m_mesh.normals;
-		}
-		return null;
-	}
-	
-	public void SetTangents (Vector4[] tangents) {
-		m_mesh.tangents = tangents;
-		UpdateGeometry();
-	}
-	
 	public void ClearMesh () {
 		if (m_mesh == null) return;
 		m_mesh.Clear();
 		UpdateGeometry();
+	}
+	
+	public int VertexCount () {
+		return m_mesh.vertexCount;
 	}
 }
 
