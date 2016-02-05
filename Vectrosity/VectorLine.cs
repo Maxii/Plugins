@@ -1,4 +1,4 @@
-// Version 5.2.1
+// Version 5.2.2
 // ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -17,7 +17,7 @@ enum CanvasState {None, OnCanvas, OffCanvas}
 [System.Serializable]
 public partial class VectorLine {
 	public static string Version () {
-		return "Vectrosity version 5.2.1";
+		return "Vectrosity version 5.2.2";
 	}
 	
 	[SerializeField]
@@ -1740,6 +1740,7 @@ public partial class VectorLine {
 			ClearTriangles();
 			m_vectorObject.ClearMesh();
 			m_pointsCount = pointsCount;
+			m_drawEnd = 0;
 			return false;
 		}
 		return true;
@@ -2499,6 +2500,8 @@ public partial class VectorLine {
 			}
 		}
 		else {
+			if (!CheckCamera3D()) return;
+			
 			for (int i = 0; i < end; i += add) {
 				if (useTransformMatrix) {
 					p1 = cam3D.WorldToScreenPoint (thisMatrix.MultiplyPoint3x4 (m_points3[i]));
@@ -2752,6 +2755,9 @@ public partial class VectorLine {
 	private static void DestroyLine (ref VectorLine line) {
 		if (line != null) {
 			Object.Destroy (line.m_go);
+			if (line.m_vectorObject != null) {
+				line.m_vectorObject.Destroy();
+			}
 			if (line.isAutoDrawing) {
 				line.StopDrawing3DAuto();
 			}

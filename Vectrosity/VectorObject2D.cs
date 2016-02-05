@@ -1,4 +1,4 @@
-// Version 5.2
+// Version 5.2.2
 // ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -25,6 +25,10 @@ public class VectorObject2D : RawImage, IVectorObject {
 		this.vectorLine = vectorLine;
 		SetTexture (tex);
 		SetMaterial (mat);
+	}
+	
+	public void Destroy () {
+		Destroy (m_mesh);
 	}
 	
 	public void Enable (bool enable) {
@@ -70,11 +74,15 @@ public class VectorObject2D : RawImage, IVectorObject {
 			m_updateVerts = false;
 		}
 		if (m_updateUVs) {
-			m_mesh.uv = vectorLine.lineUVs;
+			if (vectorLine.lineUVs.Length == m_mesh.vertexCount) {
+				m_mesh.uv = vectorLine.lineUVs;
+			}
 			m_updateUVs = false;
 		}
 		if (m_updateColors) {
-			m_mesh.colors32 = vectorLine.lineColors;
+			if (vectorLine.lineColors.Length == m_mesh.vertexCount) {	// In case line points were erased and SetColor called
+				m_mesh.colors32 = vectorLine.lineColors;
+			}
 			m_updateColors = false;
 		}
 		if (m_updateTris) {

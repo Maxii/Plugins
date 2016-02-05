@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2015 Tasharen Entertainment
+// Copyright © 2011-2016 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -911,14 +911,14 @@ public class UILabel : UIWidget
 
 					if (usage == 0)
 					{
-#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
+#if UNITY_4_3 || UNITY_4_5
 						font.textureRebuildCallback = null;
 #endif
 						mFontUsage.Remove(font);
 					}
 					else mFontUsage[font] = usage;
 				}
-#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
+#if UNITY_4_3 || UNITY_4_5
 				else font.textureRebuildCallback = null;
 #endif
 			}
@@ -931,7 +931,7 @@ public class UILabel : UIWidget
 				int usage = 0;
 
 				// Font hasn't been used yet? Register a change delegate callback
-#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
+#if UNITY_4_3 || UNITY_4_5
 				if (!mFontUsage.TryGetValue(font, out usage))
 					font.textureRebuildCallback = delegate() { OnFontChanged(font); };
 #endif
@@ -1120,7 +1120,7 @@ public class UILabel : UIWidget
 	}
 #endif
 
-#if !UNITY_4_3 && !UNITY_4_5 && !UNITY_4_6
+#if !UNITY_4_3 && !UNITY_4_5
 	static bool mTexRebuildAdded = false;
 
 	protected override void OnEnable ()
@@ -1816,7 +1816,17 @@ public class UILabel : UIWidget
 	{
 		Color c = mEffectColor;
 		c.a *= finalAlpha;
-		Color32 col = (bitmapFont != null && bitmapFont.premultipliedAlphaShader) ? NGUITools.ApplyPMA(c) : c;
+		if (bitmapFont != null && bitmapFont.premultipliedAlphaShader) c = NGUITools.ApplyPMA(c);
+
+		if (QualitySettings.activeColorSpace == ColorSpace.Linear)
+		{
+			c.r = Mathf.GammaToLinearSpace(c.r);
+			c.g = Mathf.GammaToLinearSpace(c.g);
+			c.b = Mathf.GammaToLinearSpace(c.b);
+			c.a = Mathf.GammaToLinearSpace(c.a);
+		}
+
+		Color32 col = c;
 
 		for (int i = start; i < end; ++i)
 		{
@@ -1839,7 +1849,8 @@ public class UILabel : UIWidget
 			{
 				Color fc = c;
 				fc.a = (uc.a / 255f * c.a);
-				cols.buffer[i] = (bitmapFont != null && bitmapFont.premultipliedAlphaShader) ? NGUITools.ApplyPMA(fc) : fc;
+				if (QualitySettings.activeColorSpace == ColorSpace.Linear) fc.a = Mathf.GammaToLinearSpace(fc.a);
+				cols.buffer[i] = fc;
 			}
 		}
 	}

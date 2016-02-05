@@ -98,7 +98,11 @@ public class F3DFXController : MonoBehaviour
         // Initialize bullet shells particles
         for (int i = 0; i < ShellParticles.Length; i++)
         {
-            ShellParticles[i].enableEmission = false;
+         
+
+            var em = ShellParticles[i].emission;
+
+            em.enabled = false;
             ShellParticles[i].gameObject.SetActive(true);
         }
     }

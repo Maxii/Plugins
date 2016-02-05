@@ -18,7 +18,7 @@ public class GFPolarGridEditor : GFGridEditor {
 	}
 	
 	[MenuItem ("CONTEXT/GFPolarGrid/Help")]
-		private static void BrowseDocs (MenuCommand command) {
+	private static void BrowseDocs (MenuCommand command) {
 		string url = _docsDir + "class_g_f_polar_grid.html";
 		Help.ShowHelpPage (url);
 	}

@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2015 Tasharen Entertainment
+// Copyright © 2011-2016 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -38,6 +38,12 @@ public class UIToggle : UIWidgetContainer
 	/// </summary>
 
 	public UIWidget activeSprite;
+
+	/// <summary>
+	/// If 'true', when checked the sprite will be hidden when the toggle is checked instead of when it's not.
+	/// </summary>
+
+	public bool invertSpriteState = false;
 
 	/// <summary>
 	/// Animation to play on the active sprite, if any.
@@ -186,7 +192,7 @@ public class UIToggle : UIWidgetContainer
 			}
 
 			if (Application.isPlaying && activeSprite != null)
-				activeSprite.alpha = startsActive ? 1f : 0f;
+				activeSprite.alpha = invertSpriteState ? (startsActive ? 0f : 1f) : (startsActive ? 1f : 0f);
 
 			if (EventDelegate.IsValid(onChange))
 			{
@@ -223,7 +229,8 @@ public class UIToggle : UIWidgetContainer
 		{
 			mIsActive = state;
 			startsActive = state;
-			if (activeSprite != null) activeSprite.alpha = state ? 1f : 0f;
+			if (activeSprite != null)
+				activeSprite.alpha = invertSpriteState ? (state ? 0f : 1f) : (state ? 1f : 0f);
 		}
 		else if (mIsActive != state)
 		{
@@ -252,11 +259,11 @@ public class UIToggle : UIWidgetContainer
 			{
 				if (instantTween || !NGUITools.GetActive(this))
 				{
-					activeSprite.alpha = mIsActive ? 1f : 0f;
+					activeSprite.alpha = invertSpriteState ? (mIsActive ? 0f : 1f) : (mIsActive ? 1f : 0f);
 				}
 				else
 				{
-					TweenAlpha.Begin(activeSprite.gameObject, 0.15f, mIsActive ? 1f : 0f);
+					TweenAlpha.Begin(activeSprite.gameObject, 0.15f, invertSpriteState ? (mIsActive ? 0f : 1f) : (mIsActive ? 1f : 0f));
 				}
 			}
 

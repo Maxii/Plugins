@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2015 Tasharen Entertainment
+// Copyright © 2011-2016 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -50,6 +50,7 @@ public class UIToggleInspector : UIWidgetContainerEditor
 			if (sprite.objectReferenceValue != null)
 			{
 				NGUIEditorTools.DrawProperty("Sprite", sprite, false);
+				serializedObject.DrawProperty("invertSpriteState");
 			}
 			else if (animator.objectReferenceValue != null)
 			{

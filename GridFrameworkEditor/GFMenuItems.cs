@@ -16,6 +16,11 @@ public static class GFMenuItems {
 		CreateGrid<GFRectGrid>("Rectangular");
 	}
 
+	[MenuItem("GameObject/3D Object/Grid/Spheric Grid", false)]
+	public static void CreateSphereGrid(){
+		CreateGrid<GFSphereGrid>("Spheric");
+	}
+
 	[MenuItem("GameObject/3D Object/Grid/Hexagonal Grid", false)]
 	public static void CreateHexGrid(){
 		CreateGrid<GFHexGrid>("Hexagonal");
@@ -29,6 +34,7 @@ public static class GFMenuItems {
 
 	/// <summary>Validation for adding a component.</summary> 
 	[MenuItem("Component/Grid Framework/GFRectGrid"                    , true)]
+	[MenuItem("Component/Grid Framework/GFSphereGrid"                  , true)]
 	[MenuItem("Component/Grid Framework/GFHexGrid"                     , true)]
 	[MenuItem("Component/Grid Framework/GFPolarGrid"                   , true)]
 	[MenuItem("Component/Grid Framework/Camera/GFGridRenderCamera"     , true)]
@@ -43,6 +49,11 @@ public static class GFMenuItems {
 	[MenuItem("Component/Grid Framework/GFRectGrid")]
 	public static void AddRectGrid(){
 		AddGrid<GFRectGrid>();
+	}
+
+	[MenuItem("Component/Grid Framework/GFSphereGrid")]
+	public static void AddSphereGrid(){
+		AddGrid<GFSphereGrid>();
 	}
 
 	[MenuItem("Component/Grid Framework/GFHexGrid")]

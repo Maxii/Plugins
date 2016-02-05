@@ -342,23 +342,23 @@ public class GFHexGrid : GFLayeredGrid {
 	#region Grid
 
 	/// <summary>Converts world coordinates to grid coordinates.</summary>
-	/// <param name="worldPoint">Point in world space.</param>
+	/// <param name="world">Point in world space.</param>
 	/// <returns>Grid coordinates of the world point (upwards herringbone coordinate system).</returns>
 	///
 	/// This is the same as calling <c>#WorldToHerringU</c>, because upwards
 	/// herringbone is the default grid coordinate system.
-	public override Vector3 WorldToGrid(Vector3 worldPoint) {
-		return WorldToHerringU(worldPoint);
+	public override Vector3 WorldToGrid(Vector3 world) {
+		return WorldToHerringU(world);
 	}
 
 	/// <summary>Converts grid coordinates to world coordinates</summary>
-	/// <param name="gridPoint">Point in grid space (upwards herringbone coordinate system).</param>
+	/// <param name="grid">Point in grid space (upwards herringbone coordinate system).</param>
 	/// <returns>World coordinates of the grid point.</returns>
 	///
 	/// This is the same as calling <c>#HerringUToWorld</c>, because upwards
 	/// herringbone is the default grid coordinate system.
-	public override Vector3 GridToWorld(Vector3 gridPoint) {
-		return HerringUToWorld(gridPoint);
+	public override Vector3 GridToWorld(Vector3 grid) {
+		return HerringUToWorld(grid);
 	}
 	#endregion
 

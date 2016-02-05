@@ -61,7 +61,7 @@ public class GFPolarGrid : GFLayeredGrid {
 			base.renderFrom = value;
 			_renderFrom[idx[0]] = Mathf.Max(_renderFrom[idx[0]], 0); // prevent negative value
 			_renderFrom[idx[1]] = relativeSize ? Float2Sector(value[idx[1]]) : Float2Rad(value[idx[1]]);
-			// convert to sector or angle (wrap around and handle < 0)
+		// convert to sector or angle (wrap around and handle < 0)
 		}
 	}
 
@@ -219,7 +219,7 @@ public class GFPolarGrid : GFLayeredGrid {
 	#region Grid <-> World coordinate transformation
 	/// <summary>Converts from world to grid coordinates.</summary>
 	/// <returns>Grid coordinates of the world point.</returns>
-	/// <param name="worldPoint">Point in world space.</param>
+	/// <param name="world">Point in world space.</param>
 	/// 
 	/// Converts a point from world space to grid space. The first coordinate
 	/// represents the distance from the radial axis as multiples of <see
@@ -227,17 +227,17 @@ public class GFPolarGrid : GFLayeredGrid {
 	/// distance from the main plane as multiples of <see cref="depth"/>. This
 	/// order applies to XY-grids only, for the other two orientations please
 	/// consult the manual.
-	public override Vector3 WorldToGrid(Vector3 worldPoint) {
-		return PolarToGrid(WorldToPolar(worldPoint));
+	public override Vector3 WorldToGrid(Vector3 world) {
+		return PolarToGrid(WorldToPolar(world));
 	}
 	
 	/// <summary>Converts from grid to world coordinates.</summary>
 	/// <returns>World coordinates of the grid point.</returns>
-	/// <param name="gridPoint">Point in grid space.</param>
+	/// <param name="grid">Point in grid space.</param>
 	/// 
 	/// Converts a point from grid space to world space.
-	public override Vector3 GridToWorld(Vector3 gridPoint) {
-		return PolarToWorld(GridToPolar(gridPoint));
+	public override Vector3 GridToWorld(Vector3 grid) {
+		return PolarToWorld(GridToPolar(grid));
 	}
 	#endregion
 	
@@ -702,13 +702,9 @@ public class GFPolarGrid : GFLayeredGrid {
 		if (!condition)
 			return;
 		if(!relativeSize) { // Convert to grid coordinates for easier calculation of amounts.
-			from[idx[0]] /= radius;
-			from[idx[1]] /= angle;
-			from[idx[2]] /= depth;
-			
-			to[idx[0]] /= radius;
-			to[idx[1]] /= angle;
-			to[idx[2]] /= depth;
+			from[idx[0]] /= radius ; to[idx[0]] /= radius ;
+			from[idx[1]] /= angle  ; to[idx[1]] /= angle  ;
+			from[idx[2]] /= depth  ; to[idx[2]] /= depth  ;
 		}
 		// Adjust for non-custom range: the start radius and angle have to be
 		// 0, the end angle has to be slightly less than 2π.
@@ -718,7 +714,9 @@ public class GFPolarGrid : GFLayeredGrid {
 			to[idx[1]]   = Mathf.Min(to[idx[1]], sectors - 0.00001f); // prevent the connecting radial line from being drawn twice
 		}
 
-		if (from[idx[1]] > to[idx[1]]) { // If the from angle is greater than the to angle wrap the to angle around once.
+		// If the from angle is greater than the to angle wrap the to angle
+		// around once.
+		if (from[idx[1]] > to[idx[1]]) { 
 			to[idx[1]] += sectors;
 		}
 

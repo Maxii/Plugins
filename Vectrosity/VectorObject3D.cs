@@ -1,4 +1,4 @@
-// Version 5.2
+// Version 5.2.2
 // ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -17,14 +17,24 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 	bool m_updateTris = true;
 	Mesh m_mesh;
 	VectorLine m_vectorLine;
+	Material m_material;
+	bool useCustomMaterial = false;
 			
 	public void SetVectorLine (VectorLine vectorLine, Texture tex, Material mat) {
 		gameObject.AddComponent<MeshRenderer>();
 		gameObject.AddComponent<MeshFilter>();
 		m_vectorLine = vectorLine;
-		GetComponent<MeshRenderer>().material = mat;
-		GetComponent<MeshRenderer>().material.mainTexture = tex;
+		m_material = new Material (mat);
+		m_material.mainTexture = tex;
+		GetComponent<MeshRenderer>().sharedMaterial = m_material;
 		SetupMesh();
+	}
+	
+	public void Destroy () {
+		Destroy (m_mesh);
+		if (!useCustomMaterial) {
+			Destroy (m_material);
+		}
 	}
 	
 	public void Enable (bool enable) {
@@ -33,12 +43,14 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 	}
 	
 	public void SetTexture (Texture tex) {
-		GetComponent<MeshRenderer>().material.mainTexture = tex;
+		GetComponent<MeshRenderer>().sharedMaterial.mainTexture = tex;
 	}
 	
 	public void SetMaterial (Material mat) {
-		GetComponent<MeshRenderer>().material = mat;
-		GetComponent<MeshRenderer>().material.mainTexture = m_vectorLine.texture;
+		m_material = mat;
+		useCustomMaterial = true;
+		GetComponent<MeshRenderer>().sharedMaterial = mat;
+		GetComponent<MeshRenderer>().sharedMaterial.mainTexture = m_vectorLine.texture;
 	}
 	
 	void SetupMesh () {
@@ -53,11 +65,15 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 			SetVerts();
 		}
 		if (m_updateUVs) {
-			m_mesh.uv = m_vectorLine.lineUVs;
+			if (m_vectorLine.lineUVs.Length == m_mesh.vertexCount) {
+				m_mesh.uv = m_vectorLine.lineUVs;
+			}
 			m_updateUVs = false;
 		}
 		if (m_updateColors) {
-			m_mesh.colors32 = m_vectorLine.lineColors;
+			if (m_vectorLine.lineColors.Length == m_mesh.vertexCount) {	// In case line points were erased and SetColor called
+				m_mesh.colors32 = m_vectorLine.lineColors;
+			}
 			m_updateColors = false;
 		}
 		if (m_updateTris) {

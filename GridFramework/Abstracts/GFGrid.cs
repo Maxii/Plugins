@@ -539,21 +539,21 @@ using GridFramework.Vectors;
 	#region Grid <-> World coordinate transformation
 	/// <summary>Converts world coordinates to grid coordinates.</summary>
 	/// <returns>Grid coordinates of the world point.</returns>
-	/// <param name="worldPoint">Point in world space.</param>
+	/// <param name="world">Point in world space.</param>
 	/// 
 	/// Takes in a point in world space and converts it to grid space. Some
 	/// grids have several coordinate system, so look into the specific class
 	/// for conversion methods to other coordinate systems.
-	public abstract Vector3 WorldToGrid(Vector3 worldPoint);
+	public abstract Vector3 WorldToGrid(Vector3 world);
 
 	/// <summary>Converts grid coordinates to world coordinates.</summary>
 	/// <returns>World coordinates of the grid point.</returns>
-	/// <param name="gridPoint">Point in grid space.</param>
+	/// <param name="grid">Point in grid space.</param>
 	/// 
 	/// Takes in a point in grid space and converts it to world space. Some
 	/// grids have several coordinate system, so look into the specific class
 	/// for conversion methods from other coordinate systems.
-	public abstract Vector3 GridToWorld(Vector3 gridPoint);
+	public abstract Vector3 GridToWorld(Vector3 grid);
 	#endregion
 	
 	#region nearest in world space

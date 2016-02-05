@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2015 Tasharen Entertainment
+// Copyright © 2011-2016 Tasharen Entertainment
 //----------------------------------------------
 
 #if !UNITY_EDITOR && (UNITY_IPHONE || UNITY_ANDROID || UNITY_WP8 || UNITY_WP_8_1 || UNITY_BLACKBERRY || UNITY_WINRT || UNITY_METRO)
@@ -211,6 +211,7 @@ public class UIInput : MonoBehaviour
 	[System.NonSerialized] protected string mCached = "";
 	[System.NonSerialized] protected int mSelectMe = -1;
 	[System.NonSerialized] protected int mSelectTime = -1;
+	[System.NonSerialized] protected bool mStarted = false;
 
 	/// <summary>
 	/// Default text used by the input's label.
@@ -321,7 +322,7 @@ public class UIInput : MonoBehaviour
 						mSelectionEnd = mSelectionStart;
 					}
 				}
-				else SaveToPlayerPrefs(value);
+				else if (mStarted) SaveToPlayerPrefs(value);
 
 				UpdateLabel();
 				ExecuteOnChange();
@@ -477,6 +478,7 @@ public class UIInput : MonoBehaviour
 
 		if (mLoadSavedValue && !string.IsNullOrEmpty(savedAs)) LoadValue();
 		else value = mValue.Replace("\\n", "\n");
+		mStarted = true;
 	}
 
 	/// <summary>
@@ -798,7 +800,7 @@ public class UIInput : MonoBehaviour
 				else newLine = !ctrl;
 			}
 
-			if (UICamera.GetKeyDown(mCam.submitKey0))
+			if (UICamera.GetKeyDown(mCam.submitKey0) || (mCam.submitKey0 == KeyCode.Return && UICamera.GetKeyDown(KeyCode.KeypadEnter)))
 			{
 				if (newLine)
 				{
@@ -813,7 +815,7 @@ public class UIInput : MonoBehaviour
 				}
 			}
 
-			if (UICamera.GetKeyDown(mCam.submitKey1))
+			if (UICamera.GetKeyDown(mCam.submitKey1) || (mCam.submitKey1 == KeyCode.Return && UICamera.GetKeyDown(KeyCode.KeypadEnter)))
 			{
 				if (newLine)
 				{

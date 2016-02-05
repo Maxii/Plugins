@@ -9,8 +9,7 @@ using GridFramework.Vectors;
 public class GFRectGrid: GFGrid {
 	
 	#region Class Members
-	[SerializeField]
-	private Vector3	_spacing = Vector3.one;
+	[SerializeField] private Vector3	_spacing = Vector3.one;
 
 	/// <summary>How large the grid boxes are.</summary>
 	/// <value>The spacing of the grid.</value>
@@ -25,8 +24,7 @@ public class GFRectGrid: GFGrid {
 		}
 	}
 
-	[SerializeField]
-	public Vector6 _shearing = Vector6.zero;
+	[SerializeField] public Vector6 _shearing = Vector6.zero;
 	/// <summary>How the axes are sheared.</summary>
 	/// <value>Shearing vector of the grid.</value>
 	///
@@ -126,26 +124,26 @@ public class GFRectGrid: GFGrid {
 	#region grid to world
 	/// <summary>Converts world coordinates to grid coordinates.</summary>
 	/// <returns>Grid coordinates of the world point.</returns>
-	/// <param name="worldPoint">Point in world space.</param>
+	/// <param name="world">Point in world space.</param>
 	/// 
 	/// Takes in a position in wold space and calculates where in the grid that
 	/// position is. The origin of the grid is the world position of its
 	/// GameObject and its axes lie on the corresponding axes of the Transform.
 	/// Rotation is taken into account for this operation.
-	public override Vector3 WorldToGrid(Vector3 worldPoint) {
-		return wgMatrix.MultiplyPoint3x4(worldPoint);
+	public override Vector3 WorldToGrid(Vector3 world) {
+		return wgMatrix.MultiplyPoint3x4(world);
 	}
 
 	/// <summary>Converts grid coordinates to world coordinates.</summary>
 	/// <returns>World coordinates of the Grid point.</returns>
-	/// <param name="gridPoint">Point in grid space.</param>
+	/// <param name="grid">Point in grid space.</param>
 	/// 
 	/// The opposite of <see cref="WorldToGrid"/>, this returns the world
 	/// position of a point in the grid. The origin of the grid is the world
 	/// position of its GameObject and its axes lie on the corresponding axes
 	/// of the Transform. Rotation is taken into account for this operation.
-	public override Vector3 GridToWorld(Vector3 gridPoint) {
-		return gwMatrix.MultiplyPoint3x4(gridPoint);
+	public override Vector3 GridToWorld(Vector3 grid) {
+		return gwMatrix.MultiplyPoint3x4(grid);
 	}
 	#endregion
 

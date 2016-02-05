@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2015 Tasharen Entertainment
+// Copyright © 2011-2016 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -488,13 +488,15 @@ public class UIPopupList : UIWidgetContainer
 		}
 
 		// Automatically choose the first item
-		if (Application.isPlaying)
-		{
-			if (string.IsNullOrEmpty(mSelectedItem) && items.Count > 0)
-				mSelectedItem = items[0];
-			if (!string.IsNullOrEmpty(mSelectedItem))
-				TriggerCallbacks();
-		}
+		// Removed: This triggers callbacks, which messes with popup setting the input field's value,
+		// with input field set to auto-save its value.
+		//if (Application.isPlaying)
+		//{
+		//    if (string.IsNullOrEmpty(mSelectedItem) && items.Count > 0)
+		//        mSelectedItem = items[0];
+		//    if (!string.IsNullOrEmpty(mSelectedItem))
+		//        TriggerCallbacks();
+		//}
 	}
 
 	/// <summary>
@@ -998,7 +1000,7 @@ public class UIPopupList : UIWidgetContainer
 				else
 				{
 					BoxCollider2D b2d = lbl.GetComponent<BoxCollider2D>();
-#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6 || UNITY_4_7
 					b2d.center = bcCenter;
 #else
 					b2d.offset = bcCenter;

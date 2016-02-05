@@ -56,6 +56,7 @@
     <Compile Include="GFHexGrid.cs" />
     <Compile Include="GFPolarGrid.cs" />
     <Compile Include="GFRectGrid.cs" />
+    <Compile Include="GFSphereGrid.cs" />
     <Compile Include="Grid Rendering\GFGridRenderCamera.cs" />
     <Compile Include="Grid Rendering\GFGridRenderManager.cs" />
     <Compile Include="PlayMaker Actions\FsmGFStateAction.cs" />

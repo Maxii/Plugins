@@ -1,6 +1,6 @@
 //----------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2015 Tasharen Entertainment
+// Copyright © 2011-2016 Tasharen Entertainment
 //----------------------------------------------
 
 using UnityEngine;
@@ -95,6 +95,30 @@ public class UIPanel : UIRect
 	public int startingRenderQueue = 3000;
 
 	/// <summary>
+	/// Sorting layer used by the panel -- used when mixing NGUI with the Unity's 2D system.
+	/// Contributed by Benzino07: http://www.tasharen.com/forum/index.php?topic=6956.15
+	/// </summary>
+
+	public string sortingLayerName
+	{
+		get
+		{
+			return mSortingLayerName;
+		}
+		set
+		{
+			if (mSortingLayerName != value)
+			{
+				mSortingLayerName = value;
+#if UNITY_EDITOR
+				NGUITools.SetDirty(this);
+#endif
+				UpdateDrawCalls();
+			}
+		}
+	}
+
+	/// <summary>
 	/// List of widgets managed by this panel. Do not attempt to modify this list yourself.
 	/// </summary>
 
@@ -142,6 +166,7 @@ public class UIPanel : UIRect
 	[HideInInspector][SerializeField] Vector2 mClipSoftness = new Vector2(4f, 4f);
 	[HideInInspector][SerializeField] int mDepth = 0;
 	[HideInInspector][SerializeField] int mSortingOrder = 0;
+	[HideInInspector][SerializeField] string mSortingLayerName = null;
 
 	// Whether a full rebuild of geometry buffers is required
 	bool mRebuild = false;
@@ -289,7 +314,7 @@ public class UIPanel : UIRect
 	/// Whether the camera is used to draw UI geometry.
 	/// </summary>
 
-#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6 || UNITY_4_7
 	public bool usedForUI { get { return (anchorCamera != null && mCam.isOrthoGraphic); } }
 #else
 	public bool usedForUI { get { return (anchorCamera != null && mCam.orthographic); } }
@@ -303,7 +328,7 @@ public class UIPanel : UIRect
 	{
 		get
 		{
-#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6 || UNITY_4_7
 			if (anchorCamera != null && mCam.isOrthoGraphic)
 #else
 			if (anchorCamera != null && mCam.orthographic)
@@ -961,7 +986,7 @@ public class UIPanel : UIRect
 		FindParent();
 
 		// Apparently having a rigidbody helps
-#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6 || UNITY_4_7
 		if (rigidbody == null && mParentPanel == null)
 #else
 		if (GetComponent<Rigidbody>() == null && mParentPanel == null)
@@ -1488,6 +1513,7 @@ public class UIPanel : UIRect
 			dc.alwaysOnScreen = alwaysOnScreen &&
 				(mClipping == UIDrawCall.Clipping.None || mClipping == UIDrawCall.Clipping.ConstrainButDontClip);
 			dc.sortingOrder = mSortingOrder;
+			dc.sortingLayerName = mSortingLayerName;
 			dc.clipTexture = mClipTexture;
 		}
 	}
@@ -1873,7 +1899,7 @@ public class UIPanel : UIRect
 
 		Gizmos.matrix = t.localToWorldMatrix;
 
-#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6
+#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6 || UNITY_4_7
 		if (isUsingThisPanel && !clip && mCam.isOrthoGraphic)
 #else
 		if (isUsingThisPanel && !clip && mCam.orthographic)

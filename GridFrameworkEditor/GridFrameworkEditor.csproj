@@ -60,6 +60,7 @@
     <Compile Include="Inspectors\GFHexGridEditor.cs" />
     <Compile Include="Inspectors\GFPolarGridEditor.cs" />
     <Compile Include="Inspectors\GFRectGridEditor.cs" />
+    <Compile Include="Inspectors\GFSphereGridEditor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
