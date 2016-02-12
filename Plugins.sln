@@ -1,6 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio 14
+VisualStudioVersion = 14.0.24720.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ngui", "Ngui\Ngui.csproj", "{AC0F8B23-DD41-4BAB-A967-AA2C33BB1D0B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Contextual", "Contextual\Contextual.csproj", "{4FA683FF-627F-49FE-9046-B1E9049CBE14}"
@@ -50,6 +52,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmoothTurret", "SmoothTurret\SmoothTurret.csproj", "{6AA71C16-BB38-49E0-AF2E-3A623951E2EB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectrosityEditor", "VectrosityEditor\VectrosityEditor.csproj", "{53842EC8-0DA1-4B32-BFE4-F77738BB40E6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FSM", "FSM\FSM.csproj", "{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -133,6 +137,10 @@ Global
 		{53842EC8-0DA1-4B32-BFE4-F77738BB40E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{53842EC8-0DA1-4B32-BFE4-F77738BB40E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{53842EC8-0DA1-4B32-BFE4-F77738BB40E6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{84AB84FA-983B-4FB8-BFD9-34D3B93D8000}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
