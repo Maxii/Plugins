@@ -27,108 +27,108 @@ namespace PathologicalGames
         public static readonly SpawnPoolsDict Pools = new SpawnPoolsDict();
     }
 
-	
-	/// <summary>
-	/// This can be used to intercept Instantiate and Destroy to implement your own handling. See 
-	/// PoolManagerExampleFiles/Scripts/InstanceHandlerDelegateExample.cs.
-	/// 
-	/// Simply add your own delegate and it will be run. 
-	/// 
-	/// If a SpawnPool.InstantiateDelegate is used it will override the one set here.
-	/// </summary>
-	public static class InstanceHandler  
-	{
-		public delegate GameObject InstantiateDelegate(GameObject prefab, Vector3 pos, Quaternion rot);
-		public delegate void DestroyDelegate(GameObject instance);
+    
+    /// <summary>
+    /// This can be used to intercept Instantiate and Destroy to implement your own handling. See 
+    /// PoolManagerExampleFiles/Scripts/InstanceHandlerDelegateExample.cs.
+    /// 
+    /// Simply add your own delegate and it will be run. 
+    /// 
+    /// If a SpawnPool.InstantiateDelegate is used it will override the one set here.
+    /// </summary>
+    public static class InstanceHandler  
+    {
+        public delegate GameObject InstantiateDelegate(GameObject prefab, Vector3 pos, Quaternion rot);
+        public delegate void DestroyDelegate(GameObject instance);
 
-		/// <summary>
-		/// Creates a new instance. 
-		/// 
-		/// If at least one delegate is added to InstanceHandler.InstantiateDelegates it will be used instead of 
-		/// Unity's Instantiate.
-		/// </summary>
-		public static InstantiateDelegate InstantiateDelegates;
-	
-		/// <summary>
-		/// Destroys an instance. 
-		/// 
-		/// If at least one delegate is added to InstanceHandler.DestroyDelegates it will be used instead of 
-		/// Unity's Instantiate.
-		/// </summary>
-		public static DestroyDelegate DestroyDelegates;
+        /// <summary>
+        /// Creates a new instance. 
+        /// 
+        /// If at least one delegate is added to InstanceHandler.InstantiateDelegates it will be used instead of 
+        /// Unity's Instantiate.
+        /// </summary>
+        public static InstantiateDelegate InstantiateDelegates;
+    
+        /// <summary>
+        /// Destroys an instance. 
+        /// 
+        /// If at least one delegate is added to InstanceHandler.DestroyDelegates it will be used instead of 
+        /// Unity's Instantiate.
+        /// </summary>
+        public static DestroyDelegate DestroyDelegates;
 
-		/// <summary>
-		/// See the DestroyDelegates docs
-		/// </summary>
-		/// <param name="prefab">The prefab to spawn an instance from</param>
-		/// <param name="pos">The position to spawn the instance</param>
-		/// <param name="rot">The rotation of the new instance</param>
-		/// <returns>Transform</returns>
-		internal static GameObject InstantiatePrefab(GameObject prefab, Vector3 pos, Quaternion rot)
-		{
-			if (InstanceHandler.InstantiateDelegates != null)
-			{
-				return InstanceHandler.InstantiateDelegates(prefab, pos, rot);
-			}
-			else
-			{
-				 return Object.Instantiate(prefab, pos, rot) as GameObject;
-			}
-		}
-		
-		
-		/// <summary>
-		/// See the InstantiateDelegates docs
-		/// </summary>
-		/// <param name="prefab">The prefab to spawn an instance from</param>
-		/// <returns>void</returns>
-		internal static void DestroyInstance(GameObject instance)
-		{
-			if (InstanceHandler.DestroyDelegates != null)
-			{
-				InstanceHandler.DestroyDelegates(instance);
-			}
-			else
-			{
-				Object.Destroy(instance);
-			}
-		}
-	}
+        /// <summary>
+        /// See the DestroyDelegates docs
+        /// </summary>
+        /// <param name="prefab">The prefab to spawn an instance from</param>
+        /// <param name="pos">The position to spawn the instance</param>
+        /// <param name="rot">The rotation of the new instance</param>
+        /// <returns>Transform</returns>
+        internal static GameObject InstantiatePrefab(GameObject prefab, Vector3 pos, Quaternion rot)
+        {
+            if (InstanceHandler.InstantiateDelegates != null)
+            {
+                return InstanceHandler.InstantiateDelegates(prefab, pos, rot);
+            }
+            else
+            {
+                 return Object.Instantiate(prefab, pos, rot) as GameObject;
+            }
+        }
+        
+        
+        /// <summary>
+        /// See the InstantiateDelegates docs
+        /// </summary>
+        /// <param name="prefab">The prefab to spawn an instance from</param>
+        /// <returns>void</returns>
+        internal static void DestroyInstance(GameObject instance)
+        {
+            if (InstanceHandler.DestroyDelegates != null)
+            {
+                InstanceHandler.DestroyDelegates(instance);
+            }
+            else
+            {
+                Object.Destroy(instance);
+            }
+        }
+    }
 
 
     public class SpawnPoolsDict : IDictionary<string, SpawnPool>
     {
-		#region Event Handling
-		public delegate void OnCreatedDelegate(SpawnPool pool);
-		
-		internal Dictionary<string, OnCreatedDelegate> onCreatedDelegates = 
-			 new Dictionary<string, OnCreatedDelegate>();
-		
-		public void AddOnCreatedDelegate(string poolName, OnCreatedDelegate createdDelegate)
-		{
-			// Assign first delegate "just in time"
-			if (!this.onCreatedDelegates.ContainsKey(poolName))
-			{
-				this.onCreatedDelegates.Add(poolName, createdDelegate);
-				return;
-			}
-			
-			this.onCreatedDelegates[poolName] += createdDelegate;
-		}
-		
-		public void RemoveOnCreatedDelegate(string poolName, OnCreatedDelegate createdDelegate)
-		{
-			if (!this.onCreatedDelegates.ContainsKey(poolName))
-				throw new KeyNotFoundException
-				(
-					"No OnCreatedDelegates found for pool name '" + poolName + "'."
-				);
-			
-			this.onCreatedDelegates[poolName] -= createdDelegate;
-		}
-		
-		#endregion Event Handling
-		
+        #region Event Handling
+        public delegate void OnCreatedDelegate(SpawnPool pool);
+        
+        internal Dictionary<string, OnCreatedDelegate> onCreatedDelegates = 
+             new Dictionary<string, OnCreatedDelegate>();
+        
+        public void AddOnCreatedDelegate(string poolName, OnCreatedDelegate createdDelegate)
+        {
+            // Assign first delegate "just in time"
+            if (!this.onCreatedDelegates.ContainsKey(poolName))
+            {
+                this.onCreatedDelegates.Add(poolName, createdDelegate);
+                return;
+            }
+            
+            this.onCreatedDelegates[poolName] += createdDelegate;
+        }
+        
+        public void RemoveOnCreatedDelegate(string poolName, OnCreatedDelegate createdDelegate)
+        {
+            if (!this.onCreatedDelegates.ContainsKey(poolName))
+                throw new KeyNotFoundException
+                (
+                    "No OnCreatedDelegates found for pool name '" + poolName + "'."
+                );
+            
+            this.onCreatedDelegates[poolName] -= createdDelegate;
+        }
+        
+        #endregion Event Handling
+        
         #region Public Custom Memebers
         /// <summary>
         /// Creates a new GameObject with a SpawnPool Component which registers itself
@@ -308,9 +308,9 @@ namespace PathologicalGames
             }
 
             this._pools.Add(spawnPool.poolName, spawnPool);
-			
-			if (this.onCreatedDelegates.ContainsKey(spawnPool.poolName))
-				 this.onCreatedDelegates[spawnPool.poolName](spawnPool);
+            
+            if (this.onCreatedDelegates.ContainsKey(spawnPool.poolName))
+                 this.onCreatedDelegates[spawnPool.poolName](spawnPool);
         }
 
         // Keeping here so I remember we have a NotImplimented overload (original signature)
