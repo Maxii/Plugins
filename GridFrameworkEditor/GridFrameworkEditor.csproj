@@ -64,10 +64,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\GridFrameworkDebug\GridFrameworkDebug.csproj">
-      <Project>{384a49f9-8bed-431a-8397-fdd87d599fa0}</Project>
-      <Name>GridFrameworkDebug</Name>
-    </ProjectReference>
     <ProjectReference Include="..\GridFramework\GridFramework.csproj">
       <Project>{2f5a6d85-040f-4ee6-a77f-d3e3b107a524}</Project>
       <Name>GridFramework</Name>
