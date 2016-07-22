@@ -7,7 +7,6 @@ using Pathfinding.Serialization;
 namespace Pathfinding {
 	/**  Base class for all graphs */
 	public abstract class NavGraph {
-
 		/** Used to store the guid value
 		 * \see NavGraph.guid
 		 */
@@ -25,12 +24,12 @@ namespace Pathfinding {
 		public Guid guid {
 			get {
 				if (_sguid == null || _sguid.Length != 16) {
-					_sguid = Guid.NewGuid ().ToByteArray ();
+					_sguid = Guid.NewGuid().ToByteArray();
 				}
-				return new Guid (_sguid);
+				return new Guid(_sguid);
 			}
 			set {
-				_sguid = value.ToByteArray ();
+				_sguid = value.ToByteArray();
 			}
 		}
 
@@ -72,7 +71,8 @@ namespace Pathfinding {
 				count++;
 				return true;
 			};
-			GetNodes (del);
+
+			GetNodes(del);
 			return count;
 		}
 
@@ -144,38 +144,37 @@ namespace Pathfinding {
 		 * \version Prior to version 3.6.1 the oldMatrix and newMatrix parameters were reversed by mistake.
 		 */
 		public virtual void RelocateNodes (Matrix4x4 oldMatrix, Matrix4x4 newMatrix) {
-
 			Matrix4x4 inv = oldMatrix.inverse;
 
 			Matrix4x4 m = newMatrix * inv;
 
-			GetNodes (delegate (GraphNode node) {
+			GetNodes(delegate(GraphNode node) {
 				//Vector3 tmp = inv.MultiplyPoint3x4 ((Vector3)nodes[i].position);
-				node.position = ((Int3)m.MultiplyPoint ((Vector3)node.position));
+				node.position = ((Int3)m.MultiplyPoint((Vector3)node.position));
 				return true;
 			});
-			SetMatrix (newMatrix);
+			SetMatrix(newMatrix);
 		}
 
 		/** Returns the nearest node to a position using the default NNConstraint.
-		  * \param position The position to try to find a close node to
-		  * \see Pathfinding.NNConstraint.None
-		  */
+		 * \param position The position to try to find a close node to
+		 * \see Pathfinding.NNConstraint.None
+		 */
 		public NNInfo GetNearest (Vector3 position) {
-			return GetNearest (position, NNConstraint.None);
+			return GetNearest(position, NNConstraint.None);
 		}
 
 		/** Returns the nearest node to a position using the specified NNConstraint.
-		  * \param position The position to try to find a close node to
-		  * \param constraint Can for example tell the function to try to return a walkable node. If you do not get a good node back, consider calling GetNearestForce. */
+		 * \param position The position to try to find a close node to
+		 * \param constraint Can for example tell the function to try to return a walkable node. If you do not get a good node back, consider calling GetNearestForce. */
 		public NNInfo GetNearest (Vector3 position, NNConstraint constraint) {
-			return GetNearest (position, constraint, null);
+			return GetNearest(position, constraint, null);
 		}
 
 		/** Returns the nearest node to a position using the specified NNConstraint.
-		  * \param position The position to try to find a close node to
-		  * \param hint Can be passed to enable some graph generators to find the nearest node faster.
-		  * \param constraint Can for example tell the function to try to return a walkable node. If you do not get a good node back, consider calling GetNearestForce. */
+		 * \param position The position to try to find a close node to
+		 * \param hint Can be passed to enable some graph generators to find the nearest node faster.
+		 * \param constraint Can for example tell the function to try to return a walkable node. If you do not get a good node back, consider calling GetNearestForce. */
 		public virtual NNInfo GetNearest (Vector3 position, NNConstraint constraint, GraphNode hint) {
 			// This is a default implementation and it is pretty slow
 			// Graphs usually override this to provide faster and more specialised implementations
@@ -189,7 +188,7 @@ namespace Pathfinding {
 			GraphNode minConstNode = null;
 
 			// Loop through all nodes and find the closest suitable node
-			GetNodes (node => {
+			GetNodes(node => {
 				float dist = (position-(Vector3)node.position).sqrMagnitude;
 
 				if (dist < minDist) {
@@ -197,14 +196,14 @@ namespace Pathfinding {
 					minNode = node;
 				}
 
-				if (dist < minConstDist && dist < maxDistSqr && constraint.Suitable (node)) {
+				if (dist < minConstDist && dist < maxDistSqr && constraint.Suitable(node)) {
 					minConstDist = dist;
 					minConstNode = node;
 				}
 				return true;
 			});
 
-			var nnInfo = new NNInfo (minNode);
+			var nnInfo = new NNInfo(minNode);
 
 			nnInfo.constrainedNode = minConstNode;
 
@@ -223,7 +222,7 @@ namespace Pathfinding {
 		 * \returns an NNInfo. This method will only return an empty NNInfo if there are no nodes which comply with the specified constraint.
 		 */
 		public virtual NNInfo GetNearestForce (Vector3 position, NNConstraint constraint) {
-			return GetNearest (position, constraint);
+			return GetNearest(position, constraint);
 		}
 
 		/**
@@ -254,34 +253,33 @@ namespace Pathfinding {
 		 * In almost all cases you should use AstarPath.Scan instead.
 		 */
 		public void ScanGraph () {
-
 			if (AstarPath.OnPreScan != null) {
-				AstarPath.OnPreScan (AstarPath.active);
+				AstarPath.OnPreScan(AstarPath.active);
 			}
 
 			if (AstarPath.OnGraphPreScan != null) {
-				AstarPath.OnGraphPreScan (this);
+				AstarPath.OnGraphPreScan(this);
 			}
 
-			ScanInternal ();
+			ScanInternal();
 
 			if (AstarPath.OnGraphPostScan != null) {
-				AstarPath.OnGraphPostScan (this);
+				AstarPath.OnGraphPostScan(this);
 			}
 
 			if (AstarPath.OnPostScan != null) {
-				AstarPath.OnPostScan (AstarPath.active);
+				AstarPath.OnPostScan(AstarPath.active);
 			}
 		}
 
 		[System.Obsolete("Please use AstarPath.active.Scan or if you really want this.ScanInternal which has the same functionality as this method had")]
 		public void Scan () {
-			throw new System.Exception ("This method is deprecated. Please use AstarPath.active.Scan or if you really want this.ScanInternal which has the same functionality as this method had.");
+			throw new System.Exception("This method is deprecated. Please use AstarPath.active.Scan or if you really want this.ScanInternal which has the same functionality as this method had.");
 		}
 
 		/** Internal method for scanning graphs */
 		public void ScanInternal () {
-			ScanInternal (null);
+			ScanInternal(null);
 		}
 
 		/**
@@ -300,37 +298,36 @@ namespace Pathfinding {
 			Color c = AstarColor.NodeConnection;
 
 			switch (AstarPath.active.debugMode) {
-				case GraphDebugMode.Areas:
-					c = AstarColor.GetAreaColor (node.Area);
-					break;
-				case GraphDebugMode.Penalty:
-					c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, ((float)node.Penalty-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
-					break;
-				case GraphDebugMode.Tags:
-					c = AstarMath.IntToColor ((int)node.Tag,0.5F);
-					break;
-				default:
-					if (data == null) return AstarColor.NodeConnection;
+			case GraphDebugMode.Areas:
+				c = AstarColor.GetAreaColor(node.Area);
+				break;
+			case GraphDebugMode.Penalty:
+				c = Color.Lerp(AstarColor.ConnectionLowLerp, AstarColor.ConnectionHighLerp, ((float)node.Penalty-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
+				break;
+			case GraphDebugMode.Tags:
+				c = AstarColor.GetAreaColor(node.Tag);
+				break;
+			default:
+				if (data == null) return AstarColor.NodeConnection;
 
-					PathNode nodeR = data.GetPathNode (node);
+				PathNode nodeR = data.GetPathNode(node);
 
-					switch (AstarPath.active.debugMode) {
-						case GraphDebugMode.G:
-							c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, ((float)nodeR.G-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
-							break;
-						case GraphDebugMode.H:
-							c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, ((float)nodeR.H-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
-							break;
-						case GraphDebugMode.F:
-							c = Color.Lerp (AstarColor.ConnectionLowLerp,AstarColor.ConnectionHighLerp, ((float)nodeR.F-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
-							break;
-					}
+				switch (AstarPath.active.debugMode) {
+				case GraphDebugMode.G:
+					c = Color.Lerp(AstarColor.ConnectionLowLerp, AstarColor.ConnectionHighLerp, ((float)nodeR.G-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
 					break;
+				case GraphDebugMode.H:
+					c = Color.Lerp(AstarColor.ConnectionLowLerp, AstarColor.ConnectionHighLerp, ((float)nodeR.H-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
+					break;
+				case GraphDebugMode.F:
+					c = Color.Lerp(AstarColor.ConnectionLowLerp, AstarColor.ConnectionHighLerp, ((float)nodeR.F-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
+					break;
+				}
+				break;
 			}
 
 			c.a *= 0.5F;
 			return c;
-
 		}
 
 		/** Serializes graph type specific node data.
@@ -356,37 +353,35 @@ namespace Pathfinding {
 		}
 
 #if ASTAR_NO_JSON
-		public virtual void SerializeSettings ( GraphSerializationContext ctx ) {
+		public virtual void SerializeSettings (GraphSerializationContext ctx) {
+			ctx.writer.Write(guid.ToByteArray());
+			ctx.writer.Write(initialPenalty);
+			ctx.writer.Write(open);
+			ctx.writer.Write(name ?? "");
+			ctx.writer.Write(drawGizmos);
+			ctx.writer.Write(infoScreenOpen);
 
-			ctx.writer.Write (guid.ToByteArray());
-			ctx.writer.Write (initialPenalty);
-			ctx.writer.Write (open);
-			ctx.writer.Write (name ?? "");
-			ctx.writer.Write (drawGizmos);
-			ctx.writer.Write (infoScreenOpen);
-
-			for ( int i = 0; i < 4; i++ ) {
-				for ( int j = 0; j < 4; j++ ) {
-					ctx.writer.Write (matrix.GetRow(i)[j]);
+			for (int i = 0; i < 4; i++) {
+				for (int j = 0; j < 4; j++) {
+					ctx.writer.Write(matrix.GetRow(i)[j]);
 				}
 			}
 		}
 
-		public virtual void DeserializeSettings ( GraphSerializationContext ctx ) {
-
-			guid = new Guid(ctx.reader.ReadBytes (16));
-			initialPenalty = ctx.reader.ReadUInt32 ();
+		public virtual void DeserializeSettings (GraphSerializationContext ctx) {
+			guid = new Guid(ctx.reader.ReadBytes(16));
+			initialPenalty = ctx.reader.ReadUInt32();
 			open = ctx.reader.ReadBoolean();
 			name = ctx.reader.ReadString();
 			drawGizmos = ctx.reader.ReadBoolean();
 			infoScreenOpen = ctx.reader.ReadBoolean();
 
-			for ( int i = 0; i < 4; i++ ) {
+			for (int i = 0; i < 4; i++) {
 				Vector4 row = Vector4.zero;
-				for ( int j = 0; j < 4; j++ ) {
-					row[j] = ctx.reader.ReadSingle ();
+				for (int j = 0; j < 4; j++) {
+					row[j] = ctx.reader.ReadSingle();
 				}
-				matrix.SetRow (i, row);
+				matrix.SetRow(i, row);
 			}
 		}
 #endif
@@ -397,13 +392,12 @@ namespace Pathfinding {
 		 */
 		public static bool InSearchTree (GraphNode node, Path path) {
 			if (path == null || path.pathHandler == null) return true;
-			PathNode nodeR = path.pathHandler.GetPathNode (node);
+			PathNode nodeR = path.pathHandler.GetPathNode(node);
 			return nodeR.pathID == path.pathID;
 		}
 
 		/** Draw gizmos for the graph */
 		public virtual void OnDrawGizmos (bool drawNodes) {
-
 			if (!drawNodes) {
 				return;
 			}
@@ -416,33 +410,36 @@ namespace Pathfinding {
 			// from the #node variable to #otherNode
 			GraphNodeDelegate drawConnection = otherNode => Gizmos.DrawLine((Vector3)node.position, (Vector3)otherNode.position);
 
-			GetNodes (_node => {
+			GetNodes(_node => {
 				// Set the #node variable so that #drawConnection can use it
 				node = _node;
 
-				Gizmos.color = NodeColor (node, AstarPath.active.debugPathData);
-				if (AstarPath.active.showSearchTree && !InSearchTree(node,AstarPath.active.debugPath)) return true;
+				Gizmos.color = NodeColor(node, AstarPath.active.debugPathData);
+				if (AstarPath.active.showSearchTree && !InSearchTree(node, AstarPath.active.debugPath)) return true;
 
 
-				PathNode nodeR = data != null ? data.GetPathNode (node) : null;
+				PathNode nodeR = data != null ? data.GetPathNode(node) : null;
 				if (AstarPath.active.showSearchTree && nodeR != null && nodeR.parent != null) {
-					Gizmos.DrawLine ((Vector3)node.position,(Vector3)nodeR.parent.node.position);
+					Gizmos.DrawLine((Vector3)node.position, (Vector3)nodeR.parent.node.position);
 				} else {
-					node.GetConnections (drawConnection);
+					node.GetConnections(drawConnection);
 				}
 				return true;
 			});
+		}
+
+		/** Called when temporary meshes used in OnDrawGizmos need to be unloaded to prevent memory leaks */
+		internal virtual void UnloadGizmoMeshes () {
 		}
 	}
 
 
 	/** Handles collision checking for graphs.
-	  * Mostly used by grid based graphs */
+	 * Mostly used by grid based graphs */
 	[System.Serializable]
 	public class GraphCollision {
-
 		/** Collision shape to use.
-		  * Pathfinding.ColliderType */
+		 * Pathfinding.ColliderType */
 		public ColliderType type = ColliderType.Capsule;
 
 		/** Diameter of capsule or sphere when checking for collision.
@@ -513,13 +510,13 @@ namespace Pathfinding {
 		public const float RaycastErrorMargin = 0.005F;
 
 		/** Sets up several variables using the specified matrix and scale.
-		  * \see GraphCollision.up
-		  * \see GraphCollision.upheight
-		  * \see GraphCollision.finalRadius
-		  * \see GraphCollision.finalRaycastRadius
-		  */
+		 * \see GraphCollision.up
+		 * \see GraphCollision.upheight
+		 * \see GraphCollision.finalRadius
+		 * \see GraphCollision.finalRaycastRadius
+		 */
 		public void Initialize (Matrix4x4 matrix, float scale) {
-			up = matrix.MultiplyVector (Vector3.up);
+			up = matrix.MultiplyVector(Vector3.up);
 			upheight = up*height;
 			finalRadius = diameter*scale*0.5F;
 			finalRaycastRadius = thickRaycastDiameter*scale*0.5F;
@@ -529,37 +526,36 @@ namespace Pathfinding {
 		 * If #collisionCheck is false, this will always return true.\n
 		 */
 		public bool Check (Vector3 position) {
-
 			if (!collisionCheck) {
 				return true;
 			}
 
-			if ( use2D ) {
+			if (use2D) {
 				switch (type) {
-					case ColliderType.Capsule:
-						throw new System.Exception ("Capsule mode cannot be used with 2D since capsules don't exist in 2D. Please change the Physics Testing -> Collider Type setting.");
-					case ColliderType.Sphere:
-						return Physics2D.OverlapCircle (position, finalRadius, mask) == null;
-					default:
-						return Physics2D.OverlapPoint ( position, mask ) == null;
+				case ColliderType.Capsule:
+					throw new System.Exception("Capsule mode cannot be used with 2D since capsules don't exist in 2D. Please change the Physics Testing -> Collider Type setting.");
+				case ColliderType.Sphere:
+					return Physics2D.OverlapCircle(position, finalRadius, mask) == null;
+				default:
+					return Physics2D.OverlapPoint(position, mask) == null;
 				}
 			}
 
 			position += up*collisionOffset;
 			switch (type) {
-				case ColliderType.Capsule:
-					return !Physics.CheckCapsule (position, position+upheight,finalRadius,mask);
-				case ColliderType.Sphere:
-					return !Physics.CheckSphere (position, finalRadius,mask);
+			case ColliderType.Capsule:
+				return !Physics.CheckCapsule(position, position+upheight, finalRadius, mask);
+			case ColliderType.Sphere:
+				return !Physics.CheckSphere(position, finalRadius, mask);
+			default:
+				switch (rayDirection) {
+				case RayDirection.Both:
+					return !Physics.Raycast(position, up, height, mask) && !Physics.Raycast(position+upheight, -up, height, mask);
+				case RayDirection.Up:
+					return !Physics.Raycast(position, up, height, mask);
 				default:
-					switch (rayDirection) {
-						case RayDirection.Both:
-							return !Physics.Raycast (position, up, height, mask) && !Physics.Raycast (position+upheight, -up, height, mask);
-						case RayDirection.Up:
-							return !Physics.Raycast (position, up, height, mask);
-						default:
-							return !Physics.Raycast (position+upheight, -up, height, mask);
-					}
+					return !Physics.Raycast(position+upheight, -up, height, mask);
+				}
 			}
 		}
 
@@ -567,31 +563,32 @@ namespace Pathfinding {
 		public Vector3 CheckHeight (Vector3 position) {
 			RaycastHit hit;
 			bool walkable;
-			return CheckHeight (position,out hit, out walkable);
+
+			return CheckHeight(position, out hit, out walkable);
 		}
 
 		/** Returns the position with the correct height.
 		 * If #heightCheck is false, this will return \a position.\n
-		  * \a walkable will be set to false if nothing was hit.
-		  * The ray will check a tiny bit further than to the grids base to avoid floating point errors when the ground is exactly at the base of the grid */
+		 * \a walkable will be set to false if nothing was hit.
+		 * The ray will check a tiny bit further than to the grids base to avoid floating point errors when the ground is exactly at the base of the grid */
 		public Vector3 CheckHeight (Vector3 position, out RaycastHit hit, out bool walkable) {
 			walkable = true;
 
-			if (!heightCheck || use2D ) {
-				hit = new RaycastHit ();
+			if (!heightCheck || use2D) {
+				hit = new RaycastHit();
 				return position;
 			}
 
 			if (thickRaycast) {
-				var ray = new Ray (position+up*fromHeight,-up);
-				if (Physics.SphereCast (ray, finalRaycastRadius,out hit, fromHeight+0.005F, heightMask)) {
-					return AstarMath.NearestPoint (ray.origin,ray.origin+ray.direction,hit.point);
+				var ray = new Ray(position+up*fromHeight, -up);
+				if (Physics.SphereCast(ray, finalRaycastRadius, out hit, fromHeight+0.005F, heightMask)) {
+					return VectorMath.ClosestPointOnLine(ray.origin, ray.origin+ray.direction, hit.point);
 				}
 
 				walkable &= !unwalkableWhenNoGround;
 			} else {
 				// Cast a ray from above downwards to try to find the ground
-				if (Physics.Raycast (position+up*fromHeight, -up,out hit, fromHeight+0.005F, heightMask)) {
+				if (Physics.Raycast(position+up*fromHeight, -up, out hit, fromHeight+0.005F, heightMask)) {
 					return hit.point;
 				}
 
@@ -601,25 +598,25 @@ namespace Pathfinding {
 		}
 
 		/** Same as #CheckHeight, except that the raycast will always start exactly at \a origin.
-		  * \a walkable will be set to false if nothing was hit.
-		  * The ray will check a tiny bit further than to the grids base to avoid floating point errors when the ground is exactly at the base of the grid */
+		 * \a walkable will be set to false if nothing was hit.
+		 * The ray will check a tiny bit further than to the grids base to avoid floating point errors when the ground is exactly at the base of the grid */
 		public Vector3 Raycast (Vector3 origin, out RaycastHit hit, out bool walkable) {
 			walkable = true;
 
-			if (!heightCheck || use2D ) {
-				hit = new RaycastHit ();
+			if (!heightCheck || use2D) {
+				hit = new RaycastHit();
 				return origin -up*fromHeight;
 			}
 
 			if (thickRaycast) {
-				var ray = new Ray (origin,-up);
-				if (Physics.SphereCast (ray, finalRaycastRadius,out hit, fromHeight+0.005F, heightMask)) {
-					return AstarMath.NearestPoint (ray.origin,ray.origin+ray.direction,hit.point);
+				var ray = new Ray(origin, -up);
+				if (Physics.SphereCast(ray, finalRaycastRadius, out hit, fromHeight+0.005F, heightMask)) {
+					return VectorMath.ClosestPointOnLine(ray.origin, ray.origin+ray.direction, hit.point);
 				}
 
 				walkable &= !unwalkableWhenNoGround;
 			} else {
-				if (Physics.Raycast (origin, -up,out hit, fromHeight+0.005F, heightMask)) {
+				if (Physics.Raycast(origin, -up, out hit, fromHeight+0.005F, heightMask)) {
 					return hit.point;
 				}
 
@@ -629,15 +626,14 @@ namespace Pathfinding {
 		}
 
 		/** Returns all hits when checking height for \a position.
-		  * \warning Does not work well with thick raycast, will only return an object a single time
-		  */
+		 * \warning Does not work well with thick raycast, will only return an object a single time
+		 */
 		public RaycastHit[] CheckHeightAll (Vector3 position) {
-
 			if (!heightCheck || use2D) {
-				var hit = new RaycastHit ();
+				var hit = new RaycastHit();
 				hit.point = position;
 				hit.distance = 0;
-				return new [] {hit};
+				return new [] { hit };
 			}
 
 			if (thickRaycast) {
@@ -653,7 +649,7 @@ namespace Pathfinding {
 			int numberSame = 0;
 			while (true) {
 				RaycastHit hit;
-				Raycast (cpos, out hit, out walkable);
+				Raycast(cpos, out hit, out walkable);
 				if (hit.transform == null) { //Raycast did not hit anything
 					break;
 				}
@@ -664,49 +660,49 @@ namespace Pathfinding {
 					prevHit = hit.point;
 					numberSame = 0;
 
-					hits.Add (hit);
+					hits.Add(hit);
 				} else {
 					cpos -= up*0.001F;
 					numberSame++;
 					//Check if we are hitting the same position all the time, even though we are decrementing the cpos variable
 					if (numberSame > 10) {
-						Debug.LogError ("Infinite Loop when raycasting. Please report this error (arongranberg.com)\n"+cpos+" : "+prevHit);
+						Debug.LogError("Infinite Loop when raycasting. Please report this error (arongranberg.com)\n"+cpos+" : "+prevHit);
 						break;
 					}
 				}
 			}
-			return hits.ToArray ();
+			return hits.ToArray();
 		}
 
-		public void SerializeSettings ( GraphSerializationContext ctx ) {
-			ctx.writer.Write ((int)type);
-			ctx.writer.Write (diameter);
-			ctx.writer.Write (height);
-			ctx.writer.Write (collisionOffset);
-			ctx.writer.Write ((int)rayDirection);
-			ctx.writer.Write ((int)mask);
-			ctx.writer.Write ((int)heightMask);
-			ctx.writer.Write (fromHeight);
-			ctx.writer.Write (thickRaycast);
-			ctx.writer.Write (thickRaycastDiameter);
+		public void SerializeSettings (GraphSerializationContext ctx) {
+			ctx.writer.Write((int)type);
+			ctx.writer.Write(diameter);
+			ctx.writer.Write(height);
+			ctx.writer.Write(collisionOffset);
+			ctx.writer.Write((int)rayDirection);
+			ctx.writer.Write((int)mask);
+			ctx.writer.Write((int)heightMask);
+			ctx.writer.Write(fromHeight);
+			ctx.writer.Write(thickRaycast);
+			ctx.writer.Write(thickRaycastDiameter);
 
-			ctx.writer.Write (unwalkableWhenNoGround);
-			ctx.writer.Write (use2D);
-			ctx.writer.Write (collisionCheck);
-			ctx.writer.Write (heightCheck);
+			ctx.writer.Write(unwalkableWhenNoGround);
+			ctx.writer.Write(use2D);
+			ctx.writer.Write(collisionCheck);
+			ctx.writer.Write(heightCheck);
 		}
 
-		public void DeserializeSettings ( GraphSerializationContext ctx ) {
+		public void DeserializeSettings (GraphSerializationContext ctx) {
 			type = (ColliderType)ctx.reader.ReadInt32();
-			diameter = ctx.reader.ReadSingle ();
-			height = ctx.reader.ReadSingle ();
-			collisionOffset = ctx.reader.ReadSingle ();
-			rayDirection = (RayDirection)ctx.reader.ReadInt32 ();
-			mask = (LayerMask)ctx.reader.ReadInt32 ();
-			heightMask = (LayerMask)ctx.reader.ReadInt32 ();
-			fromHeight = ctx.reader.ReadSingle ();
-			thickRaycast = ctx.reader.ReadBoolean ();
-			thickRaycastDiameter = ctx.reader.ReadSingle ();
+			diameter = ctx.reader.ReadSingle();
+			height = ctx.reader.ReadSingle();
+			collisionOffset = ctx.reader.ReadSingle();
+			rayDirection = (RayDirection)ctx.reader.ReadInt32();
+			mask = (LayerMask)ctx.reader.ReadInt32();
+			heightMask = (LayerMask)ctx.reader.ReadInt32();
+			fromHeight = ctx.reader.ReadSingle();
+			thickRaycast = ctx.reader.ReadBoolean();
+			thickRaycastDiameter = ctx.reader.ReadSingle();
 
 			unwalkableWhenNoGround = ctx.reader.ReadBoolean();
 			use2D = ctx.reader.ReadBoolean();
@@ -718,15 +714,15 @@ namespace Pathfinding {
 
 	/** Determines collision check shape */
 	public enum ColliderType {
-		Sphere,		/**< Uses a Sphere, Physics.CheckSphere */
-		Capsule,	/**< Uses a Capsule, Physics.CheckCapsule */
-		Ray			/**< Uses a Ray, Physics.Linecast */
+		Sphere,     /**< Uses a Sphere, Physics.CheckSphere */
+		Capsule,    /**< Uses a Capsule, Physics.CheckCapsule */
+		Ray         /**< Uses a Ray, Physics.Linecast */
 	}
 
 	/** Determines collision check ray direction */
 	public enum RayDirection {
-		Up,	 	/**< Casts the ray from the bottom upwards */
-		Down,	/**< Casts the ray from the top downwards */
-		Both	/**< Casts two rays in both directions */
+		Up,     /**< Casts the ray from the bottom upwards */
+		Down,   /**< Casts the ray from the top downwards */
+		Both    /**< Casts two rays in both directions */
 	}
 }

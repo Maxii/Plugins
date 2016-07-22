@@ -1,12 +1,10 @@
 using UnityEngine;
 using System.Collections.Generic;
 using UnityEditor;
-using Pathfinding;
 
 namespace Pathfinding {
 	/** Simple GUI utility functions */
 	public static class GUIUtilityx {
-
 		private static Color prevCol;
 
 		public static void SetColor (Color col) {
@@ -23,7 +21,6 @@ namespace Pathfinding {
 	 * \warning The code is not pretty.
 	 */
 	public class EditorGUILayoutx {
-
 		Dictionary<string, FadeArea> fadeAreas;
 
 		/** Global info about which editor is currently active.
@@ -59,11 +56,11 @@ namespace Pathfinding {
 				return;
 			}
 
-			fadeAreas.Remove (id);
+			fadeAreas.Remove(id);
 		}
 
 		public bool DrawID (string id) {
-			return fadeAreas != null && fadeAreas[id].Show ();
+			return fadeAreas != null && fadeAreas[id].Show();
 		}
 
 		public class FadeArea {
@@ -92,9 +89,9 @@ namespace Pathfinding {
 
 			/** Should anything inside this FadeArea be drawn.
 			 * Should be called every frame ( in all events ) for best results.
-			  */
+			 */
 			public bool Show () {
-				if ( Event.current.type == EventType.Layout ) {
+				if (Event.current.type == EventType.Layout) {
 					visibleInLayout = open || value > 0F;
 				}
 
@@ -108,30 +105,30 @@ namespace Pathfinding {
 
 		/** Make sure the stack is cleared at the start of a frame */
 		public void ClearFadeAreaStack () {
-			if ( fadeAreaStack != null ) fadeAreaStack.Clear ();
+			if (fadeAreaStack != null) fadeAreaStack.Clear();
 		}
 
-		public FadeArea BeginFadeArea (bool open,string label, string id) {
-			return BeginFadeArea (open,label,id, defaultAreaStyle);
+		public FadeArea BeginFadeArea (bool open, string label, string id) {
+			return BeginFadeArea(open, label, id, defaultAreaStyle);
 		}
 
-		public FadeArea BeginFadeArea (bool open,string label, string id, GUIStyle areaStyle) {
-			return BeginFadeArea (open, label, id, areaStyle, defaultLabelStyle);
+		public FadeArea BeginFadeArea (bool open, string label, string id, GUIStyle areaStyle) {
+			return BeginFadeArea(open, label, id, areaStyle, defaultLabelStyle);
 		}
 
-		public FadeArea BeginFadeArea (bool open,string label, string id, GUIStyle areaStyle, GUIStyle labelStyle) {
-
+		public FadeArea BeginFadeArea (bool open, string label, string id, GUIStyle areaStyle, GUIStyle labelStyle) {
 			Color tmp1 = GUI.color;
 
-			FadeArea fadeArea = BeginFadeArea (open,id, 20,areaStyle);
+			FadeArea fadeArea = BeginFadeArea(open, id, 20, areaStyle);
 
 			Color tmp2 = GUI.color;
+
 			GUI.color = tmp1;
 
 			if (label != "") {
-				if (GUILayout.Button (label,labelStyle)) {
+				if (GUILayout.Button(label, labelStyle)) {
 					fadeArea.open = !fadeArea.open;
-					editor.Repaint ();
+					editor.Repaint();
 				}
 			}
 
@@ -141,17 +138,16 @@ namespace Pathfinding {
 		}
 
 		public FadeArea BeginFadeArea (bool open, string id) {
-			return BeginFadeArea (open,id,0);
+			return BeginFadeArea(open, id, 0);
 		}
 
 		public FadeArea BeginFadeArea (bool open, string id, float minHeight) {
-			return BeginFadeArea (open, id, minHeight, GUIStyle.none);
+			return BeginFadeArea(open, id, minHeight, GUIStyle.none);
 		}
 
 		public FadeArea BeginFadeArea (bool open, string id, float minHeight, GUIStyle areaStyle) {
-
 			if (editor == null) {
-				Debug.LogError ("You need to set the 'EditorGUIx.editor' variable before calling this function");
+				Debug.LogError("You need to set the 'EditorGUIx.editor' variable before calling this function");
 				return null;
 			}
 
@@ -160,16 +156,16 @@ namespace Pathfinding {
 			}
 
 			if (fadeAreas == null) {
-				fadeAreas = new Dictionary<string, FadeArea> ();
+				fadeAreas = new Dictionary<string, FadeArea>();
 			}
 
 			FadeArea fadeArea;
-			if (!fadeAreas.TryGetValue (id, out fadeArea)) {
-				fadeArea = new FadeArea (open);
-				fadeAreas.Add (id, fadeArea);
+			if (!fadeAreas.TryGetValue(id, out fadeArea)) {
+				fadeArea = new FadeArea(open);
+				fadeAreas.Add(id, fadeArea);
 			}
 
-			fadeAreaStack.Push (fadeArea);
+			fadeAreaStack.Push(fadeArea);
 
 			fadeArea.open = open;
 
@@ -186,18 +182,18 @@ namespace Pathfinding {
 			} else {
 				lastRect.height = lastRect.height < minHeight ? minHeight : lastRect.height;
 				lastRect.height -= minHeight;
-				float faded = Hermite (0F,1F,fadeArea.value);
+				float faded = Hermite(0F, 1F, fadeArea.value);
 				lastRect.height *= faded;
 				lastRect.height += minHeight;
-				lastRect.height = Mathf.Round (lastRect.height);
+				lastRect.height = Mathf.Round(lastRect.height);
 			}
 
-			Rect gotLastRect = GUILayoutUtility.GetRect (new GUIContent (), areaStyle, GUILayout.Height (lastRect.height));
+			Rect gotLastRect = GUILayoutUtility.GetRect(new GUIContent(), areaStyle, GUILayout.Height(lastRect.height));
 
 			//The clipping area, also drawing background
-			GUILayout.BeginArea (lastRect,areaStyle);
+			GUILayout.BeginArea(lastRect, areaStyle);
 
-			Rect newRect = EditorGUILayout.BeginVertical ();
+			Rect newRect = EditorGUILayout.BeginVertical();
 
 			if (Event.current.type == EventType.Repaint || Event.current.type == EventType.ScrollWheel) {
 				newRect.x = gotLastRect.x;
@@ -209,10 +205,10 @@ namespace Pathfinding {
 				if (fadeArea.lastRect != newRect) {
 					//@Fix - duplicate
 					//fadeArea.lastUpdate = Time.realtimeSinceStartup;
-					editor.Repaint ();
+					editor.Repaint();
 				}
 
-				fadeArea.Switch ();
+				fadeArea.Switch();
 			}
 
 			if (Event.current.type == EventType.Repaint) {
@@ -222,22 +218,22 @@ namespace Pathfinding {
 				float newRectHeight = fadeArea.lastRect.height;
 				float deltaHeight = 400F / newRectHeight;
 
-				float deltaTime = Mathf.Clamp (Time.realtimeSinceStartup-fadeAreas[id].lastUpdate,0.00001F,0.05F);
+				float deltaTime = Mathf.Clamp(Time.realtimeSinceStartup-fadeAreas[id].lastUpdate, 0.00001F, 0.05F);
 
-				deltaTime *= Mathf.Lerp (deltaHeight*deltaHeight*0.01F, 0.8F, 0.9F);
+				deltaTime *= Mathf.Lerp(deltaHeight*deltaHeight*0.01F, 0.8F, 0.9F);
 
 				fadeAreas[id].lastUpdate = Time.realtimeSinceStartup;
 
 
 				if (Mathf.Abs(targetValue-value) > 0.001F) {
-					float time = Mathf.Clamp01 (deltaTime*speed);
-					value += time*Mathf.Sign (targetValue-value);
-					editor.Repaint ();
+					float time = Mathf.Clamp01(deltaTime*speed);
+					value += time*Mathf.Sign(targetValue-value);
+					editor.Repaint();
 				} else {
-					value = Mathf.Round (value);
+					value = Mathf.Round(value);
 				}
 
-				fadeArea.value = Mathf.Clamp01 (value);
+				fadeArea.value = Mathf.Clamp01(value);
 			}
 
 			if (fade) {
@@ -253,21 +249,19 @@ namespace Pathfinding {
 		}
 
 		public void EndFadeArea () {
-
 			if (fadeAreaStack.Count <= 0) {
-				Debug.LogError ("You are popping more Fade Areas than you are pushing, make sure they are balanced");
+				Debug.LogError("You are popping more Fade Areas than you are pushing, make sure they are balanced");
 				return;
 			}
 
-			FadeArea fadeArea = fadeAreaStack.Pop ();
+			FadeArea fadeArea = fadeAreaStack.Pop();
 
-			EditorGUILayout.EndVertical ();
-			GUILayout.EndArea ();
+			EditorGUILayout.EndVertical();
+			GUILayout.EndArea();
 
 			if (fade) {
 				GUI.color = fadeArea.preFadeColor;
 			}
-
 		}
 
 		/** Returns width of current editor indent.
@@ -284,8 +278,8 @@ namespace Pathfinding {
 		 * Forumula used is 13+6*EditorGUI.indentLevel
 		 */
 		public static void BeginIndent () {
-			GUILayout.BeginHorizontal ();
-			GUILayout.Space (IndentWidth());
+			GUILayout.BeginHorizontal();
+			GUILayout.Space(IndentWidth());
 		}
 
 		/** End indent.
@@ -293,24 +287,23 @@ namespace Pathfinding {
 		 * \see BeginIndent
 		 */
 		public static void EndIndent () {
-			GUILayout.EndHorizontal ();
+			GUILayout.EndHorizontal();
 		}
 
 		public static int TagField (string label, int value) {
-
 			// Make sure the tagNamesAndEditTagsButton is relatively up to date
 			if (tagNamesAndEditTagsButton == null || EditorApplication.timeSinceStartup - timeLastUpdatedTagNames > 1) {
 				timeLastUpdatedTagNames = EditorApplication.timeSinceStartup;
-				var tagNames = AstarPath.FindTagNames ();
+				var tagNames = AstarPath.FindTagNames();
 				tagNamesAndEditTagsButton = new string[tagNames.Length+1];
 				tagNames.CopyTo(tagNamesAndEditTagsButton, 0);
 				tagNamesAndEditTagsButton[tagNamesAndEditTagsButton.Length-1] = "Edit Tags...";
 			}
 
 			// Tags are between 0 and 31
-			value = Mathf.Clamp (value, 0, 31);
+			value = Mathf.Clamp(value, 0, 31);
 
-			var newValue = EditorGUILayout.IntPopup (label,value,tagNamesAndEditTagsButton,new [] {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31, -1});
+			var newValue = EditorGUILayout.IntPopup(label, value, tagNamesAndEditTagsButton, new [] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, -1 });
 
 			// Last element corresponds to the 'Edit Tags...' entry. Open the tag editor
 			if (newValue == -1) {
@@ -323,81 +316,94 @@ namespace Pathfinding {
 		}
 
 		public static void TagMaskField (GUIContent label, int value, System.Action<int> callback) {
+			GUILayout.BeginHorizontal();
 
-			GUILayout.BeginHorizontal ();
+			EditorGUILayout.PrefixLabel(label, EditorStyles.layerMaskField);
 
-			EditorGUIUtility.LookLikeControls();
-			EditorGUILayout.PrefixLabel (label,EditorStyles.layerMaskField);
+			string[] tagNames = AstarPath.FindTagNames();
 
 			string text;
-			if (value == 0) text = "Nothing";
-			else if (value == ~0) text = "Everything";
-			else text = System.Convert.ToString (value,2);
+			if (value == 0) {
+				text = "Nothing";
+			} else if (value == ~0) {
+				text = "Everything";
+			} else {
+				text = "";
+				for (int i = 0; i < 32; i++) {
+					if (((value >> i) & 0x1) != 0) {
+						// Add spacing between words
+						if (text.Length > 0) text += ", ";
 
-			string[] tagNames = AstarPath.FindTagNames ();
+						text += tagNames[i];
 
-			if (GUILayout.Button (text,EditorStyles.layerMaskField,GUILayout.ExpandWidth (true))) {
+						// Too long, just give up
+						if (text.Length > 40) {
+							text = "Mixed...";
+							break;
+						}
+					}
+				}
+			}
 
+			if (GUILayout.Button(text, EditorStyles.layerMaskField, GUILayout.ExpandWidth(true))) {
 				GenericMenu.MenuFunction2 wrappedCallback = obj => callback((int)obj);
 
-				var menu = new GenericMenu ();
+				var menu = new GenericMenu();
 
-				menu.AddItem (new GUIContent ("Everything"), value == ~0, wrappedCallback, ~0);
-				menu.AddItem (new GUIContent ("Nothing"), value == 0, wrappedCallback, 0);
+				menu.AddItem(new GUIContent("Everything"), value == ~0, wrappedCallback, ~0);
+				menu.AddItem(new GUIContent("Nothing"), value == 0, wrappedCallback, 0);
 
 				for (int i = 0; i < tagNames.Length; i++) {
 					bool on = (value >> i & 1) != 0;
 					int result = on ? value & ~(1 << i) : value | 1<<i;
-					menu.AddItem (new GUIContent (tagNames[i]), on, wrappedCallback, result);
+					menu.AddItem(new GUIContent(tagNames[i]), on, wrappedCallback, result);
 				}
 
 				// Shortcut to open the tag editor
-				menu.AddItem (new GUIContent ("Edit Tags..."),false,AstarPathEditor.EditTags);
-				menu.ShowAsContext ();
+				menu.AddItem(new GUIContent("Edit Tag Names..."), false, AstarPathEditor.EditTags);
+				menu.ShowAsContext();
 
-				Event.current.Use ();
+				Event.current.Use();
 			}
 
-			GUILayout.EndHorizontal ();
-
+			GUILayout.EndHorizontal();
 		}
 
 		public static int UpDownArrows (GUIContent label, int value, GUIStyle labelStyle, GUIStyle upArrow, GUIStyle downArrow) {
-
-			GUILayout.BeginHorizontal ();
-			GUILayout.Space (EditorGUI.indentLevel*10);
-			GUILayout.Label (label,labelStyle,GUILayout.Width (170));
+			GUILayout.BeginHorizontal();
+			GUILayout.Space(EditorGUI.indentLevel*10);
+			GUILayout.Label(label, labelStyle, GUILayout.Width(170));
 
 			if (downArrow == null || upArrow == null) {
-				upArrow = GUI.skin.FindStyle ("Button");
+				upArrow = GUI.skin.FindStyle("Button");
 				downArrow = upArrow;
 			}
 
-			if (GUILayout.Button ("",upArrow,GUILayout.Width (16),GUILayout.Height (12))) {
+			if (GUILayout.Button("", upArrow, GUILayout.Width(16), GUILayout.Height(12))) {
 				value++;
 			}
-			if (GUILayout.Button ("",downArrow,GUILayout.Width (16),GUILayout.Height (12))) {
+			if (GUILayout.Button("", downArrow, GUILayout.Width(16), GUILayout.Height(12))) {
 				value--;
 			}
 
-			GUILayout.Space (100);
-			GUILayout.EndHorizontal ();
+			GUILayout.Space(100);
+			GUILayout.EndHorizontal();
 			return value;
 		}
 
 		public static bool UnityTagMaskList (GUIContent label, bool foldout, List<string> tagMask) {
-			if (tagMask == null) throw new System.ArgumentNullException ("tagMask");
-			if (EditorGUILayout.Foldout (foldout, label)) {
+			if (tagMask == null) throw new System.ArgumentNullException("tagMask");
+			if (EditorGUILayout.Foldout(foldout, label)) {
 				EditorGUI.indentLevel++;
 				GUILayout.BeginVertical();
-				for (int i=0;i<tagMask.Count;i++) {
-					tagMask[i] = EditorGUILayout.TagField (tagMask[i]);
+				for (int i = 0; i < tagMask.Count; i++) {
+					tagMask[i] = EditorGUILayout.TagField(tagMask[i]);
 				}
 				GUILayout.BeginHorizontal();
-				if (GUILayout.Button ("Add Tag")) tagMask.Add ("Untagged");
+				if (GUILayout.Button("Add Tag")) tagMask.Add("Untagged");
 
-				EditorGUI.BeginDisabledGroup (tagMask.Count == 0);
-				if (GUILayout.Button ("Remove Last")) tagMask.RemoveAt (tagMask.Count-1);
+				EditorGUI.BeginDisabledGroup(tagMask.Count == 0);
+				if (GUILayout.Button("Remove Last")) tagMask.RemoveAt(tagMask.Count-1);
 				EditorGUI.EndDisabledGroup();
 
 				GUILayout.EndHorizontal();
@@ -420,17 +426,16 @@ namespace Pathfinding {
 					layers = new List<string>();
 					layerNames = new string[4];
 				} else {
-					layers.Clear ();
+					layers.Clear();
 				}
 
 				int emptyLayers = 0;
-				for (int i=0;i<32;i++) {
-					string layerName = LayerMask.LayerToName (i);
+				for (int i = 0; i < 32; i++) {
+					string layerName = LayerMask.LayerToName(i);
 
 					if (layerName != "") {
-
-						for (;emptyLayers>0;emptyLayers--) layers.Add ("Layer "+(i-emptyLayers));
-						layers.Add (layerName);
+						for (; emptyLayers > 0; emptyLayers--) layers.Add("Layer "+(i-emptyLayers));
+						layers.Add(layerName);
 					} else {
 						emptyLayers++;
 					}
@@ -439,15 +444,15 @@ namespace Pathfinding {
 				if (layerNames.Length != layers.Count) {
 					layerNames = new string[layers.Count];
 				}
-				for (int i=0;i<layerNames.Length;i++) layerNames[i] = layers[i];
+				for (int i = 0; i < layerNames.Length; i++) layerNames[i] = layers[i];
 			}
 
-			selected.value =  EditorGUILayout.MaskField (label,selected.value,layerNames);
+			selected.value =  EditorGUILayout.MaskField(label, selected.value, layerNames);
 
 			return selected;
 		}
 
-		public static float Hermite(float start, float end, float value) {
+		public static float Hermite (float start, float end, float value) {
 			return Mathf.Lerp(start, end, value * value * (3.0f - 2.0f * value));
 		}
 	}

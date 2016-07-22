@@ -1,8 +1,6 @@
-using Pathfinding;
 using UnityEngine;
 
-namespace Pathfinding
-{
+namespace Pathfinding {
 	/** Holds a coordinate in integers */
 	public struct Int3 {
 		public int x;
@@ -24,21 +22,14 @@ namespace Pathfinding
 		/** 1 divided by #Precision */
 		public const float PrecisionFactor = 0.001F;
 
-		/* Factor to multiply cost with */
-		//public const float CostFactor = 0.01F;
-
-		private static Int3 _zero = new Int3(0,0,0);
+		private static Int3 _zero = new Int3(0, 0, 0);
 		public static Int3 zero { get { return _zero; } }
 
 		public Int3 (Vector3 position) {
-			x = (int)System.Math.Round (position.x*FloatPrecision);
-			y = (int)System.Math.Round (position.y*FloatPrecision);
-			z = (int)System.Math.Round (position.z*FloatPrecision);
-			//x = Mathf.RoundToInt (position.x);
-			//y = Mathf.RoundToInt (position.y);
-			//z = Mathf.RoundToInt (position.z);
+			x = (int)System.Math.Round(position.x*FloatPrecision);
+			y = (int)System.Math.Round(position.y*FloatPrecision);
+			z = (int)System.Math.Round(position.z*FloatPrecision);
 		}
-
 
 		public Int3 (int _x, int _y, int _z) {
 			x = _x;
@@ -47,28 +38,27 @@ namespace Pathfinding
 		}
 
 		public static bool operator == (Int3 lhs, Int3 rhs) {
-			return 	lhs.x == rhs.x &&
-					lhs.y == rhs.y &&
-					lhs.z == rhs.z;
+			return lhs.x == rhs.x &&
+				   lhs.y == rhs.y &&
+				   lhs.z == rhs.z;
 		}
 
 		public static bool operator != (Int3 lhs, Int3 rhs) {
-			return 	lhs.x != rhs.x ||
-					lhs.y != rhs.y ||
-					lhs.z != rhs.z;
+			return lhs.x != rhs.x ||
+				   lhs.y != rhs.y ||
+				   lhs.z != rhs.z;
 		}
 
 		public static explicit operator Int3 (Vector3 ob) {
-			return new Int3 (
-				(int)System.Math.Round (ob.x*FloatPrecision),
-				(int)System.Math.Round (ob.y*FloatPrecision),
-				(int)System.Math.Round (ob.z*FloatPrecision)
+			return new Int3(
+				(int)System.Math.Round(ob.x*FloatPrecision),
+				(int)System.Math.Round(ob.y*FloatPrecision),
+				(int)System.Math.Round(ob.z*FloatPrecision)
 				);
-			//return new Int3 (Mathf.RoundToInt (ob.x*FloatPrecision),Mathf.RoundToInt (ob.y*FloatPrecision),Mathf.RoundToInt (ob.z*FloatPrecision));
 		}
 
 		public static explicit operator Vector3 (Int3 ob) {
-			return new Vector3 (ob.x*PrecisionFactor,ob.y*PrecisionFactor,ob.z*PrecisionFactor);
+			return new Vector3(ob.x*PrecisionFactor, ob.y*PrecisionFactor, ob.z*PrecisionFactor);
 		}
 
 		public static Int3 operator - (Int3 lhs, Int3 rhs) {
@@ -85,6 +75,7 @@ namespace Pathfinding
 			return lhs;
 		}
 
+		// REMOVE!
 		public static Int3 operator + (Int3 lhs, Int3 rhs) {
 			lhs.x += rhs.x;
 			lhs.y += rhs.y;
@@ -101,41 +92,34 @@ namespace Pathfinding
 		}
 
 		public static Int3 operator * (Int3 lhs, float rhs) {
-			lhs.x = (int)System.Math.Round (lhs.x * rhs);
-			lhs.y = (int)System.Math.Round (lhs.y * rhs);
-			lhs.z = (int)System.Math.Round (lhs.z * rhs);
+			lhs.x = (int)System.Math.Round(lhs.x * rhs);
+			lhs.y = (int)System.Math.Round(lhs.y * rhs);
+			lhs.z = (int)System.Math.Round(lhs.z * rhs);
 
 			return lhs;
 		}
 
 		public static Int3 operator * (Int3 lhs, double rhs) {
-			lhs.x = (int)System.Math.Round (lhs.x * rhs);
-			lhs.y = (int)System.Math.Round (lhs.y * rhs);
-			lhs.z = (int)System.Math.Round (lhs.z * rhs);
+			lhs.x = (int)System.Math.Round(lhs.x * rhs);
+			lhs.y = (int)System.Math.Round(lhs.y * rhs);
+			lhs.z = (int)System.Math.Round(lhs.z * rhs);
 
 			return lhs;
 		}
 
 		public static Int3 operator * (Int3 lhs, Vector3 rhs) {
-			lhs.x = (int)System.Math.Round (lhs.x * rhs.x);
-			lhs.y =	(int)System.Math.Round (lhs.y * rhs.y);
-			lhs.z = (int)System.Math.Round (lhs.z * rhs.z);
+			lhs.x = (int)System.Math.Round(lhs.x * rhs.x);
+			lhs.y = (int)System.Math.Round(lhs.y * rhs.y);
+			lhs.z = (int)System.Math.Round(lhs.z * rhs.z);
 
 			return lhs;
 		}
 
 		public static Int3 operator / (Int3 lhs, float rhs) {
-			lhs.x = (int)System.Math.Round (lhs.x / rhs);
-			lhs.y = (int)System.Math.Round (lhs.y / rhs);
-			lhs.z = (int)System.Math.Round (lhs.z / rhs);
+			lhs.x = (int)System.Math.Round(lhs.x / rhs);
+			lhs.y = (int)System.Math.Round(lhs.y / rhs);
+			lhs.z = (int)System.Math.Round(lhs.z / rhs);
 			return lhs;
-		}
-
-		public Int3 DivBy2 () {
-			x >>= 1;
-			y >>= 1;
-			z >>= 1;
-			return this;
 		}
 
 		public int this[int i] {
@@ -151,23 +135,24 @@ namespace Pathfinding
 
 		/** Angle between the vectors in radians */
 		public static float Angle (Int3 lhs, Int3 rhs) {
-			double cos = Dot(lhs,rhs)/ ((double)lhs.magnitude*(double)rhs.magnitude);
-			cos = cos < -1 ? -1 : ( cos > 1 ? 1 : cos );
-			return (float)System.Math.Acos( cos );
+			double cos = Dot(lhs, rhs)/ ((double)lhs.magnitude*(double)rhs.magnitude);
+
+			cos = cos < -1 ? -1 : (cos > 1 ? 1 : cos);
+			return (float)System.Math.Acos(cos);
 		}
 
 		public static int Dot (Int3 lhs, Int3 rhs) {
 			return
-					lhs.x * rhs.x +
-					lhs.y * rhs.y +
-					lhs.z * rhs.z;
+				lhs.x * rhs.x +
+				lhs.y * rhs.y +
+				lhs.z * rhs.z;
 		}
 
 		public static long DotLong (Int3 lhs, Int3 rhs) {
 			return
-					(long)lhs.x * (long)rhs.x +
-					(long)lhs.y * (long)rhs.y +
-					(long)lhs.z * (long)rhs.z;
+				(long)lhs.x * (long)rhs.x +
+				(long)lhs.y * (long)rhs.y +
+				(long)lhs.z * (long)rhs.z;
 		}
 
 		/** Normal in 2D space (XZ).
@@ -175,30 +160,12 @@ namespace Pathfinding
 		 * except that the Y coordinate is left unchanged with this operation.
 		 */
 		public Int3 Normal2D () {
-			return new Int3 ( z, y, -x );
-		}
-
-		public Int3 NormalizeTo (int newMagn) {
-			float magn = magnitude;
-
-			if (magn == 0) {
-				return this;
-			}
-
-			x *= newMagn;
-			y *= newMagn;
-			z *= newMagn;
-
-			x = (int)System.Math.Round (x/magn);
-			y = (int)System.Math.Round (y/magn);
-			z = (int)System.Math.Round (z/magn);
-
-			return this;
+			return new Int3(z, y, -x);
 		}
 
 		/** Returns the magnitude of the vector. The magnitude is the 'length' of the vector from 0,0,0 to this point. Can be used for distance calculations:
-		  * \code Debug.Log ("Distance between 3,4,5 and 6,7,8 is: "+(new Int3(3,4,5) - new Int3(6,7,8)).magnitude); \endcode
-		  */
+		 * \code Debug.Log ("Distance between 3,4,5 and 6,7,8 is: "+(new Int3(3,4,5) - new Int3(6,7,8)).magnitude); \endcode
+		 */
 		public float magnitude {
 			get {
 				//It turns out that using doubles is just as fast as using ints with Mathf.Sqrt. And this can also handle larger numbers (possibly with small errors when using huge numbers)!
@@ -207,37 +174,32 @@ namespace Pathfinding
 				double _y = y;
 				double _z = z;
 
-				return (float)System.Math.Sqrt (_x*_x+_y*_y+_z*_z);
-
-				//return Mathf.Sqrt (x*x+y*y+z*z);
+				return (float)System.Math.Sqrt(_x*_x+_y*_y+_z*_z);
 			}
 		}
 
 		/** Magnitude used for the cost between two nodes. The default cost between two nodes can be calculated like this:
-		  * \code int cost = (node1.position-node2.position).costMagnitude; \endcode
-		  *
-		  * This is simply the magnitude, rounded to the nearest integer
-		  */
+		 * \code int cost = (node1.position-node2.position).costMagnitude; \endcode
+		 *
+		 * This is simply the magnitude, rounded to the nearest integer
+		 */
 		public int costMagnitude {
 			get {
-				return (int)System.Math.Round (magnitude);
+				return (int)System.Math.Round(magnitude);
 			}
 		}
 
-		/** The magnitude in world units */
+		/** The magnitude in world units.
+		 * \deprecated This property is deprecated. Use magnitude or cast to a Vector3
+		 */
+		[System.Obsolete("This property is deprecated. Use magnitude or cast to a Vector3")]
 		public float worldMagnitude {
 			get {
 				double _x = x;
 				double _y = y;
 				double _z = z;
 
-				return (float)System.Math.Sqrt (_x*_x+_y*_y+_z*_z)*PrecisionFactor;
-
-				//Scale numbers down
-				/*float _x = x*PrecisionFactor;
-				float _y = y*PrecisionFactor;
-				float _z = z*PrecisionFactor;
-				return Mathf.Sqrt (_x*_x+_y*_y+_z*_z);*/
+				return (float)System.Math.Sqrt(_x*_x+_y*_y+_z*_z)*PrecisionFactor;
 			}
 		}
 
@@ -261,15 +223,8 @@ namespace Pathfinding
 			}
 		}
 
-		/** \warning Can cause number overflows if the magnitude is too large */
-		public int unsafeSqrMagnitude {
-			get {
-				return x*x+y*y+z*z;
-			}
-		}
-
 		public static implicit operator string (Int3 ob) {
-			return ob.ToString ();
+			return ob.ToString();
 		}
 
 		/** Returns a nicely formatted string representing the vector */
@@ -278,14 +233,13 @@ namespace Pathfinding
 		}
 
 		public override bool Equals (System.Object o) {
-
 			if (o == null) return false;
 
 			var rhs = (Int3)o;
 
-			return 	x == rhs.x &&
-					y == rhs.y &&
-					z == rhs.z;
+			return x == rhs.x &&
+				   y == rhs.y &&
+				   z == rhs.z;
 		}
 
 		public override int GetHashCode () {
@@ -303,12 +257,6 @@ namespace Pathfinding
 			this.y = y;
 		}
 
-		public int sqrMagnitude {
-			get {
-				return x*x+y*y;
-			}
-		}
-
 		public long sqrMagnitudeLong {
 			get {
 				return (long)x*(long)x+(long)y*(long)y;
@@ -316,11 +264,11 @@ namespace Pathfinding
 		}
 
 		public static Int2 operator + (Int2 a, Int2 b) {
-			return new Int2 (a.x+b.x, a.y+b.y);
+			return new Int2(a.x+b.x, a.y+b.y);
 		}
 
 		public static Int2 operator - (Int2 a, Int2 b) {
-			return new Int2 (a.x-b.x, a.y-b.y);
+			return new Int2(a.x-b.x, a.y-b.y);
 		}
 
 		public static bool operator == (Int2 a, Int2 b) {
@@ -331,10 +279,7 @@ namespace Pathfinding
 			return a.x != b.x || a.y != b.y;
 		}
 
-		public static int Dot (Int2 a, Int2 b) {
-			return a.x*b.x + a.y*b.y;
-		}
-
+		/** Dot product of the two coordinates */
 		public static long DotLong (Int2 a, Int2 b) {
 			return (long)a.x*(long)b.x + (long)a.y*(long)b.y;
 		}
@@ -360,45 +305,46 @@ namespace Pathfinding
 		 * \endcode
 		 */
 		private static readonly int[] Rotations = {
-			 1, 0, //Identity matrix
-			 0, 1,
+			1, 0,  //Identity matrix
+			0, 1,
 
-			 0, 1,
+			0, 1,
 			-1, 0,
 
 			-1, 0,
-			 0,-1,
+			0, -1,
 
-			 0,-1,
-			 1, 0
+			0, -1,
+			1, 0
 		};
 
-		/** Returns a new Int2 rotated 90*r degrees around the origin. */
-		public static Int2 Rotate ( Int2 v, int r ) {
+		/** Returns a new Int2 rotated 90*r degrees around the origin.
+		 * \deprecated Deprecated becuase it is not used by any part of the A* Pathfinding Project
+		 */
+		[System.Obsolete("Deprecated becuase it is not used by any part of the A* Pathfinding Project")]
+		public static Int2 Rotate (Int2 v, int r) {
 			r = r % 4;
-			return new Int2 ( v.x*Rotations[r*4+0] + v.y*Rotations[r*4+1], v.x*Rotations[r*4+2] + v.y*Rotations[r*4+3] );
+			return new Int2(v.x*Rotations[r*4+0] + v.y*Rotations[r*4+1], v.x*Rotations[r*4+2] + v.y*Rotations[r*4+3]);
 		}
 
 		public static Int2 Min (Int2 a, Int2 b) {
-			return new Int2 (System.Math.Min (a.x,b.x), System.Math.Min (a.y,b.y));
+			return new Int2(System.Math.Min(a.x, b.x), System.Math.Min(a.y, b.y));
 		}
 
 		public static Int2 Max (Int2 a, Int2 b) {
-			return new Int2 (System.Math.Max (a.x,b.x), System.Math.Max (a.y,b.y));
+			return new Int2(System.Math.Max(a.x, b.x), System.Math.Max(a.y, b.y));
 		}
 
 		public static Int2 FromInt3XZ (Int3 o) {
-			return new Int2 (o.x,o.z);
+			return new Int2(o.x, o.z);
 		}
 
 		public static Int3 ToInt3XZ (Int2 o) {
-			return new Int3 (o.x,0,o.y);
+			return new Int3(o.x, 0, o.y);
 		}
 
-		public override string ToString ()
-		{
+		public override string ToString () {
 			return "("+x+", " +y+")";
 		}
 	}
 }
-

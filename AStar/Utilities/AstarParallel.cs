@@ -1,11 +1,4 @@
-#if NETFX_CORE && !UNITY_EDITOR
-//using Thread = MarkerMetro.Unity.WinLegacy.Threading.Thread;
-//using ParameterizedThreadStart = MarkerMetro.Unity.WinLegacy.Threading.ParameterizedThreadStart;
-#endif
 
-using UnityEngine;
-using System.Collections;
-using System.Threading;
-
-namespace Pathfinding.Threading {
-}
+// This file has been removed from the project. Since UnityPackages cannot
+// delete files, only replace them, this message is left here to prevent old
+// files from causing compiler errors

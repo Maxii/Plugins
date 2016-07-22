@@ -1,14 +1,12 @@
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
-using Pathfinding;
 using System.Linq;
 
 namespace Pathfinding {
 	/** Handles update checking for the A* Pathfinding Project */
 	[InitializeOnLoad]
 	public static class AstarUpdateChecker {
-
 		/** Used for downloading new version information */
 		static WWW updateCheckDownload;
 
@@ -35,20 +33,20 @@ namespace Pathfinding {
 			get {
 				try {
 					// Reading from EditorPrefs is relatively slow, avoid it
-					if ( _lastUpdateCheckRead ) return _lastUpdateCheck;
+					if (_lastUpdateCheckRead) return _lastUpdateCheck;
 
-					_lastUpdateCheck = System.DateTime.Parse (EditorPrefs.GetString ("AstarLastUpdateCheck","1/1/1971 00:00:01"), System.Globalization.CultureInfo.InvariantCulture);
+					_lastUpdateCheck = System.DateTime.Parse(EditorPrefs.GetString("AstarLastUpdateCheck", "1/1/1971 00:00:01"), System.Globalization.CultureInfo.InvariantCulture);
 					_lastUpdateCheckRead = true;
 				}
 				catch (System.FormatException) {
 					lastUpdateCheck = System.DateTime.UtcNow;
-					Debug.LogWarning ("Invalid DateTime string encountered when loading from preferences");
+					Debug.LogWarning("Invalid DateTime string encountered when loading from preferences");
 				}
 				return _lastUpdateCheck;
 			}
 			private set {
 				_lastUpdateCheck = value;
-				EditorPrefs.SetString ("AstarLastUpdateCheck", _lastUpdateCheck.ToString ( System.Globalization.CultureInfo.InvariantCulture ));
+				EditorPrefs.SetString("AstarLastUpdateCheck", _lastUpdateCheck.ToString(System.Globalization.CultureInfo.InvariantCulture));
 			}
 		}
 
@@ -88,15 +86,15 @@ namespace Pathfinding {
 		/** Holds various URLs and text for the editor.
 		 * This info can be updated when a check for new versions is done to ensure that there are no invalid links.
 		 */
-		static Dictionary<string,string> astarServerData = new Dictionary<string, string> {
-			{"URL:modifiers","http://www.arongranberg.com/astar/docs/modifiers.php"},
-			{"URL:astarpro","http://arongranberg.com/unity/a-pathfinding/astarpro/"},
-			{"URL:documentation","http://arongranberg.com/astar/docs/"},
-			{"URL:findoutmore","http://arongranberg.com/astar"},
-			{"URL:download","http://arongranberg.com/unity/a-pathfinding/download"},
-			{"URL:changelog","http://arongranberg.com/astar/docs/changelog.php"},
-			{"URL:tags","http://arongranberg.com/astar/docs/tags.php"},
-			{"URL:homepage","http://arongranberg.com/astar/"}
+		static Dictionary<string, string> astarServerData = new Dictionary<string, string> {
+			{ "URL:modifiers", "http://www.arongranberg.com/astar/docs/modifiers.php" },
+			{ "URL:astarpro", "http://arongranberg.com/unity/a-pathfinding/astarpro/" },
+			{ "URL:documentation", "http://arongranberg.com/astar/docs/" },
+			{ "URL:findoutmore", "http://arongranberg.com/astar" },
+			{ "URL:download", "http://arongranberg.com/unity/a-pathfinding/download" },
+			{ "URL:changelog", "http://arongranberg.com/astar/docs/changelog.php" },
+			{ "URL:tags", "http://arongranberg.com/astar/docs/tags.php" },
+			{ "URL:homepage", "http://arongranberg.com/astar/" }
 		};
 
 		static AstarUpdateChecker() {
@@ -106,25 +104,25 @@ namespace Pathfinding {
 
 		static void RefreshServerMessage () {
 			if (!hasParsedServerMessage) {
-				var serverMessage = EditorPrefs.GetString ("AstarServerMessage");
+				var serverMessage = EditorPrefs.GetString("AstarServerMessage");
 
 				if (!string.IsNullOrEmpty(serverMessage)) {
-					ParseServerMessage (serverMessage);
-					ShowUpdateWindowIfRelevant ();
+					ParseServerMessage(serverMessage);
+					ShowUpdateWindowIfRelevant();
 				}
 			}
 		}
 
 		public static string GetURL (string tag) {
-			RefreshServerMessage ();
+			RefreshServerMessage();
 			string url;
-			astarServerData.TryGetValue ("URL:"+tag,out url);
+			astarServerData.TryGetValue("URL:"+tag, out url);
 			return url ?? "";
 		}
 
 		/** Initiate a check for updates now, regardless of when the last check was done */
 		public static void CheckForUpdatesNow () {
-			lastUpdateCheck = System.DateTime.UtcNow.AddDays (-5);
+			lastUpdateCheck = System.DateTime.UtcNow.AddDays(-5);
 
 			// Remove the callback if it already exists
 			EditorApplication.update -= UpdateCheckLoop;
@@ -139,7 +137,7 @@ namespace Pathfinding {
 		 */
 		static void UpdateCheckLoop () {
 			// Go on until the update check has been completed
-			if (!CheckForUpdates ()) {
+			if (!CheckForUpdates()) {
 				EditorApplication.update -= UpdateCheckLoop;
 			}
 		}
@@ -149,22 +147,20 @@ namespace Pathfinding {
 		 * \returns True if an update check is progressing (WWW request)
 		 */
 		static bool CheckForUpdates () {
-
 			if (updateCheckDownload != null && updateCheckDownload.isDone) {
-
-				if (!string.IsNullOrEmpty (updateCheckDownload.error)) {
-					Debug.LogWarning ("There was an error checking for updates to the A* Pathfinding Project\n" +
-					                  "The error might disappear if you switch build target from Webplayer to Standalone because of the webplayer security emulation\nError: " +
-					                  updateCheckDownload.error);
+				if (!string.IsNullOrEmpty(updateCheckDownload.error)) {
+					Debug.LogWarning("There was an error checking for updates to the A* Pathfinding Project\n" +
+						"The error might disappear if you switch build target from Webplayer to Standalone because of the webplayer security emulation\nError: " +
+						updateCheckDownload.error);
 					updateCheckDownload = null;
 					return false;
 				}
-				UpdateCheckCompleted (updateCheckDownload.text);
+				UpdateCheckCompleted(updateCheckDownload.text);
 				updateCheckDownload = null;
 			}
 
 			// Check if it is time to check for updates
-			if (System.DateTime.Compare (lastUpdateCheck.AddDays (updateCheckRate),System.DateTime.UtcNow) < 0) {
+			if (System.DateTime.Compare(lastUpdateCheck.AddDays(updateCheckRate), System.DateTime.UtcNow) < 0) {
 				DownloadVersionInfo();
 			}
 
@@ -175,37 +171,40 @@ namespace Pathfinding {
 			bool use = AstarPath.active != null || GameObject.FindObjectOfType(typeof(AstarPath)) != null;
 			bool mecanim = GameObject.FindObjectOfType(typeof(Animator)) != null;
 			string query = updateURL+
-					"?v="+AstarPath.Version+
-					"&pro="+(AstarPath.HasPro ? "1":"0")+
-					"&check="+updateCheckRate+"&distr="+AstarPath.Distribution+
-					"&unitypro="+(Application.HasProLicense()?"1":"0")+
-					"&inscene="+(use?"1":"0")+
-					"&targetplatform="+EditorUserBuildSettings.activeBuildTarget+
-					"&devplatform="+Application.platform+
-					"&mecanim="+(mecanim?"1":"0")+
-					"&unityversion="+Application.unityVersion+
-					"&branch="+AstarPath.Branch;
+						   "?v="+AstarPath.Version+
+						   "&pro="+(AstarPath.HasPro ? "1" : "0")+
+						   "&check="+updateCheckRate+"&distr="+AstarPath.Distribution+
+						   "&unitypro="+(Application.HasProLicense() ? "1" : "0")+
+						   "&inscene="+(use ? "1" : "0")+
+						   "&targetplatform="+EditorUserBuildSettings.activeBuildTarget+
+						   "&devplatform="+Application.platform+
+						   "&mecanim="+(mecanim ? "1" : "0")+
+						   "&unityversion="+Application.unityVersion+
+						   "&branch="+AstarPath.Branch;
 
-			updateCheckDownload = new WWW (query);
+			updateCheckDownload = new WWW(query);
 			lastUpdateCheck = System.DateTime.UtcNow;
 		}
 
 		/** Handles the data from the update page */
 		static void UpdateCheckCompleted (string result) {
-			EditorPrefs.SetString ("AstarServerMessage", result);
-			ParseServerMessage (result);
-			ShowUpdateWindowIfRelevant ();
+			EditorPrefs.SetString("AstarServerMessage", result);
+			ParseServerMessage(result);
+			ShowUpdateWindowIfRelevant();
 		}
 
 		static void ParseServerMessage (string result) {
-			if (string.IsNullOrEmpty (result)) {
+			if (string.IsNullOrEmpty(result)) {
 				return;
 			}
 
 			hasParsedServerMessage = true;
 
+			#if ASTARDEBUG
+			Debug.Log("Result from update check:\n"+result);
+			#endif
 
-			string[] splits = result.Split ('|');
+			string[] splits = result.Split('|');
 			latestVersionDescription = splits.Length > 1 ? splits[1] : "";
 
 			if (splits.Length > 4) {
@@ -223,41 +222,41 @@ namespace Pathfinding {
 			try {
 				latestVersion = new System.Version(astarServerData["VERSION:branch"]);
 			} catch (System.Exception ex) {
-				Debug.LogWarning ("Could not parse version\n"+ex);
+				Debug.LogWarning("Could not parse version\n"+ex);
 			}
 
 			try {
 				latestBetaVersion = new System.Version(astarServerData["VERSION:beta"]);
 			} catch (System.Exception ex) {
-				Debug.LogWarning ("Could not parse version\n"+ex);
+				Debug.LogWarning("Could not parse version\n"+ex);
 			}
 		}
 
 		static void ShowUpdateWindowIfRelevant () {
 			try {
 				System.DateTime remindDate;
-				var remindVersion = new System.Version (EditorPrefs.GetString ("AstarRemindUpdateVersion", "0.0.0.0"));
-				if (latestVersion == remindVersion && System.DateTime.TryParse (EditorPrefs.GetString ("AstarRemindUpdateDate", "1/1/1971 00:00:01"), out remindDate)) {
-					if ( System.DateTime.UtcNow < remindDate ) {
+				var remindVersion = new System.Version(EditorPrefs.GetString("AstarRemindUpdateVersion", "0.0.0.0"));
+				if (latestVersion == remindVersion && System.DateTime.TryParse(EditorPrefs.GetString("AstarRemindUpdateDate", "1/1/1971 00:00:01"), out remindDate)) {
+					if (System.DateTime.UtcNow < remindDate) {
 						// Don't remind yet
 						return;
 					}
 				} else {
-					EditorPrefs.DeleteKey ("AstarRemindUpdateDate");
-					EditorPrefs.DeleteKey ("AstarRemindUpdateVersion");
+					EditorPrefs.DeleteKey("AstarRemindUpdateDate");
+					EditorPrefs.DeleteKey("AstarRemindUpdateVersion");
 				}
 			} catch {
-				Debug.LogError ("Invalid AstarRemindUpdateVersion or AstarRemindUpdateDate");
+				Debug.LogError("Invalid AstarRemindUpdateVersion or AstarRemindUpdateDate");
 			}
 
-			var skipVersion = new System.Version (EditorPrefs.GetString ("AstarSkipUpToVersion", AstarPath.Version.ToString()));
+			var skipVersion = new System.Version(EditorPrefs.GetString("AstarSkipUpToVersion", AstarPath.Version.ToString()));
 
-			if ( AstarPathEditor.FullyDefinedVersion(latestVersion) != AstarPathEditor.FullyDefinedVersion(skipVersion) && AstarPathEditor.FullyDefinedVersion(latestVersion) > AstarPathEditor.FullyDefinedVersion(AstarPath.Version) ) {
-				EditorPrefs.DeleteKey ("AstarSkipUpToVersion");
-				EditorPrefs.DeleteKey ("AstarRemindUpdateDate");
-				EditorPrefs.DeleteKey ("AstarRemindUpdateVersion");
+			if (AstarPathEditor.FullyDefinedVersion(latestVersion) != AstarPathEditor.FullyDefinedVersion(skipVersion) && AstarPathEditor.FullyDefinedVersion(latestVersion) > AstarPathEditor.FullyDefinedVersion(AstarPath.Version)) {
+				EditorPrefs.DeleteKey("AstarSkipUpToVersion");
+				EditorPrefs.DeleteKey("AstarRemindUpdateDate");
+				EditorPrefs.DeleteKey("AstarRemindUpdateVersion");
 
-				AstarUpdateWindow.Init (latestVersion, latestVersionDescription);
+				AstarUpdateWindow.Init(latestVersion, latestVersionDescription);
 			}
 		}
 	}

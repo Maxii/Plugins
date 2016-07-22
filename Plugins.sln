@@ -59,6 +59,20 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoolManager", "PoolManager\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoolManagerEditor", "PoolManagerEditor\PoolManagerEditor.csproj", "{6E590F99-B8B8-4D8F-81D4-23853A44B6D6}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Clipper", "Clipper", "{8B11661A-1201-4AEE-A98D-932582000BF5}"
+	ProjectSection(SolutionItems) = preProject
+		AStarPlugins\Clipper\Pathfinding.ClipperLib.dll = AStarPlugins\Clipper\Pathfinding.ClipperLib.dll
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Poly2Tri", "Poly2Tri", "{A1736422-DCCB-466A-8B1A-CF5984F76FD1}"
+	ProjectSection(SolutionItems) = preProject
+		AStarPlugins\Poly2Tri\Pathfinding.Poly2Tri.dll = AStarPlugins\Poly2Tri\Pathfinding.Poly2Tri.dll
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GridFramework2", "GridFramework2\GridFramework2.csproj", "{A8831D30-DF32-47B0-8070-BF23E8FEBE53}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GridFramework2Editor", "GridFramework2Editor\GridFramework2Editor.csproj", "{E57E989D-986B-4190-8054-4C7582E0D00B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -153,6 +167,14 @@ Global
 		{6E590F99-B8B8-4D8F-81D4-23853A44B6D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6E590F99-B8B8-4D8F-81D4-23853A44B6D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6E590F99-B8B8-4D8F-81D4-23853A44B6D6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8831D30-DF32-47B0-8070-BF23E8FEBE53}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8831D30-DF32-47B0-8070-BF23E8FEBE53}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8831D30-DF32-47B0-8070-BF23E8FEBE53}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8831D30-DF32-47B0-8070-BF23E8FEBE53}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E57E989D-986B-4190-8054-4C7582E0D00B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E57E989D-986B-4190-8054-4C7582E0D00B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E57E989D-986B-4190-8054-4C7582E0D00B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E57E989D-986B-4190-8054-4C7582E0D00B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -160,5 +182,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{6AE1FB36-A813-4126-99BE-9DB7C87D48AE} = {250733FE-01D4-469A-89B9-20F929CCF094}
 		{35C53D29-C4FF-4B62-A231-65357632F17B} = {250733FE-01D4-469A-89B9-20F929CCF094}
+		{8B11661A-1201-4AEE-A98D-932582000BF5} = {250733FE-01D4-469A-89B9-20F929CCF094}
+		{A1736422-DCCB-466A-8B1A-CF5984F76FD1} = {250733FE-01D4-469A-89B9-20F929CCF094}
 	EndGlobalSection
 EndGlobal

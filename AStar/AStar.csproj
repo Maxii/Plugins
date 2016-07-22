@@ -34,11 +34,17 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Pathfinding.ClipperLib">
+      <HintPath>..\AStarPlugins\Clipper\Pathfinding.ClipperLib.dll</HintPath>
+    </Reference>
     <Reference Include="Pathfinding.Ionic.Zip.Reduced">
       <HintPath>..\AStarPlugins\DotNetZip\Pathfinding.Ionic.Zip.Reduced.dll</HintPath>
     </Reference>
     <Reference Include="Pathfinding.JsonFx">
       <HintPath>..\AStarPlugins\JsonFx\Pathfinding.JsonFx.dll</HintPath>
+    </Reference>
+    <Reference Include="Pathfinding.Poly2Tri">
+      <HintPath>..\AStarPlugins\Poly2Tri\Pathfinding.Poly2Tri.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -59,8 +65,11 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Core\AI\AILerp.cs" />
     <Compile Include="Core\AI\AIPath.cs" />
     <Compile Include="Core\AI\NavmeshController.cs" />
+    <Compile Include="Core\AI\RichAI.cs" />
+    <Compile Include="Core\AI\RichPath.cs" />
     <Compile Include="Core\AI\Seeker.cs" />
     <Compile Include="Core\astarclasses.cs" />
     <Compile Include="Core\AstarData.cs" />
@@ -74,6 +83,7 @@
     <Compile Include="Core\Misc\BinaryHeap.cs" />
     <Compile Include="Core\Misc\GraphEditorBase.cs" />
     <Compile Include="Core\Misc\GraphModifier.cs" />
+    <Compile Include="Core\Misc\GraphUpdateProcessor.cs" />
     <Compile Include="Core\Misc\Int3.cs" />
     <Compile Include="Core\Misc\ListPool.cs" />
     <Compile Include="Core\Misc\NodeLink.cs" />
@@ -81,37 +91,76 @@
     <Compile Include="Core\Misc\NodeLink3.cs" />
     <Compile Include="Core\Misc\ObjectPool.cs" />
     <Compile Include="Core\Misc\PathPool.cs" />
+    <Compile Include="Core\Misc\PathProcessor.cs" />
+    <Compile Include="Core\Misc\PathReturnQueue.cs" />
     <Compile Include="Core\Misc\StackPool.cs" />
     <Compile Include="Core\Misc\ThreadControlQueue.cs" />
     <Compile Include="Core\Misc\WindowsStoreCompatibility.cs" />
+    <Compile Include="Core\Misc\WorkItemProcessor.cs" />
     <Compile Include="Core\Nodes\GraphNode.cs" />
     <Compile Include="Core\Path.cs" />
     <Compile Include="Core\PathHandler.cs" />
+    <Compile Include="Core\RVO\RVOAgent.cs" />
+    <Compile Include="Core\RVO\RVOCoreObstacle.cs" />
+    <Compile Include="Core\RVO\RVOCoreSimulator.cs" />
+    <Compile Include="Core\RVO\RVOLine.cs" />
+    <Compile Include="Core\RVO\RVOQuadtree.cs" />
     <Compile Include="Core\Serialization\JsonConverters.cs" />
     <Compile Include="Core\Serialization\JsonSerializer.cs" />
     <Compile Include="Core\Serialization\SimpleJsonReplacement.cs" />
     <Compile Include="Core\Serialization\SimpleZipReplacement.cs" />
     <Compile Include="Generators\Base.cs" />
     <Compile Include="Generators\GridGenerator.cs" />
+    <Compile Include="Generators\LayerGridGraphGenerator.cs" />
     <Compile Include="Generators\NavMeshGenerator.cs" />
     <Compile Include="Generators\NodeClasses\GridNode.cs" />
     <Compile Include="Generators\NodeClasses\PointNode.cs" />
     <Compile Include="Generators\NodeClasses\TriangleMeshNode.cs" />
     <Compile Include="Generators\PointGenerator.cs" />
     <Compile Include="Generators\QuadtreeGraph.cs" />
+    <Compile Include="Generators\RecastGenerator.cs" />
     <Compile Include="Generators\Utilities\BBTree.cs" />
     <Compile Include="Generators\Utilities\EuclideanEmbedding.cs" />
     <Compile Include="Generators\Utilities\NavMeshRenderer.cs" />
     <Compile Include="Generators\Utilities\ObjImporter.cs" />
+    <Compile Include="Generators\Utilities\RecastBBTree.cs" />
+    <Compile Include="Generators\Utilities\RecastMeshGatherer.cs" />
+    <Compile Include="Generators\Utilities\RecastMeshObj.cs" />
+    <Compile Include="Generators\Utilities\TileHandler.cs" />
+    <Compile Include="Generators\Utilities\Voxels\DebugUtility.cs" />
+    <Compile Include="Generators\Utilities\Voxels\VoxelClasses.cs" />
+    <Compile Include="Generators\Utilities\Voxels\VoxelContour.cs" />
+    <Compile Include="Generators\Utilities\Voxels\VoxelMesh.cs" />
+    <Compile Include="Generators\Utilities\Voxels\VoxelPolygonClipper.cs" />
+    <Compile Include="Generators\Utilities\Voxels\VoxelRasterization.cs" />
+    <Compile Include="Generators\Utilities\Voxels\VoxelRegion.cs" />
+    <Compile Include="Generators\Utilities\Voxels\VoxelUtility.cs" />
+    <Compile Include="Modifiers\AdvancedSmooth.cs" />
     <Compile Include="Modifiers\AlternativePath.cs" />
     <Compile Include="Modifiers\FunnelModifier.cs" />
     <Compile Include="Modifiers\Modifiers.cs" />
+    <Compile Include="Modifiers\RadiusModifier.cs" />
     <Compile Include="Modifiers\RaycastModifier.cs" />
     <Compile Include="Modifiers\SimpleSmoothModifier.cs" />
     <Compile Include="Modifiers\StartEndModifier.cs" />
+    <Compile Include="Navmesh\NavmeshAdd.cs" />
+    <Compile Include="Navmesh\NavmeshCut.cs" />
     <Compile Include="Navmesh\RelevantGraphSurface.cs" />
+    <Compile Include="Navmesh\TileHandlerHelper.cs" />
     <Compile Include="Pathfinders\ABPath.cs" />
+    <Compile Include="Pathfinders\ConstantPath.cs" />
+    <Compile Include="Pathfinders\FleePath.cs" />
+    <Compile Include="Pathfinders\FloodPath.cs" />
+    <Compile Include="Pathfinders\FloodPathTracer.cs" />
+    <Compile Include="Pathfinders\MultiTargetPath.cs" />
+    <Compile Include="Pathfinders\RandomPath.cs" />
+    <Compile Include="Pathfinders\XPath.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RVO\RVOController.cs" />
+    <Compile Include="RVO\RVONavmesh.cs" />
+    <Compile Include="RVO\RVOObstacle.cs" />
+    <Compile Include="RVO\RVOSimulator.cs" />
+    <Compile Include="RVO\RVOSquareObstacle.cs" />
     <Compile Include="Utilities\AstarChecksum.cs" />
     <Compile Include="Utilities\AstarMemory.cs" />
     <Compile Include="Utilities\AstarParallel.cs" />

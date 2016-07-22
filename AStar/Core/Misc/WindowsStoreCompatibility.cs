@@ -10,7 +10,7 @@ using TP = System.Type;
 
 namespace Pathfinding.WindowsStore {
 	public static class WindowsStoreCompatibility {
-		public static System.Type GetTypeFromInfo ( TP type ) {
+		public static System.Type GetTypeFromInfo (TP type) {
 #if NETFX_CORE
 			return type.AsType();
 #else
@@ -18,7 +18,7 @@ namespace Pathfinding.WindowsStore {
 #endif
 		}
 
-		public static TP GetTypeInfo ( System.Type type ) {
+		public static TP GetTypeInfo (System.Type type) {
 #if NETFX_CORE
 			return type.GetTypeInfo();
 #else
@@ -26,25 +26,24 @@ namespace Pathfinding.WindowsStore {
 #endif
 		}
 	}
-	
+
 #if NETFX_CORE
 	public delegate void ParameterizedThreadStart (System.Object ob);
 	public delegate void ThreadStart ();
 
-	public class Thread
-	{
+	public class Thread {
 		//
 		// Fields
 		//
 		private Pathfinding.WindowsStore.ParameterizedThreadStart _paramThreadStart;
-		
+
 		private CancellationTokenSource _taskCancellationTokenSource;
-		
+
 		private Task _task = null;
-		
+
 		private Pathfinding.WindowsStore.ThreadStart _threadStart;
 
-		private static ManualResetEvent SleepEvent = new ManualResetEvent (false);
+		private static ManualResetEvent SleepEvent = new ManualResetEvent(false);
 
 		//
 		// Properties
@@ -54,10 +53,10 @@ namespace Pathfinding.WindowsStore {
 				return this._task != null && !this._task.IsCompleted;
 			}
 			set {
-				throw new NotImplementedException ();
+				throw new NotImplementedException();
 			}
 		}
-		
+
 		public bool IsBackground {
 			get {
 				return false;
@@ -65,79 +64,70 @@ namespace Pathfinding.WindowsStore {
 			set {
 			}
 		}
-		
+
 		public string Name {
 			get;
 			set;
 		}
-		
+
 		//
 		// Constructors
 		//
-		public Thread (Pathfinding.WindowsStore.ParameterizedThreadStart start)
-		{
-			this._taskCancellationTokenSource = new CancellationTokenSource ();
+		public Thread (Pathfinding.WindowsStore.ParameterizedThreadStart start) {
+			this._taskCancellationTokenSource = new CancellationTokenSource();
 			this._paramThreadStart = start;
 		}
-		
-		public Thread (Pathfinding.WindowsStore.ThreadStart start)
-		{
-			this._taskCancellationTokenSource = new CancellationTokenSource ();
+
+		public Thread (Pathfinding.WindowsStore.ThreadStart start) {
+			this._taskCancellationTokenSource = new CancellationTokenSource();
 			this._threadStart = start;
 		}
-		
+
 		//
 		// Static Methods
 		//
-		public static void Sleep (int ms)
-		{
-			SleepEvent.WaitOne (ms);
+		public static void Sleep (int ms) {
+			SleepEvent.WaitOne(ms);
 		}
-		
+
 		//
 		// Methods
 		//
-		public void Abort ()
-		{
-			if (this._taskCancellationTokenSource != null ) {
-				this._taskCancellationTokenSource.Cancel ();
+		public void Abort () {
+			if (this._taskCancellationTokenSource != null) {
+				this._taskCancellationTokenSource.Cancel();
 			}
 		}
-		
-		private void EnsureTask (object paramThreadStartParam = null )
-		{
-			if (this._task == null ) {
-				if (this._paramThreadStart != null ) {
-					this._task = new Task (delegate {
-						this._paramThreadStart (paramThreadStartParam);
+
+		private void EnsureTask (object paramThreadStartParam = null) {
+			if (this._task == null) {
+				if (this._paramThreadStart != null) {
+					this._task = new Task(delegate {
+						this._paramThreadStart(paramThreadStartParam);
 					}, this._taskCancellationTokenSource.Token);
-				}
-				else {
-					if (this._threadStart != null ) {
-						this._task = new Task (delegate {
-							this._threadStart ();
+				} else {
+					if (this._threadStart != null) {
+						this._task = new Task(delegate {
+							this._threadStart();
 						}, this._taskCancellationTokenSource.Token);
 					}
 				}
 			}
 		}
-		
-		public bool Join (int ms)
-		{
-			this.EnsureTask ();
-			return this._task.Wait (ms, this._taskCancellationTokenSource.Token);
+
+		public bool Join (int ms) {
+			this.EnsureTask();
+			return this._task.Wait(ms, this._taskCancellationTokenSource.Token);
 		}
-		
-		public void Start ()
-		{
-			this.EnsureTask ();
-			this._task.Start (TaskScheduler.Default);
+
+		public void Start () {
+			this.EnsureTask();
+			this._task.Start(TaskScheduler.Default);
 		}
-		
-		public void Start (object param)
-		{
-			this.EnsureTask (param);
-			this._task.Start (TaskScheduler.Default);
+
+		public void Start (object param) {
+			this.EnsureTask(param);
+			this._task.Start(TaskScheduler.Default);
 		}
 	}
 #endif

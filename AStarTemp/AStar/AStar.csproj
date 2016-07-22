@@ -1,0 +1,135 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{7E32BD55-F315-4BDE-885C-646841C273F7}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>AStar</RootNamespace>
+    <AssemblyName>AStar</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <CodeAnalysisRuleSet>BasicCorrectnessRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Pathfinding.Ionic.Zip.Reduced">
+      <HintPath>..\AStarPlugins\DotNetZip\Pathfinding.Ionic.Zip.Reduced.dll</HintPath>
+    </Reference>
+    <Reference Include="Pathfinding.JsonFx">
+      <HintPath>..\AStarPlugins\JsonFx\Pathfinding.JsonFx.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="UnityEditor">
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\AssemblyVersionInfo.cs">
+      <Link>Properties\AssemblyVersionInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
+      <Link>Properties\SharedAssemblyInfo.cs</Link>
+    </Compile>
+    <Compile Include="Core\AI\AIPath.cs" />
+    <Compile Include="Core\AI\NavmeshController.cs" />
+    <Compile Include="Core\AI\Seeker.cs" />
+    <Compile Include="Core\astarclasses.cs" />
+    <Compile Include="Core\AstarData.cs" />
+    <Compile Include="Core\AstarMath.cs" />
+    <Compile Include="Core\AstarPath.cs" />
+    <Compile Include="Core\GraphUpdateScene.cs" />
+    <Compile Include="Core\GraphUpdateShape.cs" />
+    <Compile Include="Core\Misc\AnimationLink.cs" />
+    <Compile Include="Core\Misc\AstarDebugger.cs" />
+    <Compile Include="Core\Misc\AstarEnumFlagAttr.cs" />
+    <Compile Include="Core\Misc\BinaryHeap.cs" />
+    <Compile Include="Core\Misc\GraphEditorBase.cs" />
+    <Compile Include="Core\Misc\GraphModifier.cs" />
+    <Compile Include="Core\Misc\Int3.cs" />
+    <Compile Include="Core\Misc\ListPool.cs" />
+    <Compile Include="Core\Misc\NodeLink.cs" />
+    <Compile Include="Core\Misc\NodeLink2.cs" />
+    <Compile Include="Core\Misc\NodeLink3.cs" />
+    <Compile Include="Core\Misc\ObjectPool.cs" />
+    <Compile Include="Core\Misc\PathPool.cs" />
+    <Compile Include="Core\Misc\StackPool.cs" />
+    <Compile Include="Core\Misc\ThreadControlQueue.cs" />
+    <Compile Include="Core\Misc\WindowsStoreCompatibility.cs" />
+    <Compile Include="Core\Nodes\GraphNode.cs" />
+    <Compile Include="Core\Path.cs" />
+    <Compile Include="Core\PathHandler.cs" />
+    <Compile Include="Core\Serialization\JsonConverters.cs" />
+    <Compile Include="Core\Serialization\JsonSerializer.cs" />
+    <Compile Include="Core\Serialization\SimpleJsonReplacement.cs" />
+    <Compile Include="Core\Serialization\SimpleZipReplacement.cs" />
+    <Compile Include="Generators\Base.cs" />
+    <Compile Include="Generators\GridGenerator.cs" />
+    <Compile Include="Generators\NavMeshGenerator.cs" />
+    <Compile Include="Generators\NodeClasses\GridNode.cs" />
+    <Compile Include="Generators\NodeClasses\PointNode.cs" />
+    <Compile Include="Generators\NodeClasses\TriangleMeshNode.cs" />
+    <Compile Include="Generators\PointGenerator.cs" />
+    <Compile Include="Generators\QuadtreeGraph.cs" />
+    <Compile Include="Generators\Utilities\BBTree.cs" />
+    <Compile Include="Generators\Utilities\EuclideanEmbedding.cs" />
+    <Compile Include="Generators\Utilities\NavMeshRenderer.cs" />
+    <Compile Include="Generators\Utilities\ObjImporter.cs" />
+    <Compile Include="Modifiers\AlternativePath.cs" />
+    <Compile Include="Modifiers\FunnelModifier.cs" />
+    <Compile Include="Modifiers\Modifiers.cs" />
+    <Compile Include="Modifiers\RaycastModifier.cs" />
+    <Compile Include="Modifiers\SimpleSmoothModifier.cs" />
+    <Compile Include="Modifiers\StartEndModifier.cs" />
+    <Compile Include="Navmesh\RelevantGraphSurface.cs" />
+    <Compile Include="Pathfinders\ABPath.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utilities\AstarChecksum.cs" />
+    <Compile Include="Utilities\AstarMemory.cs" />
+    <Compile Include="Utilities\AstarParallel.cs" />
+    <Compile Include="Utilities\AstarProfiler.cs" />
+    <Compile Include="Utilities\DotNetReplacements.cs" />
+    <Compile Include="Utilities\GraphUpdateUtilities.cs" />
+    <Compile Include="Utilities\LockFreeStack.cs" />
+    <Compile Include="Utilities\PathUtilities.cs" />
+    <Compile Include="Utilities\ProfileHelper.cs" />
+    <Compile Include="Utilities\UnityReferenceHelper.cs" />
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
