@@ -19,12 +19,14 @@ public class TweenRotationEditor : UITweenerEditor
 
 		Vector3 from = EditorGUILayout.Vector3Field("From", tw.from);
 		Vector3 to = EditorGUILayout.Vector3Field("To", tw.to);
+		var quat = EditorGUILayout.Toggle("Quaternion", tw.quaternionLerp);
 
 		if (GUI.changed)
 		{
 			NGUIEditorTools.RegisterUndo("Tween Change", tw);
 			tw.from = from;
 			tw.to = to;
+			tw.quaternionLerp = quat;
 			NGUITools.SetDirty(tw);
 		}
 

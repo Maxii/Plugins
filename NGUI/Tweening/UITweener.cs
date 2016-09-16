@@ -117,10 +117,12 @@ public abstract class UITweener : MonoBehaviour
 	{
 		get
 		{
+			if (duration == 0f) return 1000f;
+
 			if (mDuration != duration)
 			{
 				mDuration = duration;
-				mAmountPerDelta = Mathf.Abs((duration > 0f) ? 1f / duration : 1000f) * Mathf.Sign(mAmountPerDelta);
+				mAmountPerDelta = Mathf.Abs(1f / duration) * Mathf.Sign(mAmountPerDelta);
 			}
 			return mAmountPerDelta;
 		}
@@ -176,7 +178,7 @@ public abstract class UITweener : MonoBehaviour
 		if (time < mStartTime) return;
 
 		// Advance the sampling factor
-		mFactor += amountPerDelta * delta;
+		mFactor += (duration == 0f) ? 1f : amountPerDelta * delta;
 
 		// Loop style simply resets the play factor after it exceeds 1.
 		if (style == Style.Loop)
@@ -461,9 +463,10 @@ public abstract class UITweener : MonoBehaviour
 		}
 #endif
 		comp.mStarted = false;
-		comp.duration = duration;
 		comp.mFactor = 0f;
-		comp.mAmountPerDelta = Mathf.Abs(comp.amountPerDelta);
+		comp.duration = duration;
+		comp.mDuration = duration;
+		comp.mAmountPerDelta = duration > 0f ? Mathf.Abs(1f / duration) : 1000f;
 		comp.style = Style.Once;
 		comp.animationCurve = new AnimationCurve(new Keyframe(0f, 0f, 0f, 1f), new Keyframe(1f, 1f, 1f, 0f));
 		comp.eventReceiver = null;

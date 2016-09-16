@@ -100,7 +100,7 @@ static public class NGUIText
 		finalSize = Mathf.RoundToInt(fontSize / pixelDensity);
 		finalSpacingX = spacingX * fontScale;
 		finalLineHeight = (fontSize + spacingY) * fontScale;
-		useSymbols = (bitmapFont != null && bitmapFont.hasSymbols) && encoding && symbolStyle != SymbolStyle.None;
+		useSymbols = (dynamicFont != null || bitmapFont != null) && encoding && symbolStyle != SymbolStyle.None;
 
 #if DYNAMIC_FONT
 		Font font = dynamicFont;
@@ -349,7 +349,7 @@ static public class NGUIText
 
 	[System.Diagnostics.DebuggerHidden]
 	[System.Diagnostics.DebuggerStepThrough]
-	static public Color ParseColor (string text, int offset) { return ParseColor24(text, offset); }
+	static public Color ParseColor (string text, int offset = 0) { return ParseColor24(text, offset); }
 
 	/// <summary>
 	/// Parse a RrGgBb color encoded in the string.
@@ -357,7 +357,7 @@ static public class NGUIText
 
 	[System.Diagnostics.DebuggerHidden]
 	[System.Diagnostics.DebuggerStepThrough]
-	static public Color ParseColor24 (string text, int offset)
+	static public Color ParseColor24 (string text, int offset = 0)
 	{
 		int r = (NGUIMath.HexToDecimal(text[offset])     << 4) | NGUIMath.HexToDecimal(text[offset + 1]);
 		int g = (NGUIMath.HexToDecimal(text[offset + 2]) << 4) | NGUIMath.HexToDecimal(text[offset + 3]);
@@ -1173,6 +1173,12 @@ static public class NGUIText
 						c.a *= mColors[b].a;
 
 					--offset;
+
+					// Add the previous word to the final string
+					if (start < offset) sb.Append(text.Substring(start, offset - start + 1));
+					else sb.Append(ch);
+					start = offset + 1;
+
 					continue;
 				}
 			}
@@ -1315,9 +1321,11 @@ static public class NGUIText
 
 					if (wrapLineColors)
 					{
+						// Negate previous colors prior to the newline character
 						for (int i = 0; i < mColors.size; ++i)
 							sb.Insert(sb.Length - 1, "[-]");
 
+						// Add all the current colors before going forward
 						for (int i = 0; i < mColors.size; ++i)
 						{
 							sb.Append("[");
@@ -1345,13 +1353,13 @@ static public class NGUIText
 		return fits && ((offset == textLength) || (lineCount <= Mathf.Min(maxLines, maxLineCount)));
 	}
 
-	static Color32 s_c0, s_c1;
+	static Color s_c0, s_c1;
 
 	/// <summary>
 	/// Print the specified text into the buffers.
 	/// </summary>
 
-	static public void Print (string text, BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color32> cols)
+	static public void Print (string text, BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols)
 	{
 		if (string.IsNullOrEmpty(text)) return;
 
@@ -1366,9 +1374,9 @@ static public class NGUIText
 		float x = 0f, y = 0f, maxX = 0f;
 		float sizeF = finalSize;
 
-		Color gb = tint * gradientBottom;
-		Color gt = tint * gradientTop;
-		Color32 uc = tint;
+		Color gb = (tint * gradientBottom);
+		Color gt = (tint * gradientTop);
+		Color gc = tint;
 		int textLength = text.Length;
 
 		Rect uvRect = new Rect();
@@ -1432,27 +1440,24 @@ static public class NGUIText
 			if (encoding && ParseSymbol(text, ref i, mColors, premultiply, ref subscriptMode, ref bold,
 				ref italic, ref underline, ref strikethrough, ref ignoreColor))
 			{
-				Color fc;
-
 				if (ignoreColor)
 				{
-					fc = mColors[mColors.size - 1];
-					fc.a *= mAlpha * tint.a;
+					gc = mColors[mColors.size - 1];
+					gc.a *= mAlpha * tint.a;
 				}
 				else
 				{
-					fc = tint * mColors[mColors.size - 1];
-					fc.a *= mAlpha;
+					gc = tint * mColors[mColors.size - 1];
+					gc.a *= mAlpha;
 				}
-				uc = fc;
 
 				for (int b = 0, bmax = mColors.size - 2; b < bmax; ++b)
-					fc.a *= mColors[b].a;
+					gc.a *= mColors[b].a;
 
 				if (gradient)
 				{
-					gb = gradientBottom * fc;
-					gt = gradientTop * fc;
+					gb = (gradientBottom * gc);
+					gt = (gradientTop * gc);
 				}
 				--i;
 				continue;
@@ -1517,12 +1522,12 @@ static public class NGUIText
 				{
 					if (symbolStyle == SymbolStyle.Colored)
 					{
-						for (int b = 0; b < 4; ++b) cols.Add(uc);
+						for (int b = 0; b < 4; ++b) cols.Add(gc);
 					}
 					else
 					{
-						Color32 col = Color.white;
-						col.a = uc.a;
+						Color col = Color.white;
+						col.a = gc.a;
 						for (int b = 0; b < 4; ++b) cols.Add(col);
 					}
 				}
@@ -1597,6 +1602,9 @@ static public class NGUIText
 				x += (subscriptMode == 0) ? finalSpacingX + glyph.advance :
 					(finalSpacingX + glyph.advance) * sizeShrinkage;
 
+				// Subscript may cause pixels to no longer be aligned
+				if (subscriptMode != 0) x = Mathf.Round(x);
+
 				// No need to continue if this is a space character
 				if (IsSpace(ch)) continue;
 
@@ -1653,7 +1661,7 @@ static public class NGUIText
 						else
 						{
 							for (int j = 0, jmax = (bold ? 16 : 4); j < jmax; ++j)
-								cols.Add(uc);
+								cols.Add(gc);
 						}
 					}
 					else
@@ -1666,7 +1674,7 @@ static public class NGUIText
 						// - Should not be a part of the atlas (eastern fonts rarely are anyway).
 						// - Lower color precision
 
-						Color col = uc;
+						Color col = gc;
 
 						col *= 0.49f;
 
@@ -1678,9 +1686,8 @@ static public class NGUIText
 							case 8: col.a += 0.51f; break;
 						}
 
-						Color32 c = col;
 						for (int j = 0, jmax = (bold ? 16 : 4); j < jmax; ++j)
-							cols.Add(c);
+							cols.Add(col);
 					}
 				}
 
@@ -1799,7 +1806,7 @@ static public class NGUIText
 					else
 					{
 						for (int j = 0, jmax = (bold ? 16 : 4); j < jmax; ++j)
-							cols.Add(uc);
+							cols.Add(gc);
 					}
 				}
 			}
@@ -2266,6 +2273,76 @@ static public class NGUIText
 			// Align the highlight
 			if (alignment != Alignment.Left && highlightOffset < highlight.size)
 				Align(highlight, highlightOffset, x - finalSpacingX);
+		}
+	}
+
+	/// <summary>
+	/// Replace the specified link.
+	/// </summary>
+
+	static public bool ReplaceLink (ref string text, ref int index, string prefix)
+	{
+		if (index == -1) return false;
+		index = text.IndexOf(prefix, index);
+		if (index == -1) return false;
+
+		int domainStart = index + prefix.Length;
+		int end = text.IndexOf(' ', domainStart);
+		if (end == -1) end = text.Length;
+
+		int domainEnd = text.IndexOfAny(new char[] { '/', ' ' }, domainStart);
+
+		if (domainEnd == -1 || domainEnd == domainStart)
+		{
+			index += 7;
+			return true;
+		}
+
+		string left = text.Substring(0, index);
+		string link = text.Substring(index, end - index);
+		string right = text.Substring(end);
+		string urlName = text.Substring(domainStart, domainEnd - domainStart);
+
+		text = left + "[url=" + link + "][u]" + urlName + "[/u][/url]";
+		index = text.Length;
+		text += right;
+		return true;
+	}
+
+	/// <summary>
+	/// Insert a hyperlink around the specified keyword.
+	/// </summary>
+
+	static public bool InsertHyperlink (ref string text, ref int index, string keyword, string link)
+	{
+		int patchStart = text.IndexOf(keyword, index, System.StringComparison.CurrentCultureIgnoreCase);
+		if (patchStart == -1) return false;
+
+		string left = text.Substring(0, patchStart);
+		string url = "[url=" + link + "][u]";
+		string middle = text.Substring(patchStart, keyword.Length) + "[/u][/url]";
+		string right = text.Substring(patchStart + keyword.Length);
+
+		text = left + url + middle;
+		index = text.Length;
+		text += right;
+		return true;
+	}
+
+	/// <summary>
+	/// Helper function that replaces links within text with clickable ones.
+	/// </summary>
+
+	static public void ReplaceLinks (ref string text)
+	{
+		for (int index = 0; index < text.Length; )
+		{
+			if (!ReplaceLink(ref text, ref index, "http://")) break;
+		}
+
+		for (int index = 0; index < text.Length; )
+		{
+			if (!ReplaceLink(ref text, ref index, "https://")) break;
 		}
 	}
 }

@@ -165,8 +165,10 @@ public class UIToggle : UIWidgetContainer
 	/// Activate the initial state.
 	/// </summary>
 
-	void Start ()
+	public void Start ()
 	{
+		if (mStarted) return;
+
 		if (startsChecked)
 		{
 			startsChecked = false;
@@ -219,9 +221,10 @@ public class UIToggle : UIWidgetContainer
 
 	/// <summary>
 	/// Fade out or fade in the active sprite and notify the OnChange event listener.
+	/// If setting the initial value, call Start() first.
 	/// </summary>
 
-	public void Set (bool state)
+	public void Set (bool state, bool notify = true)
 	{
 		if (validator != null && !validator(state)) return;
 
@@ -267,7 +270,7 @@ public class UIToggle : UIWidgetContainer
 				}
 			}
 
-			if (current == null)
+			if (notify && current == null)
 			{
 				UIToggle tog = current;
 				current = this;
@@ -307,7 +310,7 @@ public class UIToggle : UIWidgetContainer
 
 				if (tween.tweenGroup != 0)
 				{
-					UITweener[] tws = tween.GetComponentsInChildren<UITweener>();
+					UITweener[] tws = tween.GetComponentsInChildren<UITweener>(true);
 
 					for (int i = 0, imax = tws.Length; i < imax; ++i)
 					{

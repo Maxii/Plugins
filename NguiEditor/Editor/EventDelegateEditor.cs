@@ -9,7 +9,7 @@ using System.Reflection;
 using System.Collections.Generic;
 using Entry = PropertyReferenceDrawer.Entry;
 
-public static class EventDelegateEditor
+static public class EventDelegateEditor
 {
 	/// <summary>
 	/// Collect a list of usable delegates from the specified target game object.

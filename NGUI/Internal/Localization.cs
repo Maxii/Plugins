@@ -27,7 +27,7 @@ using System.Collections.Generic;
 /// Info,"Localization Example","Par exemple la localisation"
 /// </summary>
 
-public static class Localization
+static public class Localization
 {
 	public delegate byte[] LoadFunction (string path);
 	public delegate void OnLocalizeNotification ();

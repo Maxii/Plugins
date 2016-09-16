@@ -1,5 +1,5 @@
-// Version 5.2
-// ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.3
+// ©2016 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using System.Collections;
@@ -12,6 +12,8 @@ public class VisibilityControlStatic : MonoBehaviour {
 	RefInt m_objectNumber;
 	VectorLine m_vectorLine;
 	bool m_destroyed = false;
+	bool m_dontDestroyLine = false;
+	Matrix4x4 m_originalMatrix;
 	
 	public RefInt objectNumber {
 		get {return m_objectNumber;}
@@ -23,10 +25,10 @@ public class VisibilityControlStatic : MonoBehaviour {
 		}
 		// Adjust points to this position, so the line doesn't have to be updated with the transform of this object
 		// Also make sure the points are unique by creating a new list and copying the points over
-		var thisMatrix = transform.localToWorldMatrix;
+		m_originalMatrix = transform.localToWorldMatrix;
 		var thisPoints = new List<Vector3>(line.points3);
 		for (int i = 0; i < thisPoints.Count; i++) {
-			thisPoints[i] = thisMatrix.MultiplyPoint3x4 (thisPoints[i]);
+			thisPoints[i] = m_originalMatrix.MultiplyPoint3x4 (thisPoints[i]);
 		}
 		line.points3 = thisPoints;
 		m_vectorLine = line;
@@ -62,6 +64,15 @@ public class VisibilityControlStatic : MonoBehaviour {
 		if (m_destroyed) return;	// Paranoia check
 		m_destroyed = true;
 		VectorManager.VisibilityStaticRemove (m_objectNumber.i);
+		if (m_dontDestroyLine) return;
 		VectorLine.Destroy (ref m_vectorLine);
+	}
+	
+	public void DontDestroyLine () {
+		m_dontDestroyLine = true;
+	}
+	
+	public Matrix4x4 GetMatrix () {
+		return m_originalMatrix;
 	}
 }

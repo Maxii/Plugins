@@ -54,6 +54,7 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Interaction\EnvelopContent.cs" />
     <Compile Include="Interaction\LanguageSelection.cs" />
     <Compile Include="Interaction\TypewriterEffect.cs" />
     <Compile Include="Interaction\UIButton.cs" />
@@ -128,6 +129,7 @@
     <Compile Include="Tweening\SpringPosition.cs" />
     <Compile Include="Tweening\TweenAlpha.cs" />
     <Compile Include="Tweening\TweenColor.cs" />
+    <Compile Include="Tweening\TweenFill.cs" />
     <Compile Include="Tweening\TweenFOV.cs" />
     <Compile Include="Tweening\TweenHeight.cs" />
     <Compile Include="Tweening\TweenOrthoSize.cs" />

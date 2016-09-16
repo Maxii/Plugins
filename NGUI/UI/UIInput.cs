@@ -279,54 +279,61 @@ public class UIInput : MonoBehaviour
 			if (mDoInit) Init();
 			return mValue;
 		}
-		set
-		{
+		set { Set(value); }
+	}
+
+	/// <summary>
+	/// Set the input field's value. If setting the initial value, call Start() first.
+	/// </summary>
+
+	public void Set (string value, bool notify = true)
+	{
 #if UNITY_EDITOR
-			if (!Application.isPlaying) return;
+		if (!Application.isPlaying) return;
 #endif
-			if (mDoInit) Init();
-			mDrawStart = 0;
+		if (mDoInit) Init();
+		if (value == this.value) return;
+		mDrawStart = 0;
 
-			// BB10's implementation has a bug in Unity
- #if UNITY_4_3
-			if (Application.platform == RuntimePlatform.BB10Player)
- #else
-			if (Application.platform == RuntimePlatform.BlackBerryPlayer)
- #endif
-				value = value.Replace("\\b", "\b");
-
-			// Validate all input
-			value = Validate(value);
+		// BB10's implementation has a bug in Unity
+#if UNITY_4_3
+		if (Application.platform == RuntimePlatform.BB10Player)
+			value = value.Replace("\\b", "\b");
+#elif UNITY_4_7 || UNITY_5_0 || UNITY_5_1 || UNITY_5_2 || UNITY_5_3
+		if (Application.platform == RuntimePlatform.BlackBerryPlayer)
+			value = value.Replace("\\b", "\b");
+#endif
+		// Validate all input
+		value = Validate(value);
 #if MOBILE
-			if (isSelected && mKeyboard != null && mCached != value)
-			{
-				mKeyboard.text = value;
-				mCached = value;
-			}
+		if (isSelected && mKeyboard != null && mCached != value)
+		{
+			mKeyboard.text = value;
+			mCached = value;
+		}
 #endif
-			if (mValue != value)
+		if (mValue != value)
+		{
+			mValue = value;
+			mLoadSavedValue = false;
+
+			if (isSelected)
 			{
-				mValue = value;
-				mLoadSavedValue = false;
-
-				if (isSelected)
+				if (string.IsNullOrEmpty(value))
 				{
-					if (string.IsNullOrEmpty(value))
-					{
-						mSelectionStart = 0;
-						mSelectionEnd = 0;
-					}
-					else
-					{
-						mSelectionStart = value.Length;
-						mSelectionEnd = mSelectionStart;
-					}
+					mSelectionStart = 0;
+					mSelectionEnd = 0;
 				}
-				else if (mStarted) SaveToPlayerPrefs(value);
-
-				UpdateLabel();
-				ExecuteOnChange();
+				else
+				{
+					mSelectionStart = value.Length;
+					mSelectionEnd = mSelectionStart;
+				}
 			}
+			else if (mStarted) SaveToPlayerPrefs(value);
+
+			UpdateLabel();
+			if (notify) ExecuteOnChange();
 		}
 	}
 
@@ -461,8 +468,9 @@ public class UIInput : MonoBehaviour
 	/// Automatically set the value by loading it from player prefs if possible.
 	/// </summary>
 
-	void Start ()
+	public void Start ()
 	{
+		if (mStarted) return;
 		if (selectOnTab != null)
 		{
 			UIKeyNavigation nav = GetComponent<UIKeyNavigation>();
@@ -885,10 +893,16 @@ public class UIInput : MonoBehaviour
 
 		RuntimePlatform rp = Application.platform;
 
+#if UNITY_4_7 || UNITY_5_0 || UNITY_5_1 || UNITY_5_2 || UNITY_5_3
 		bool isMac = (
 			rp == RuntimePlatform.OSXEditor ||
 			rp == RuntimePlatform.OSXPlayer ||
 			rp == RuntimePlatform.OSXWebPlayer);
+#else
+		bool isMac = (
+			rp == RuntimePlatform.OSXEditor ||
+			rp == RuntimePlatform.OSXPlayer);
+#endif
 
 		bool ctrl = isMac ?
 			((ev.modifiers & EventModifiers.Command) != 0) :

@@ -223,10 +223,13 @@ public class UIPanel : UIRect
 
 			if (mAlpha != val)
 			{
+				bool wasVisible = mAlpha > 0.001f;
 				mAlphaFrameID = -1;
 				mResized = true;
 				mAlpha = val;
-				SetDirty();
+				for (int i = 0, imax = drawCalls.Count; i < imax; ++i)
+					drawCalls[i].isDirty = true;
+				Invalidate(!wasVisible && mAlpha > 0.001f);
 			}
 		}
 	}
@@ -924,12 +927,12 @@ public class UIPanel : UIRect
 
 		mHalfPixelOffset = (Application.platform == RuntimePlatform.WindowsPlayer ||
 			Application.platform == RuntimePlatform.XBOX360 ||
+#if UNITY_4_7 || UNITY_5_0 || UNITY_5_1 || UNITY_5_2 || UNITY_5_3
 			Application.platform == RuntimePlatform.WindowsWebPlayer ||
-			Application.platform == RuntimePlatform.WindowsEditor);
-
-		// Only DirectX 9 needs the half-pixel offset
-		if (mHalfPixelOffset && SystemInfo.graphicsDeviceVersion.Contains("Direct3D"))
-			mHalfPixelOffset = (SystemInfo.graphicsShaderLevel < 40);
+#endif
+			Application.platform == RuntimePlatform.WindowsEditor) &&
+			SystemInfo.graphicsDeviceVersion.Contains("Direct3D") &&
+			SystemInfo.graphicsShaderLevel < 40;
 	}
 
 	/// <summary>
@@ -1054,16 +1057,10 @@ public class UIPanel : UIRect
 	{
 		int fc = Time.frameCount;
 
-		if (cachedTransform.hasChanged)
-		{
-			mTrans.hasChanged = false;
-			mMatrixFrame = -1;
-		}
-
-		if (mMatrixFrame != fc)
+		if (mHasMoved || mMatrixFrame != fc)
 		{
 			mMatrixFrame = fc;
-			worldToLocal = mTrans.worldToLocalMatrix;
+			worldToLocal = cachedTransform.worldToLocalMatrix;
 
 			Vector2 size = GetViewSize() * 0.5f;
 
@@ -1256,12 +1253,17 @@ public class UIPanel : UIRect
 		}
 	}
 
+	[System.NonSerialized]
+	bool mHasMoved = false;
+
 	/// <summary>
 	/// Update the panel, all of its widgets and draw calls.
 	/// </summary>
 
 	void UpdateSelf ()
 	{
+		mHasMoved = cachedTransform.hasChanged;
+
 		UpdateTransformMatrix();
 		UpdateLayers();
 		UpdateWidgets();
@@ -1292,6 +1294,12 @@ public class UIPanel : UIRect
 			mUpdateScroll = false;
 			UIScrollView sv = GetComponent<UIScrollView>();
 			if (sv != null) sv.UpdateScrollbars();
+		}
+
+		if (mHasMoved)
+		{
+			mHasMoved = false;
+			mTrans.hasChanged = false;
 		}
 	}
 
@@ -1616,11 +1624,11 @@ public class UIPanel : UIRect
 				
 
 				// First update the widget's transform
-				if (w.UpdateTransform(frame) || mResized)
+				if (w.UpdateTransform(frame) || mResized || (mHasMoved && !alwaysOnScreen))
 				{
 					// Only proceed to checking the widget's visibility if it actually moved
 					bool vis = forceVisible || (w.CalculateCumulativeAlpha(frame) > 0.001f);
-					w.UpdateVisibility(vis, forceVisible || ((clipped || w.hideIfOffScreen) ? IsVisible(w) : true));
+					w.UpdateVisibility(vis, forceVisible || alwaysOnScreen || ((clipped || w.hideIfOffScreen) ? IsVisible(w) : true));
 				}
 				
 				// Update the widget's geometry if necessary

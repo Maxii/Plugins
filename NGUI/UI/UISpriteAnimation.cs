@@ -15,6 +15,12 @@ using System.Collections.Generic;
 [AddComponentMenu("NGUI/UI/Sprite Animation")]
 public class UISpriteAnimation : MonoBehaviour
 {
+	/// <summary>
+	/// Index of the current frame in the sprite animation.
+	/// </summary>
+
+	public int frameIndex = 0;
+
 	[HideInInspector][SerializeField] protected int mFPS = 30;
 	[HideInInspector][SerializeField] protected string mPrefix = "";
 	[HideInInspector][SerializeField] protected bool mLoop = true;
@@ -22,7 +28,6 @@ public class UISpriteAnimation : MonoBehaviour
 
 	protected UISprite mSprite;
 	protected float mDelta = 0f;
-	protected int mIndex = 0;
 	protected bool mActive = true;
 	protected List<string> mSpriteNames = new List<string>();
 
@@ -77,15 +82,15 @@ public class UISpriteAnimation : MonoBehaviour
 			{
 				mDelta = (rate > 0f) ? mDelta - rate : 0f;
 
-				if (++mIndex >= mSpriteNames.Count)
+				if (++frameIndex >= mSpriteNames.Count)
 				{
-					mIndex = 0;
+					frameIndex = 0;
 					mActive = mLoop;
 				}
 
 				if (mActive)
 				{
-					mSprite.spriteName = mSpriteNames[mIndex];
+					mSprite.spriteName = mSpriteNames[frameIndex];
 					if (mSnap) mSprite.MakePixelPerfect();
 				}
 			}
@@ -137,11 +142,11 @@ public class UISpriteAnimation : MonoBehaviour
 	public void ResetToBeginning ()
 	{
 		mActive = true;
-		mIndex = 0;
+		frameIndex = 0;
 
 		if (mSprite != null && mSpriteNames.Count > 0)
 		{
-			mSprite.spriteName = mSpriteNames[mIndex];
+			mSprite.spriteName = mSpriteNames[frameIndex];
 			if (mSnap) mSprite.MakePixelPerfect();
 		}
 	}

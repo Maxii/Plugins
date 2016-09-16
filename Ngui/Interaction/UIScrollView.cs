@@ -60,6 +60,13 @@ public class UIScrollView : MonoBehaviour
 	public bool restrictWithinPanel = true;
 
 	/// <summary>
+	/// Whether the scroll view will execute its constrain within bounds logic on every drag operation.
+	/// </summary>
+
+	[Tooltip("Whether the scroll view will execute its constrain within bounds logic on every drag operation")]
+	public bool constrainOnDrag = false;
+
+	/// <summary>
 	/// Whether dragging will be disabled if the contents fit.
 	/// </summary>
 
@@ -416,7 +423,7 @@ public class UIScrollView : MonoBehaviour
 				Vector3 pos = mTrans.localPosition + constraint;
 				pos.x = Mathf.Round(pos.x);
 				pos.y = Mathf.Round(pos.y);
-				SpringPanel.Begin(mPanel.gameObject, pos, 13f).strength = 8f;
+				SpringPanel.Begin(mPanel.gameObject, pos, 8f);
 			}
 			else
 			{
@@ -776,7 +783,7 @@ public class UIScrollView : MonoBehaviour
 			}
 			else
 			{
-				if (restrictWithinPanel && mPanel.clipping != UIDrawCall.Clipping.None)
+				if (mDragStarted && restrictWithinPanel && mPanel.clipping != UIDrawCall.Clipping.None)
 					RestrictWithinBounds(dragEffect == DragEffect.None, canMoveHorizontally, canMoveVertically);
 
 				if (mDragStarted && onDragFinished != null) onDragFinished();
@@ -857,24 +864,35 @@ public class UIScrollView : MonoBehaviour
 				{
 					Vector3 constraint = mPanel.CalculateConstrainOffset(bounds.min, bounds.max);
 
+					if (movement == Movement.Horizontal)
+					{
+						constraint.y = 0f;
+					}
+					else if (movement == Movement.Vertical)
+					{
+						constraint.x = 0f;
+					}
+					else if (movement == Movement.Custom)
+					{
+						constraint.x *= customMovement.x;
+						constraint.y *= customMovement.y;
+					}
+
 					if (constraint.magnitude > 1f)
 					{
 						MoveAbsolute(offset * 0.5f);
 						mMomentum *= 0.5f;
 					}
-					else
-					{
-						MoveAbsolute(offset);
-					}
+					else MoveAbsolute(offset);
 				}
 
 				// We want to constrain the UI to be within bounds
-				//if (restrictWithinPanel &&
-				//    mPanel.clipping != UIDrawCall.Clipping.None &&
-				//    dragEffect != DragEffect.MomentumAndSpring)
-				//{
-				//    RestrictWithinBounds(true, canMoveHorizontally, canMoveVertically);
-				//}
+				if (constrainOnDrag && restrictWithinPanel &&
+					mPanel.clipping != UIDrawCall.Clipping.None &&
+					dragEffect != DragEffect.MomentumAndSpring)
+				{
+					RestrictWithinBounds(true, canMoveHorizontally, canMoveVertically);
+				}
 			}
 		}
 	}
@@ -940,7 +958,7 @@ public class UIScrollView : MonoBehaviour
 		// Apply momentum
 		if (!mPressed)
 		{
-			if (mMomentum.magnitude > 0.0001f || mScroll != 0f)
+			if (mMomentum.magnitude > 0.0001f || Mathf.Abs(mScroll) > 0.0001f)
 			{
 				if (movement == Movement.Horizontal)
 				{
@@ -1019,8 +1037,8 @@ public class UIScrollView : MonoBehaviour
 
 		if (horizontalScrollBar == null && verticalScrollBar == null)
 		{
-			if (scale.x != 0f) Scroll(delta.x);
-			else if (scale.y != 0f) Scroll(delta.y);
+			if (canMoveHorizontally) Scroll(delta.x);
+			else if (canMoveVertically) Scroll(delta.y);
 		}
 	}
 

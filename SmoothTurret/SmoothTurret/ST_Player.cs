@@ -7,20 +7,36 @@ public class ST_Player : MonoBehaviour {
 	public GameObject aimObject;
 	public GameObject fireObject;
 	[Tooltip("Targeting range to use if clicking on empty space.")]
-	public float emptyClickRange = 100;
+	public float emptyAimRange = 100;
+	[Tooltip("aimObject always appears at Empty Aim Range.")]
+	public bool fixedAimObjectRange;
 	
 	bool? turretControlToggle = null;
 	bool error;
-	
+
 	void Start () {
 		if ( CheckErrors() == true ) { return; }
 
-		if ( !aimObject ) {
+		if ( aimObject ) { // aimObject is defined
+			if ( !aimObject.activeInHierarchy ) { // not active in hierarchy - object is a prefab
+				// create from prefab
+				aimObject = (GameObject)Instantiate( aimObject, Vector3.zero, Quaternion.identity );
+			}
+		} else {
 			aimObject = new GameObject("AimPoint");
 		}
-		if ( !fireObject ) {
+		aimObject.SetActive(false);
+
+		if ( fireObject ) { // aimObject is defined
+			if ( !fireObject.activeInHierarchy ) { // not active in hierarchy - object is a prefab
+				// create from prefab
+				fireObject = (GameObject)Instantiate( fireObject, Vector3.zero, Quaternion.identity );
+			}
+		} else {
 			fireObject = new GameObject("FirePoint");
 		}
+		fireObject.SetActive(false);
+
 	}
 	
 	void Update () {
@@ -44,9 +60,13 @@ public class ST_Player : MonoBehaviour {
 			Vector3 _objPos;
 
 			if ( Physics.Raycast( _ray, out _hit, Mathf.Infinity ) ) { // hit collider
-				_objPos = _hit.point;
+				if ( fixedAimObjectRange == true ) {
+					_objPos = _ray.origin + (_ray.direction * emptyAimRange);
+				} else {
+					_objPos = _hit.point;
+				}
 			} else { // hit nothing
-				_objPos = _ray.origin + (_ray.direction * emptyClickRange);
+				_objPos = _ray.origin + (_ray.direction * emptyAimRange);
 			}
 			// move aimObject to mouse location
 			aimObject.transform.position = _objPos;
@@ -55,15 +75,6 @@ public class ST_Player : MonoBehaviour {
 
 	private bool CheckErrors () {
 		error = false;
-//		string _object = gameObject.name;
-
-//		if ( clickLayer != "" ) {
-//			if ( LayerMask.NameToLayer( clickLayer ) != -1 ) {
-//				mask = LayerMask.GetMask( clickLayer );
-//			} else {
-//				Debug.Log(_object+": Couldn't find layer: "+clickLayer); error = true;
-//			}
-//		}
 
 		return error;
 	}

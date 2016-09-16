@@ -122,7 +122,8 @@ public abstract class UIRect : MonoBehaviour
 #if UNITY_4_3 || UNITY_4_5 || UNITY_4_6 || UNITY_4_7
 				if (target.camera != null) return target.camera.GetSides(relativeTo);
 #else
-				if (target.GetComponent<Camera>() != null) return target.GetComponent<Camera>().GetSides(relativeTo);
+				var cam = target.GetComponent<Camera>();
+				if (cam != null) return cam.GetSides(relativeTo);
 #endif
 			}
 			return null;

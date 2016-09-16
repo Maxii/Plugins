@@ -82,8 +82,9 @@ public class TweenVolume : UITweener
 
 		if (targetVolume > 0f)
 		{
-			comp.audioSource.enabled = true;
-			comp.audioSource.Play();
+			var s = comp.audioSource;
+			s.enabled = true;
+			s.Play();
 		}
 		return comp;
 	}

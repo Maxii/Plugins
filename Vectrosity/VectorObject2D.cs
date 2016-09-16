@@ -1,5 +1,5 @@
-// Version 5.2.2
-// ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.3
+// ©2016 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using UnityEngine.UI;

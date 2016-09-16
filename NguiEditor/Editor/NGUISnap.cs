@@ -9,7 +9,7 @@ using UnityEngine;
 /// Utility class that makes it easy to perform snapping while dragging widgets.
 /// </summary>
 
-public static class NGUISnap
+static public class NGUISnap
 {
 	const float SNAP_THRESHOLD = 10f;
 

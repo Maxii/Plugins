@@ -9,6 +9,10 @@ namespace GridFramework.Editor {
 	[CustomEditor (typeof(PolarGrid))]
 	public class PolarGridEditor : UnityEditor.Editor {
 #region  Private variables
+		// Whether to display the computed properties
+		[SerializeField]
+		private static bool _showProps = true;
+
 		private static readonly string _docsURL =
 			"file://" + Application.dataPath
 			+ "/Plugins/GridFramework/Documentation/html/"
@@ -25,8 +29,18 @@ namespace GridFramework.Editor {
 		public override void OnInspectorGUI() {
 			RadiusFields();
 			SectorFields();
-			AngleFields();
 			DepthFields();
+
+			_showProps =
+				EditorGUILayout.Foldout(_showProps, "Computed Properties");
+
+			if (_showProps) {
+				++EditorGUI.indentLevel;
+				RadiansFields();
+				PiFields();
+				DegreesField();
+				--EditorGUI.indentLevel;
+			}
 
 			if (GUI.changed) {
 				EditorUtility.SetDirty(target);
@@ -43,15 +57,25 @@ namespace GridFramework.Editor {
 			_grid.Sectors = EditorGUILayout.IntField("Sectors", _grid.Sectors);
 		}
 
-		private void AngleFields() {
-			var radians = _grid.Radians / Mathf.PI;
-			var degrees = _grid.Degrees;
-
-			EditorGUILayout.LabelField("Radians / Deg Angle", ""+ radians + "\u03c0 = " + degrees + "\u00b0");
+		private void PiFields() {
+			const string label = "Radians (in \u03c0)";
+			_grid.Radians =
+				EditorGUILayout.FloatField(label, _grid.Radians / Mathf.PI);
+			_grid.Radians *= Mathf.PI;
 		}
 
 		private void DepthFields() {
 			_grid.Depth = EditorGUILayout.FloatField("Depth", _grid.Depth);
+		}
+
+		private void RadiansFields() {
+			const string label = "Radians";
+			_grid.Radians = EditorGUILayout.FloatField(label, _grid.Radians);
+		}
+
+		private void DegreesField() {
+			const string label = "Degrees";
+			_grid.Degrees = EditorGUILayout.FloatField(label, _grid.Degrees);
 		}
 #endregion  // Fields
 

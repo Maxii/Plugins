@@ -1,4 +1,4 @@
-// Version 5.0
+// Version 5.3
 // ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -156,6 +156,10 @@ public partial class VectorLine {
 		}
 		if (index < 0) {
 			Debug.LogError ("VectorLine.MakeRoundedRect: index value must be >= 0");
+			return;
+		}
+		if (!m_is2D && bottomLeft.z != topRight.z) {
+			Debug.LogError ("VectorLine.MakeRoundedRect only works on the X/Y plane");
 			return;
 		}
 		int neededCount = (m_lineType != LineType.Discrete)? cornerSegments * 4 + 5 + index : cornerSegments * 8 + 8 + index;

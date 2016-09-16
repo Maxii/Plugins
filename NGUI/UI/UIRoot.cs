@@ -287,7 +287,7 @@ public class UIRoot : MonoBehaviour
 					!(Mathf.Abs(ls.z - size) <= float.Epsilon))
 				{
 					mTrans.localScale = new Vector3(size, size, size);
-					if (updateAnchors) BroadcastMessage("UpdateAnchors");
+					if (updateAnchors) BroadcastMessage("UpdateAnchors", SendMessageOptions.DontRequireReceiver);
 				}
 			}
 		}

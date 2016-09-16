@@ -73,7 +73,7 @@ public class UIAnchor : MonoBehaviour
 	UIRoot mRoot;
 	bool mStarted = false;
 
-	void Awake ()
+	void OnEnable ()
 	{
 		mTrans = transform;
 #if UNITY_4_3 || UNITY_4_5 || UNITY_4_6 || UNITY_4_7
@@ -84,7 +84,7 @@ public class UIAnchor : MonoBehaviour
 		UICamera.onScreenResize += ScreenSizeChanged;
 	}
 
-	void OnDestroy () { UICamera.onScreenResize -= ScreenSizeChanged; }
+	void OnDisable () { UICamera.onScreenResize -= ScreenSizeChanged; }
 
 	void ScreenSizeChanged () { if (mStarted && runOnlyOnce) Update(); }
 
@@ -118,6 +118,7 @@ public class UIAnchor : MonoBehaviour
 	void Update ()
 	{
 		if (mAnim != null && mAnim.enabled && mAnim.isPlaying) return;
+		if (mTrans == null) return;
 
 		bool useCamera = false;
 

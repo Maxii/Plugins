@@ -1,5 +1,5 @@
-// Version 5.2
-// ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.3
+// ©2016 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using Vectrosity;
@@ -10,6 +10,7 @@ public class VisibilityControl : MonoBehaviour {
 	RefInt m_objectNumber;
 	VectorLine m_vectorLine;
 	bool m_destroyed = false;
+	bool m_dontDestroyLine = false;
 	
 	public RefInt objectNumber {
 		get {return m_objectNumber;}
@@ -22,11 +23,13 @@ public class VisibilityControl : MonoBehaviour {
 		
 		VectorManager.VisibilitySetup (transform, line, out m_objectNumber);
 		m_vectorLine = line;
+		if (GetComponent<Renderer>().isVisible) {
+			OnBecameVisible();
+		}
 	}
 
 	void OnBecameVisible () {
 		m_vectorLine.active = true;
-		
 		// Draw line now, otherwise's there's a 1-frame delay before the line is actually drawn in the next LateUpdate
 		VectorManager.DrawArrayLine2 (m_objectNumber.i);
 	}
@@ -39,6 +42,11 @@ public class VisibilityControl : MonoBehaviour {
 		if (m_destroyed) return;	// Paranoia check
 		m_destroyed = true;
 		VectorManager.VisibilityRemove (m_objectNumber.i);
+		if (m_dontDestroyLine) return;
 		VectorLine.Destroy (ref m_vectorLine);
+	}
+
+	public void DontDestroyLine () {
+		m_dontDestroyLine = true;
 	}
 }

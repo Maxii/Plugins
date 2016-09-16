@@ -154,7 +154,6 @@ public class UITooltip : MonoBehaviour
 				mPos = mTrans.localPosition;
 				mPos.x = Mathf.Round(mPos.x);
 				mPos.y = Mathf.Round(mPos.y);
-				mTrans.localPosition = mPos;
 			}
 			else
 			{
@@ -166,6 +165,8 @@ public class UITooltip : MonoBehaviour
 				mPos.x -= Screen.width * 0.5f;
 				mPos.y -= Screen.height * 0.5f;
 			}
+
+			mTrans.localPosition = mPos;
 
 			// Force-update all anchors below the tooltip
 			if (tooltipRoot != null) tooltipRoot.BroadcastMessage("UpdateAnchors");

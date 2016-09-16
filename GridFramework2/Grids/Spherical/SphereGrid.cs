@@ -7,23 +7,23 @@ namespace GridFramework.Grids {
 	/// </summary>
 	/// <remarks>
 	///   <para>
-	///   Spherical grids are round 3D grids defined by the radius of the sphere,
-	///   the number of parallel circles running orthogonal to the sphere's polar
-	///   axis and the number or meridians running from one pole to the other along
-	///   the surface of the sphere.
+	///   Spherical  grids are  round 3D  grids defined  by the  radius of  the
+	///   sphere,  the number  of parallel  circles running  orthogonal to  the
+	///   sphere's polar axis and the number or meridians running from one pole
+	///   to the other along the surface of the sphere.
 	///   </para>
 	///   <para>
-	///     This type of grid as three coordinate systems: spherical, grid and
-	///     geographical. Spherical- and geographic coordinates are similar to
+	///     This type of grid as three coordinate systems:  spherical, grid and
+	///     geographical.  Spherical- and geographic coordinates are similar to
 	///     each other, except in how they thread the meridian coordinate.
 	///   </para>
 	///   <para>
-	///     The north pole is in positive Y-direction from the origin of the grid,
-	///     the south pole is opposite of it, the vector from south- to north pole
-	///     is the axis of rotation. The direction of rotation for longitude is
-	///     counter-clockwise when the rotation axis is pointing towards the
-	///     observer, or in other words eastwards. The primary meridian alignes
-	///     with the object's Z-axis (forward).
+	///     The north pole  is in positive  Y-direction from the  origin of the
+	///     grid,  the south pole is opposite of it,  the vector from south- to
+	///     north pole is the  axis of rotation.  The direction of rotation for
+	///     longitude is counter-clockwise  when the rotation  axis is pointing
+	///     towards the  observer,  or in  other words  eastwards.  The primary
+	///     meridian alignes with the object's Z-axis (forward).
 	///   </para>
 	///   <list type="table">
 	///     <listheader>
@@ -40,10 +40,10 @@ namespace GridFramework.Grids {
 	///       </term>
 	///       <description>
 	///         Vectors are given as radius, polar angle and azimuth angle. The
-	///         radius is the distance from the origin of the grid, and the polar
-	///         angle is the angle between the vector and the polar axis. The azimuth
-	///         angle is the angle from the prime-meridian, between 0 and 2π, similar
-	///         to the angle in polar coordinates.
+	///         radius is the  distance from the  origin of  the grid,  and the
+	///         polar angle is the angle between the vector and the polar axis.
+	///         The azimuth angle is the angle from the prime-meridian, between
+	///         0 and 2π, similar to the angle in polar coordinates.
 	///       </description>
 	///     </item>
 	///     <item>
@@ -51,12 +51,12 @@ namespace GridFramework.Grids {
 	///         Geographic coordinates
 	///       </term>
 	///       <description>
-	///         Vectors are given as altitude, latitude and longitude. The altitude
-	///         is the distance from the surface of the first sphere, the latitude is
-	///         the same as the polar angle in spherical coordinates. The longitude
-	///         is positive to the right of the primary meridian and negative to the
-	///         left.  The sign of the longitude opposite of the prime meridian is
-	///         undefined.
+	///         Vectors are  given as  altitude,  latitude and  longitude.  The
+	///         altitude is the distance  from the surface of the first sphere,
+	///         the  latitude  is the  same as  the  polar  angle in  spherical
+	///         coordinates.  The longitude  is positive  to the  right of  the
+	///         primary meridian  and negative  to the  left.  The sign  of the
+	///         longitude opposite of the prime meridian is undefined.
 	///       </description>
 	///     </item>
 	///     <item>
@@ -64,9 +64,9 @@ namespace GridFramework.Grids {
 	///         Grid coordinates
 	///       </term>
 	///       <description>
-	///         This is similar to the spheric grid, the only difference is that
-	///         values are not in absolute distance and angles, but in relative
-	///         number of spheres, parallels and meridians.
+	///         This is  similar to the  spheric grid,  the  only difference is
+	///         that values  are not  in absolute distance  and angles,  but in
+	///         relative number of spheres, parallels and meridians.
 	///       </description>
 	///     </item>
 	///   </list>
@@ -320,9 +320,18 @@ namespace GridFramework.Grids {
 		/// <value>
 		///   Polar angle between two parallels in radians.
 		/// </value>
+		/// <remarks>
+		///   <para>
+		///     When assigning a value only values of the form <c>π/n</c> are
+		///     valid, everything else will be rounded to the nearest possible
+		///     value.
+		///   </para>
+		/// </remarks>
 		public float Polar {
 			get {
 				return Mathf.PI / (Parallels - 1);
+			} set {
+				Parallels = Mathf.RoundToInt(Mathf.PI / value) + 1;
 			}
 		}
 	
@@ -332,9 +341,18 @@ namespace GridFramework.Grids {
 		/// <value>
 		///   Polar angle between two parallels in degrees.
 		/// </value>
+		/// <remarks>
+		///   <para>
+		///     When assigning a value only values of the form <c>360 / 2^n</c>
+		///     are valid, everything else will be rounded to the nearest
+		///     possible value.
+		///   </para>
+		/// </remarks>
 		public float PolarDeg {
 			get {
 				return 180f * Polar / Mathf.PI;
+			} set {
+				Polar = value * Mathf.PI / 180f;
 			}
 		}
 	
@@ -344,9 +362,18 @@ namespace GridFramework.Grids {
 		/// <value>
 		///   Azimuth angle between two meridians in radians.
 		/// </value>
+		/// <remarks>
+		///   <para>
+		///     When assigning a value only values of the form <c>2π / 2^n</c>
+		///     are valid, everything else will be rounded to the nearest
+		///     possible value.
+		///   </para>
+		/// </remarks>
 		public float Azimuth {
 			get {
 				return 2f * Mathf.PI / Meridians;
+			} set {
+				Meridians = Mathf.RoundToInt(2f * Mathf.PI / value);
 			}
 		}
 	
@@ -356,9 +383,18 @@ namespace GridFramework.Grids {
 		/// <value>
 		///   Azimuth angle between two meridians in degrees.
 		/// </value>
+		/// <remarks>
+		///   <para>
+		///     When assigning a value only values of the form <c>360 / 2^n</c>
+		///     are valid, everything else will be rounded to the nearest
+		///     possible value.
+		///   </para>
+		/// </remarks>
 		public float AzimuthDeg {
 			get {
 				return 180f * Azimuth / Mathf.PI;
+			} set {
+				Azimuth = value * Mathf.PI / 180f;
 			}
 		}
 #endregion  // Computed properties

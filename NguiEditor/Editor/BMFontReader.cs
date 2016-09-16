@@ -12,7 +12,7 @@ using System.Text;
 /// This functionality is not a part of BMFont anymore because Flash export option can't handle System.IO functions.
 /// </summary>
 
-public static class BMFontReader
+static public class BMFontReader
 {
 	/// <summary>
 	/// Helper function that retrieves the string value of the key=value pair.

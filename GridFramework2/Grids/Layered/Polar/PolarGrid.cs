@@ -176,17 +176,24 @@ namespace GridFramework.Grids {
 		/// </summary>
 		/// <remarks>
 		///   <para>
-		///     This is a read-only value derived from @c #Sectors. It gives
+		///     This is a read-only value derived from <c>Sectors</c>. It gives
 		///     you the angle within a sector in radians and it is a shorthand
 		///     writing for
 		///   </para>
 		///   <code>
 		///     (2f * Mathf.PI) / Sectors
 		///   </code>
+		///   <para>
+		///     When assigning a value only values of the form <c>2π / 2^n</c>
+		///     are valid, everything else will be rounded to the nearest
+		///     possible value.
+		///   </para>
 		/// </remarks>
 		public float Radians {
 			get {
-				return (2f * Mathf.PI) / Sectors;
+				return 2f * Mathf.PI / Sectors;
+			} set {
+				Sectors = Mathf.RoundToInt(2f * Mathf.PI / value);
 			}
 		}
 		
@@ -201,10 +208,17 @@ namespace GridFramework.Grids {
 		///   <code>
 		///     360f / Sectors
 		///   </code>
+		///   <para>
+		///     When assigning a value only values of the form <c>360 / 2^n</c>
+		///     are valid, everything else will be rounded to the nearest
+		///     possible value.
+		///   </para>
 		/// </remarks>
 		public float Degrees {
 			get {
 				return 360f / Sectors;
+			} set {
+				Sectors = Mathf.RoundToInt(360f / value);
 			}
 		}
 

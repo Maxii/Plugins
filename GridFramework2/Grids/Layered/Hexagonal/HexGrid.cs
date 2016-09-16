@@ -266,12 +266,17 @@ namespace GridFramework.Grids {
 		/// </summary>
 		/// <value>
 		///   <para>
-		///     Shorthand writing for <c>1.5f * Radius</c> (read-only).
+		///     Shorthand writing for <c>1.5f * Radius</c>. When setting the
+		///     value of this property you are implicitly setting the
+		///     <c>Radius</c> of the grid. Because this is a computed property
+		///     floating point rounding errors might apply.
 		///   </para>
 		/// </value>
 		public float Side {
 			get {
 				return Radius * 1.5f ;
+			} set {
+				Radius = value / 1.5f;
 			}
 		}
 
@@ -280,11 +285,16 @@ namespace GridFramework.Grids {
 		/// </summary>
 		/// <value>
 		///   This is the full vertical height of a hex, the distance from one
-		///   edge to its opposite (<c>sqrt(3) * Radius</c>).
+		///   edge to its opposite (<c>sqrt(3) * Radius</c>). When setting the
+		///   value of this property you are implicitly setting the
+		///   <c>Radius</c> of the grid. Because this is a computed property
+		///   floating point rounding errors might apply.
 		/// </value>
 		public float Height {
 			get {
 				return Radius * Mathf.Sqrt(3f);
+			} set {
+				Radius = value / Mathf.Sqrt(3f);
 			}
 		}
 
@@ -293,11 +303,16 @@ namespace GridFramework.Grids {
 		/// </summary>
 		/// <value>
 		///   This is the full horizontal width of a hex, the distance from one
-		///   vertex to its opposite (<c>2 * Radius</c>).
+		///   vertex to its opposite (<c>2 * Radius</c>). When setting the
+		///   value of this property you are implicitly setting the
+		///   <c>Radius</c> of the grid. Because this is a computed property
+		///   floating point rounding errors might apply.
 		/// </value>
 		public float Width {
 			get {
 				return Radius * 2f;
+			} set {
+				Radius = value / 2f;
 			}
 		}
 

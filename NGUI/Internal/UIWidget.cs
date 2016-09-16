@@ -35,7 +35,7 @@ public class UIWidget : UIRect
 	[HideInInspector][SerializeField] protected int mDepth = 0;
 
 	public delegate void OnDimensionsChanged ();
-	public delegate void OnPostFillCallback (UIWidget widget, int bufferOffset, BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color32> cols);
+	public delegate void OnPostFillCallback (UIWidget widget, int bufferOffset, BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols);
 
 	/// <summary>
 	/// Notification triggered when the widget's dimensions or position changes.
@@ -909,14 +909,6 @@ public class UIWidget : UIRect
 		{
 			base.OnValidate();
 
-			// Prior to NGUI 2.7.0 width and height was specified as transform's local scale
-			if ((mWidth == 100 || mWidth == minWidth) &&
-				(mHeight == 100 || mHeight == minHeight) && cachedTransform.localScale.magnitude > 8f)
-			{
-				UpgradeFrom265();
-				cachedTransform.localScale = Vector3.one;
-			}
-
 			if (mWidth < minWidth) mWidth = minWidth;
 			if (mHeight < minHeight) mHeight = minHeight;
 			if (autoResizeBoxCollider) ResizeCollider();
@@ -1057,16 +1049,6 @@ public class UIWidget : UIRect
 		base.OnInit();
 		RemoveFromPanel();
 		mMoved = true;
-
-		// Prior to NGUI 2.7.0 width and height was specified as transform's local scale
-		if (mWidth == 100 && mHeight == 100 && cachedTransform.localScale.magnitude > 8f)
-		{
-			UpgradeFrom265();
-			cachedTransform.localScale = Vector3.one;
-#if UNITY_EDITOR
-			NGUITools.SetDirty(this);
-#endif
-		}
 		Update();
 	}
 
@@ -1351,7 +1333,7 @@ public class UIWidget : UIRect
 
 			// Draw the gizmo
 			Gizmos.matrix = cachedTransform.localToWorldMatrix;
-			Gizmos.color = (UnityEditor.Selection.activeGameObject == cachedTransform) ? Color.white : outline;
+			Gizmos.color = (UnityEditor.Selection.activeGameObject == gameObject) ? Color.white : outline;
 			Gizmos.DrawWireCube(center, size);
 
 			// Make the widget selectable
@@ -1512,7 +1494,7 @@ public class UIWidget : UIRect
 	/// Append the local geometry buffers to the specified ones.
 	/// </summary>
 
-	public void WriteToBuffers (BetterList<Vector3> v, BetterList<Vector2> u, BetterList<Color32> c, BetterList<Vector3> n, BetterList<Vector4> t)
+	public void WriteToBuffers (BetterList<Vector3> v, BetterList<Vector2> u, BetterList<Color> c, BetterList<Vector3> n, BetterList<Vector4> t)
 	{
 		geometry.WriteToBuffers(v, u, c, n, t);
 	}
@@ -1555,7 +1537,7 @@ public class UIWidget : UIRect
 	/// Virtual function called by the UIPanel that fills the buffers.
 	/// </summary>
 
-	virtual public void OnFill(BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color32> cols)
+	virtual public void OnFill(BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols)
 	{
 		// Call this in your derived classes:
 		//if (onPostFill != null)

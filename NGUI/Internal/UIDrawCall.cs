@@ -54,7 +54,7 @@ public class UIDrawCall : MonoBehaviour
 	[HideInInspector][System.NonSerialized] public BetterList<Vector3> norms = new BetterList<Vector3>();
 	[HideInInspector][System.NonSerialized] public BetterList<Vector4> tans = new BetterList<Vector4>();
 	[HideInInspector][System.NonSerialized] public BetterList<Vector2> uvs = new BetterList<Vector2>();
-	[HideInInspector][System.NonSerialized] public BetterList<Color32> cols = new BetterList<Color32>();
+	[HideInInspector][System.NonSerialized] public BetterList<Color> cols = new BetterList<Color>();
 
 	Material		mMaterial;		// Material used by this draw call
 	Texture			mTexture;		// Main texture used by the material
@@ -133,9 +133,24 @@ public class UIDrawCall : MonoBehaviour
 
 	public string sortingLayerName
 	{
-		get { return (mRenderer != null) ? mRenderer.sortingLayerName : null; }
-		set { if (mRenderer != null && mRenderer.sortingLayerName != value) mRenderer.sortingLayerName = value; }
+		get
+		{
+			if (!string.IsNullOrEmpty(mSortingLayerName)) return mSortingLayerName;
+			if (mRenderer == null) return null;
+			mSortingLayerName = mRenderer.sortingLayerName;
+			return mSortingLayerName;
+		}
+		set
+		{
+			if (mRenderer != null && mSortingLayerName != value)
+			{
+				mSortingLayerName = value;
+				mRenderer.sortingLayerName = value;
+			}
+		}
 	}
+
+	[System.NonSerialized] string mSortingLayerName;
 
 	/// <summary>
 	/// Final render queue used to draw the draw call's geometry.
@@ -389,6 +404,8 @@ public class UIDrawCall : MonoBehaviour
 		}
 	}
 
+	static ColorSpace mColorSpace = ColorSpace.Uninitialized;
+
 	/// <summary>
 	/// Set the draw call's geometry.
 	/// </summary>
@@ -401,6 +418,22 @@ public class UIDrawCall : MonoBehaviour
 		// Safety check to ensure we get valid values
 		if (count > 0 && (count == uvs.size && count == cols.size) && (count % 4) == 0)
 		{
+			if (mColorSpace == ColorSpace.Uninitialized)
+				mColorSpace = QualitySettings.activeColorSpace;
+
+			if (mColorSpace == ColorSpace.Linear)
+			{
+				for (int i = 0; i < cols.size; ++i)
+				{
+					var c = cols[i];
+					c.r = Mathf.GammaToLinearSpace(c.r);
+					c.g = Mathf.GammaToLinearSpace(c.g);
+					c.b = Mathf.GammaToLinearSpace(c.b);
+					c.a = Mathf.GammaToLinearSpace(c.a);
+					cols[i] = c;
+				}
+			}
+
 			// Cache all components
 			if (mFilter == null) mFilter = gameObject.GetComponent<MeshFilter>();
 			if (mFilter == null) mFilter = gameObject.AddComponent<MeshFilter>();
@@ -449,7 +482,7 @@ public class UIDrawCall : MonoBehaviour
 
 					mMesh.vertices = verts.ToArray();
 					mMesh.uv = uvs.ToArray();
-					mMesh.colors32 = cols.ToArray();
+					mMesh.colors = cols.ToArray();
 
 					if (norms != null) mMesh.normals = norms.ToArray();
 					if (tans != null) mMesh.tangents = tans.ToArray();
@@ -464,7 +497,7 @@ public class UIDrawCall : MonoBehaviour
 
 					mMesh.vertices = verts.buffer;
 					mMesh.uv = uvs.buffer;
-					mMesh.colors32 = cols.buffer;
+					mMesh.colors = cols.buffer;
 
 					if (norms != null) mMesh.normals = norms.buffer;
 					if (tans != null) mMesh.tangents = tans.buffer;
@@ -480,7 +513,7 @@ public class UIDrawCall : MonoBehaviour
 
 				mMesh.vertices = verts.ToArray();
 				mMesh.uv = uvs.ToArray();
-				mMesh.colors32 = cols.ToArray();
+				mMesh.colors = cols.ToArray();
 
 				if (norms != null) mMesh.normals = norms.ToArray();
 				if (tans != null) mMesh.tangents = tans.ToArray();

@@ -3,43 +3,38 @@ using System.Collections;
 
 public class MF_SelectionRepeater : MonoBehaviour {
 
-	// allows objects with more than one collider to have multiple clickable colliders. Click are sent to a single selection script.
+	// allows objects with more than one collider to have multiple clickable colliders. Clicks are sent to a single selection script.
 
-	public GameObject selectScriptObject;
+	public MF_AbstractSelection selectionScript;
 
-	MF_AbstractSelection selectionScript;
 	bool error;
 
 	void Start () {
 		if ( CheckErrors() == true ) { return; }
 	}
 
-	// send click to the main selection script of this object
+	// send OnMouseOver to the designated selection script
 	void OnMouseDown () {
-		if (error) { return; }
-		selectionScript.OnMouseOver();
+		if ( error == true ) { return; }
+
+		if (selectionScript) {
+			selectionScript.OnMouseOver();
+		}
 	}
 
-	bool CheckErrors () {
+	public virtual bool CheckErrors () {
 		error = false;
-		string _object = transform.root.name;
 		
 		Transform rps;
-
-		if ( selectScriptObject ) {
-			if ( selectScriptObject.GetComponent<MF_AbstractSelection>() ) {
-				selectionScript = selectScriptObject.GetComponent<MF_AbstractSelection>();
-			} else {
-				Debug.Log(_object+": Selection script not found on defined object: "+selectScriptObject); error = true;
-			}
-		} else {
-			rps = UtilityMF.RecursiveParentSearch( "MF_AbstractSelection", transform );
+		if ( !selectionScript ) {
+			rps = UtilityMF.RecursiveParentComponentSearch( "MF_AbstractSelection", transform );
 			if ( rps != null ) {
 				selectionScript = rps.GetComponent<MF_AbstractSelection>();
 			} else {
-				Debug.Log(_object+": Selection script not found."); error = true;
+				Debug.Log( this+": No selection script found."); error = true;
 			}
 		}
+
 		return error;
 	}
 }

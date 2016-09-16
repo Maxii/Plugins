@@ -1,5 +1,5 @@
-// Version 5.2
-// ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.3
+// ©2016 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using System.Collections.Generic;
@@ -7,7 +7,7 @@ using Vectrosity;
 
 namespace Vectrosity {
 public class VectorManager {
-
+	
 	public static float minBrightnessDistance = 500.0f;
 	public static float maxBrightnessDistance = 250.0f;
 	static int brightnessLevels = 32;
@@ -33,7 +33,7 @@ public class VectorManager {
 	
 	public static void ObjectSetup (GameObject go, VectorLine line, Visibility visibility, Brightness brightness) {
 		ObjectSetup (go, line, visibility, brightness, true);
-	}	
+	}
 	
 	public static void ObjectSetup (GameObject go, VectorLine line, Visibility visibility, Brightness brightness, bool makeBounds) {
 		var vc = go.GetComponent(typeof(VisibilityControl)) as VisibilityControl;
@@ -41,18 +41,24 @@ public class VectorManager {
 		var vca = go.GetComponent(typeof(VisibilityControlAlways)) as VisibilityControlAlways;
 		var bc = go.GetComponent(typeof(BrightnessControl)) as BrightnessControl;
 				
-		if (visibility == Visibility.None) {
-			if (vc) {
-				MonoBehaviour.Destroy(vc);
-			}
+		if (vc) {
+			MonoBehaviour.Destroy (vc);
+		}
+		if (vcs) {
+			MonoBehaviour.Destroy (vcs);
+		}
+		if (vca) {
+			MonoBehaviour.Destroy (vca);
+		}
+		
+		if (visibility == Visibility.Dynamic) {
 			if (vcs) {
-				MonoBehaviour.Destroy(vcs);
+				vcs.DontDestroyLine();
+				ResetLinePoints (vcs, line);
 			}
 			if (vca) {
-				MonoBehaviour.Destroy(vca);
+				vca.DontDestroyLine();
 			}
-		}
-		if (visibility == Visibility.Dynamic) {
 			if (vc == null) {
 				vc = go.AddComponent (typeof(VisibilityControl)) as VisibilityControl;
 				vc.Setup (line, makeBounds);
@@ -62,6 +68,12 @@ public class VectorManager {
 			}
 		}
 		else if (visibility == Visibility.Static) {
+			if (vc) {
+				vc.DontDestroyLine();
+			}
+			if (vca) {
+				vca.DontDestroyLine();
+			}
 			if (vcs == null) {
 				vcs = go.AddComponent (typeof(VisibilityControlStatic)) as VisibilityControlStatic;
 				vcs.Setup (line, makeBounds);
@@ -71,6 +83,13 @@ public class VectorManager {
 			}
 		}
 		else if (visibility == Visibility.Always) {
+			if (vc) {
+				vc.DontDestroyLine();
+			}
+			if (vcs) {
+				vcs.DontDestroyLine();
+				ResetLinePoints (vcs, line);
+			}
 			if (vca == null) {
 				vca = go.AddComponent (typeof(VisibilityControlAlways)) as VisibilityControlAlways;
 				vca.Setup (line);
@@ -79,6 +98,7 @@ public class VectorManager {
 				}
 			}
 		}
+		
 		if (brightness == Brightness.Fog) {
 			if (bc == null) {
 				bc = go.AddComponent (typeof(BrightnessControl)) as BrightnessControl;
@@ -97,6 +117,13 @@ public class VectorManager {
 		}
 	}
 	
+	static void ResetLinePoints (VisibilityControlStatic vcs, VectorLine line) {
+		Matrix4x4 thisMatrix = vcs.GetMatrix().inverse;
+		for (int i = 0; i < line.points3.Count; i++) {
+			line.points3[i] = thisMatrix.MultiplyPoint3x4 (line.points3[i]);
+		}
+	}
+	
 	// It's quite a bit simpler just to have each VisibilityControlStatic script do its own check...however, running a lot of LateUpdate instances
 	// is a fair bit slower than just running a centralized instance that checks all objects in a loop.
 	// Hence it's worth the bother of tracking some Lists.
@@ -112,6 +139,7 @@ public class VectorManager {
 			vectorLines = new List<VectorLine>();
 			objectNumbers = new List<RefInt>();
 		}
+		line.drawTransform = null;
 		vectorLines.Add (line);
 		objectNum = new RefInt(_arrayCount++); 
 		objectNumbers.Add (objectNum);
@@ -305,7 +333,7 @@ public class VectorManager {
 		}
 		
 		bounds.min = min;
-		bounds.max = max;		
+		bounds.max = max;
 		return bounds;
 	}
 	

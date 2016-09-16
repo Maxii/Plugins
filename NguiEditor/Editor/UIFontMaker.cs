@@ -188,12 +188,8 @@ public class UIFontMaker : EditorWindow
 			{
 				if (!FreeType.isPresent)
 				{
-#if UNITY_4_3 || UNITY_4_5 || UNITY_4_6 || UNITY_4_7
 					string filename = (Application.platform == RuntimePlatform.WindowsEditor) ? "FreeType.dll" : "FreeType.dylib";
-#else
-					string filename = (Application.platform == RuntimePlatform.WindowsEditor) ? "FreeType64.dll" : "FreeType64.dylib";
-#endif
-					EditorGUILayout.HelpBox("Assets/NGUI/Editor/" + filename + " is missing", MessageType.Error);
+					EditorGUILayout.HelpBox(filename + " is missing", MessageType.Error);
 
 					GUILayout.BeginHorizontal();
 					GUILayout.Space(20f);

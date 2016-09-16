@@ -10,7 +10,7 @@ using System.IO;
 /// This class contains NGUI's extensions to Unity Editor's functionality.
 /// </summary>
 
-public static class NGUIEditorExtensions
+static public class NGUIEditorExtensions
 {
 	/// <summary>
 	/// Render the camera into a render texture. If the camera has a render texture assigned, it will be re-used.

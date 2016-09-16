@@ -9,6 +9,10 @@ namespace GridFramework.Editor {
 	[CustomEditor (typeof(SphereGrid))]
 	public class SphereGridEditor : UnityEditor.Editor {
 #region  Private variables
+		// Whether to display the computed properties
+		[SerializeField]
+		private static bool _showProps = true;
+
 		private static readonly string _docsURL =
 			"file://" + Application.dataPath
 			+ "/Plugins/GridFramework/Documentation/html/"
@@ -23,19 +27,47 @@ namespace GridFramework.Editor {
 		}
 
 		public override void OnInspectorGUI() {
-			_grid.Radius = EditorGUILayout.FloatField("Radius"   , _grid.Radius   );
+			MainFields();
 
-			_grid.Parallels = EditorGUILayout.IntField("Parallels", _grid.Parallels);
-			_grid.Meridians = EditorGUILayout.IntField("Meridians", _grid.Meridians);
+			_showProps =
+				EditorGUILayout.Foldout(_showProps, "Computed Properties");
 
-			EditorGUILayout.LabelField("Polar angle"  , _grid.Polar   / Mathf.PI + "\u03c0 = " + _grid.PolarDeg   + "\u00b0");
-			EditorGUILayout.LabelField("Azimuth angle", _grid.Azimuth / Mathf.PI + "\u03c0 = " + _grid.AzimuthDeg + "\u00b0");
+			if (_showProps) {
+				++EditorGUI.indentLevel;
+				PolarFields();
+				AzimuthFields();
+				--EditorGUI.indentLevel;
+			}
 
 			if (GUI.changed) {
 				EditorUtility.SetDirty(target);
 			}
 		}
 #endregion  // Callback methods
+
+#region  Field methods
+		private void MainFields() {
+			_grid.Radius    = EditorGUILayout.FloatField("Radius"   , _grid.Radius   );
+			_grid.Parallels = EditorGUILayout.IntField(  "Parallels", _grid.Parallels);
+			_grid.Meridians = EditorGUILayout.IntField(  "Meridians", _grid.Meridians);
+		}
+
+		private void PolarFields() {
+			_grid.Polar = EditorGUILayout.FloatField("Polar", _grid.Polar);
+			_grid.Polar /= Mathf.PI;
+			_grid.Polar = EditorGUILayout.FloatField("Polar (in \u03c0)", _grid.Polar);
+			_grid.Polar *= Mathf.PI;
+			_grid.PolarDeg = EditorGUILayout.FloatField("Polar (degrees)", _grid.PolarDeg);
+		}
+
+		private void AzimuthFields() {
+			_grid.Azimuth = EditorGUILayout.FloatField("Azimuth", _grid.Azimuth);
+			_grid.Azimuth /= Mathf.PI;
+			_grid.Azimuth = EditorGUILayout.FloatField("Azimuth (in \u03c0)", _grid.Azimuth);
+			_grid.Azimuth *= Mathf.PI;
+			_grid.AzimuthDeg = EditorGUILayout.FloatField("Azimuth (degrees)", _grid.AzimuthDeg);
+		}
+#endregion  // Field methods
 
 #region  Menu items
 		[MenuItem ("CONTEXT/PolarGrid/Help")]

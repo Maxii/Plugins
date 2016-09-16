@@ -175,7 +175,7 @@ public class UIDragDropItem : MonoBehaviour
 			if (cloneOnDrag)
 			{
 				mPressed = false;
-				GameObject clone = NGUITools.AddChild(transform.parent.gameObject, gameObject);
+				GameObject clone = transform.parent.gameObject.AddChild(gameObject);
 				clone.transform.localPosition = transform.localPosition;
 				clone.transform.localRotation = transform.localRotation;
 				clone.transform.localScale = transform.localScale;
@@ -229,7 +229,8 @@ public class UIDragDropItem : MonoBehaviour
 	{
 		if (!interactable) return;
 		if (!mDragging || !enabled || mTouch != UICamera.currentTouch) return;
-		OnDragDropMove(delta * mRoot.pixelSizeAdjustment);
+		if (mRoot != null) OnDragDropMove(delta * mRoot.pixelSizeAdjustment);
+		else OnDragDropMove(delta);
 	}
 
 	/// <summary>

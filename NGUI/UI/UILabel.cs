@@ -35,6 +35,14 @@ public class UILabel : UIWidget
 		Always,
 	}
 
+	public enum Modifier
+	{
+		None,
+		ToUppercase,
+		ToLowercase,
+		Custom = 255,
+	}
+
 	/// <summary>
 	/// Whether the label will keep its content crisp even when shrunk.
 	/// You may want to turn this off on mobile devices.
@@ -68,6 +76,8 @@ public class UILabel : UIWidget
 	[HideInInspector][SerializeField] float mFloatSpacingX = 0;
 	[HideInInspector][SerializeField] float mFloatSpacingY = 0;
 	[HideInInspector][SerializeField] bool mOverflowEllipsis = false;
+	[HideInInspector][SerializeField] int mOverflowWidth = 0;
+	[HideInInspector][SerializeField] Modifier mModifier = Modifier.None;
 
 	// Obsolete values
 	[HideInInspector][SerializeField] bool mShrinkToFit = false;
@@ -551,6 +561,27 @@ public class UILabel : UIWidget
 	}
 
 	/// <summary>
+	/// Maximum width used when Resize Freely overflow type is enabled.
+	/// If the printed text exceeds this width, it will wrap onto the following line.
+	/// </summary>
+
+	public int overflowWidth
+	{
+		get
+		{
+			return mOverflowWidth;
+		}
+		set
+		{
+			if (mOverflowWidth != value)
+			{
+				mOverflowWidth = value;
+				MarkAsChanged();
+			}
+		}
+	}
+
+	/// <summary>
 	/// Whether the label will use the printed size instead of font size when printing the label.
 	/// It's a dynamic font feature that will ensure that the text is crisp when shrunk.
 	/// </summary>
@@ -866,6 +897,34 @@ public class UILabel : UIWidget
 
 	bool isValid { get { return mFont != null || mTrueTypeFont != null; } }
 
+	/// <summary>
+	/// Custom text modifier that can transform the visible text when the label's text is assigned.
+	/// </summary>
+
+	public ModifierFunc customModifier;
+	public delegate string ModifierFunc (string s);
+
+	/// <summary>
+	/// Text modifier can transform the text that's actually printed, without altering the label's text value.
+	/// </summary>
+
+	public Modifier modifier
+	{
+		get
+		{
+			return mModifier;
+		}
+		set
+		{
+			if (mModifier != value)
+			{
+				mModifier = value;
+				MarkAsChanged();
+				ProcessAndRequest();
+			}
+		}
+	}
+
 	static BetterList<UILabel> mList = new BetterList<UILabel>();
 	static Dictionary<Font, int> mFontUsage = new Dictionary<Font, int>();
 
@@ -945,6 +1004,25 @@ public class UILabel : UIWidget
 	}
 
 	/// <summary>
+	/// Label's actual printed text may be modified before being drawn.
+	/// </summary>
+
+	public string printedText
+	{
+		get
+		{
+			if (!string.IsNullOrEmpty(mText))
+			{
+				if (mModifier == Modifier.None) return mText;
+				if (mModifier == Modifier.ToLowercase) return mText.ToLower();
+				if (mModifier == Modifier.ToUppercase) return mText.ToUpper();
+				if (mModifier == Modifier.Custom && customModifier != null) return customModifier(mText);
+			}
+			return mText;
+		}
+	}
+
+	/// <summary>
 	/// Notification called when the Unity's font's texture gets rebuilt.
 	/// Unity's font has a nice tendency to simply discard other characters when the texture's dimensions change.
 	/// By requesting them inside the notification callback, we immediately force them back in.
@@ -965,7 +1043,7 @@ public class UILabel : UIWidget
 
 				if (fnt == font)
 				{
-					fnt.RequestCharactersInTexture(lbl.mText, lbl.mFinalFontSize, lbl.mFontStyle);
+					fnt.RequestCharactersInTexture(lbl.printedText, lbl.mFinalFontSize, lbl.mFontStyle);
 					lbl.MarkAsChanged();
 
 					if (lbl.panel == null)
@@ -1221,6 +1299,12 @@ public class UILabel : UIWidget
 		{
 			NGUIText.rectWidth = 1000000;
 			NGUIText.regionWidth = 1000000;
+
+			if (mOverflowWidth > 0)
+			{
+				NGUIText.rectWidth = Mathf.Min(NGUIText.rectWidth, mOverflowWidth);
+				NGUIText.regionWidth = Mathf.Min(NGUIText.regionWidth, mOverflowWidth);
+			}
 		}
 
 		if (mOverflow == Overflow.ResizeFreely || mOverflow == Overflow.ResizeHeight)
@@ -1250,7 +1334,7 @@ public class UILabel : UIWidget
 				NGUIText.Update(false);
 
 				// Wrap the text
-				bool fits = NGUIText.WrapText(mText, out mProcessedText, true, false,
+				bool fits = NGUIText.WrapText(printedText, out mProcessedText, true, false,
 					mOverflowEllipsis && mOverflow == Overflow.ClampContent);
 
 				if (mOverflow == Overflow.ShrinkContent && !fits)
@@ -1262,20 +1346,33 @@ public class UILabel : UIWidget
 				{
 					mCalculatedSize = NGUIText.CalculatePrintedSize(mProcessedText);
 
-					mWidth = Mathf.Max(minWidth, Mathf.RoundToInt(mCalculatedSize.x));
-					if (regionX != 1f) mWidth = Mathf.RoundToInt(mWidth / regionX);
-					mHeight = Mathf.Max(minHeight, Mathf.RoundToInt(mCalculatedSize.y));
-					if (regionY != 1f) mHeight = Mathf.RoundToInt(mHeight / regionY);
+					int w = Mathf.Max(minWidth, Mathf.RoundToInt(mCalculatedSize.x));
+					if (regionX != 1f) w = Mathf.RoundToInt(w / regionX);
+					int h = Mathf.Max(minHeight, Mathf.RoundToInt(mCalculatedSize.y));
+					if (regionY != 1f) h = Mathf.RoundToInt(h / regionY);
 
-					if ((mWidth & 1) == 1) ++mWidth;
-					if ((mHeight & 1) == 1) ++mHeight;
+					if ((w & 1) == 1) ++w;
+					if ((h & 1) == 1) ++h;
+
+					if (mWidth != w || mHeight != h)
+					{
+						mWidth = w;
+						mHeight = h;
+						if (onChange != null) onChange();
+					}
 				}
 				else if (mOverflow == Overflow.ResizeHeight)
 				{
 					mCalculatedSize = NGUIText.CalculatePrintedSize(mProcessedText);
-					mHeight = Mathf.Max(minHeight, Mathf.RoundToInt(mCalculatedSize.y));
-					if (regionY != 1f) mHeight = Mathf.RoundToInt(mHeight / regionY);
-					if ((mHeight & 1) == 1) ++mHeight;
+					int h = Mathf.Max(minHeight, Mathf.RoundToInt(mCalculatedSize.y));
+					if (regionY != 1f) h = Mathf.RoundToInt(h / regionY);
+					if ((h & 1) == 1) ++h;
+
+					if (mHeight != h)
+					{
+						mHeight = h;
+						if (onChange != null) onChange();
+					}
 				}
 				else
 				{
@@ -1458,16 +1555,18 @@ public class UILabel : UIWidget
 
 	public string GetWordAtCharacterIndex (int characterIndex)
 	{
-		if (characterIndex != -1 && characterIndex < mText.Length)
+		string s = printedText;
+
+		if (characterIndex != -1 && characterIndex < s.Length)
 		{
 #if UNITY_FLASH
-			int wordStart = LastIndexOfAny(mText, new char[] { ' ', '\n' }, characterIndex) + 1;
-			int wordEnd = IndexOfAny(mText, new char[] { ' ', '\n', ',', '.' }, characterIndex);
+			int wordStart = LastIndexOfAny(s, new char[] { ' ', '\n' }, characterIndex) + 1;
+			int wordEnd = IndexOfAny(s, new char[] { ' ', '\n', ',', '.' }, characterIndex);
 #else
-			int wordStart = mText.LastIndexOfAny(new char[] {' ', '\n'}, characterIndex) + 1;
-			int wordEnd = mText.IndexOfAny(new char[] { ' ', '\n', ',', '.' }, characterIndex);
+			int wordStart = s.LastIndexOfAny(new char[] {' ', '\n'}, characterIndex) + 1;
+			int wordEnd = s.IndexOfAny(new char[] { ' ', '\n', ',', '.' }, characterIndex);
 #endif
-			if (wordEnd == -1) wordEnd = mText.Length;
+			if (wordEnd == -1) wordEnd = s.Length;
 
 			if (wordStart != wordEnd)
 			{
@@ -1475,7 +1574,7 @@ public class UILabel : UIWidget
 
 				if (len > 0)
 				{
-					string word = mText.Substring(wordStart, len);
+					string word = s.Substring(wordStart, len);
 					return NGUIText.StripSymbols(word);
 				}
 			}
@@ -1547,30 +1646,32 @@ public class UILabel : UIWidget
 
 	public string GetUrlAtCharacterIndex (int characterIndex)
 	{
-		if (characterIndex != -1 && characterIndex < mText.Length - 6)
+		string s = printedText;
+
+		if (characterIndex != -1 && characterIndex < s.Length - 6)
 		{
 			int linkStart;
 
 			// LastIndexOf() fails if the string happens to begin with the expected text
-			if (mText[characterIndex] == '[' &&
-				mText[characterIndex + 1] == 'u' &&
-				mText[characterIndex + 2] == 'r' &&
-				mText[characterIndex + 3] == 'l' &&
-				mText[characterIndex + 4] == '=')
+			if (s[characterIndex] == '[' &&
+				s[characterIndex + 1] == 'u' &&
+				s[characterIndex + 2] == 'r' &&
+				s[characterIndex + 3] == 'l' &&
+				s[characterIndex + 4] == '=')
 			{
 				linkStart = characterIndex;
 			}
-			else linkStart = mText.LastIndexOf("[url=", characterIndex);
+			else linkStart = s.LastIndexOf("[url=", characterIndex);
 			
 			if (linkStart == -1) return null;
 
 			linkStart += 5;
-			int linkEnd = mText.IndexOf("]", linkStart);
+			int linkEnd = s.IndexOf("]", linkStart);
 			if (linkEnd == -1) return null;
 
-			int urlEnd = mText.IndexOf("[/url]", linkEnd);
+			int urlEnd = s.IndexOf("[/url]", linkEnd);
 			if (urlEnd == -1 || characterIndex <= urlEnd)
-				return mText.Substring(linkStart, linkEnd - linkStart);
+				return s.Substring(linkStart, linkEnd - linkStart);
 		}
 		return null;
 	}
@@ -1657,7 +1758,7 @@ public class UILabel : UIWidget
 			{
 				ApplyOffset(highlight.verts, startingVertices);
 
-				Color32 c = new Color(highlightColor.r, highlightColor.g, highlightColor.b, highlightColor.a * alpha);
+				Color c = new Color(highlightColor.r, highlightColor.g, highlightColor.b, highlightColor.a * alpha);
 
 				for (int i = startingVertices; i < highlight.verts.size; ++i)
 				{
@@ -1670,7 +1771,7 @@ public class UILabel : UIWidget
 
 		// Fill the caret UVs and colors
 		ApplyOffset(caret.verts, startingCaretVerts);
-		Color32 cc = new Color(caretColor.r, caretColor.g, caretColor.b, caretColor.a * alpha);
+		Color cc = new Color(caretColor.r, caretColor.g, caretColor.b, caretColor.a * alpha);
 
 		for (int i = startingCaretVerts; i < caret.verts.size; ++i)
 		{
@@ -1686,7 +1787,7 @@ public class UILabel : UIWidget
 	/// Draw the label.
 	/// </summary>
 
-	public override void OnFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color32> cols)
+	public override void OnFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols)
 	{
 		if (!isValid) return;
 
@@ -1695,14 +1796,6 @@ public class UILabel : UIWidget
 		col.a = finalAlpha;
 		
 		if (mFont != null && mFont.premultipliedAlphaShader) col = NGUITools.ApplyPMA(col);
-
-		if (QualitySettings.activeColorSpace == ColorSpace.Linear)
-		{
-			col.r = Mathf.GammaToLinearSpace(col.r);
-			col.g = Mathf.GammaToLinearSpace(col.g);
-			col.b = Mathf.GammaToLinearSpace(col.b);
-			col.a = Mathf.GammaToLinearSpace(col.a);
-		}
 
 		string text = processedText;
 		int start = verts.size;
@@ -1812,21 +1905,12 @@ public class UILabel : UIWidget
 	/// Apply a shadow effect to the buffer.
 	/// </summary>
 
-	public void ApplyShadow (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color32> cols, int start, int end, float x, float y)
+	public void ApplyShadow (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols, int start, int end, float x, float y)
 	{
 		Color c = mEffectColor;
 		c.a *= finalAlpha;
 		if (bitmapFont != null && bitmapFont.premultipliedAlphaShader) c = NGUITools.ApplyPMA(c);
-
-		if (QualitySettings.activeColorSpace == ColorSpace.Linear)
-		{
-			c.r = Mathf.GammaToLinearSpace(c.r);
-			c.g = Mathf.GammaToLinearSpace(c.g);
-			c.b = Mathf.GammaToLinearSpace(c.b);
-			c.a = Mathf.GammaToLinearSpace(c.a);
-		}
-
-		Color32 col = c;
+		Color col = c;
 
 		for (int i = start; i < end; ++i)
 		{
@@ -1839,17 +1923,16 @@ public class UILabel : UIWidget
 			v.y += y;
 			verts.buffer[i] = v;
 
-			Color32 uc = cols.buffer[i];
+			Color uc = cols.buffer[i];
 
-			if (uc.a == 255)
+			if (uc.a == 1f)
 			{
 				cols.buffer[i] = col;
 			}
 			else
 			{
 				Color fc = c;
-				fc.a = (uc.a / 255f * c.a);
-				if (QualitySettings.activeColorSpace == ColorSpace.Linear) fc.a = Mathf.GammaToLinearSpace(fc.a);
+				fc.a = uc.a * c.a;
 				cols.buffer[i] = fc;
 			}
 		}

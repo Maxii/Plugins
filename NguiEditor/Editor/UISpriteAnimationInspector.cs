@@ -24,6 +24,7 @@ public class UISpriteAnimationInspector : Editor
 		NGUIEditorTools.SetLabelWidth(80f);
 		serializedObject.Update();
 
+		NGUIEditorTools.DrawProperty("Frame Index", serializedObject, "frameIndex");
 		NGUIEditorTools.DrawProperty("Framerate", serializedObject, "mFPS");
 		NGUIEditorTools.DrawProperty("Name Prefix", serializedObject, "mPrefix");
 		NGUIEditorTools.DrawProperty("Loop", serializedObject, "mLoop");

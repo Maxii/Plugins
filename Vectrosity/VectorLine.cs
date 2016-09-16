@@ -1,5 +1,5 @@
-// Version 5.2.2
-// ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.3
+// ©2016 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -17,7 +17,7 @@ enum CanvasState {None, OnCanvas, OffCanvas}
 [System.Serializable]
 public partial class VectorLine {
 	public static string Version () {
-		return "Vectrosity version 5.2.2";
+		return "Vectrosity version 5.3";
 	}
 	
 	[SerializeField]
@@ -358,13 +358,19 @@ public partial class VectorLine {
 				Debug.LogError ("LineType.Points can't use end caps");
 				return;
 			}
+			if (m_endCap == value) {
+				return;
+			}
 			if (value == null || value == "") {
 				RemoveEndCap();
-				return;				
+				return;
 			}
 			if (capDictionary == null || !capDictionary.ContainsKey (value)) {
 				Debug.LogError ("End cap \"" + value + "\" is not set up");
 				return;
+			}
+			if (m_capType != EndCap.None) {
+				RemoveEndCap();
 			}
 			m_endCap = value;
 			m_capType = capDictionary[value].capType;
@@ -379,7 +385,11 @@ public partial class VectorLine {
 	Color32 m_frontColor;
 	[SerializeField]
 	Color32 m_backColor;
-	
+	[SerializeField]
+	int m_frontEndCapIndex = -1;
+	[SerializeField]
+	int m_backEndCapIndex = -1;
+		
 	[SerializeField]
 	float m_lineUVBottom;
 	[SerializeField]
@@ -464,14 +474,14 @@ public partial class VectorLine {
 		get {
 			if (m_canvasState == CanvasState.OffCanvas) {
 				Debug.LogError ("VectorLine.drawDepth can't be used with lines made with Draw3D");
-				return 0;			
+				return 0;
 			}
 			return m_go.transform.GetSiblingIndex();
 		}
 		set {
 			if (m_canvasState == CanvasState.OffCanvas) {
 				Debug.LogError ("VectorLine.drawDepth can't be used with lines made with Draw3D");
-				return;			
+				return;
 			}
 			m_go.transform.SetSiblingIndex (value);
 		}
@@ -765,7 +775,7 @@ public partial class VectorLine {
 			m_lineTriangles[i-3] = 0; m_lineTriangles[i-2] = 0; m_lineTriangles[i-1] = 0;
 		}
 		if (updateTris && m_vectorObject != null) {
-			m_vectorObject.UpdateTris();			
+			m_vectorObject.UpdateTris();
 		}
 	}
 	
@@ -954,13 +964,12 @@ public partial class VectorLine {
 				System.Array.Resize (ref m_screenPoints, baseArrayLength*4);
 			}
 		}
-		
 		if (m_lineWidths.Length > 1) {
 			if (m_lineType != LineType.Points) {
 				baseArrayLength = (m_lineType == LineType.Continuous)? baseArrayLength-1 : baseArrayLength/2;
 			}
 			if (baseArrayLength > m_lineWidths.Length) {
-				System.Array.Resize (ref m_lineWidths, baseArrayLength);
+				ResizeLineWidths (baseArrayLength);
 			}
 		}
 		
@@ -972,9 +981,6 @@ public partial class VectorLine {
 		if (m_pointsCount > originalSegmentCount) {
 			SetColor (m_color, originalSegmentCount, GetSegmentNumber());
 			SetUVs (originalSegmentCount, GetSegmentNumber());
-			if (m_lineWidths.Length > 1) {
-				SetWidth (m_lineWidth, originalSegmentCount, GetSegmentNumber());
-			}
 		}
 		if (m_pointsCount < oldCount) {
 			ZeroVertices (m_pointsCount, oldCount);
@@ -988,6 +994,19 @@ public partial class VectorLine {
 		if (m_vectorObject != null) {
 			m_vectorObject.UpdateMeshAttributes();
 		}
+	}
+	
+	void ResizeLineWidths (int newSize) {
+		if (newSize > m_lineWidths.Length) {
+			var newWidths = new float[newSize];
+			for (int i = 0; i < m_lineWidths.Length; i++) {
+				newWidths[i] = m_lineWidths[i];
+			}
+			for (int i = m_lineWidths.Length; i < newSize; i++) {
+				newWidths[i] = m_lineWidth * .5f;
+			}
+			m_lineWidths = newWidths;
+		}	
 	}
 	
 	private void SetUVs (int startIndex, int endIndex) {
@@ -1287,6 +1306,26 @@ public partial class VectorLine {
 		SetEndCapColors();
 	}
 	
+	public void SetEndCapIndex (EndCap endCap, int index) {
+		if (m_capType == EndCap.None) {
+			Debug.LogError ("VectorLine.SetEndCapIndex: the line \"" + name + "\" does not have any end caps");
+			return;
+		}
+		if (endCap != EndCap.Front && endCap != EndCap.Back) {
+			Debug.Log ("VectorLine.SetEndCapIndex: endCap must be EndCap.Front or EndCap.Back");
+			return;
+		}
+		if (index < 0) {
+			index = 0;
+		}
+		if (endCap == EndCap.Front) {
+			m_frontEndCapIndex = index;
+		}
+		else if (endCap == EndCap.Back) {
+			m_backEndCapIndex = index;
+		}
+	}
+	
 	public void SetColor (Color32 color) {
 		SetColor (color, 0, pointsCount);
 	}
@@ -1400,7 +1439,7 @@ public partial class VectorLine {
 			}
 		}
 	}
-		
+	
 	public Color32 GetColor (int index) {
 		if (pointsCount != m_pointsCount) {
 			Resize();
@@ -1418,10 +1457,7 @@ public partial class VectorLine {
 	
 	private void SetupWidths (int max) {
 		if ((max >= 2 && m_lineWidths.Length == 1) || (max >= 2 && m_lineWidths.Length != max)) {
-			System.Array.Resize (ref m_lineWidths, max);
-			for (int i = 0; i < max; i++) {
-				m_lineWidths[i] = m_lineWidth * .5f;
-			}
+			ResizeLineWidths (max);
 		}
 	}
 	
@@ -1587,7 +1623,7 @@ public partial class VectorLine {
 		}
 		if (m_useTangents && !m_tangentsCalculated) {
 			m_vectorObject.UpdateTangents();
-			m_tangentsCalculated = true;			
+			m_tangentsCalculated = true;
 		}
 	}
 	
@@ -1604,8 +1640,18 @@ public partial class VectorLine {
 	}
 	
 	private void DrawEndCap (bool draw3D) {
+		int vIndex;
 		if (m_capType <= EndCap.Mirror) {	// Draw front
-			int vIndex = m_drawStart * 4;
+			if (m_frontEndCapIndex != -1) {
+				vIndex = m_frontEndCapIndex;
+				if (m_lineType == LineType.Discrete && (vIndex & 1) != 0) {	// No odd numbers for discrete lines
+					vIndex++;
+				}
+				vIndex = Mathf.Clamp (vIndex, drawStart, drawEnd) * 4;
+			}
+			else {
+				vIndex = m_drawStart * 4;
+			}
 			int widthIndex = (m_lineWidths.Length > 1)? m_drawStart : 0;
 			if (m_lineType == LineType.Discrete) {
 				widthIndex /= 2;
@@ -1648,7 +1694,16 @@ public partial class VectorLine {
 			else {
 				if (end < pointsCount) end++;
 			}
-			int vIndex = end * 4;
+			if (m_backEndCapIndex != -1) {
+				vIndex = m_backEndCapIndex;
+				if (m_lineType == LineType.Discrete && (vIndex & 1) != 0) {
+					vIndex++;
+				}
+				vIndex = Mathf.Clamp (vIndex, drawStart, end) * 4;
+			}
+			else {
+				vIndex = end * 4;
+			}
 			int widthIndex = (m_lineWidths.Length > 1)? end-1 : 0;
 			if (widthIndex < 0) {
 				widthIndex = 0;
@@ -1805,7 +1860,17 @@ public partial class VectorLine {
 	private void SetupCanvasState (CanvasState wantedState) {
 		if (wantedState == CanvasState.OnCanvas) {
 			if (m_go == null) return;
-			if (m_go.transform.parent == null || m_go.transform.root.GetComponent<Canvas>() == null) {
+			// See if any parent object is already a canvas, and if not, parent line object to the vector canvas
+			var parentObject = m_go.transform.parent;
+			var doSetCanvasParent = true;
+			while (parentObject != null) {
+				if (parentObject.GetComponent<Canvas>() != null) {
+					doSetCanvasParent = false;
+					break;
+				}
+				parentObject = parentObject.parent;
+			}
+			if (doSetCanvasParent) {
 				if (m_canvas == null) {
 					SetupVectorCanvas();
 				}
@@ -1970,6 +2035,7 @@ public partial class VectorLine {
 				WeldJoinsDiscrete (start + 1, end, Approximately (m_points2[0], m_points2[m_pointsCount-1]));
 			}
 		}
+		CheckDrawStartFill (start);
 	}
 	
 	private void Line3D (int start, int end, Matrix4x4 thisMatrix, bool useTransformMatrix) {
@@ -2050,6 +2116,19 @@ public partial class VectorLine {
 					end--;
 				}
 				WeldJoinsDiscrete (start + 1, end, start == 0 && end == m_pointsCount-1 && Approximately (m_points3[0], m_points3[m_pointsCount-1]));
+			}
+		}
+		CheckDrawStartFill (start);
+	}
+	
+	void CheckDrawStartFill (int start) {
+		// Prevent drawStart > 0 and Joins.Fill from creating a triangle that connects to the origin
+		if (m_joins == Joins.Fill) {
+			int idx = start * 4;
+			if (m_drawStart > 0 && m_lineVertices.Length > idx && idx-3 >= 0) {
+				m_lineVertices[idx-1] = m_lineVertices[idx];
+				m_lineVertices[idx-2] = m_lineVertices[idx];
+				m_lineVertices[idx-3] = m_lineVertices[idx];
 			}
 		}
 	}
@@ -2146,6 +2225,7 @@ public partial class VectorLine {
 				WeldJoinsDiscrete3D (start + 1, end, start == 0 && end == m_pointsCount-1 && Approximately (m_points3[0], m_points3[m_pointsCount-1]));
 			}
 		}
+		CheckDrawStartFill (start);
 		
 		CheckLine (true);
 		if (m_useTextureScale) {
@@ -2854,7 +2934,7 @@ public partial class VectorLine {
 			point = Vector2.Lerp(m_points2[(index-1)*2], m_points2[(index-1)*2+1], Mathf.InverseLerp(m_distances[index-1], m_distances[index], distance));
 		}
 		if (m_drawTransform) {
-			point += new Vector2(m_drawTransform.position.x, m_drawTransform.position.y);
+			point = m_drawTransform.localToWorldMatrix.MultiplyPoint3x4 (point);
 		}
 		index--;
 		return point;
@@ -2890,7 +2970,7 @@ public partial class VectorLine {
 			point = Vector3.Lerp (m_points3[(index-1)*2], m_points3[(index-1)*2+1], Mathf.InverseLerp (m_distances[index-1], m_distances[index], distance));
 		}
 		if (m_drawTransform) {
-			point += m_drawTransform.position;
+			point = m_drawTransform.localToWorldMatrix.MultiplyPoint3x4 (point);
 		}
 		index--;
 		return point;

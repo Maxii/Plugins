@@ -50,10 +50,10 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="PGEditorUtils.cs" />
-    <Compile Include="PreRuntimePoolItemInspector.cs" />
+    <Compile Include="Common\PGEditorUtils.cs" />
+    <Compile Include="PoolManager\PreRuntimePoolItemInspector.cs" />
+    <Compile Include="PoolManager\SpawnPoolInspector.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SpawnPoolInspector.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PoolManager\PoolManager.csproj">

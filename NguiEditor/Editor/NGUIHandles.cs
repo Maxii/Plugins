@@ -10,7 +10,7 @@ using UnityEditor;
 /// Editor helper class containing functions related to drawing things in the Scene View using UnityEditor.Handles.
 /// </summary>
 
-public static class NGUIHandles
+static public class NGUIHandles
 {
 	/// <summary>
 	/// Given a plane the rectangle lies upon, convert the given screen coordinates to world coordinates.

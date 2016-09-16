@@ -70,7 +70,6 @@
     <Compile Include="Examples\InventorySystem\System\InvStat.cs" />
     <Compile Include="Examples\Other\ChatInput.cs" />
     <Compile Include="Examples\Other\DownloadTexture.cs" />
-    <Compile Include="Examples\Other\EnvelopContent.cs" />
     <Compile Include="Examples\Other\ExampleDragDropItem.cs" />
     <Compile Include="Examples\Other\ExampleDragDropSurface.cs" />
     <Compile Include="Examples\Other\LagPosition.cs" />

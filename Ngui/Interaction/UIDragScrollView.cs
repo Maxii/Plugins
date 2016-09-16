@@ -77,13 +77,15 @@ public class UIDragScrollView : MonoBehaviour
 		mScroll = scrollView;
 	}
 
+	[System.NonSerialized] bool mPressed = false;
+
 	/// <summary>
 	/// Stop the active dragging operation.
 	/// </summary>
 
 	void OnDisable ()
 	{
-		if (mScroll != null && mScroll.GetComponentInChildren<UIWrapContent>() == null)
+		if (mPressed && mScroll != null && mScroll.GetComponentInChildren<UIWrapContent>() == null)
 		{
 			mScroll.Press(false);
 			mScroll = null;
@@ -96,6 +98,8 @@ public class UIDragScrollView : MonoBehaviour
 
 	void OnPress (bool pressed)
 	{
+		mPressed = pressed;
+
 		// If the scroll view has been set manually, don't try to find it again
 		if (mAutoFind && mScroll != scrollView)
 		{

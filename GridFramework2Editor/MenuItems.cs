@@ -16,16 +16,12 @@ using        Rhombus = GridFramework.Renderers.Hexagonal.Rhombus;
 
 
 namespace GridFramework.Editor {
-
 	/// <summary>
 	///   Menu items for Grid Framework.
 	/// </summary>
 	public static class MenuItems {
-
 #region  Private variables
-		private const string onlineHelpURL
-			= "http://hiphish.github.io/grid-framework/documentation/";
-		private const string offlineHelpURL
+		private const string helpURL
 			= "/Plugins/GridFramework/Documentation/html/index.html";
 #endregion  // Private variables
 
@@ -69,11 +65,7 @@ namespace GridFramework.Editor {
 #region  Help Menu
 		[MenuItem("Help/Grid Framework Documentation", false, -1)]
 		public static void BrowseGridFrameworkDocs() {
-			if (File.Exists (Application.dataPath + offlineHelpURL)) {
-				Help.ShowHelpPage("file://" + Application.dataPath + offlineHelpURL);
-			} else {
-				Help.BrowseURL(onlineHelpURL);
-			}
+			Help.ShowHelpPage("file://" + Application.dataPath + helpURL);
 		}
 #endregion  // Help Menu
 
