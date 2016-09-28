@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections;
 using antilunchbox;
 using UnityEngine.SceneManagement;
+//using System;
 
 public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
 
@@ -29,10 +30,17 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
             ClearAudioSources();
             Init();
             SetupSoundFX();
+            // 9.19.16 OnLevelWasLoaded deprecated by Unity 5.4.1
             ////OnLevelWasLoaded(Application.loadedLevel);
-            OnLevelWasLoaded(SceneManager.GetActiveScene().buildIndex);
+            ////OnLevelWasLoaded(SceneManager.GetActiveScene().buildIndex);
+            Subscribe();    // 9.19.16 replaces OnLevelWasLoaded() call
         }
     }
+
+    private void Subscribe() {
+        SceneManager.sceneLoaded += SceneLoadedEventHandler;
+    }
+
 
     /// <summary>
     /// Init this instance with the appropriate AudioSources and settings.
