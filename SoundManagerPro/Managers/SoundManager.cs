@@ -34,7 +34,9 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
     //}
 
     public void SceneLoadedEventHandler(Scene scene, LoadSceneMode mode) {  // 9.19.16 My replacement for OnLevelWasLoaded
-        Debug.Log("SceneLoadedEventHandler(" + scene.name + ") called.");
+        if (showDebug) {
+            Debug.Log("SceneLoadedEventHandler(" + scene.name + ") called.");
+        }
         if (Instance == this) {
             if (!ignoreLevelLoad) {
                 HandleLevel(scene.buildIndex);
