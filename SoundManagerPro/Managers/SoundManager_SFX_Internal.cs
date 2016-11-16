@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
@@ -182,11 +183,11 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
         foreach (KeyValuePair<AudioClip, SFXPoolInfo> pair in ownedPools) {
             for (int i = 0; i < pair.Value.ownedAudioClipPool.Count; ++i) {
 #if UNITY_3_4 || UNITY_3_5
-                if (pair.Value.ownedAudioClipPool[i].active)
+                        if (pair.Value.ownedAudioClipPool[i].active)
 #else
                 if (pair.Value.ownedAudioClipPool[i].activeSelf)
 #endif
-                {
+                        {
                     AudioSource thisAudio = pair.Value.ownedAudioClipPool[i].GetComponent<AudioSource>();
                     if (!thisAudio.isPlaying) // if not playing
                     {
@@ -203,10 +204,10 @@ public partial class SoundManager : antilunchbox.Singleton<SoundManager> {
                         if (cappedSFXObjects.ContainsKey(instanceID))
                             cappedSFXObjects.Remove(instanceID);
 #if UNITY_3_4 || UNITY_3_5
-                        pair.Value.ownedAudioClipPool[i].SetActiveRecursively(false);
+                                pair.Value.ownedAudioClipPool[i].SetActiveRecursively(false);
 #else
                         pair.Value.ownedAudioClipPool[i].SetActive(false);
-#endif						
+#endif
                         if (pair.Value.prepoolAmount <= i)
                             pair.Value.timesOfDeath[i] = Time.time + SFXObjectLifetime;
                     }
