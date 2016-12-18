@@ -1,12 +1,15 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class F3DDummyEvent : MonoBehaviour
+namespace Forge3D
 {
-    // Use this for initialization
-    void Start()
+    public class F3DDummyEvent : MonoBehaviour
     {
-        // Used in the example scene to fire up initialization routines
-        BroadcastMessage("OnSpawned", SendMessageOptions.DontRequireReceiver);
+        // Use this for initialization
+        void Start()
+        {
+            // Used in the example scene to fire up initialization routines
+            BroadcastMessage("OnSpawned", SendMessageOptions.DontRequireReceiver);
+        }
     }
 }

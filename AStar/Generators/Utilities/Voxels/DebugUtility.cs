@@ -10,11 +10,7 @@ namespace Pathfinding {
 	public class DebugUtility : MonoBehaviour {
 		public Material defaultMaterial;
 
-#if UNITY_4_6 || UNITY_4_3
-		public static new DebugUtility active;
-#else
 		public static DebugUtility active;
-#endif
 
 		public float offset = 0.2F;
 
@@ -83,30 +79,19 @@ namespace Pathfinding {
 				Vector3 bottom4 = bottom + new Vector3(-width, 0, width);
 
 				int vIndex = i*4*6;
+				int tIndex = i*6*6;
 
 				Color col = vertexColors[i];
-				//Color.Lerp (Color.green,Color.red,topVerts[i].y*0.06F);
-				//
 
 				for (int c = vIndex; c < vIndex+24; c++) {
 					colors[c] = col;
 				}
 
 				//Top
-
 				vertices[vIndex] = top1;
 				vertices[vIndex+1] = top4;
 				vertices[vIndex+2] = top3;
 				vertices[vIndex+3] = top2;
-
-				int tIndex = i*6*6;
-				tris[tIndex] = vIndex;
-				tris[tIndex+1] = vIndex+1;
-				tris[tIndex+2] = vIndex+2;
-
-				tris[tIndex+3] = vIndex;
-				tris[tIndex+4] = vIndex+2;
-				tris[tIndex+5] = vIndex+3;
 
 				//Bottom
 				vIndex += 4;
@@ -115,30 +100,12 @@ namespace Pathfinding {
 				vertices[vIndex+1] = bottom3;
 				vertices[vIndex] = bottom2;
 
-				tIndex += 6;
-				tris[tIndex] = vIndex;
-				tris[tIndex+1] = vIndex+1;
-				tris[tIndex+2] = vIndex+2;
-
-				tris[tIndex+3] = vIndex;
-				tris[tIndex+4] = vIndex+2;
-				tris[tIndex+5] = vIndex+3;
-
 				//Right
 				vIndex += 4;
 				vertices[vIndex] = bottom2;
 				vertices[vIndex+1] = top2;
 				vertices[vIndex+2] = top3;
 				vertices[vIndex+3] = bottom3;
-
-				tIndex += 6;
-				tris[tIndex] = vIndex;
-				tris[tIndex+1] = vIndex+1;
-				tris[tIndex+2] = vIndex+2;
-
-				tris[tIndex+3] = vIndex;
-				tris[tIndex+4] = vIndex+2;
-				tris[tIndex+5] = vIndex+3;
 
 				//Left
 				vIndex += 4;
@@ -147,30 +114,12 @@ namespace Pathfinding {
 				vertices[vIndex+1] = top4;
 				vertices[vIndex] = bottom4;
 
-				tIndex += 6;
-				tris[tIndex] = vIndex;
-				tris[tIndex+1] = vIndex+1;
-				tris[tIndex+2] = vIndex+2;
-
-				tris[tIndex+3] = vIndex;
-				tris[tIndex+4] = vIndex+2;
-				tris[tIndex+5] = vIndex+3;
-
 				//Forward
 				vIndex += 4;
 				vertices[vIndex+3] = bottom3;
 				vertices[vIndex+2] = bottom4;
 				vertices[vIndex+1] = top4;
 				vertices[vIndex] = top3;
-
-				tIndex += 6;
-				tris[tIndex] = vIndex;
-				tris[tIndex+1] = vIndex+1;
-				tris[tIndex+2] = vIndex+2;
-
-				tris[tIndex+3] = vIndex;
-				tris[tIndex+4] = vIndex+2;
-				tris[tIndex+5] = vIndex+3;
 
 				//Back
 				vIndex += 4;
@@ -179,14 +128,19 @@ namespace Pathfinding {
 				vertices[vIndex+2] = top1;
 				vertices[vIndex+3] = top2;
 
-				tIndex += 6;
-				tris[tIndex] = vIndex;
-				tris[tIndex+1] = vIndex+1;
-				tris[tIndex+2] = vIndex+2;
+				// Add all triangles
+				for (int k = 0; k < 6; k++) {
+					int vert = vIndex + k*4;
+					int tri = tIndex + k*6;
 
-				tris[tIndex+3] = vIndex;
-				tris[tIndex+4] = vIndex+2;
-				tris[tIndex+5] = vIndex+3;
+					tris[tri+0] = vert;
+					tris[tri+1] = vert+1;
+					tris[tri+2] = vert+2;
+
+					tris[tri+3] = vert;
+					tris[tri+4] = vert+2;
+					tris[tri+5] = vert+3;
+				}
 			}
 
 
@@ -201,7 +155,9 @@ namespace Pathfinding {
 			mesh.RecalculateBounds();
 
 			if (active.optimizeMeshes) {
+#if !UNITY_5_5_OR_NEWER
 				mesh.Optimize();
+#endif
 			}
 
 			GameObject go = new GameObject("DebugMesh");

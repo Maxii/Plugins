@@ -85,7 +85,7 @@ namespace Pathfinding {
 
 			if (left.Count != right.Count) throw new System.ArgumentException("left and right lists must have equal length");
 
-			if (left.Count <= 3) {
+			if (left.Count < 3) {
 				return false;
 			}
 

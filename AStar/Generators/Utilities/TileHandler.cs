@@ -2,6 +2,9 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+#if UNITY_5_5_OR_NEWER
+using UnityEngine.Profiling;
+#endif
 using Pathfinding;
 using Pathfinding.ClipperLib;
 using Pathfinding.Poly2Tri;
@@ -9,7 +12,6 @@ using Pathfinding.Poly2Tri;
 namespace Pathfinding.Util {
 	public class TileHandler {
 		RecastGraph _graph;
-		List<TileType> tileTypes = new List<TileType>();
 
 		Clipper clipper;
 		int[] cached_int_array = new int[32];
@@ -44,12 +46,16 @@ namespace Pathfinding.Util {
 			return activeTileRotations[p.x + p.y*_graph.tileXCount];
 		}
 
+		/** \deprecated */
+		[System.Obsolete("Use the result from RegisterTileType instead")]
 		public TileType GetTileType (int index) {
-			return tileTypes[index];
+			throw new System.Exception("This method has been deprecated. Use the result from RegisterTileType instead.");
 		}
 
+		/** \deprecated */
+		[System.Obsolete("Use the result from RegisterTileType instead")]
 		public int GetTileTypeCount () {
-			return tileTypes.Count;
+			throw new System.Exception("This method has been deprecated. Use the result from RegisterTileType instead.");
 		}
 
 		public class TileType {
@@ -211,10 +217,7 @@ namespace Pathfinding.Util {
 		 * \returns Identifier for loading that tile type
 		 */
 		public TileType RegisterTileType (Mesh source, Int3 centerOffset, int width = 1, int depth = 1) {
-			var tp = new TileType(source, new Int3(graph.tileSizeX, 1, graph.tileSizeZ)*(Int3.Precision*graph.cellSize), centerOffset, width, depth);
-
-			tileTypes.Add(tp);
-			return tp;
+			return new TileType(source, new Int3(graph.tileSizeX, 1, graph.tileSizeZ)*(Int3.Precision*graph.cellSize), centerOffset, width, depth);
 		}
 
 		public void CreateTileTypesFromGraph () {
@@ -226,22 +229,28 @@ namespace Pathfinding.Util {
 			for (int z = 0; z < graph.tileZCount; z++) {
 				for (int x = 0; x < graph.tileXCount; x++) {
 					RecastGraph.NavmeshTile tile = tiles[x + z*graph.tileXCount];
-
-					Bounds b = graph.GetTileBounds(x, z);
-					var min = (Int3)b.min;
-					Int3 size = new Int3(graph.tileSizeX, 1, graph.tileSizeZ)*(Int3.Precision*graph.cellSize);
-					min += new Int3(size.x*tile.w/2, 0, size.z*tile.d/2);
-					min = -min;
-
-					var tp = new TileType(tile.verts, tile.tris, size, min, tile.w, tile.d);
-					tileTypes.Add(tp);
-
-					int index = x + z*graph.tileXCount;
-					activeTileTypes[index] = tp;
-					activeTileRotations[index] = 0;
-					activeTileOffsets[index] = 0;
+					UpdateTileType(tile);
 				}
 			}
+		}
+
+		void UpdateTileType (RecastGraph.NavmeshTile tile) {
+			int x = tile.x;
+			int z = tile.z;
+
+			Bounds b = graph.GetTileBounds(x, z);
+			var min = (Int3)b.min;
+			Int3 size = new Int3(graph.tileSizeX, 1, graph.tileSizeZ)*(Int3.Precision*graph.cellSize);
+
+			min += new Int3(size.x*tile.w/2, 0, size.z*tile.d/2);
+			min = -min;
+
+			var tp = new TileType(tile.verts, tile.tris, size, min, tile.w, tile.d);
+
+			int index = x + z*graph.tileXCount;
+			activeTileTypes[index] = tp;
+			activeTileRotations[index] = 0;
+			activeTileOffsets[index] = 0;
 		}
 
 		/** Start batch loading.

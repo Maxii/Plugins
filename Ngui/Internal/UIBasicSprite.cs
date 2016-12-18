@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Functionality common to both NGUI and 2D sprites brought out into a single common parent.
@@ -302,7 +303,7 @@ public abstract class UIBasicSprite : UIWidget
 	/// Fill the draw buffers.
 	/// </summary>
 
-	protected void Fill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols, Rect outer, Rect inner)
+	protected void Fill (List<Vector3> verts, List<Vector2> uvs, List<Color> cols, Rect outer, Rect inner)
 	{
 		mOuterUV = outer;
 		mInnerUV = inner;
@@ -335,7 +336,7 @@ public abstract class UIBasicSprite : UIWidget
 	/// Regular sprite fill function is quite simple.
 	/// </summary>
 
-	void SimpleFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols)
+	void SimpleFill (List<Vector3> verts, List<Vector2> uvs, List<Color> cols)
 	{
 		Vector4 v = drawingDimensions;
 		Vector4 u = drawingUVs;
@@ -371,7 +372,7 @@ public abstract class UIBasicSprite : UIWidget
 	/// Sliced sprite fill function is more complicated as it generates 9 quads instead of 1.
 	/// </summary>
 
-	void SlicedFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols)
+	void SlicedFill (List<Vector3> verts, List<Vector2> uvs, List<Color> cols)
 	{
 		Vector4 br = border * pixelSize;
 		
@@ -475,7 +476,7 @@ public abstract class UIBasicSprite : UIWidget
 
 	[System.Diagnostics.DebuggerHidden]
 	[System.Diagnostics.DebuggerStepThrough]
-	void AddVertexColours (BetterList<Color> cols, ref Color color, int x, int y)
+	void AddVertexColours (List<Color> cols, ref Color color, int x, int y)
 	{
 		if (y == 0 || y == 1)
 		{
@@ -491,7 +492,7 @@ public abstract class UIBasicSprite : UIWidget
 	/// Tiled sprite fill function.
 	/// </summary>
 
-	void TiledFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols)
+	void TiledFill (List<Vector3> verts, List<Vector2> uvs, List<Color> cols)
 	{
 		Texture tex = mainTexture;
 		if (tex == null) return;
@@ -580,7 +581,7 @@ public abstract class UIBasicSprite : UIWidget
 	/// Filled sprite fill function.
 	/// </summary>
 
-	void FilledFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols)
+	void FilledFill (List<Vector3> verts, List<Vector2> uvs, List<Color> cols)
 	{
 		if (mFillAmount < 0.001f) return;
 
@@ -759,7 +760,7 @@ public abstract class UIBasicSprite : UIWidget
 	/// Advanced sprite fill function. Contributed by Nicki Hansen.
 	/// </summary>
 
-	void AdvancedFill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols)
+	void AdvancedFill (List<Vector3> verts, List<Vector2> uvs, List<Color> cols)
 	{
 		Texture tex = mainTexture;
 		if (tex == null) return;
@@ -1103,7 +1104,7 @@ public abstract class UIBasicSprite : UIWidget
 	/// Helper function that adds the specified values to the buffers.
 	/// </summary>
 
-	static void Fill (BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols,
+	static void Fill (List<Vector3> verts, List<Vector2> uvs, List<Color> cols,
 		float v0x, float v1x, float v0y, float v1y, float u0x, float u1x, float u0y, float u1y, Color col)
 	{
 		verts.Add(new Vector3(v0x, v0y));

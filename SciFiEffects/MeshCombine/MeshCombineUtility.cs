@@ -218,8 +218,7 @@ public class MeshCombineUtility
             Vector3 p = new Vector3(p4.x, p4.y, p4.z);
             p = transform.MultiplyVector(p).normalized;
             dst[i + offset] = new Vector4(p.x, p.y, p.z, p4.w);
-        }
-
+        } 
         offset += vertexcount;
     }
 }

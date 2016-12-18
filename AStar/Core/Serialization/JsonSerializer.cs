@@ -4,9 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Pathfinding;
 using Pathfinding.Util;
-using Pathfinding.Serialization.JsonFx;
 #if NETFX_CORE && !UNITY_EDITOR
-
 #if !ASTAR_NO_ZIP
 using Pathfinding.Ionic.Zip;
 #else
@@ -44,22 +42,28 @@ namespace Pathfinding.Serialization {
 		 */
 		public readonly uint graphIndex;
 
-		public GraphSerializationContext (BinaryReader reader, GraphNode[] id2NodeMapping, uint graphIndex) {
+		/** Metadata about graphs being deserialized */
+		public readonly GraphMeta meta;
+
+		public GraphSerializationContext (BinaryReader reader, GraphNode[] id2NodeMapping, uint graphIndex, GraphMeta meta) {
 			this.reader = reader;
 			this.id2NodeMapping = id2NodeMapping;
 			this.graphIndex = graphIndex;
+			this.meta = meta;
 		}
 
 		public GraphSerializationContext (BinaryWriter writer) {
 			this.writer = writer;
 		}
 
-		public int GetNodeIdentifier (GraphNode node) {
-			return node == null ? -1 : node.NodeIndex;
+		public void SerializeNodeReference (GraphNode node) {
+			writer.Write(node == null ? -1 : node.NodeIndex);
 		}
 
-		public GraphNode GetNodeFromIdentifier (int id) {
-			if (id2NodeMapping == null) throw new Exception("Calling GetNodeFromIdentifier when serializing");
+		public GraphNode DeserializeNodeReference () {
+			var id = reader.ReadInt32();
+
+			if (id2NodeMapping == null) throw new Exception("Calling DeserializeNodeReference when serializing");
 
 			if (id == -1) return null;
 			GraphNode node = id2NodeMapping[id];
@@ -67,7 +71,6 @@ namespace Pathfinding.Serialization {
 			return node;
 		}
 
-#if ASTAR_NO_JSON
 		/** Write a Vector3 */
 		public void SerializeVector3 (Vector3 v) {
 			writer.Write(v.x);
@@ -78,6 +81,18 @@ namespace Pathfinding.Serialization {
 		/** Read a Vector3 */
 		public Vector3 DeserializeVector3 () {
 			return new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+		}
+
+		/** Write an Int3 */
+		public void SerializeInt3 (Int3 v) {
+			writer.Write(v.x);
+			writer.Write(v.y);
+			writer.Write(v.z);
+		}
+
+		/** Read an Int3 */
+		public Int3 DeserializeInt3 () {
+			return new Int3(reader.ReadInt32(), reader.ReadInt32(), reader.ReadInt32());
 		}
 
 		public int DeserializeInt (int defaultValue) {
@@ -94,47 +109,6 @@ namespace Pathfinding.Serialization {
 			} else {
 				return defaultValue;
 			}
-		}
-
-		/** Write a UnityEngine.Object */
-		public void SerializeUnityObject (UnityEngine.Object ob) {
-			if (ob == null) {
-				writer.Write(int.MaxValue);
-				return;
-			}
-
-			int inst = ob.GetInstanceID();
-			string name = ob.name;
-			string type = ob.GetType().AssemblyQualifiedName;
-			string guid = "";
-
-			//Write scene path if the object is a Component or GameObject
-			Component component = ob as Component;
-			GameObject go = ob as GameObject;
-
-			if (component != null || go != null) {
-				if (component != null && go == null) {
-					go = component.gameObject;
-				}
-
-				UnityReferenceHelper helper = go.GetComponent<UnityReferenceHelper>();
-
-				if (helper == null) {
-					Debug.Log("Adding UnityReferenceHelper to Unity Reference '"+ob.name+"'");
-					helper = go.AddComponent<UnityReferenceHelper>();
-				}
-
-				//Make sure it has a unique GUID
-				helper.Reset();
-
-				guid = helper.GetGUID();
-			}
-
-
-			writer.Write(inst);
-			writer.Write(name);
-			writer.Write(type);
-			writer.Write(guid);
 		}
 
 		/** Read a UnityEngine.Object */
@@ -181,7 +155,6 @@ namespace Pathfinding.Serialization {
 
 			return null;
 		}
-#endif
 	}
 
 	/** Handles low level serialization and deserialization of graph settings and data.
@@ -192,11 +165,6 @@ namespace Pathfinding.Serialization {
 	 */
 	public class AstarSerializer {
 		private AstarData data;
-
-#if !ASTAR_NO_JSON
-		public JsonWriterSettings writerSettings;
-		public JsonReaderSettings readerSettings;
-#endif
 
 		/** Zip which the data is loaded from */
 		private ZipFile zip;
@@ -223,21 +191,16 @@ namespace Pathfinding.Serialization {
 
 		/** Extension to use for binary files */
 		const string binaryExt = ".binary";
-#if !ASTAR_NO_JSON
+
 		/** Extension to use for json files */
 		const string jsonExt = ".json";
-#else
-		const string jsonExt = binaryExt;
-#endif
 
 		/** Checksum for the serialized data.
 		 * Used to provide a quick equality check in editor code
 		 */
 		private uint checksum = 0xffffffff;
 
-#if !ASTAR_NO_JSON
 		System.Text.UTF8Encoding encoding = new System.Text.UTF8Encoding();
-#endif
 
 		/** Cached StringBuilder to avoid excessive allocations */
 		static System.Text.StringBuilder _stringBuilder = new System.Text.StringBuilder();
@@ -247,6 +210,14 @@ namespace Pathfinding.Serialization {
 		 * thus only be called from a single thread and should not be called while using an earlier got string builder.
 		 */
 		static System.Text.StringBuilder GetStringBuilder () { _stringBuilder.Length = 0; return _stringBuilder; }
+
+		static void CloseOrDispose (BinaryWriter writer) {
+#if NETFX_CORE
+			writer.Dispose();
+#else
+			writer.Close();
+#endif
+		}
 
 		public AstarSerializer (AstarData data) {
 			this.data = data;
@@ -275,19 +246,6 @@ namespace Pathfinding.Serialization {
 			zip = new ZipFile();
 			zip.AlternateEncoding = System.Text.Encoding.UTF8;
 			zip.AlternateEncodingUsage = ZipOption.Always;
-
-#if !ASTAR_NO_JSON
-			// Add some converters so that we can serialize some Unity types
-			writerSettings = new JsonWriterSettings();
-			writerSettings.AddTypeConverter(new VectorConverter());
-			writerSettings.AddTypeConverter(new BoundsConverter());
-			writerSettings.AddTypeConverter(new LayerMaskConverter());
-			writerSettings.AddTypeConverter(new MatrixConverter());
-			writerSettings.AddTypeConverter(new GuidConverter());
-			writerSettings.AddTypeConverter(new UnityObjectConverter());
-
-			writerSettings.PrettyPrint = settings.prettyPrint;
-#endif
 			meta = new GraphMeta();
 		}
 
@@ -317,13 +275,6 @@ namespace Pathfinding.Serialization {
 			zip.Save(output);
 			bytes = output.ToArray();
 			output.Dispose();
-
-#if ASTARDEBUG
-			CompatFileStream fs = new CompatFileStream("output.zip", FileMode.Create);
-			fs.Write(bytes, 0, bytes.Length);
-			fs.Close();
-#endif
-
 			zip.Dispose();
 
 			zip = null;
@@ -356,66 +307,34 @@ namespace Pathfinding.Serialization {
 
 			meta.version = AstarPath.Version;
 			meta.graphs = graphs.Length;
-			meta.guids = new string[graphs.Length];
-			meta.typeNames = new string[graphs.Length];
-			meta.nodeCounts = new int[graphs.Length];
+			meta.guids = new List<string>();
+			meta.typeNames = new List<string>();
 
 			// For each graph, save the guid
 			// of the graph and the type of it
 			for (int i = 0; i < graphs.Length; i++) {
-				if (graphs[i] == null) continue;
-
-				meta.guids[i] = graphs[i].guid.ToString();
-				meta.typeNames[i] = graphs[i].GetType().FullName;
+				if (graphs[i] != null) {
+					meta.guids.Add(graphs[i].guid.ToString());
+					meta.typeNames.Add(graphs[i].GetType().FullName);
+				} else {
+					meta.guids.Add(null);
+					meta.typeNames.Add(null);
+				}
 			}
 
-#if !ASTAR_NO_JSON
 			// Grab a cached string builder to avoid allocations
 			var output = GetStringBuilder();
-			var writer = new JsonWriter(output, writerSettings);
-			writer.Write(meta);
-
+			TinyJsonSerializer.Serialize(meta, output);
 			return encoding.GetBytes(output.ToString());
-#else
-			// Serialize the metadata without using json for compatibility
-			var mem = new System.IO.MemoryStream();
-			var writer = new System.IO.BinaryWriter(mem);
-			writer.Write("A*");    // Magic string
-			writer.Write(meta.version.Major);
-			writer.Write(meta.version.Minor);
-			writer.Write(meta.version.Build);
-			writer.Write(meta.version.Revision);
-			writer.Write(meta.graphs);
-
-			writer.Write(meta.guids.Length);
-			for (int i = 0; i < meta.guids.Length; i++) writer.Write(meta.guids[i] ?? "");
-
-			writer.Write(meta.typeNames.Length);
-			for (int i = 0; i < meta.typeNames.Length; i++) writer.Write(meta.typeNames[i] ?? "");
-
-			writer.Write(meta.nodeCounts.Length);
-			for (int i = 0; i < meta.nodeCounts.Length; i++) writer.Write(meta.nodeCounts[i]);
-
-			return mem.ToArray();
-#endif
 		}
 
 		/** Serializes the graph settings to JSON and returns the data */
 		public byte[] Serialize (NavGraph graph) {
-#if !ASTAR_NO_JSON
 			// Grab a cached string builder to avoid allocations
 			var output = GetStringBuilder();
-			var writer = new JsonWriter(output, writerSettings);
-			writer.Write(graph);
 
+			TinyJsonSerializer.Serialize(graph, output);
 			return encoding.GetBytes(output.ToString());
-#else
-			var mem = new System.IO.MemoryStream();
-			var writer = new System.IO.BinaryWriter(mem);
-			var ctx = new GraphSerializationContext(writer);
-			graph.SerializeSettings(ctx);
-			return mem.ToArray();
-#endif
 		}
 
 		/** Deprecated method to serialize node data.
@@ -465,11 +384,7 @@ namespace Pathfinding.Serialization {
 			if (maxNodeIndex2 != maxNodeIndex) throw new Exception("Some graphs are not consistent in their GetNodes calls, sequential calls give different results.");
 
 			byte[] bytes = stream.ToArray();
-#if NETFX_CORE
-			wr.Dispose();
-#else
-			wr.Close();
-#endif
+			CloseOrDispose(wr);
 
 			return bytes;
 		}
@@ -482,12 +397,7 @@ namespace Pathfinding.Serialization {
 
 			graph.SerializeExtraInfo(ctx);
 			byte[] bytes = stream.ToArray();
-
-#if NETFX_CORE
-			wr.Dispose();
-#else
-			wr.Close();
-#endif
+			CloseOrDispose(wr);
 
 			return bytes;
 		}
@@ -506,12 +416,7 @@ namespace Pathfinding.Serialization {
 				node.SerializeReferences(ctx);
 				return true;
 			});
-
-#if NETFX_CORE
-			wr.Dispose();
-#else
-			wr.Close();
-#endif
+			CloseOrDispose(wr);
 
 			var bytes = stream.ToArray();
 			return bytes;
@@ -536,19 +441,29 @@ namespace Pathfinding.Serialization {
 				AddChecksum(bytes);
 				zip.AddEntry("graph"+i+"_references"+binaryExt, bytes);
 			}
+
+			bytes = SerializeNodeLinks();
+			AddChecksum(bytes);
+			zip.AddEntry("node_link2" + binaryExt, bytes);
+		}
+
+		byte[] SerializeNodeLinks () {
+			var stream = new MemoryStream();
+			var wr = new BinaryWriter(stream);
+			var ctx = new GraphSerializationContext(wr);
+
+			NodeLink2.SerializeReferences(ctx);
+			return stream.ToArray();
 		}
 
 		public void SerializeEditorSettings (GraphEditorBase[] editors) {
 			if (editors == null || !settings.editorSettings) return;
 
-#if !ASTAR_NO_JSON
 			for (int i = 0; i < editors.Length; i++) {
 				if (editors[i] == null) return;
 
 				var output = GetStringBuilder();
-				var writer = new JsonWriter(output, writerSettings);
-				writer.Write(editors[i]);
-
+				TinyJsonSerializer.Serialize(editors[i], output);
 				var bytes = encoding.GetBytes(output.ToString());
 
 				//Less or equal to 2 bytes means that nothing was saved (file is "{}")
@@ -558,7 +473,6 @@ namespace Pathfinding.Serialization {
 				AddChecksum(bytes);
 				zip.AddEntry("graph"+i+"_editor"+jsonExt, bytes);
 			}
-#endif
 		}
 
 		#endregion
@@ -566,17 +480,6 @@ namespace Pathfinding.Serialization {
 		#region Deserialize
 
 		public bool OpenDeserialize (byte[] bytes) {
-#if !ASTAR_NO_JSON
-			// Add some converters so that we can deserialize Unity builtin types
-			readerSettings = new JsonReaderSettings();
-			readerSettings.AddTypeConverter(new VectorConverter());
-			readerSettings.AddTypeConverter(new BoundsConverter());
-			readerSettings.AddTypeConverter(new LayerMaskConverter());
-			readerSettings.AddTypeConverter(new MatrixConverter());
-			readerSettings.AddTypeConverter(new GuidConverter());
-			readerSettings.AddTypeConverter(new UnityObjectConverter());
-#endif
-
 			// Copy the bytes to a stream
 			zipStream = new MemoryStream();
 			zipStream.Write(bytes, 0, bytes.Length);
@@ -591,7 +494,13 @@ namespace Pathfinding.Serialization {
 				return false;
 			}
 
-			meta = DeserializeMeta(zip["meta"+jsonExt]);
+			if (zip.ContainsEntry("meta" + jsonExt)) {
+				meta = DeserializeMeta(zip["meta" + jsonExt]);
+			} else if (zip.ContainsEntry("meta" + binaryExt)) {
+				meta = DeserializeBinaryMeta(zip["meta" + binaryExt]);
+			} else {
+				throw new Exception("No metadata found in serialized data.");
+			}
 
 			if (FullyDefinedVersion(meta.version) > FullyDefinedVersion(AstarPath.Version)) {
 				Debug.LogWarning("Trying to load data from a newer version of the A* Pathfinding Project\nCurrent version: "+AstarPath.Version+" Data version: "+meta.version +
@@ -629,26 +538,23 @@ namespace Pathfinding.Serialization {
 			// Graph was null when saving, ignore
 			if (System.Type.Equals(tp, null)) return null;
 
-			var entry = zip["graph"+zipIndex+jsonExt];
-
-			if (entry == null)
-				throw new FileNotFoundException("Could not find data for graph "+zipIndex+" in zip. Entry 'graph"+zipIndex+jsonExt+"' does not exist");
-
 			// Create a new graph of the right type
 			NavGraph graph = data.CreateGraph(tp);
 			graph.graphIndex = (uint)(graphIndex);
 
-#if !ASTAR_NO_JSON
-			var entryText = GetString(entry);
-			var reader = new JsonReader(entryText, readerSettings);
+			var jsonName = "graph" + zipIndex + jsonExt;
+			var binName = "graph" + zipIndex + binaryExt;
 
-			// Read the graph settings
-			reader.PopulateObject(ref graph);
-#else
-			var reader = GetBinaryReader(entry);
-			var ctx = new GraphSerializationContext(reader, null, graph.graphIndex);
-			graph.DeserializeSettings(ctx);
-#endif
+			if (zip.ContainsEntry(jsonName)) {
+				// Read the graph settings
+				TinyJsonDeserializer.Deserialize(GetString(zip[jsonName]), tp, graph);
+			} else if (zip.ContainsEntry(binName)) {
+				var reader = GetBinaryReader(zip[binName]);
+				var ctx = new GraphSerializationContext(reader, null, graph.graphIndex, meta);
+				graph.DeserializeSettingsCompatibility(ctx);
+			} else {
+				throw new FileNotFoundException("Could not find data for graph " + zipIndex + " in zip. Entry 'graph" + zipIndex + jsonExt + "' does not exist");
+			}
 
 			if (graph.guid.ToString() != meta.guids[zipIndex])
 				throw new Exception("Guid in graph file not equal to guid defined in meta file. Have you edited the data manually?\n"+graph.guid+" != "+meta.guids[zipIndex]);
@@ -687,7 +593,7 @@ namespace Pathfinding.Serialization {
 
 			var reader = GetBinaryReader(entry);
 
-			var ctx = new GraphSerializationContext(reader, null, graph.graphIndex);
+			var ctx = new GraphSerializationContext(reader, null, graph.graphIndex, meta);
 
 			// Call the graph to process the data
 			graph.DeserializeExtraInfo(ctx);
@@ -752,7 +658,7 @@ namespace Pathfinding.Serialization {
 			if (entry == null) throw new Exception("Node references for graph " + zipIndex + " not found in the data. Was this loaded from an older version of the A* Pathfinding Project?");
 
 			var reader = GetBinaryReader(entry);
-			var ctx = new GraphSerializationContext(reader, int2Node, graph.graphIndex);
+			var ctx = new GraphSerializationContext(reader, int2Node, graph.graphIndex, meta);
 
 			graph.GetNodes(node => {
 				node.DeserializeReferences(ctx);
@@ -791,6 +697,19 @@ namespace Pathfinding.Serialization {
 			for (int i = 0; i < graphs.Length; i++) {
 				DeserializeNodeReferences(graphs[i], int2Node);
 			}
+
+			DeserializeNodeLinks(int2Node);
+		}
+
+		void DeserializeNodeLinks (GraphNode[] int2Node) {
+			var entry = zip["node_link2"+binaryExt];
+
+			if (entry == null)
+				return;
+
+			var reader = GetBinaryReader(entry);
+			var ctx = new GraphSerializationContext(reader, int2Node, 0, meta);
+			NodeLink2.DeserializeReferences(ctx);
 		}
 
 		/** Calls PostDeserialization on all loaded graphs */
@@ -807,7 +726,6 @@ namespace Pathfinding.Serialization {
 		 * \note Stored in files named "graph#_editor.json" where # is the graph number.
 		 */
 		public void DeserializeEditorSettings (GraphEditorBase[] graphEditors) {
-#if !ASTAR_NO_JSON
 			if (graphEditors == null) return;
 
 			for (int i = 0; i < graphEditors.Length; i++) {
@@ -819,16 +737,10 @@ namespace Pathfinding.Serialization {
 					ZipEntry entry = zip["graph"+zipIndex+"_editor"+jsonExt];
 					if (entry == null) continue;
 
-					string entryText = GetString(entry);
-
-					var reader = new JsonReader(entryText, readerSettings);
-					GraphEditorBase graphEditor = graphEditors[i];
-					reader.PopulateObject(ref graphEditor);
-					graphEditors[i] = graphEditor;
+					TinyJsonDeserializer.Deserialize(GetString(entry), graphEditors[i].GetType(), graphEditors[i]);
 					break;
 				}
 			}
-#endif
 		}
 
 		/** Returns a binary reader for the data in the zip entry */
@@ -854,17 +766,14 @@ namespace Pathfinding.Serialization {
 		}
 
 		private GraphMeta DeserializeMeta (ZipEntry entry) {
-			if (entry == null) throw new Exception("No metadata found in serialized data.");
+			return TinyJsonDeserializer.Deserialize(GetString(entry), typeof(GraphMeta)) as GraphMeta;
+		}
 
-#if !ASTAR_NO_JSON
-			string s = GetString(entry);
-
-			var reader = new JsonReader(s, readerSettings);
-			return (GraphMeta)reader.Deserialize(typeof(GraphMeta));
-#else
+		private GraphMeta DeserializeBinaryMeta (ZipEntry entry) {
 			var meta = new GraphMeta();
 
 			var reader = GetBinaryReader(entry);
+
 			if (reader.ReadString() != "A*") throw new System.Exception("Invalid magic number in saved data");
 			int major = reader.ReadInt32();
 			int minor = reader.ReadInt32();
@@ -881,17 +790,15 @@ namespace Pathfinding.Serialization {
 
 			meta.graphs = reader.ReadInt32();
 
-			meta.guids = new string[reader.ReadInt32()];
-			for (int i = 0; i < meta.guids.Length; i++) meta.guids[i] = reader.ReadString();
+			meta.guids = new List<string>();
+			int count = reader.ReadInt32();
+			for (int i = 0; i < count; i++) meta.guids.Add(reader.ReadString());
 
-			meta.typeNames = new string[reader.ReadInt32()];
-			for (int i = 0; i < meta.typeNames.Length; i++) meta.typeNames[i] = reader.ReadString();
-
-			meta.nodeCounts = new int[reader.ReadInt32()];
-			for (int i = 0; i < meta.nodeCounts.Length; i++) meta.nodeCounts[i] = reader.ReadInt32();
+			meta.typeNames = new List<string>();
+			count = reader.ReadInt32();
+			for (int i = 0; i < count; i++) meta.typeNames.Add(reader.ReadString());
 
 			return meta;
-#endif
 		}
 
 
@@ -927,7 +834,7 @@ namespace Pathfinding.Serialization {
 	}
 
 	/** Metadata for all graphs included in serialization */
-	class GraphMeta {
+	public class GraphMeta {
 		/** Project version it was saved with */
 		public Version version;
 
@@ -935,13 +842,10 @@ namespace Pathfinding.Serialization {
 		public int graphs;
 
 		/** Guids for all graphs */
-		public string[] guids;
+		public List<string> guids;
 
 		/** Type names for all graphs */
-		public string[] typeNames;
-
-		/** Number of nodes for every graph. Nodes are not necessarily serialized */
-		public int[] nodeCounts;
+		public List<string> typeNames;
 
 		/** Returns the Type of graph number \a i */
 		public Type GetGraphType (int i) {
@@ -956,7 +860,8 @@ namespace Pathfinding.Serialization {
 				if (types[j].FullName == typeNames[i]) type = types[j];
 			}
 #else
-			Type type = Type.GetType(typeNames[i]);
+			// Note calling through assembly is more stable on e.g WebGL
+			Type type = typeof(AstarPath).Assembly.GetType(typeNames[i]);
 #endif
 			if (!System.Type.Equals(type, null))
 				return type;
@@ -975,6 +880,7 @@ namespace Pathfinding.Serialization {
 		/** Use pretty printing for the json data.
 		 * Good if you want to open up the saved data and edit it manually
 		 */
+		[System.Obsolete("There is no support for pretty printing the json anymore")]
 		public bool prettyPrint;
 
 		/** Save editor settings.
@@ -987,17 +893,6 @@ namespace Pathfinding.Serialization {
 			get {
 				var s = new SerializeSettings();
 				s.nodes = false;
-				return s;
-			}
-		}
-
-		/** Serialization settings for saving everything that can be saved.
-		 * This includes all node data
-		 */
-		public static SerializeSettings All {
-			get {
-				var s = new SerializeSettings();
-				s.nodes = true;
 				return s;
 			}
 		}

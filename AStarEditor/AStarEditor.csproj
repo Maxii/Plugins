@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR; UNITY_5_5_OR_NEWER</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -44,9 +44,6 @@
     <CodeAnalysisRuleSet>BasicCorrectnessRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Pathfinding.JsonFx">
-      <HintPath>..\AStarPlugins\JsonFx\Pathfinding.JsonFx.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -72,7 +69,6 @@
     <Compile Include="AstarUpdateWindow.cs" />
     <Compile Include="CustomGraphEditorAttribute.cs" />
     <Compile Include="EditorGUIx.cs" />
-    <Compile Include="EditorUtilities.cs" />
     <Compile Include="GraphEditors\GraphEditor.cs" />
     <Compile Include="GraphEditors\GridGeneratorEditor.cs" />
     <Compile Include="GraphEditors\LayerGridGraphEditor.cs" />
@@ -83,6 +79,7 @@
     <Compile Include="Misc\AstarEnumFlagDrawer.cs" />
     <Compile Include="ModifierEditors\RaycastModifierEditor.cs" />
     <Compile Include="ModifierEditors\SmoothModifierEditor.cs" />
+    <Compile Include="NavmeshCutEditor.cs" />
     <Compile Include="OptimizationHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RecastMeshObjEditor.cs" />

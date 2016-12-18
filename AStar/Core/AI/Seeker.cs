@@ -344,15 +344,33 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	 *
 	 * \a callback will be called when the path has completed.
 	 * \a Callback will not be called if the path is canceled (e.g when a new path is requested before the previous one has completed)
+	 *
+	 * \version Since 3.8.3 this method works properly if a MultiTargetPath is used.
+	 * It now behaves identically to the StartMultiTargetPath(MultiTargetPath) method.
 	 */
 	public Path StartPath (Path p, OnPathDelegate callback = null, int graphMask = -1) {
+		var mtp = p as MultiTargetPath;
+
+		if (mtp != null) {
+			// TODO: Allocation, cache
+			var callbacks = new OnPathDelegate[mtp.targetPoints.Length];
+
+			for (int i = 0; i < callbacks.Length; i++) {
+				callbacks[i] = onPartialPathDelegate;
+			}
+
+			mtp.callbacks = callbacks;
+			p.callback += OnMultiPathComplete;
+		} else {
+			p.callback += onPathDelegate;
+		}
+
 		p.enabledTags = traversableTags;
 		p.tagPenalties = tagPenalties;
-		p.callback += onPathDelegate;
 		p.nnConstraint.graphMask = graphMask;
 
 		StartPathInternal(p, callback);
-		return path;
+		return p;
 	}
 
 	/** Internal method to start a path and mark it as the currently active path */
@@ -400,7 +418,8 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 		MultiTargetPath p = MultiTargetPath.Construct(start, endPoints, null, null);
 
 		p.pathsForAll = pathsForAll;
-		return StartMultiTargetPath(p, callback, graphMask);
+		StartPath(p, callback, graphMask);
+		return p;
 	}
 
 	/** Starts a Multi Target Path from multiple start points to a single target point.
@@ -421,7 +440,8 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 		MultiTargetPath p = MultiTargetPath.Construct(startPoints, end, null, null);
 
 		p.pathsForAll = pathsForAll;
-		return StartMultiTargetPath(p, callback, graphMask);
+		StartPath(p, callback, graphMask);
+		return p;
 	}
 
 	/** Starts a Multi Target Path.
@@ -435,24 +455,13 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	 * \astarpro
 	 * \see Pathfinding.MultiTargetPath
 	 * \see \ref MultiTargetPathExample.cs "Example of how to use multi-target-paths"
+	 *
+	 * \version Since 3.8.3 calling this method behaves identically to calling StartPath with a MultiTargetPath.
+	 * \version Since 3.8.3 this method also sets enabledTags and tagPenalties on the path object.
 	 */
+	[System.Obsolete("You can use StartPath instead of this method now. It will behave identically.")]
 	public MultiTargetPath StartMultiTargetPath (MultiTargetPath p, OnPathDelegate callback = null, int graphMask = -1) {
-		// TODO: Allocation, cache
-		var callbacks = new OnPathDelegate[p.targetPoints.Length];
-
-		for (int i = 0; i < callbacks.Length; i++) {
-			callbacks[i] = onPartialPathDelegate;
-		}
-
-		// TODO: This method does not set the enabledTags or tagPenalties
-		// as the StartPath method does... should this be changed?
-		// Hard to do since the API has existed for a long time...
-
-		p.callbacks = callbacks;
-		p.callback += OnMultiPathComplete;
-		p.nnConstraint.graphMask = graphMask;
-
-		StartPathInternal(p, callback);
+		StartPath(p, callback, graphMask);
 		return p;
 	}
 

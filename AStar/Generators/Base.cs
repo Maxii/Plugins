@@ -1,17 +1,11 @@
 using UnityEngine;
 using System.Collections.Generic;
 using Pathfinding.Util;
-using Pathfinding.Serialization.JsonFx;
 using Pathfinding.Serialization;
 
 namespace Pathfinding {
 	/**  Base class for all graphs */
 	public abstract class NavGraph {
-		/** Used to store the guid value
-		 * \see NavGraph.guid
-		 */
-		public byte[] _sguid;
-
 		/** Reference to the AstarPath object in the scene.
 		 * Might not be entirely safe to use, it's better to use AstarPath.active
 		 */
@@ -21,17 +15,7 @@ namespace Pathfinding {
 		 * \note This is Pathfinding.Util.Guid not System.Guid. A replacement for System.Guid was coded for better compatibility with iOS
 		 */
 		[JsonMember]
-		public Guid guid {
-			get {
-				if (_sguid == null || _sguid.Length != 16) {
-					_sguid = Guid.NewGuid().ToByteArray();
-				}
-				return new Guid(_sguid);
-			}
-			set {
-				_sguid = value.ToByteArray();
-			}
-		}
+		public Guid guid;
 
 		/** Default penalty to apply to all nodes */
 		[JsonMember]
@@ -352,23 +336,11 @@ namespace Pathfinding {
 		public virtual void PostDeserialization () {
 		}
 
-#if ASTAR_NO_JSON
-		public virtual void SerializeSettings (GraphSerializationContext ctx) {
-			ctx.writer.Write(guid.ToByteArray());
-			ctx.writer.Write(initialPenalty);
-			ctx.writer.Write(open);
-			ctx.writer.Write(name ?? "");
-			ctx.writer.Write(drawGizmos);
-			ctx.writer.Write(infoScreenOpen);
-
-			for (int i = 0; i < 4; i++) {
-				for (int j = 0; j < 4; j++) {
-					ctx.writer.Write(matrix.GetRow(i)[j]);
-				}
-			}
-		}
-
-		public virtual void DeserializeSettings (GraphSerializationContext ctx) {
+		/** An old format for serializing settings.
+		 * \deprecated This is deprecated now, but the deserialization code is kept to
+		 * avoid loosing data when upgrading from older versions.
+		 */
+		public virtual void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
 			guid = new Guid(ctx.reader.ReadBytes(16));
 			initialPenalty = ctx.reader.ReadUInt32();
 			open = ctx.reader.ReadBoolean();
@@ -384,7 +356,6 @@ namespace Pathfinding {
 				matrix.SetRow(i, row);
 			}
 		}
-#endif
 
 		/** Returns if the node is in the search tree of the path.
 		 * Only guaranteed to be correct if \a path is the latest path calculated.
@@ -402,8 +373,11 @@ namespace Pathfinding {
 				return;
 			}
 
-			PathHandler data = AstarPath.active.debugPathData;
+			// This is the relatively slow default implementation
+			// subclasses of the base graph class may override
+			// this method to draw gizmos in a more optimized way
 
+			PathHandler data = AstarPath.active.debugPathData;
 			GraphNode node = null;
 
 			// Use this delegate to draw connections
@@ -416,7 +390,6 @@ namespace Pathfinding {
 
 				Gizmos.color = NodeColor(node, AstarPath.active.debugPathData);
 				if (AstarPath.active.showSearchTree && !InSearchTree(node, AstarPath.active.debugPath)) return true;
-
 
 				PathNode nodeR = data != null ? data.GetPathNode(node) : null;
 				if (AstarPath.active.showSearchTree && nodeR != null && nodeR.parent != null) {
@@ -674,25 +647,7 @@ namespace Pathfinding {
 			return hits.ToArray();
 		}
 
-		public void SerializeSettings (GraphSerializationContext ctx) {
-			ctx.writer.Write((int)type);
-			ctx.writer.Write(diameter);
-			ctx.writer.Write(height);
-			ctx.writer.Write(collisionOffset);
-			ctx.writer.Write((int)rayDirection);
-			ctx.writer.Write((int)mask);
-			ctx.writer.Write((int)heightMask);
-			ctx.writer.Write(fromHeight);
-			ctx.writer.Write(thickRaycast);
-			ctx.writer.Write(thickRaycastDiameter);
-
-			ctx.writer.Write(unwalkableWhenNoGround);
-			ctx.writer.Write(use2D);
-			ctx.writer.Write(collisionCheck);
-			ctx.writer.Write(heightCheck);
-		}
-
-		public void DeserializeSettings (GraphSerializationContext ctx) {
+		public void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
 			type = (ColliderType)ctx.reader.ReadInt32();
 			diameter = ctx.reader.ReadSingle();
 			height = ctx.reader.ReadSingle();

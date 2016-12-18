@@ -69,6 +69,7 @@
     <Compile Include="Editor\EventDelegateDrawer.cs" />
     <Compile Include="Editor\EventDelegateEditor.cs" />
     <Compile Include="Editor\FreeType.cs" />
+    <Compile Include="Editor\MinMaxRangeAttributeDrawer.cs" />
     <Compile Include="Editor\NGUIContextMenu.cs" />
     <Compile Include="Editor\NGUIEditorExtensions.cs" />
     <Compile Include="Editor\NGUIEditorTools.cs" />

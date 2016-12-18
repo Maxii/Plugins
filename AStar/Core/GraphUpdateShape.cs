@@ -11,6 +11,7 @@ namespace Pathfinding {
 		bool _convex;
 
 		/** Gets or sets the points of the polygon in the shape.
+		 * These points should be specified in clockwise order.
 		 * Will automatically calculate the convex hull if #convex is set to true */
 		public Vector3[] points {
 			get {

@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR; UNITY_5_5_OR_NEWER</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -49,9 +49,6 @@
     </Reference>
     <Reference Include="Pathfinding.Ionic.Zip.Reduced">
       <HintPath>..\AStarPlugins\DotNetZip\Pathfinding.Ionic.Zip.Reduced.dll</HintPath>
-    </Reference>
-    <Reference Include="Pathfinding.JsonFx">
-      <HintPath>..\AStarPlugins\JsonFx\Pathfinding.JsonFx.dll</HintPath>
     </Reference>
     <Reference Include="Pathfinding.Poly2Tri">
       <HintPath>..\AStarPlugins\Poly2Tri\Pathfinding.Poly2Tri.dll</HintPath>
@@ -88,6 +85,7 @@
     <Compile Include="Core\GraphUpdateScene.cs" />
     <Compile Include="Core\GraphUpdateShape.cs" />
     <Compile Include="Core\Misc\AnimationLink.cs" />
+    <Compile Include="Core\Misc\ArrayPool.cs" />
     <Compile Include="Core\Misc\AstarDebugger.cs" />
     <Compile Include="Core\Misc\AstarEnumFlagAttr.cs" />
     <Compile Include="Core\Misc\BinaryHeap.cs" />
@@ -119,11 +117,13 @@
     <Compile Include="Core\Serialization\JsonSerializer.cs" />
     <Compile Include="Core\Serialization\SimpleJsonReplacement.cs" />
     <Compile Include="Core\Serialization\SimpleZipReplacement.cs" />
+    <Compile Include="Core\Serialization\TinyJson.cs" />
     <Compile Include="Generators\Base.cs" />
     <Compile Include="Generators\GridGenerator.cs" />
     <Compile Include="Generators\LayerGridGraphGenerator.cs" />
     <Compile Include="Generators\NavMeshGenerator.cs" />
     <Compile Include="Generators\NodeClasses\GridNode.cs" />
+    <Compile Include="Generators\NodeClasses\GridNodeBase.cs" />
     <Compile Include="Generators\NodeClasses\PointNode.cs" />
     <Compile Include="Generators\NodeClasses\TriangleMeshNode.cs" />
     <Compile Include="Generators\PointGenerator.cs" />

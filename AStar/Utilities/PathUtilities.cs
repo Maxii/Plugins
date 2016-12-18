@@ -412,10 +412,10 @@ namespace Pathfinding {
 				|| nodes[0] is GridNode
 #endif
 				) {
-				//Assume all nodes are triangle nodes or grid nodes
-
+				// Accumulated area of all nodes
 				List<float> accs = ListPool<float>.Claim(nodes.Count);
 
+				// Total area of all nodes so far
 				float tot = 0;
 
 				for (int i = 0; i < nodes.Count; i++) {
@@ -458,6 +458,7 @@ namespace Pathfinding {
 							if (testLimit > 100) clearanceRadius = 0;
 						}
 
+						// Pick a random node among the ones in the list weighted by their area
 						float tg = (float)rnd.NextDouble()*tot;
 						int v = accs.BinarySearch(tg);
 						if (v < 0) v = ~v;
@@ -474,6 +475,8 @@ namespace Pathfinding {
 
 						if (node != null) {
 							// Find a random point inside the triangle
+							// This generates uniformly distributed trilinear coordinates
+							// See http://mathworld.wolfram.com/TrianglePointPicking.html
 							float v1;
 							float v2;
 							do {
@@ -481,6 +484,7 @@ namespace Pathfinding {
 								v2 = (float)rnd.NextDouble();
 							} while (v1+v2 > 1);
 
+							// Pick the point corresponding to the trilinear coordinate
 							p = ((Vector3)(node.GetVertex(1)-node.GetVertex(0)))*v1 + ((Vector3)(node.GetVertex(2)-node.GetVertex(0)))*v2 + (Vector3)node.GetVertex(0);
 						} else {
 #if !ASTAR_NO_GRID_GRAPH

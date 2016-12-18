@@ -2221,6 +2221,8 @@ static public class NGUIEditorTools
 			GUILayout.Space(18f);
 	}
 
+	static System.Collections.Generic.Dictionary<string, TextureImporterType> mOriginal = new Dictionary<string, TextureImporterType>();
+
 	/// <summary>
 	/// Force the texture to be readable. Returns the asset database path to the texture.
 	/// </summary>
@@ -2236,6 +2238,22 @@ static public class NGUIEditorTools
 			if (textureImporter != null && textureImporter.isReadable != readable)
 			{
 				textureImporter.isReadable = readable;
+
+				if (readable)
+				{
+					mOriginal[path] = textureImporter.textureType;
+					textureImporter.textureType = TextureImporterType.Image;
+				}
+				else
+				{
+					TextureImporterType type;
+
+					if (mOriginal.TryGetValue(path, out type))
+					{
+						textureImporter.textureType = type;
+						mOriginal.Remove(path);
+					}
+				}
 				AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
 			}
 		}

@@ -51,10 +51,10 @@ namespace Pathfinding.RVO {
 		/** A higher value will result in lower quality local avoidance but faster calculations.
 		 * Valid range is [0...1]
 		 */
-		[Tooltip("[GradientDecent][unitless][0...1] A higher value will result in lower quality local avoidance but faster calculations.")]
+		[Tooltip("[GradientDescent][unitless][0...1] A higher value will result in lower quality local avoidance but faster calculations.")]
 		public float qualityCutoff = 0.05f;
 
-		[Tooltip("[GradientDecent][unitless][0...2] How large steps to take when searching for a minimum to the penalty function. " +
+		[Tooltip("[GradientDescent][unitless][0...2] How large steps to take when searching for a minimum to the penalty function. " +
 			 "Larger values will make it faster, but less accurate, too low values (near 0) can also give large inaccuracies. Values around 0.5-1.5 work the best.")]
 		public float stepScale = 1.5f;
 
@@ -74,8 +74,8 @@ namespace Pathfinding.RVO {
 		 * \see http://digestingduck.blogspot.se/2010/04/adaptive-rvo-sampling.html
 		 * \see http://digestingduck.blogspot.se/2010/10/rvo-sample-pattern.html
 		 */
-		[Tooltip("What sampling algorithm to use. GradientDecent is a bit more agressive but makes it easier for agents to intersect.")]
-		public Pathfinding.RVO.Simulator.SamplingAlgorithm algorithm = Pathfinding.RVO.Simulator.SamplingAlgorithm.GradientDecent;
+		[Tooltip("What sampling algorithm to use. GradientDescent is a bit more agressive but makes it easier for agents to intersect.")]
+		public Pathfinding.RVO.Simulator.SamplingAlgorithm algorithm = Pathfinding.RVO.Simulator.SamplingAlgorithm.GradientDescent;
 
 		[Tooltip("Run multiple simulation steps per step. Much slower, but may lead to slightly higher quality local avoidance.")]
 		public bool oversampling;

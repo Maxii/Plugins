@@ -1,14 +1,15 @@
 using UnityEngine;
 using System.Collections.Generic;
 using Pathfinding;
-using Pathfinding.Util;
-using Pathfinding.Serialization.JsonFx;
 
 // Empty namespace declaration to avoid errors in the free version
 // Which does not have any classes in the RVO namespace
 namespace Pathfinding.RVO {}
 
 namespace Pathfinding {
+	using Pathfinding.Util;
+	using Pathfinding.Serialization;
+
 #if UNITY_5_0
 	/** Used in Unity 5.0 since the HelpURLAttribute was first added in Unity 5.1 */
 	public class HelpURLAttribute : Attribute {}
@@ -446,7 +447,11 @@ namespace Pathfinding {
 		private List<uint> backupData;
 		private List<Int3> backupPositionData;
 
-		/** A shape can be specified if a bounds object does not give enough precision */
+		/** A shape can be specified if a bounds object does not give enough precision.
+		 * Note that if you set this, you should set the bounds so that it encloses the shape
+		 * because the bounds will be used as an initial fast check for which nodes that should
+		 * be updated.
+		 */
 		public GraphUpdateShape shape;
 
 		/** Should be called on every node which is updated with this GUO before it is updated.
@@ -734,109 +739,100 @@ namespace Pathfinding {
 			Debug.DrawLine(p4, p1, col);
 		}
 	}
+
+	#region Delegates
+
+	/* Delegate with on Path object as parameter.
+	 * This is used for callbacks when a path has finished calculation.\n
+	 * Example function:
+	 * \code
+	 * public void Start () {
+	 *  //Assumes a Seeker component is attached to the GameObject
+	 *  Seeker seeker = GetComponent<Seeker>();
+	 *
+	 *  //seeker.pathCallback is a OnPathDelegate, we add the function OnPathComplete to it so it will be called whenever a path has finished calculating on that seeker
+	 *  seeker.pathCallback += OnPathComplete;
+	 * }
+	 *
+	 * public void OnPathComplete (Path p) {
+	 *  Debug.Log ("This is called when a path is completed on the seeker attached to this GameObject");
+	 * }
+	 * \endcode
+	 */
+	public delegate void OnPathDelegate (Path p);
+
+	public delegate void OnGraphDelegate (NavGraph graph);
+
+	public delegate void OnScanDelegate (AstarPath script);
+
+	public delegate void OnScanStatus (Progress progress);
+
+	#endregion
+
+	#region Enums
+
+	public enum GraphUpdateThreading {
+		UnityThread,
+		SeparateThread,
+		SeparateAndUnityInit
+	}
+
+	/** How path results are logged by the system */
+	public enum PathLog {
+		None,       /**< Does not log anything */
+		Normal,     /**< Logs basic info about the paths */
+		Heavy,      /**< Includes additional info */
+		InGame,     /**< Same as heavy, but displays the info in-game using GUI */
+		OnlyErrors  /**< Same as normal, but logs only paths which returned an error */
+	}
+
+	/** Heuristic to use. Heuristic is the estimated cost from the current node to the target */
+	public enum Heuristic {
+		Manhattan,
+		DiagonalManhattan,
+		Euclidean,
+		None
+	}
+
+	/** What data to draw the graph debugging with */
+	public enum GraphDebugMode {
+		Areas,
+		G,
+		H,
+		F,
+		Penalty,
+		Connections,
+		Tags
+	}
+
+	public enum ThreadCount {
+		AutomaticLowLoad = -1,
+		AutomaticHighLoad = -2,
+		None = 0,
+		One = 1,
+		Two,
+		Three,
+		Four,
+		Five,
+		Six,
+		Seven,
+		Eight
+	}
+
+	public enum PathState {
+		Created = 0,
+		PathQueue = 1,
+		Processing = 2,
+		ReturnQueue = 3,
+		Returned = 4
+	}
+
+	public enum PathCompleteState {
+		NotCalculated = 0,
+		Error = 1,
+		Complete = 2,
+		Partial = 3
+	}
+
+	#endregion
 }
-
-#region Delegates
-
-/* Delegate with on Path object as parameter.
- * This is used for callbacks when a path has finished calculation.\n
- * Example function:
- * \code
- * public void Start () {
- *  //Assumes a Seeker component is attached to the GameObject
- *  Seeker seeker = GetComponent<Seeker>();
- *
- *  //seeker.pathCallback is a OnPathDelegate, we add the function OnPathComplete to it so it will be called whenever a path has finished calculating on that seeker
- *  seeker.pathCallback += OnPathComplete;
- * }
- *
- * public void OnPathComplete (Path p) {
- *  Debug.Log ("This is called when a path is completed on the seeker attached to this GameObject");
- * }\endcode
- */
-public delegate void OnPathDelegate (Path p);
-
-public delegate Vector3[] GetNextTargetDelegate (Path p, Vector3 currentPosition);
-
-public delegate void NodeDelegate (GraphNode node);
-
-public delegate void OnGraphDelegate (NavGraph graph);
-
-public delegate void OnScanDelegate (AstarPath script);
-
-public delegate void OnScanStatus (Progress progress);
-
-#endregion
-
-#region Enums
-
-public enum GraphUpdateThreading {
-	UnityThread,
-	SeparateThread,
-	SeparateAndUnityInit
-}
-
-/** How path results are logged by the system */
-public enum PathLog {
-	None,       /**< Does not log anything */
-	Normal,     /**< Logs basic info about the paths */
-	Heavy,      /**< Includes additional info */
-	InGame,     /**< Same as heavy, but displays the info in-game using GUI */
-	OnlyErrors  /**< Same as normal, but logs only paths which returned an error */
-}
-
-/** Heuristic to use. Heuristic is the estimated cost from the current node to the target */
-public enum Heuristic {
-	Manhattan,
-	DiagonalManhattan,
-	Euclidean,
-	None
-}
-
-/** What data to draw the graph debugging with */
-public enum GraphDebugMode {
-	Areas,
-	G,
-	H,
-	F,
-	Penalty,
-	Connections,
-	Tags
-}
-
-/** Type of connection for a user placed link */
-public enum ConnectionType {
-	Connection,
-	ModifyNode
-}
-
-public enum ThreadCount {
-	AutomaticLowLoad = -1,
-	AutomaticHighLoad = -2,
-	None = 0,
-	One = 1,
-	Two,
-	Three,
-	Four,
-	Five,
-	Six,
-	Seven,
-	Eight
-}
-
-public enum PathState {
-	Created = 0,
-	PathQueue = 1,
-	Processing = 2,
-	ReturnQueue = 3,
-	Returned = 4
-}
-
-public enum PathCompleteState {
-	NotCalculated = 0,
-	Error = 1,
-	Complete = 2,
-	Partial = 3
-}
-
-#endregion

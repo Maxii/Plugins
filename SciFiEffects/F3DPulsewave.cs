@@ -1,106 +1,109 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class F3DPulsewave : MonoBehaviour
+namespace Forge3D
 {
-    public float FadeOutDelay;      // Color fade delay in ms
-    public float FadeOutTime;       // Color fade speed
-    public float ScaleTime;         // Scaling speed
-    public Vector3 ScaleSize;       // The size wave will be scaled to
-
-    public bool DebugLoop;          // Constant looping flag mainly used in preview scene
-
-    new Transform transform;        // Cached transform
-    MeshRenderer meshRenderer;      // Cached mesh renderer
-
-    int timerID = -1;               // Timer reference
-    bool isFadeOut;                 // Fading flag
-    bool isEnabled;                 // Enabled flag
-
-    Color defaultColor;             // Default wave color
-    Color color;                    // Current wave color
-
-    int tintColorRef;               // Shader property reference
-
-    void Awake()
+    public class F3DPulsewave : MonoBehaviour
     {
-        // Cache components
-        transform = GetComponent<Transform>();
-        meshRenderer = GetComponent<MeshRenderer>();
+        public float FadeOutDelay; // Color fade delay in ms
+        public float FadeOutTime; // Color fade speed
+        public float ScaleTime; // Scaling speed
+        public Vector3 ScaleSize; // The size wave will be scaled to
 
-        // Get shader property
-        tintColorRef = Shader.PropertyToID("_TintColor");
+        public bool DebugLoop; // Constant looping flag mainly used in preview scene
 
-        // Store default color
-        defaultColor = meshRenderer.material.GetColor(tintColorRef);
-    }
+        new Transform transform; // Cached transform
+        MeshRenderer meshRenderer; // Cached mesh renderer
 
-    void Start()
-    {
-        // Fire up manually
-        if (DebugLoop)
-            OnSpawned();
-    }
+        int timerID = -1; // Timer reference
+        bool isFadeOut; // Fading flag
+        bool isEnabled; // Enabled flag
 
-    // OnSpawned called by pool manager 
-    void OnSpawned()
-    {
-        // Set scale to zero
-        transform.localScale = new Vector3(0f, 0f, 0f);
+        Color defaultColor; // Default wave color
+        Color color; // Current wave color
 
-        // Set required flags and set delayed fade flag using timer 
-        isEnabled = true;
-        isFadeOut = false;
-        timerID = F3DTime.time.AddTimer(FadeOutDelay, OnFadeOut);
+        int tintColorRef; // Shader property reference
 
-        // Reset default color
-        meshRenderer.material.SetColor(tintColorRef, defaultColor);
-        color = defaultColor;
-    }
-
-    // OnDespawned called by pool manager 
-    void OnDespawned()
-    {
-        // Remove timer
-        if (timerID >= 0)
+        void Awake()
         {
-            F3DTime.time.RemoveTimer(timerID);
-            timerID = -1;
+            // Cache components
+            transform = GetComponent<Transform>();
+            meshRenderer = GetComponent<MeshRenderer>();
+
+            // Get shader property
+            tintColorRef = Shader.PropertyToID("_TintColor");
+
+            // Store default color
+            defaultColor = meshRenderer.material.GetColor(tintColorRef);
         }
-    }
 
-    // Toggle fading state
-    void OnFadeOut()
-    {        
-        isFadeOut = true;
-    }
-
-    void Update ()
-    {
-        // Enabled state
-        if (isEnabled)
+        void Start()
         {
-            // Scale the wave
-            transform.localScale = Vector3.Lerp(transform.localScale, ScaleSize, Time.deltaTime * ScaleTime);
+            // Fire up manually
+            if (DebugLoop)
+                OnSpawned();
+        }
 
-            // Check the fading state 
-            if (isFadeOut)
+        // OnSpawned called by pool manager 
+        void OnSpawned()
+        {
+            // Set scale to zero
+            transform.localScale = new Vector3(0f, 0f, 0f);
+
+            // Set required flags and set delayed fade flag using timer 
+            isEnabled = true;
+            isFadeOut = false;
+            timerID = F3DTime.time.AddTimer(FadeOutDelay, OnFadeOut);
+
+            // Reset default color
+            meshRenderer.material.SetColor(tintColorRef, defaultColor);
+            color = defaultColor;
+        }
+
+        // OnDespawned called by pool manager 
+        void OnDespawned()
+        {
+            // Remove timer
+            if (timerID >= 0)
             {
-                // Lerp color and update the shader
-                color = Color.Lerp(color, new Color(0, 0, 0, -0.1f), Time.deltaTime * FadeOutTime);
-                meshRenderer.material.SetColor(tintColorRef, color);
+                F3DTime.time.RemoveTimer(timerID);
+                timerID = -1;
+            }
+        }
 
-                // Make sure alpha value is not overshooting 
-                if (color.a <= 0f)
+        // Toggle fading state
+        void OnFadeOut()
+        {
+            isFadeOut = true;
+        }
+
+        void Update()
+        {
+            // Enabled state
+            if (isEnabled)
+            {
+                // Scale the wave
+                transform.localScale = Vector3.Lerp(transform.localScale, ScaleSize, Time.deltaTime*ScaleTime);
+
+                // Check the fading state 
+                if (isFadeOut)
                 {
-                    // Disable the update loop 
-                    isEnabled = false;
+                    // Lerp color and update the shader
+                    color = Color.Lerp(color, new Color(0, 0, 0, -0.1f), Time.deltaTime*FadeOutTime);
+                    meshRenderer.material.SetColor(tintColorRef, color);
 
-                    // Reset the sequence in case of the debug loop flag
-                    if(DebugLoop)
+                    // Make sure alpha value is not overshooting 
+                    if (color.a <= 0f)
                     {
-                        OnDespawned();
-                        OnSpawned();
+                        // Disable the update loop 
+                        isEnabled = false;
+
+                        // Reset the sequence in case of the debug loop flag
+                        if (DebugLoop)
+                        {
+                            OnDespawned();
+                            OnSpawned();
+                        }
                     }
                 }
             }

@@ -99,11 +99,13 @@ namespace Pathfinding {
 				for (int i = rndStart; i < prevNodes.Length; i += rnd.Next(1, randomStep)) {
 					if (prevNodes[i].Penalty < prevPenalty) {
 						warnPenalties = true;
+						prevNodes[i].Penalty = 0;
+					} else {
+						prevNodes[i].Penalty = (uint)(prevNodes[i].Penalty-prevPenalty);
 					}
-					prevNodes[i].Penalty = (uint)(prevNodes[i].Penalty-prevPenalty);
 				}
 				if (warnPenalties) {
-					Debug.LogWarning("Penalty for some nodes has been reset while this modifier was active. Penalties might not be correctly set.");
+					Debug.LogWarning("Penalty for some nodes has been reset while this modifier was active. Penalties might not be correctly set.", this);
 				}
 			}
 		}

@@ -76,7 +76,7 @@ namespace Pathfinding {
 			return Pathfinding.Polygon.ClosestPointOnTriangle((Vector3)g.GetVertex(v0), (Vector3)g.GetVertex(v1), (Vector3)g.GetVertex(v2), p);
 		}
 
-		public override Vector3 ClosestPointOnNodeXZ (Vector3 _p) {
+		public override Vector3 ClosestPointOnNodeXZ (Vector3 p) {
 			// Get the object holding the vertex data for this node
 			// This is usually a graph or a recast graph tile
 			INavmeshHolder g = GetNavmeshHolder(GraphIndex);
@@ -86,56 +86,14 @@ namespace Pathfinding {
 			Int3 tp2 = g.GetVertex(v1);
 			Int3 tp3 = g.GetVertex(v2);
 
-			// We need the point as an Int3
-			var p = (Int3)_p;
+			Vector2 closest = Polygon.ClosestPointOnTriangle(
+				new Vector2(tp1.x*Int3.PrecisionFactor, tp1.z*Int3.PrecisionFactor),
+				new Vector2(tp2.x*Int3.PrecisionFactor, tp2.z*Int3.PrecisionFactor),
+				new Vector2(tp3.x*Int3.PrecisionFactor, tp3.z*Int3.PrecisionFactor),
+				new Vector2(p.x, p.z)
+				);
 
-			// Save the original y coordinate, we will return a point with the same y coordinate
-			int oy = p.y;
-
-			// Assumes the triangle vertices are laid out in (counter?)clockwise order
-
-			tp1.y = 0;
-			tp2.y = 0;
-			tp3.y = 0;
-			p.y = 0;
-
-			if ((long)(tp2.x - tp1.x) * (long)(p.z - tp1.z) - (long)(p.x - tp1.x) * (long)(tp2.z - tp1.z) > 0) {
-				float f = Mathf.Clamp01(VectorMath.ClosestPointOnLineFactor(tp1, tp2, p));
-				return new Vector3(tp1.x + (tp2.x-tp1.x)*f, oy, tp1.z + (tp2.z-tp1.z)*f)*Int3.PrecisionFactor;
-			} else if ((long)(tp3.x - tp2.x) * (long)(p.z - tp2.z) - (long)(p.x - tp2.x) * (long)(tp3.z - tp2.z) > 0) {
-				float f = Mathf.Clamp01(VectorMath.ClosestPointOnLineFactor(tp2, tp3, p));
-				return new Vector3(tp2.x + (tp3.x-tp2.x)*f, oy, tp2.z + (tp3.z-tp2.z)*f)*Int3.PrecisionFactor;
-			} else if ((long)(tp1.x - tp3.x) * (long)(p.z - tp3.z) - (long)(p.x - tp3.x) * (long)(tp1.z - tp3.z) > 0) {
-				float f = Mathf.Clamp01(VectorMath.ClosestPointOnLineFactor(tp3, tp1, p));
-				return new Vector3(tp3.x + (tp1.x-tp3.x)*f, oy, tp3.z + (tp1.z-tp3.z)*f)*Int3.PrecisionFactor;
-			} else {
-				return _p;
-			}
-
-			/*
-			 * Equivalent to the above, but the above uses manual inlining
-			 * if (!VectorMath.RightOrColinearXZ (tp1, tp2, p)) {
-			 *  float f = Mathf.Clamp01 (VectorMath.ClosestPointOnLineFactor (tp1, tp2, p));
-			 *  return new Vector3(tp1.x + (tp2.x-tp1.x)*f, oy, tp1.z + (tp2.z-tp1.z)*f)*Int3.PrecisionFactor;
-			 * } else if (!VectorMath.RightOrColinearXZ (tp2, tp3, p)) {
-			 *  float f = Mathf.Clamp01 (VectorMath.ClosestPointOnLineFactor (tp2, tp3, p));
-			 *  return new Vector3(tp2.x + (tp3.x-tp2.x)*f, oy, tp2.z + (tp3.z-tp2.z)*f)*Int3.PrecisionFactor;
-			 * } else if (!VectorMath.RightOrColinearXZ (tp3, tp1, p)) {
-			 *  float f = Mathf.Clamp01 (VectorMath.ClosestPointOnLineFactor (tp3, tp1, p));
-			 *  return new Vector3(tp3.x + (tp1.x-tp3.x)*f, oy, tp3.z + (tp1.z-tp3.z)*f)*Int3.PrecisionFactor;
-			 * } else {
-			 *  return _p;
-			 * }*/
-
-			/* Almost equivalent to the above, but this is slower
-			 * Vector3 tp1 = (Vector3)g.GetVertex(v0);
-			 * Vector3 tp2 = (Vector3)g.GetVertex(v1);
-			 * Vector3 tp3 = (Vector3)g.GetVertex(v2);
-			 * tp1.y = 0;
-			 * tp2.y = 0;
-			 * tp3.y = 0;
-			 * _p.y = 0;
-			 * return Pathfinding.Polygon.ClosestPointOnTriangle (tp1,tp2,tp3,_p);*/
+			return new Vector3(closest.x, p.y, closest.y);
 		}
 
 		public override bool ContainsPoint (Int3 p) {

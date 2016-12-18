@@ -191,7 +191,7 @@ namespace Pathfinding.RVO {
 
 		public enum SamplingAlgorithm {
 			AdaptiveSampling,
-			GradientDecent
+			GradientDescent
 		}
 
 		/** What sampling algorithm to use.

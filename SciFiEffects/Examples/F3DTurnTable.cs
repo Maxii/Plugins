@@ -1,19 +1,23 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class F3DTurnTable : MonoBehaviour {
+namespace Forge3D
+{
+    public class F3DTurnTable : MonoBehaviour
+    {
 
-    public float speed;
+        public float speed;
 
-	// Use this for initialization
-	void Start () {
-	
-	}
-	
-	// Update is called once per frame
-	void Update () {
+        // Use this for initialization
+        void Start()
+        {
 
-        transform.rotation = transform.rotation * Quaternion.Euler(0, speed * Time.deltaTime, 0);
+        }
 
-	}
+        // Update is called once per frame
+        void Update()
+        { 
+            transform.rotation = transform.rotation * Quaternion.Euler(0, speed * Time.deltaTime, 0); 
+        }
+    }
 }

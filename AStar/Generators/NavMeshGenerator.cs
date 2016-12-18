@@ -1,7 +1,9 @@
 using UnityEngine;
 using System.Collections.Generic;
-using Pathfinding.Serialization.JsonFx;
 using Pathfinding.Serialization;
+#if UNITY_5_5_OR_NEWER
+using UnityEngine.Profiling;
+#endif
 
 namespace Pathfinding {
 	public interface INavmesh {
@@ -935,6 +937,7 @@ namespace Pathfinding {
 				nodes = new TriangleMeshNode[0];
 				_vertices = new Int3[0];
 				originalVertices = new Vector3[0];
+				return;
 			}
 
 			nodes = new TriangleMeshNode[nodeCount];
@@ -942,8 +945,8 @@ namespace Pathfinding {
 			originalVertices = new Vector3[vertexCount];
 
 			for (int i = 0; i < vertexCount; i++) {
-				_vertices[i] = new Int3(ctx.reader.ReadInt32(), ctx.reader.ReadInt32(), ctx.reader.ReadInt32());
-				originalVertices[i] = new Vector3(ctx.reader.ReadSingle(), ctx.reader.ReadSingle(), ctx.reader.ReadSingle());
+				_vertices[i] = ctx.DeserializeInt3();
+				originalVertices[i] = ctx.DeserializeVector3();
 			}
 
 			bbTree = new BBTree();
@@ -968,13 +971,8 @@ namespace Pathfinding {
 			ctx.writer.Write(_vertices.Length);
 
 			for (int i = 0; i < _vertices.Length; i++) {
-				ctx.writer.Write(_vertices[i].x);
-				ctx.writer.Write(_vertices[i].y);
-				ctx.writer.Write(_vertices[i].z);
-
-				ctx.writer.Write(originalVertices[i].x);
-				ctx.writer.Write(originalVertices[i].y);
-				ctx.writer.Write(originalVertices[i].z);
+				ctx.SerializeInt3(_vertices[i]);
+				ctx.SerializeVector3(originalVertices[i]);
 			}
 
 			for (int i = 0; i < nodes.Length; i++) {
@@ -982,21 +980,8 @@ namespace Pathfinding {
 			}
 		}
 
-#if ASTAR_NO_JSON
-		public override void SerializeSettings (GraphSerializationContext ctx) {
-			base.SerializeSettings(ctx);
-
-			ctx.SerializeUnityObject(sourceMesh);
-
-			ctx.SerializeVector3(offset);
-			ctx.SerializeVector3(rotation);
-
-			ctx.writer.Write(scale);
-			ctx.writer.Write(accurateNearestNode);
-		}
-
-		public override void DeserializeSettings (GraphSerializationContext ctx) {
-			base.DeserializeSettings(ctx);
+		public override void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
+			base.DeserializeSettingsCompatibility(ctx);
 
 			sourceMesh = ctx.DeserializeUnityObject() as Mesh;
 
@@ -1005,6 +990,5 @@ namespace Pathfinding {
 			scale = ctx.reader.ReadSingle();
 			accurateNearestNode = ctx.reader.ReadBoolean();
 		}
-#endif
 	}
 }

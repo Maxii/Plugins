@@ -125,7 +125,7 @@ public class UIGrid : UIWidgetContainer
 		for (int i = 0; i < myTrans.childCount; ++i)
 		{
 			Transform t = myTrans.GetChild(i);
-			if (!hideInactive || (t && NGUITools.GetActive(t.gameObject)))
+			if (!hideInactive || (t && t.gameObject.activeSelf))
 				list.Add(t);
 		}
 

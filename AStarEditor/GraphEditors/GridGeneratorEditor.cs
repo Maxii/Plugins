@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEditor;
-using Pathfinding.Serialization.JsonFx;
+using Pathfinding.Serialization;
 
 namespace Pathfinding {
 	[CustomGraphEditor(typeof(GridGraph), "Grid Graph")]

@@ -11,38 +11,27 @@ namespace Pathfinding {
 	 * \astarpro
 	 */
 	public class RecastBBTree {
-		public RecastBBTreeBox root;
+		RecastBBTreeBox root;
 
 		/** Queries the tree for all RecastMeshObjs inside the specified bounds.
 		 *
 		 * \param bounds World space bounds to search within
 		 * \param buffer The results will be added to the buffer
-		 *
 		 */
 		public void QueryInBounds (Rect bounds, List<RecastMeshObj> buffer) {
-			RecastBBTreeBox c = root;
-
-			if (c == null) return;
-
-			QueryBoxInBounds(c, bounds, buffer);
+			if (root == null) return;
+			QueryBoxInBounds(root, bounds, buffer);
 		}
 
 		void QueryBoxInBounds (RecastBBTreeBox box, Rect bounds, List<RecastMeshObj> boxes) {
 			if (box.mesh != null) {
-				//Leaf node
+				// Leaf node
 				if (RectIntersectsRect(box.rect, bounds)) {
 					// Found a RecastMeshObj, add it to the result
 					boxes.Add(box.mesh);
 				}
 			} else {
-	#if ASTARDEBUG
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMin), new Vector3(box.rect.xMax, 0, box.rect.yMin), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMax), new Vector3(box.rect.xMax, 0, box.rect.yMax), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMin), new Vector3(box.rect.xMin, 0, box.rect.yMax), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMax, 0, box.rect.yMin), new Vector3(box.rect.xMax, 0, box.rect.yMax), Color.white);
-	#endif
-
-				//Search children
+				// Search children
 				if (RectIntersectsRect(box.c1.rect, bounds)) {
 					QueryBoxInBounds(box.c1, bounds, boxes);
 				}
@@ -143,91 +132,9 @@ namespace Pathfinding {
 			}
 		}
 
-		public void OnDrawGizmos () {
-			// Uncomment to draw nice gizmos
-			//Gizmos.color = new Color (1,1,1,0.01F);
-			//OnDrawGizmos (root);
-		}
-
-		public void OnDrawGizmos (RecastBBTreeBox box) {
-			if (box == null) {
-				return;
-			}
-
-			var min = new Vector3(box.rect.xMin, 0, box.rect.yMin);
-			var max = new Vector3(box.rect.xMax, 0, box.rect.yMax);
-
-			Vector3 center = (min+max)*0.5F;
-			Vector3 size = (max-center)*2;
-
-			Gizmos.DrawCube(center, size);
-
-			OnDrawGizmos(box.c1);
-			OnDrawGizmos(box.c2);
-		}
 
 		static bool RectIntersectsRect (Rect r, Rect r2) {
 			return (r.xMax > r2.xMin && r.yMax > r2.yMin && r2.xMax > r.xMin && r2.yMax > r.yMin);
-		}
-
-		static bool RectIntersectsCircle (Rect r, Vector3 p, float radius) {
-			if (float.IsPositiveInfinity(radius)) return true;
-
-			if (RectContains(r, p)) {
-				return true;
-			}
-
-			return XIntersectsCircle(r.xMin, r.xMax, r.yMin, p, radius) ||
-				   XIntersectsCircle(r.xMin, r.xMax, r.yMax, p, radius) ||
-				   ZIntersectsCircle(r.yMin, r.yMax, r.xMin, p, radius) ||
-				   ZIntersectsCircle(r.yMin, r.yMax, r.xMax, p, radius);
-		}
-
-		/** Returns if a rect contains the 3D point in XZ space */
-		static bool RectContains (Rect r, Vector3 p) {
-			return p.x >= r.xMin && p.x <= r.xMax && p.z >= r.yMin && p.z <= r.yMax;
-		}
-
-		static bool ZIntersectsCircle (float z1, float z2, float xpos, Vector3 circle, float radius) {
-			double f = Math.Abs(xpos-circle.x)/radius;
-
-			if (f > 1.0 || f < -1.0) {
-				return false;
-			}
-
-			float s1 = (float)Math.Sqrt(1.0 - f*f)*radius;
-
-			float s2 = circle.z - s1;
-			s1 += circle.z;
-
-			float min = Math.Min(s1, s2);
-			float max = Math.Max(s1, s2);
-
-			min = Mathf.Max(z1, min);
-			max = Mathf.Min(z2, max);
-
-			return max > min;
-		}
-
-		static bool XIntersectsCircle (float x1, float x2, float zpos, Vector3 circle, float radius) {
-			double f = Math.Abs(zpos-circle.z)/radius;
-
-			if (f > 1.0 || f < -1.0) {
-				return false;
-			}
-
-			float s1 = (float)Math.Sqrt(1.0 - f*f)*radius;
-
-			float s2 = circle.x - s1;
-			s1 += circle.x;
-
-			float min = Math.Min(s1, s2);
-			float max = Math.Max(s1, s2);
-
-			min = Mathf.Max(x1, min);
-			max = Mathf.Min(x2, max);
-
-			return max > min;
 		}
 
 		/** Returns the difference in area between \a r and \a r expanded to contain \a r2 */
@@ -254,18 +161,6 @@ namespace Pathfinding {
 		static float RectArea (Rect r) {
 			return r.width*r.height;
 		}
-
-		public new void ToString () {
-			//Console.WriteLine ("Root "+(root.node != null ? root.node.ToString () : ""));
-
-			RecastBBTreeBox c = root;
-
-			var stack = new Stack<RecastBBTreeBox>();
-
-			stack.Push(c);
-
-			c.WriteChildren(0);
-		}
 	}
 
 	public class RecastBBTreeBox {
@@ -285,25 +180,6 @@ namespace Pathfinding {
 
 		public bool Contains (Vector3 p) {
 			return rect.Contains(p);
-		}
-
-		public void WriteChildren (int level) {
-			for (int i = 0; i < level; i++) {
-#if !NETFX_CORE || UNITY_EDITOR
-				Console.Write("  ");
-#endif
-			}
-			if (mesh != null) {
-#if !NETFX_CORE || UNITY_EDITOR
-				Console.WriteLine("Leaf "); //+triangle.ToString ());
-#endif
-			} else {
-#if !NETFX_CORE || UNITY_EDITOR
-				Console.WriteLine("Box "); //+rect.ToString ());
-#endif
-				c1.WriteChildren(level+1);
-				c2.WriteChildren(level+1);
-			}
 		}
 	}
 }

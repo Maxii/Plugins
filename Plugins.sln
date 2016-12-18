@@ -26,11 +26,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DotNetZip", "DotNetZip", "{
 		AStarPlugins\DotNetZip\Pathfinding.Ionic.Zip.Reduced.dll = AStarPlugins\DotNetZip\Pathfinding.Ionic.Zip.Reduced.dll
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "JsonFx", "JsonFx", "{35C53D29-C4FF-4B62-A231-65357632F17B}"
-	ProjectSection(SolutionItems) = preProject
-		AStarPlugins\JsonFx\Pathfinding.JsonFx.dll = AStarPlugins\JsonFx\Pathfinding.JsonFx.dll
-	EndProjectSection
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AStarEditor", "AStarEditor\AStarEditor.csproj", "{89B92DFD-410D-4E95-BF4E-4A42868C5AE3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceD", "SpaceD\SpaceD.csproj", "{D1D9E6DA-D2AC-4CDC-B8A8-3B749D41CA5E}"
@@ -171,7 +166,6 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{6AE1FB36-A813-4126-99BE-9DB7C87D48AE} = {250733FE-01D4-469A-89B9-20F929CCF094}
-		{35C53D29-C4FF-4B62-A231-65357632F17B} = {250733FE-01D4-469A-89B9-20F929CCF094}
 		{8B11661A-1201-4AEE-A98D-932582000BF5} = {250733FE-01D4-469A-89B9-20F929CCF094}
 		{A1736422-DCCB-466A-8B1A-CF5984F76FD1} = {250733FE-01D4-469A-89B9-20F929CCF094}
 	EndGlobalSection

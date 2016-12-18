@@ -6,6 +6,9 @@ using UnityEditor;
 #endif
 
 namespace Pathfinding {
+	/** Connects two nodes with a direct connection.
+	 * It is not possible to detect this link when following a path (which may be good or bad), for that you can use NodeLink2.
+	 */
 	[AddComponentMenu("Pathfinding/Link")]
 	[HelpURL("http://arongranberg.com/astar/docs/class_pathfinding_1_1_node_link.php")]
 	public class NodeLink : GraphModifier {

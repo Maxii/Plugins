@@ -870,7 +870,7 @@ namespace Pathfinding {
 		/** Works like a constructor, but can be used even for pooled objects. Returns \a this for easy chaining */
 		public RichSpecial Initialize (NodeLink2 nodeLink, GraphNode first) {
 			this.nodeLink = nodeLink;
-			if (first == nodeLink.StartNode) {
+			if (first == nodeLink.startNode) {
 				this.first = nodeLink.StartTransform;
 				this.second = nodeLink.EndTransform;
 				reverse = false;

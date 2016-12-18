@@ -500,7 +500,6 @@ public class UIInput : MonoBehaviour
 			mDoInit = false;
 			mDefaultText = label.text;
 			mDefaultColor = label.color;
-			label.supportEncoding = false;
 			mEllipsis = label.overflowEllipsis;
 
 			if (label.alignment == NGUIText.Alignment.Justified)
@@ -540,6 +539,8 @@ public class UIInput : MonoBehaviour
 	{
 		if (isSelected)
 		{
+			if (label != null) label.supportEncoding = false;
+
 #if !MOBILE
 			if (mOnGUI == null)
 				mOnGUI = gameObject.AddComponent<UIInputOnGUI>();
@@ -766,6 +767,7 @@ public class UIInput : MonoBehaviour
 					if (ch == '\uF701') continue;
 					if (ch == '\uF702') continue;
 					if (ch == '\uF703') continue;
+					if (ch == '\uF728') continue;
 
 					Insert(ch.ToString());
 				}

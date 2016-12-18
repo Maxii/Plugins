@@ -1,7 +1,6 @@
 #if !ASTAR_NO_GRID_GRAPH
 using UnityEngine;
 using System.Collections.Generic;
-using Pathfinding.Serialization.JsonFx;
 using Pathfinding.Serialization;
 
 namespace Pathfinding {
@@ -30,8 +29,6 @@ namespace Pathfinding {
 		void RemoveGridGraphFromStatic () {
 			LevelGridNode.SetGridGraph(active.astarData.GetGraphIndex(this), null);
 		}
-
-		public int[] nodeCellIndices;
 
 		/** Number of layers.
 		 * \warning Do not modify this variable
@@ -513,8 +510,6 @@ namespace Pathfinding {
 			}
 
 			nodeIndex = 0;
-
-			nodeCellIndices = new int[linkedCells.Length];
 
 			for (int z = 0; z < depth; z++) {
 				for (int x = 0; x < width; x++) {
@@ -1095,6 +1090,7 @@ namespace Pathfinding {
 		}
 	}
 
+	/** Internal class used by the LayerGridGraph */
 	public class LinkedLevelCell {
 		public int count;
 		public int index;
@@ -1102,6 +1098,7 @@ namespace Pathfinding {
 		public LinkedLevelNode first;
 	}
 
+	/** Internal class used by the LayerGridGraph */
 	public class LinkedLevelNode {
 		public Vector3 position;
 		public bool walkable;
@@ -1114,12 +1111,6 @@ namespace Pathfinding {
 	 * Works almost the same as a grid node, except that it also stores to which layer the connections go to
 	 */
 	public class LevelGridNode : GridNodeBase {
-		const int GridFlagsWalkableErosionOffset = 8;
-		const int GridFlagsWalkableErosionMask = 1 << GridFlagsWalkableErosionOffset;
-
-		const int GridFlagsWalkableTmpOffset = 9;
-		const int GridFlagsWalkableTmpMask = 1 << GridFlagsWalkableTmpOffset;
-
 		public LevelGridNode (AstarPath astar) : base(astar) {
 		}
 
@@ -1135,8 +1126,6 @@ namespace Pathfinding {
 
 			_gridGraphs[graphIndex] = graph;
 		}
-
-		protected ushort gridFlags;
 
 #if ASTAR_LEVELGRIDNODE_FEW_LAYERS
 		protected ushort gridConnections;
@@ -1172,30 +1161,6 @@ namespace Pathfinding {
 			}
 		}
 
-		/*public override Int3 Position {
-		 *  get {
-		 *      return position;
-		 *  }
-		 * }*/
-
-		public bool WalkableErosion {
-			get {
-				return (gridFlags & GridFlagsWalkableErosionMask) != 0;
-			}
-			set {
-				unchecked { gridFlags = (ushort)(gridFlags & ~GridFlagsWalkableErosionMask | (value ? (ushort)GridFlagsWalkableErosionMask : (ushort)0)); }
-			}
-		}
-
-		public bool TmpWalkable {
-			get {
-				return (gridFlags & GridFlagsWalkableTmpMask) != 0;
-			}
-			set {
-				unchecked { gridFlags = (ushort)(gridFlags & ~GridFlagsWalkableTmpMask | (value ? (ushort)GridFlagsWalkableTmpMask : (ushort)0)); }
-			}
-		}
-
 		/** Does this node have any grid connections */
 		public bool HasAnyGridConnections () {
 			unchecked {
@@ -1218,19 +1183,22 @@ namespace Pathfinding {
 				LevelGridNode[] nodes = graph.nodes;
 
 				for (int i = 0; i < 4; i++) {
-					int conn = GetConnectionValue(i);//(gridConnections >> i*4) & 0xF;
+					int conn = GetConnectionValue(i);
 					if (conn != LevelGridNode.NoConnection) {
 						LevelGridNode other = nodes[NodeInGridIndex+neighbourOffsets[i] + graph.lastScannedWidth*graph.lastScannedDepth*conn];
 						if (other != null) {
-							//Remove reverse connection
-							/** \todo Check if correct */
-							other.SetConnectionValue(i < 4 ? ((i + 2) % 4) : (((5-2) % 4) + 4), NoConnection);
+							// Remove reverse connection
+							other.SetConnectionValue((i + 2) % 4, NoConnection);
 						}
 					}
 				}
 			}
 
 			ResetAllGridConnections();
+
+#if !ASTAR_GRID_NO_CUSTOM_CONNECTIONS
+			base.ClearConnections(alsoReverse);
+#endif
 		}
 
 		public override void GetConnections (GraphNodeDelegate del) {
@@ -1242,12 +1210,16 @@ namespace Pathfinding {
 			LevelGridNode[] nodes = graph.nodes;
 
 			for (int i = 0; i < 4; i++) {
-				int conn = GetConnectionValue(i);//(gridConnections >> i*4) & 0xF;
+				int conn = GetConnectionValue(i);
 				if (conn != LevelGridNode.NoConnection) {
 					LevelGridNode other = nodes[index+neighbourOffsets[i] + graph.lastScannedWidth*graph.lastScannedDepth*conn];
 					if (other != null) del(other);
 				}
 			}
+
+#if !ASTAR_GRID_NO_CUSTOM_CONNECTIONS
+			base.GetConnections(del);
+#endif
 		}
 
 		public override void FloodFill (Stack<GraphNode> stack, uint region) {
@@ -1259,7 +1231,7 @@ namespace Pathfinding {
 			LevelGridNode[] nodes = graph.nodes;
 
 			for (int i = 0; i < 4; i++) {
-				int conn = GetConnectionValue(i);//(gridConnections >> i*4) & 0xF;
+				int conn = GetConnectionValue(i);
 				if (conn != LevelGridNode.NoConnection) {
 					LevelGridNode other = nodes[index+neighbourOffsets[i] + graph.lastScannedWidth*graph.lastScannedDepth*conn];
 					if (other != null && other.Area != region) {
@@ -1268,14 +1240,10 @@ namespace Pathfinding {
 					}
 				}
 			}
-		}
 
-		public override void AddConnection (GraphNode node, uint cost) {
-			throw new System.NotImplementedException("Layered Grid Nodes do not have support for adding manual connections");
-		}
-
-		public override void RemoveConnection (GraphNode node) {
-			throw new System.NotImplementedException("Layered Grid Nodes do not have support for adding manual connections");
+#if !ASTAR_GRID_NO_CUSTOM_CONNECTIONS
+			base.FloodFill(stack, region);
+#endif
 		}
 
 		/** Is there a grid connection in that direction */
@@ -1312,7 +1280,7 @@ namespace Pathfinding {
 			int index = NodeInGridIndex;
 
 			for (int i = 0; i < 4; i++) {
-				int conn = GetConnectionValue(i);//(gridConnections >> i*4) & 0xF;
+				int conn = GetConnectionValue(i);
 				if (conn != LevelGridNode.NoConnection) {
 					if (other == nodes[index+neighbourOffsets[i] + graph.lastScannedWidth*graph.lastScannedDepth*conn]) {
 						Vector3 middle = ((Vector3)(position + other.position))*0.5f;
@@ -1330,8 +1298,6 @@ namespace Pathfinding {
 		}
 
 		public override void UpdateRecursiveG (Path path, PathNode pathNode, PathHandler handler) {
-			//BaseUpdateAllG (nodeR, nodeRunData);
-
 			handler.PushNode(pathNode);
 			UpdateG(path, pathNode);
 
@@ -1341,7 +1307,7 @@ namespace Pathfinding {
 			int index = NodeInGridIndex;
 
 			for (int i = 0; i < 4; i++) {
-				int conn = GetConnectionValue(i);//(gridConnections >> i*4) & 0xF;
+				int conn = GetConnectionValue(i);
 				if (conn != LevelGridNode.NoConnection) {
 					LevelGridNode other = nodes[index+neighbourOffsets[i] + graph.lastScannedWidth*graph.lastScannedDepth*conn];
 					PathNode otherPN = handler.GetPathNode(other);
@@ -1351,21 +1317,23 @@ namespace Pathfinding {
 					}
 				}
 			}
+
+#if !ASTAR_GRID_NO_CUSTOM_CONNECTIONS
+			base.UpdateRecursiveG(path, pathNode, handler);
+#endif
 		}
 
 		public override void Open (Path path, PathNode pathNode, PathHandler handler) {
-			//BaseOpen (nodeRunData, nodeR, targetPosition, path);
-
 			LayerGridGraph graph = GetGridGraph(GraphIndex);
 
 			int[] neighbourOffsets = graph.neighbourOffsets;
 			uint[] neighbourCosts = graph.neighbourCosts;
 			LevelGridNode[] nodes = graph.nodes;
 
-			int index = NodeInGridIndex;//indices & 0xFFFFFF;
+			int index = NodeInGridIndex;
 
 			for (int i = 0; i < 4; i++) {
-				int conn = GetConnectionValue(i);//(gridConnections >> i*4) & 0xF;
+				int conn = GetConnectionValue(i);
 				if (conn != LevelGridNode.NoConnection) {
 					GraphNode other = nodes[index+neighbourOffsets[i] + graph.lastScannedWidth*graph.lastScannedDepth*conn];
 
@@ -1416,20 +1384,22 @@ namespace Pathfinding {
 					}
 				}
 			}
+
+#if !ASTAR_GRID_NO_CUSTOM_CONNECTIONS
+			base.Open(path, pathNode, handler);
+#endif
 		}
 
 		public override void SerializeNode (GraphSerializationContext ctx) {
 			base.SerializeNode(ctx);
-			ctx.writer.Write(position.x);
-			ctx.writer.Write(position.y);
-			ctx.writer.Write(position.z);
+			ctx.SerializeInt3(position);
 			ctx.writer.Write(gridFlags);
 			ctx.writer.Write(gridConnections);
 		}
 
 		public override void DeserializeNode (GraphSerializationContext ctx) {
 			base.DeserializeNode(ctx);
-			position = new Int3(ctx.reader.ReadInt32(), ctx.reader.ReadInt32(), ctx.reader.ReadInt32());
+			position = ctx.DeserializeInt3();
 			gridFlags = ctx.reader.ReadUInt16();
 #if ASTAR_LEVELGRIDNODE_FEW_LAYERS
 			gridConnections = ctx.reader.ReadUInt16();

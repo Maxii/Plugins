@@ -150,7 +150,7 @@ namespace Pathfinding.Voxels {
 		}
 
 		public void Init () {
-			//Initialize the voxel area
+			// Initialize the voxel area
 			if (voxelArea == null || voxelArea.width != width || voxelArea.depth != depth)
 				voxelArea = new VoxelArea(width, depth);
 			else voxelArea.Reset();
@@ -521,7 +521,7 @@ namespace Pathfinding.Voxels {
 							int bottom = (int)s.top;
 							int top = s.next != null ? (int)s.next.bottom : VoxelArea.MaxHeightInt;
 
-							voxelArea.compactSpans[idx] = new CompactVoxelSpan((ushort)AstarMath.Clamp(bottom, 0, 0xffff), (uint)AstarMath.Clamp(top-bottom, 0, 0xffff));
+							voxelArea.compactSpans[idx] = new CompactVoxelSpan((ushort)Mathf.Clamp(bottom, 0, 0xffff), (uint)Mathf.Clamp(top-bottom, 0, 0xffff));
 							voxelArea.areaTypes[idx] = s.area;
 							idx++;
 							count++;
@@ -960,8 +960,8 @@ namespace Pathfinding.Voxels {
 
 							int ntop = nsx != null ? (int)nsx.bottom : VoxelArea.MaxHeightInt;
 
-							if (AstarMath.Min(top, ntop) - AstarMath.Max(bottom, nbottom) > voxelWalkableHeight) {
-								minHeight = AstarMath.Min(minHeight, nbottom - bottom);
+							if (System.Math.Min(top, ntop) - System.Math.Max(bottom, nbottom) > voxelWalkableHeight) {
+								minHeight = System.Math.Min(minHeight, nbottom - bottom);
 							}
 
 							//Loop through spans
@@ -969,10 +969,10 @@ namespace Pathfinding.Voxels {
 								nbottom = (int)ns.top;
 								ntop = ns.next != null ? (int)ns.next.bottom : VoxelArea.MaxHeightInt;
 
-								if (AstarMath.Min(top, ntop) - AstarMath.Max(bottom, nbottom) > voxelWalkableHeight) {
-									minHeight = AstarMath.Min(minHeight, nbottom - bottom);
+								if (System.Math.Min(top, ntop) - System.Math.Max(bottom, nbottom) > voxelWalkableHeight) {
+									minHeight = System.Math.Min(minHeight, nbottom - bottom);
 
-									if (AstarMath.Abs(nbottom - bottom) <= voxelWalkableClimb) {
+									if (System.Math.Abs(nbottom - bottom) <= voxelWalkableClimb) {
 										if (nbottom < aMinHeight) { aMinHeight = nbottom; }
 										if (nbottom > aMaxHeight) { aMaxHeight = nbottom; }
 									}

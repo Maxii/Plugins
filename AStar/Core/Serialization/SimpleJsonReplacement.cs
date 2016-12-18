@@ -1,8 +1,4 @@
-#if ASTAR_NO_JSON
-namespace Pathfinding.Serialization.JsonFx {
-	public class JsonMemberAttribute : System.Attribute {}
-	public class JsonOptInAttribute : System.Attribute {}
-	public class JsonNameAttribute : System.Attribute { public JsonNameAttribute (string s) {}
-	}
-}
-#endif
+
+// This file has been removed from the project. Since UnityPackages cannot
+// delete files, only replace them, this message is left here to prevent old
+// files from causing compiler errors

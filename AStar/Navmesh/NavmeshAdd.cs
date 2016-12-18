@@ -250,7 +250,6 @@ namespace Pathfinding {
 			Bounds b = GetBounds();
 			Gizmos.DrawCube(b.center, b.size);
 			Gizmos.DrawWireCube(b.center, b.size);
-			Debug.Log(mesh.bounds);
 		}
 	#endif
 	}

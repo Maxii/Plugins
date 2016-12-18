@@ -46,10 +46,10 @@ namespace Pathfinding {
 			}
 		}
 
-		int GetBox (MeshNode node) {
+		int GetBox (MeshNode node, IntRect bounds) {
 			if (count >= arr.Length) EnsureCapacity(count+1);
 
-			arr[count] = new BBTreeBox(node);
+			arr[count] = new BBTreeBox(node, bounds);
 			count++;
 			return count-1;
 		}
@@ -62,6 +62,8 @@ namespace Pathfinding {
 			return count-1;
 		}
 
+		public static System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
+
 		/** Rebuilds the tree using the specified nodes.
 		 * This is faster and gives better quality results compared to calling Insert with all nodes
 		 */
@@ -72,67 +74,84 @@ namespace Pathfinding {
 				return;
 			}
 
-			if (nodes.Length == 1) {
-				GetBox(nodes[0]);
-				return;
-			}
-
 			// We will use approximately 2N tree nodes
 			EnsureCapacity(Mathf.CeilToInt(nodes.Length * 2.1f));
 
-			// Make a copy of the nodes array since we will be modifying it
-			var nodeCopies = new MeshNode[nodes.Length];
-			for (int i = 0; i < nodes.Length; i++) nodeCopies[i] = nodes[i];
+			// This will store the order of the nodes while the tree is being built
+			// It turns out that it is a lot faster to do this than to actually modify
+			// the nodes and nodeBounds arrays (presumably since that involves shuffling
+			// around 20 bytes of memory (sizeof(pointer) + sizeof(IntRect)) per node
+			// instead of 4 bytes (sizeof(int)).
+			// It also means we don't have to make a copy of the nodes array since
+			// we do not modify it
+			var permutation = new int[nodes.Length];
+			for (int i = 0; i < nodes.Length; i++) {
+				permutation[i] = i;
+			}
 
-			RebuildFromInternal(nodeCopies, 0, nodes.Length, false);
+			// Precalculate the bounds of the nodes in XZ space.
+			// It turns out that calculating the bounds is a bottleneck and precalculating
+			// the bounds makes it around 3 times faster to build a tree
+			var nodeBounds = new IntRect[nodes.Length];
+			for (int i = 0; i < nodes.Length; i++) {
+				var node = nodes[i];
+				var v0 = node.GetVertex(0);
+				var v1 = node.GetVertex(1);
+				var v2 = node.GetVertex(2);
+
+				var r = new IntRect(v0.x, v0.z, v0.x, v0.z);
+				r = r.ExpandToContain(v1.x, v1.z);
+				r = r.ExpandToContain(v2.x, v2.z);
+				nodeBounds[i] = r;
+			}
+
+			RebuildFromInternal(nodes, permutation, nodeBounds, 0, nodes.Length, false);
 		}
 
-		static int SplitByX (MeshNode[] nodes, int from, int to, int divider) {
+		static int SplitByX (MeshNode[] nodes, int[] permutation, int from, int to, int divider) {
 			int mx = to;
 
 			for (int i = from; i < mx; i++) {
-				if (nodes[i].position.x > divider) {
-					// swap with mx
+				if (nodes[permutation[i]].position.x > divider) {
 					mx--;
-					var tmp = nodes[mx];
-					nodes[mx] = nodes[i];
-					nodes[i] = tmp;
+					// Swap items i and mx
+					var tmp = permutation[mx];
+					permutation[mx] = permutation[i];
+					permutation[i] = tmp;
 					i--;
 				}
 			}
 			return mx;
 		}
 
-		static int SplitByZ (MeshNode[] nodes, int from, int to, int divider) {
+		static int SplitByZ (MeshNode[] nodes, int[] permutation, int from, int to, int divider) {
 			int mx = to;
 
 			for (int i = from; i < mx; i++) {
-				if (nodes[i].position.z > divider) {
-					// swap with mx
+				if (nodes[permutation[i]].position.z > divider) {
 					mx--;
-					var tmp = nodes[mx];
-					nodes[mx] = nodes[i];
-					nodes[i] = tmp;
+					// Swap items i and mx
+					var tmp = permutation[mx];
+					permutation[mx] = permutation[i];
+					permutation[i] = tmp;
 					i--;
 				}
 			}
 			return mx;
 		}
 
-		int RebuildFromInternal (MeshNode[] nodes, int from, int to, bool odd) {
-			if (to - from <= 0) throw new ArgumentException();
-
+		int RebuildFromInternal (MeshNode[] nodes, int[] permutation, IntRect[] nodeBounds, int from, int to, bool odd) {
 			if (to - from == 1) {
-				return GetBox(nodes[from]);
+				return GetBox(nodes[permutation[from]], nodeBounds[permutation[from]]);
 			}
 
-			var rect = NodeBounds(nodes, from, to);
+			var rect = NodeBounds(permutation, nodeBounds, from, to);
 			int box = GetBox(rect);
 
 			// Performance optimization for a common case
 			if (to - from == 2) {
-				arr[box].left = GetBox(nodes[from]);
-				arr[box].right = GetBox(nodes[from+1]);
+				arr[box].left = GetBox(nodes[permutation[from]], nodeBounds[permutation[from]]);
+				arr[box].right = GetBox(nodes[permutation[from+1]], nodeBounds[permutation[from+1]]);
 				return box;
 			}
 
@@ -140,11 +159,11 @@ namespace Pathfinding {
 			if (odd) {
 				// X
 				int divider = (rect.xmin + rect.xmax)/2;
-				mx = SplitByX(nodes, from, to, divider);
+				mx = SplitByX(nodes, permutation, from, to, divider);
 			} else {
 				// Y/Z
 				int divider = (rect.ymin + rect.ymax)/2;
-				mx = SplitByZ(nodes, from, to, divider);
+				mx = SplitByZ(nodes, permutation, from, to, divider);
 			}
 
 			if (mx == from || mx == to) {
@@ -154,11 +173,11 @@ namespace Pathfinding {
 				if (!odd) {
 					// X
 					int divider = (rect.xmin + rect.xmax)/2;
-					mx = SplitByX(nodes, from, to, divider);
+					mx = SplitByX(nodes, permutation, from, to, divider);
 				} else {
 					// Y/Z
 					int divider = (rect.ymin + rect.ymax)/2;
-					mx = SplitByZ(nodes, from, to, divider);
+					mx = SplitByZ(nodes, permutation, from, to, divider);
 				}
 
 				if (mx == from || mx == to) {
@@ -168,91 +187,31 @@ namespace Pathfinding {
 				}
 			}
 
-			arr[box].left = RebuildFromInternal(nodes, from, mx, !odd);
-			arr[box].right = RebuildFromInternal(nodes, mx, to, !odd);
+			arr[box].left = RebuildFromInternal(nodes, permutation, nodeBounds, from, mx, !odd);
+			arr[box].right = RebuildFromInternal(nodes, permutation, nodeBounds, mx, to, !odd);
 
 			return box;
 		}
 
 		/** Calculates the bounding box in XZ space of all nodes between \a from (inclusive) and \a to (exclusive) */
-		static IntRect NodeBounds (MeshNode[] nodes, int from, int to) {
+		static IntRect NodeBounds (int[] permutation, IntRect[] nodeBounds, int from, int to) {
 			if (to - from <= 0) throw new ArgumentException();
 
-			var first = nodes[from].GetVertex(0);
-			var min = new Int2(first.x, first.z);
-			Int2 max = min;
+			var r = nodeBounds[permutation[from]];
+			for (int j = from + 1; j < to; j++) {
+				var r2 = nodeBounds[permutation[j]];
 
-			for (int j = from; j < to; j++) {
-				var node = nodes[j];
-				var nverts = node.GetVertexCount();
-				for (int i = 0; i < nverts; i++) {
-					var p = node.GetVertex(i);
-					min.x = Math.Min(min.x, p.x);
-					min.y = Math.Min(min.y, p.z);
-
-					max.x = Math.Max(max.x, p.x);
-					max.y = Math.Max(max.y, p.z);
-				}
+				// Equivalent to r = IntRect.Union(r, r2)
+				// but manually inlining is approximately
+				// 25% faster when building an entire tree.
+				// This code is hot when using navmesh cutting.
+				r.xmin = System.Math.Min(r.xmin, r2.xmin);
+				r.ymin = System.Math.Min(r.ymin, r2.ymin);
+				r.xmax = System.Math.Max(r.xmax, r2.xmax);
+				r.ymax = System.Math.Max(r.ymax, r2.ymax);
 			}
 
-			return new IntRect(min.x, min.y, max.x, max.y);
-		}
-
-		/** Inserts a mesh node in the tree */
-		public void Insert (MeshNode node) {
-			int boxi = GetBox(node);
-
-			// Was set to root
-			if (boxi == 0) {
-				return;
-			}
-
-			BBTreeBox box = arr[boxi];
-
-			//int depth = 0;
-
-			int c = 0;
-			while (true) {
-				BBTreeBox cb = arr[c];
-
-				cb.rect = ExpandToContain(cb.rect, box.rect);
-				if (cb.node != null) {
-					//Is Leaf
-					cb.left = boxi;
-
-					int box2 = GetBox(cb.node);
-					//BBTreeBox box2 = new BBTreeBox (this,c.node);
-
-					//Console.WriteLine ("Inserted "+box.node+", rect "+box.rect.ToString ());
-					cb.right = box2;
-
-
-					cb.node = null;
-					//cb.depth++;
-
-					//c.rect = c.rect.
-					arr[c] = cb;
-					//Debug.Log (depth);
-					return;
-				} else {
-					//depth++;
-					//cb.depth++;
-					arr[c] = cb;
-
-					int e1 = ExpansionRequired(arr[cb.left].rect, box.rect);// * arr[cb.left].depth;
-					int e2 =  ExpansionRequired(arr[cb.right].rect, box.rect);// * arr[cb.left].depth;
-
-					//Choose the rect requiring the least expansion to contain box.rect
-					if (e1 < e2) {
-						c = cb.left;
-					} else if (e2 < e1) {
-						c = cb.right;
-					} else {
-						//Equal, Choose the one with the smallest area
-						c = RectArea(arr[cb.left].rect) < RectArea(arr[cb.right].rect) ? cb.left : cb.right;
-					}
-				}
-			}
+			return r;
 		}
 
 		public NNInfo Query (Vector3 p, NNConstraint constraint) {
@@ -358,10 +317,10 @@ namespace Pathfinding {
 				#endif
 			} else {
 				#if ASTARDEBUG
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMin), new Vector3(box.rect.xMax, 0, box.rect.yMin), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMax), new Vector3(box.rect.xMax, 0, box.rect.yMax), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMin), new Vector3(box.rect.xMin, 0, box.rect.yMax), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMax, 0, box.rect.yMin), new Vector3(box.rect.xMax, 0, box.rect.yMax), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymin), new Vector3(box.rect.xmax, 0, box.rect.ymin), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymax), new Vector3(box.rect.xmax, 0, box.rect.ymax), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymin), new Vector3(box.rect.xmin, 0, box.rect.ymax), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmax, 0, box.rect.ymin), new Vector3(box.rect.xmax, 0, box.rect.ymax), Color.white);
 				#endif
 
 				//Search children
@@ -434,10 +393,10 @@ namespace Pathfinding {
 				}
 			} else {
 				#if ASTARDEBUG
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMin), new Vector3(box.rect.xMax, 0, box.rect.yMin), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMax), new Vector3(box.rect.xMax, 0, box.rect.yMax), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMin), new Vector3(box.rect.xMin, 0, box.rect.yMax), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMax, 0, box.rect.yMin), new Vector3(box.rect.xMax, 0, box.rect.yMax), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymin), new Vector3(box.rect.xmax, 0, box.rect.ymin), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymax), new Vector3(box.rect.xmax, 0, box.rect.ymax), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymin), new Vector3(box.rect.xmin, 0, box.rect.ymax), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmax, 0, box.rect.ymin), new Vector3(box.rect.xmax, 0, box.rect.ymax), Color.white);
 				#endif
 
 				//Search children
@@ -481,10 +440,10 @@ namespace Pathfinding {
 				}
 			} else {
 				#if ASTARDEBUG
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMin), new Vector3(box.rect.xMax, 0, box.rect.yMin), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMax), new Vector3(box.rect.xMax, 0, box.rect.yMax), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMin), new Vector3(box.rect.xMin, 0, box.rect.yMax), Color.white);
-				Debug.DrawLine(new Vector3(box.rect.xMax, 0, box.rect.yMin), new Vector3(box.rect.xMax, 0, box.rect.yMax), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymin), new Vector3(box.rect.xmax, 0, box.rect.ymin), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymax), new Vector3(box.rect.xmax, 0, box.rect.ymax), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymin), new Vector3(box.rect.xmin, 0, box.rect.ymax), Color.white);
+				Debug.DrawLine(new Vector3(box.rect.xmax, 0, box.rect.ymin), new Vector3(box.rect.xmax, 0, box.rect.ymax), Color.white);
 				#endif
 
 				//Search children
@@ -547,10 +506,10 @@ namespace Pathfinding {
 			}
 
 			#if ASTARDEBUG
-			Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMin), new Vector3(box.rect.xMax, 0, box.rect.yMin), Color.white);
-			Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMax), new Vector3(box.rect.xMax, 0, box.rect.yMax), Color.white);
-			Debug.DrawLine(new Vector3(box.rect.xMin, 0, box.rect.yMin), new Vector3(box.rect.xMin, 0, box.rect.yMax), Color.white);
-			Debug.DrawLine(new Vector3(box.rect.xMax, 0, box.rect.yMin), new Vector3(box.rect.xMax, 0, box.rect.yMax), Color.white);
+			Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymin), new Vector3(box.rect.xmax, 0, box.rect.ymin), Color.white);
+			Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymax), new Vector3(box.rect.xmax, 0, box.rect.ymax), Color.white);
+			Debug.DrawLine(new Vector3(box.rect.xmin, 0, box.rect.ymin), new Vector3(box.rect.xmin, 0, box.rect.ymax), Color.white);
+			Debug.DrawLine(new Vector3(box.rect.xmax, 0, box.rect.ymin), new Vector3(box.rect.xmax, 0, box.rect.ymax), Color.white);
 			#endif
 
 			//Search children
@@ -615,22 +574,9 @@ namespace Pathfinding {
 				left = right = -1;
 			}
 
-			public BBTreeBox (MeshNode node) {
+			public BBTreeBox (MeshNode node, IntRect rect) {
 				this.node = node;
-				var first = node.GetVertex(0);
-				var min = new Int2(first.x, first.z);
-				Int2 max = min;
-
-				for (int i = 1; i < node.GetVertexCount(); i++) {
-					var p = node.GetVertex(i);
-					min.x = Math.Min(min.x, p.x);
-					min.y = Math.Min(min.y, p.z);
-
-					max.x = Math.Max(max.x, p.x);
-					max.y = Math.Max(max.y, p.z);
-				}
-
-				rect = new IntRect(min.x, min.y, max.x, max.y);
+				this.rect = rect;
 				left = right = -1;
 			}
 
@@ -692,24 +638,9 @@ namespace Pathfinding {
 			return (p.x-po.x)*(p.x-po.x) + (p.z-po.z)*(p.z-po.z) < radius*radius;
 		}
 
-		/** Returns the difference in area between \a r and \a r expanded to contain \a r2 */
-		static int ExpansionRequired (IntRect r, IntRect r2) {
-			int xMin = Math.Min(r.xmin, r2.xmin);
-			int xMax = Math.Max(r.xmax, r2.xmax);
-			int yMin = Math.Min(r.ymin, r2.ymin);
-			int yMax = Math.Max(r.ymax, r2.ymax);
-
-			return (xMax-xMin)*(yMax-yMin)-RectArea(r);
-		}
-
 		/** Returns a new rect which contains both \a r and \a r2 */
 		static IntRect ExpandToContain (IntRect r, IntRect r2) {
 			return IntRect.Union(r, r2);
-		}
-
-		/** Returns the area of a rect */
-		static int RectArea (IntRect r) {
-			return r.Width*r.Height;
 		}
 	}
 }

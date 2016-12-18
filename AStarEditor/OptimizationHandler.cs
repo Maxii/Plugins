@@ -29,9 +29,8 @@ namespace Pathfinding {
 			return Application.dataPath + "/AstarPathfindingProject";
 		}
 
-		public static void EnableDefine (string name) {
-			name = name.Trim();
-
+		static Dictionary<BuildTargetGroup, List<string> > GetDefineSymbols () {
+			var result = new Dictionary<BuildTargetGroup, List<string> >();
 			var buildTypes = System.Enum.GetValues(typeof(BuildTargetGroup)) as int[];
 
 			for (int i = 0; i < buildTypes.Length; i++) {
@@ -41,56 +40,43 @@ namespace Pathfinding {
 				if (defineString == null) continue;
 
 				var defines = defineString.Split(';').Select(s => s.Trim()).ToList();
-
-				// Already enabled
-				if (defines.Contains(name)) {
-					continue;
-				}
-
-				defineString = defineString+";"+name;
-				PlayerSettings.SetScriptingDefineSymbolsForGroup((BuildTargetGroup)buildTypes[i], defineString);
+				result[(BuildTargetGroup)buildTypes[i]] = defines;
 			}
+			return result;
+		}
+
+		static void SetDefineSymbols (Dictionary<BuildTargetGroup, List<string> > symbols) {
+			foreach (var pair in symbols) {
+				var defineString = string.Join(";", pair.Value.Distinct().ToArray());
+				PlayerSettings.SetScriptingDefineSymbolsForGroup(pair.Key, defineString);
+			}
+		}
+
+		public static void EnableDefine (string name) {
+			name = name.Trim();
+			var newSymbols = GetDefineSymbols().ToDictionary(pair => pair.Key, pair => {
+				pair.Value.Add(name);
+				return pair.Value;
+			});
+			SetDefineSymbols(newSymbols);
 		}
 
 		public static void DisableDefine (string name) {
 			name = name.Trim();
-
-			var buildTypes = System.Enum.GetValues(typeof(BuildTargetGroup)) as int[];
-
-			for (int i = 0; i < buildTypes.Length; i++) {
-				if (buildTypes[i] == (int)BuildTargetGroup.Unknown) continue;
-
-				string defineString = PlayerSettings.GetScriptingDefineSymbolsForGroup((BuildTargetGroup)buildTypes[i]);
-
-				if (defineString == null) continue;
-
-				var defines = defineString.Split(';').Select(s => s.Trim()).ToList();
-
-				if (defines.Remove(name)) {
-					defineString = string.Join(";", defines.Distinct().ToArray());
-					PlayerSettings.SetScriptingDefineSymbolsForGroup((BuildTargetGroup)buildTypes[i], defineString);
-				}
-			}
+			var newSymbols = GetDefineSymbols().ToDictionary(pair => pair.Key, pair => {
+				pair.Value.Remove(name);
+				return pair.Value;
+			});
+			SetDefineSymbols(newSymbols);
 		}
 
 		public static void IsDefineEnabled (string name, out bool enabled, out bool consistent) {
 			name = name.Trim();
-
-			var buildTypes = System.Enum.GetValues(typeof(BuildTargetGroup)) as int[];
-
 			int foundEnabled = 0;
 			int foundDisabled = 0;
 
-			for (int i = 0; i < buildTypes.Length; i++) {
-				if (buildTypes[i] == (int)BuildTargetGroup.Unknown) continue;
-
-				string defineString = PlayerSettings.GetScriptingDefineSymbolsForGroup((BuildTargetGroup)buildTypes[i]);
-
-				if (defineString == null) continue;
-
-				var defines = defineString.Split(';').Select(s => s.Trim()).ToList();
-
-				if (defines.Contains(name)) {
+			foreach (var pair in GetDefineSymbols()) {
+				if (pair.Value.Contains(name)) {
 					foundEnabled++;
 				} else {
 					foundDisabled++;

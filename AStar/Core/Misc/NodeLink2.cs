@@ -7,6 +7,21 @@ using UnityEditor;
 #endif
 
 namespace Pathfinding {
+	/** Connects two nodes via two intermediate point nodes.
+	 * In contrast to the NodeLink component, this link type will not connect the nodes directly
+	 * instead it will create two point nodes at the start and end position of this link and connect
+	 * through those nodes.
+	 *
+	 * If the closest node to this object is called A and the closest node to the end transform is called
+	 * D, then it will create one point node at this object's position (call it B) and one point node at
+	 * the position of the end transform (call it C), it will then connect A to B, B to C and C to D.
+	 *
+	 * This link type is possible to detect while following since it has these special point nodes in the middle.
+	 * The link corresponding to one of those intermediate nodes can be retrieved using the #GetNodeLink method
+	 * which can be of great use if you want to, for example, play a link specific animation when reaching the link.
+	 *
+	 * \see The example scene RecastExample2 contains a few links which you can take a look at to see how they are used.
+	 */
 	[AddComponentMenu("Pathfinding/Link2")]
 	[HelpURL("http://arongranberg.com/astar/docs/class_pathfinding_1_1_node_link2.php")]
 	public class NodeLink2 : GraphModifier {
@@ -22,18 +37,13 @@ namespace Pathfinding {
 		public Transform end;
 
 		/** The connection will be this times harder/slower to traverse.
-		 * Note that values lower than one will not always make the pathfinder choose this path instead of another path even though this one should
+		 * Note that values lower than 1 will not always make the pathfinder choose this path instead of another path even though this one should
 		 * lead to a lower total cost unless you also adjust the Heuristic Scale in A* Inspector -> Settings -> Pathfinding or disable the heuristic altogether.
 		 */
 		public float costFactor = 1.0f;
 
 		/** Make a one-way connection */
 		public bool oneWay = false;
-
-		/* Delete existing connection instead of adding one */
-		//public bool deleteConnection = false;
-
-		//private bool createHiddenNodes = true;
 
 		public Transform StartTransform {
 			get { return transform; }
@@ -43,58 +53,43 @@ namespace Pathfinding {
 			get { return end; }
 		}
 
-		PointNode startNode;
-		PointNode endNode;
-		MeshNode connectedNode1, connectedNode2;
+		public PointNode startNode { get; private set; }
+		public PointNode endNode { get; private set; }
+		GraphNode connectedNode1, connectedNode2;
 		Vector3 clamped1, clamped2;
 		bool postScanCalled = false;
 
+		[System.Obsolete("Use startNode instead (lowercase s)")]
 		public GraphNode StartNode {
 			get { return startNode; }
 		}
 
+		[System.Obsolete("Use endNode instead (lowercase e)")]
 		public GraphNode EndNode {
 			get { return endNode; }
 		}
 
 		public override void OnPostScan () {
-			if (AstarPath.active.isScanning) {
-				InternalOnPostScan();
-			} else {
-				AstarPath.active.AddWorkItem(new AstarPath.AstarWorkItem(delegate(bool force) {
-					InternalOnPostScan();
-					return true;
-				}));
-			}
+			InternalOnPostScan();
 		}
 
 		public void InternalOnPostScan () {
 			if (EndTransform == null || StartTransform == null) return;
 
-#if !ASTAR_NO_POINT_GRAPH
-			if (AstarPath.active.astarData.pointGraph == null) {
-				AstarPath.active.astarData.AddGraph(new PointGraph());
-			}
-#endif
-
-
-			if (startNode != null) {
-				NodeLink2 tmp;
-				if (reference.TryGetValue(startNode, out tmp) && tmp == this) reference.Remove(startNode);
-			}
-
-			if (endNode != null) {
-				NodeLink2 tmp;
-				if (reference.TryGetValue(endNode, out tmp) && tmp == this) reference.Remove(endNode);
-			}
-
-#if !ASTAR_NO_POINT_GRAPH
-			//Get nearest nodes from the first point graph, assuming both start and end transforms are nodes
-			startNode = AstarPath.active.astarData.pointGraph.AddNode((Int3)StartTransform.position);   //AstarPath.active.astarData.pointGraph.GetNearest(StartTransform.position).node as PointNode;
-			endNode = AstarPath.active.astarData.pointGraph.AddNode((Int3)EndTransform.position);    //AstarPath.active.astarData.pointGraph.GetNearest(EndTransform.position).node as PointNode;
-#else
+#if ASTAR_NO_POINT_GRAPH
 			throw new System.Exception("Point graph is not included. Check your A* optimization settings.");
-#endif
+#else
+			if (AstarPath.active.astarData.pointGraph == null) {
+				var graph = AstarPath.active.astarData.AddGraph(typeof(PointGraph)) as PointGraph;
+				graph.name = "PointGraph (used for node links)";
+			}
+
+			if (startNode != null) reference.Remove(startNode);
+			if (endNode != null) reference.Remove(endNode);
+
+			// Create new nodes on the point graph
+			startNode = AstarPath.active.astarData.pointGraph.AddNode((Int3)StartTransform.position);
+			endNode = AstarPath.active.astarData.pointGraph.AddNode((Int3)EndTransform.position);
 
 			connectedNode1 = null;
 			connectedNode2 = null;
@@ -109,25 +104,25 @@ namespace Pathfinding {
 			reference[startNode] = this;
 			reference[endNode] = this;
 			Apply(true);
+#endif
 		}
 
 		public override void OnGraphsPostUpdate () {
-			//if (connectedNode1 != null && connectedNode2 != null) {
-			if (!AstarPath.active.isScanning) {
-				if (connectedNode1 != null && connectedNode1.Destroyed) {
-					connectedNode1 = null;
-				}
-				if (connectedNode2 != null && connectedNode2.Destroyed) {
-					connectedNode2 = null;
-				}
+			// Don't bother running it now since OnPostScan will be called later anyway
+			if (AstarPath.active.isScanning)
+				return;
 
-				if (!postScanCalled) {
-					OnPostScan();
-				} else {
-					//OnPostScan will also call this method
-					/** \todo Can mess up pathfinding, wrap in delegate */
-					Apply(false);
-				}
+			if (connectedNode1 != null && connectedNode1.Destroyed) {
+				connectedNode1 = null;
+			}
+			if (connectedNode2 != null && connectedNode2.Destroyed) {
+				connectedNode2 = null;
+			}
+
+			if (!postScanCalled) {
+				OnPostScan();
+			} else {
+				Apply(false);
 			}
 		}
 
@@ -135,8 +130,9 @@ namespace Pathfinding {
 			base.OnEnable();
 
 #if !ASTAR_NO_POINT_GRAPH
-			if (AstarPath.active != null && AstarPath.active.astarData != null && AstarPath.active.astarData.pointGraph != null) {
-				OnGraphsPostUpdate();
+			if (Application.isPlaying && AstarPath.active != null && AstarPath.active.astarData != null && AstarPath.active.astarData.pointGraph != null && !AstarPath.active.isScanning) {
+				// Call OnGraphsPostUpdate as soon as possible when it is safe to update the graphs
+				AstarPath.RegisterSafeUpdate(OnGraphsPostUpdate);
 			}
 #endif
 		}
@@ -146,15 +142,8 @@ namespace Pathfinding {
 
 			postScanCalled = false;
 
-			if (startNode != null) {
-				NodeLink2 tmp;
-				if (reference.TryGetValue(startNode, out tmp) && tmp == this) reference.Remove(startNode);
-			}
-
-			if (endNode != null) {
-				NodeLink2 tmp;
-				if (reference.TryGetValue(endNode, out tmp) && tmp == this) reference.Remove(endNode);
-			}
+			if (startNode != null) reference.Remove(startNode);
+			if (endNode != null) reference.Remove(endNode);
 
 			if (startNode != null && endNode != null) {
 				startNode.RemoveConnection(endNode);
@@ -206,13 +195,13 @@ namespace Pathfinding {
 
 			if (connectedNode1 == null || forceNewCheck) {
 				NNInfo n1 = AstarPath.active.GetNearest(StartTransform.position, nn);
-				connectedNode1 = n1.node as MeshNode;
+				connectedNode1 = n1.node;
 				clamped1 = n1.clampedPosition;
 			}
 
 			if (connectedNode2 == null || forceNewCheck) {
 				NNInfo n2 = AstarPath.active.GetNearest(EndTransform.position, nn);
-				connectedNode2 = n2.node as MeshNode;
+				connectedNode2 = n2.node;
 				clamped2 = n2.clampedPosition;
 			}
 
@@ -289,6 +278,62 @@ namespace Pathfinding {
 					Vector3 cross = Vector3.Cross(Vector3.up, (EndTransform.position-StartTransform.position)).normalized;
 					DrawGizmoBezier(StartTransform.position+cross*0.1f, EndTransform.position+cross*0.1f);
 					DrawGizmoBezier(StartTransform.position-cross*0.1f, EndTransform.position-cross*0.1f);
+				}
+			}
+		}
+
+		internal static void SerializeReferences (Pathfinding.Serialization.GraphSerializationContext ctx) {
+			var links = GetModifiersOfType<NodeLink2>();
+
+			ctx.writer.Write(links.Count);
+			foreach (var link in links) {
+				ctx.writer.Write(link.uniqueID);
+				ctx.SerializeNodeReference(link.startNode);
+				ctx.SerializeNodeReference(link.endNode);
+				ctx.SerializeNodeReference(link.connectedNode1);
+				ctx.SerializeNodeReference(link.connectedNode2);
+				ctx.SerializeVector3(link.clamped1);
+				ctx.SerializeVector3(link.clamped2);
+				ctx.writer.Write(link.postScanCalled);
+			}
+		}
+
+		internal static void DeserializeReferences (Pathfinding.Serialization.GraphSerializationContext ctx) {
+			int count = ctx.reader.ReadInt32();
+
+			for (int i = 0; i < count; i++) {
+				var linkID = ctx.reader.ReadUInt64();
+				var startNode = ctx.DeserializeNodeReference();
+				var endNode = ctx.DeserializeNodeReference();
+				var connectedNode1 = ctx.DeserializeNodeReference();
+				var connectedNode2 = ctx.DeserializeNodeReference();
+				var clamped1 = ctx.DeserializeVector3();
+				var clamped2 = ctx.DeserializeVector3();
+				var postScanCalled = ctx.reader.ReadBoolean();
+
+				GraphModifier link;
+				if (usedIDs.TryGetValue(linkID, out link)) {
+					var link2 = link as NodeLink2;
+					if (link2 != null) {
+						reference[startNode] = link2;
+						reference[endNode] = link2;
+
+						// If any nodes happened to be registered right now
+						if (link2.startNode != null) reference.Remove(link2.startNode);
+						if (link2.endNode != null) reference.Remove(link2.endNode);
+
+						link2.startNode = startNode as PointNode;
+						link2.endNode = endNode as PointNode;
+						link2.connectedNode1 = connectedNode1;
+						link2.connectedNode2 = connectedNode2;
+						link2.postScanCalled = postScanCalled;
+						link2.clamped1 = clamped1;
+						link2.clamped2 = clamped2;
+					} else {
+						throw new System.Exception("Tried to deserialize a NodeLink2 reference, but the link was not of the correct type or it has been destroyed.\nIf a NodeLink2 is included in serialized graph data, the same NodeLink2 component must be present in the scene when loading the graph data.");
+					}
+				} else {
+					throw new System.Exception("Tried to deserialize a NodeLink2 reference, but the link could not be found in the scene.\nIf a NodeLink2 is included in serialized graph data, the same NodeLink2 component must be present in the scene when loading the graph data.");
 				}
 			}
 		}

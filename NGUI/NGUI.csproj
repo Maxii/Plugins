@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR; UNITY_5_5_OR_NEWER</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -117,6 +117,7 @@
     <Compile Include="Internal\ByteReader.cs" />
     <Compile Include="Internal\EventDelegate.cs" />
     <Compile Include="Internal\Localization.cs" />
+    <Compile Include="Internal\MinMaxRangeAttribute.cs" />
     <Compile Include="Internal\NGUIDebug.cs" />
     <Compile Include="Internal\NGUIMath.cs" />
     <Compile Include="Internal\NGUIText.cs" />
@@ -142,6 +143,7 @@
     <Compile Include="Tweening\TweenFill.cs" />
     <Compile Include="Tweening\TweenFOV.cs" />
     <Compile Include="Tweening\TweenHeight.cs" />
+    <Compile Include="Tweening\TweenLetters.cs" />
     <Compile Include="Tweening\TweenOrthoSize.cs" />
     <Compile Include="Tweening\TweenPosition.cs" />
     <Compile Include="Tweening\TweenRotation.cs" />

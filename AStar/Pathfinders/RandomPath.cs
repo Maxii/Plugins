@@ -7,33 +7,36 @@ namespace Pathfinding {
 	 *
 	 * \code
 	 *
-	 * //Call a RandomPath call like this, assumes that a Seeker is attached to the GameObject
+	 * // Call a RandomPath call like this, assumes that a Seeker is attached to the GameObject
 	 *
-	 * //The path will be returned when the path is over a specified length (or more accurately has "costed" more than a specific value)
-	 * int theGScoreToStopAt = 50;
+	 * // The path will be returned when the path is over a specified length (or more accurately when the traversal cost is greater than a specified value).
+	 * // A score of 1000 is approximately equal to the cost of moving one world unit.
+	 * int theGScoreToStopAt = 50000;
 	 *
-	 * //Create a path object
-	 * RandomPath path = RandomPath.Construct  (transform.position, theGScoreToStopAt);
+	 * // Create a path object
+	 * RandomPath path = RandomPath.Construct(transform.position, theGScoreToStopAt);
+	 * // Determines the variation in path length that is allowed
+	 * path.spread = 5000;
 	 *
-	 * //Get the Seeker component which must be attached to this GameObject
+	 * // Get the Seeker component which must be attached to this GameObject
 	 * Seeker seeker = GetComponent<Seeker>();
 	 *
-	 * //Start the path and return the result to MyCompleteFunction (which is a function you have to define, the name can of course be changed)
-	 * seeker.StartPath (path,MyCompleteFunction);
+	 * // Start the path and return the result to MyCompleteFunction (which is a function you have to define, the name can of course be changed)
+	 * seeker.StartPath(path, MyCompleteFunction);
 	 *
 	 * \endcode
-	 * \astarpro */
+	 * \astarpro
+	 */
 	public class RandomPath : ABPath {
 		/** G score to stop searching at.
-		 * The G score is rougly the distance to get from the start node to a node multiplied by 100 (per default, see Pathfinding.Int3.Precision), plus any eventual penalties */
+		 * The G score is rougly the distance to get from the start node to a node multiplied by 1000 (per default, see Pathfinding.Int3.Precision), plus any penalties */
 		public int searchLength;
 
 		/** All G scores between #searchLength and #searchLength+#spread are valid end points, a random one of them is chosen as the final point.
-		 * On grid graphs a low spread usually works (but keep it higher than nodeSize*100 since that it the default cost of moving between two nodes), on NavMesh graphs
-		 * I would recommend a higher spread so it can evaluate more nodes */
-		public int spread;
-
-		public bool uniform;
+		 * On grid graphs a low spread usually works (but keep it higher than nodeSize*1000 since that it the default cost of moving between two nodes), on NavMesh graphs
+		 * I would recommend a higher spread so it can evaluate more nodes
+		 */
+		public int spread = 5000;
 
 		/** If an #aim is set, the higher this value is, the more it will try to reach #aim */
 		public float aimStrength;
@@ -56,7 +59,7 @@ namespace Pathfinding {
 
 		int nodesEvaluatedRep;
 
-		/** Random class */
+		/** Random number generator */
 		readonly System.Random rnd = new System.Random();
 
 		public override bool FloodingPath {
@@ -77,7 +80,6 @@ namespace Pathfinding {
 			searchLength = 5000;
 			spread = 5000;
 
-			uniform = true;
 			aimStrength = 0.0f;
 			chosenNodeR = null;
 			maxGScoreNodeR = null;
@@ -216,13 +218,16 @@ namespace Pathfinding {
 
 				// Close the current node, if the current node is the target node then the path is finished
 				if (currentR.G >= searchLength) {
-					nodesEvaluatedRep++;
+					if (currentR.G <= searchLength+spread) {
+						nodesEvaluatedRep++;
 
-					if (chosenNodeR == null || rnd.NextDouble() <= 1.0f/nodesEvaluatedRep) {
-						chosenNodeR = currentR;
-					}
+						if (rnd.NextDouble() <= 1.0f/nodesEvaluatedRep) {
+							chosenNodeR = currentR;
+						}
+					} else {
+						// If no node was in the valid range of G scores, then fall back to picking one right outside valid range
+						if (chosenNodeR == null) chosenNodeR = currentR;
 
-					if (currentR.G >= searchLength+spread) {
 						CompleteState = PathCompleteState.Complete;
 						break;
 					}

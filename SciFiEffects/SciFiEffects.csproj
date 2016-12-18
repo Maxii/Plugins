@@ -67,7 +67,7 @@
     <Compile Include="F3DLightning.cs" />
     <Compile Include="F3DMissile.cs" />
     <Compile Include="F3DParticleScale.cs" />
-    <Compile Include="F3DPool.cs" />
+    <Compile Include="F3DPool_Legacy.cs" />
     <Compile Include="F3DPredictTrajectory.cs" />
     <Compile Include="F3DProjectile.cs" />
     <Compile Include="F3DPulsewave.cs" />
@@ -75,13 +75,23 @@
     <Compile Include="F3DRift.cs" />
     <Compile Include="F3DShotgun.cs" />
     <Compile Include="F3DTime.cs" />
-    <Compile Include="F3DTurret.cs" />
+    <Compile Include="F3DTurret_Legacy.cs" />
     <Compile Include="F3DWarpJump.cs" />
     <Compile Include="F3DWarpJumpTunnel.cs" />
     <Compile Include="F3DWarpTunnel.cs" />
+    <Compile Include="Lib\F3DMath.cs" />
     <Compile Include="MeshCombine\CombineChildren.cs" />
     <Compile Include="MeshCombine\MeshCombineUtility.cs" />
+    <Compile Include="Player\F3DPlayerController_Legacy.cs" />
+    <Compile Include="Player\F3DPlayerTurretController.cs" />
+    <Compile Include="PoolManager\F3DPool.cs" />
+    <Compile Include="PoolManager\F3DPoolContainer.cs" />
+    <Compile Include="PoolManager\F3DPoolManager.cs" />
+    <Compile Include="PoolManager\F3DPoolManagerDB.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Turrets\Constructor\F3DTurretConstructor.cs" />
+    <Compile Include="Turrets\Constructor\F3DTurretScriptable.cs" />
+    <Compile Include="Turrets\F3DTurret.cs" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

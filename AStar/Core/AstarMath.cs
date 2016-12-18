@@ -765,6 +765,36 @@ namespace Pathfinding {
 
 			return volume < 0;
 		}
+
+		/** True if the matrix will reverse orientations of faces in the XZ plane.
+		 * Almost the same as ReversesFaceOrientations, but this method assumes
+		 * that scaling a face with a negative scale along the Y axis does not
+		 * reverse the orientation of the face.
+		 *
+		 * This is used for navmesh cuts.
+		 *
+		 * Scaling by a negative value along one axis or rotating
+		 * it so that it is upside down will reverse
+		 * the orientation of the cut, so we need to be reverse
+		 * it again as a countermeasure.
+		 * However if it is flipped along two axes it does not need to
+		 * be reversed.
+		 * We can handle all these cases by finding out how a unit square formed
+		 * by our forward axis and our rightward axis is transformed in XZ space
+		 * when applying the local to world matrix.
+		 * If the (signed) area of the unit square turns out to be negative
+		 * that also means that the orientation of it has been reversed.
+		 * The signed area is calculated using a cross product of the vectors.
+		 */
+		public static bool ReversesFaceOrientationsXZ (Matrix4x4 matrix) {
+			var dX = matrix.MultiplyVector(new Vector3(1, 0, 0));
+			var dZ = matrix.MultiplyVector(new Vector3(0, 0, 1));
+
+			// Take the cross product of the vectors projected onto the XZ plane
+			var cross = (dX.x*dZ.z - dZ.x*dX.z);
+
+			return cross < 0;
+		}
 	}
 
 	/** Utility functions for working with numbers and strings.
@@ -1550,173 +1580,141 @@ namespace Pathfinding {
 			return ClosestPointOnTriangle(triangle[0], triangle[1], triangle[2], point);
 		}
 
-		/** Returns the closest point on the triangle.
-		 *
-		 * \author Got code from the internet, changed a bit to work with the Unity API
-		 *
+		/** Closest point on the triangle abc to the point p.
+		 * \see 'Real Time Collision Detection' by Christer Ericson, chapter 5.1, page 141
 		 */
-		public static Vector3 ClosestPointOnTriangle (Vector3 tr0, Vector3 tr1, Vector3 tr2, Vector3 point) {
-			Vector3 diff = tr0 - point;
-			Vector3 edge0 = tr1 - tr0;
-			Vector3 edge1 = tr2 - tr0;
-			float a00 = edge0.sqrMagnitude;
-			float a01 = Vector3.Dot(edge0, edge1);
-			float a11 = edge1.sqrMagnitude;
-			float b0 = Vector3.Dot(diff, edge0);
-			float b1 = Vector3.Dot(diff, edge1);
-			//float c = diff.sqrMagnitude;
-			float det = a00 * a11 - a01 * a01;
+		public static Vector2 ClosestPointOnTriangle (Vector2 a, Vector2 b, Vector2 c, Vector2 p) {
+			// Check if p is in vertex region outside A
+			var ab = b - a;
+			var ac = c - a;
+			var ap = p - a;
 
-			float s = a01 * b1 - a11 * b0;
-			float t = a01 * b0 - a00 * b1;
+			var d1 = Vector2.Dot(ab, ap);
+			var d2 = Vector2.Dot(ac, ap);
 
-			//float sqrDistance;
+			// Barycentric coordinates (1,0,0)
+			if (d1 <= 0 && d2 <= 0) {
+				return a;
+			}
 
-			if (s + t <= det) {
-				if (s < 0f) {
-					if (t < 0f) { // region 4
-						if (b0 < 0f) {
-							t = 0f;
-							if (-b0 >= a00) {
-								s = 1f;
-								//sqrDistance = a00 + (2f) * b0 + c;
-							} else {
-								s = -b0 / a00;
-								//sqrDistance = b0 * s + c;
-							}
-						} else {
-							s = 0f;
-							if (b1 >= 0f) {
-								t = 0f;
-								//sqrDistance = c;
-							} else if (-b1 >= a11) {
-								t = 1f;
-								//sqrDistance = a11 + (2f) * b1 + c;
-							} else {
-								t = -b1 / a11;
-								//sqrDistance = b1 * t + c;
-							}
-						}
-					} else { // region 3
-						s = 0f;
-						if (b1 >= 0f) {
-							t = 0f;
-							//sqrDistance = c;
-						} else if (-b1 >= a11) {
-							t = 1f;
-							//sqrDistance = a11 + (2f) * b1 + c;
-						} else {
-							t = -b1 / a11;
-							// sqrDistance = b1 * t + c;
-						}
-					}
-				} else if (t < 0f) { // region 5
-					t = 0f;
-					if (b0 >= 0f) {
-						s = 0f;
-						// sqrDistance = c;
-					} else if (-b0 >= a00) {
-						s = 1f;
-						//sqrDistance = a00 + (2f) * b0 + c;
-					} else {
-						s = -b0 / a00;
-						//  sqrDistance = b0 * s + c;
-					}
-				} else { // region 0
-					     // minimum at interior point
-					float invDet = 1f / det;
-					s *= invDet;
-					t *= invDet;
-					// sqrDistance = s * (a00 * s + a01 * t + (2f) * b0) + t * (a01 * s + a11 * t + (2f) * b1) + c;
-				}
-			} else {
-				float tmp0, tmp1, numer, denom;
+			// Check if p is in vertex region outside B
+			var bp = p - b;
+			var d3 = Vector2.Dot(ab, bp);
+			var d4 = Vector2.Dot(ac, bp);
 
-				if (s < 0f) { // region 2
-					tmp0 = a01 + b0;
-					tmp1 = a11 + b1;
-					if (tmp1 > tmp0) {
-						numer = tmp1 - tmp0;
-						denom = a00 - (2f) * a01 + a11;
-						if (numer >= denom) {
-							s = 1f;
-							t = 0f;
-							// sqrDistance = a00 + (2f) * b0 + c;
-						} else {
-							s = numer / denom;
-							t = 1f - s;
-							// sqrDistance = s * (a00 * s + a01 * t + (2f) * b0) + t * (a01 * s + a11 * t + (2f) * b1) + c;
-						}
-					} else {
-						s = 0f;
-						if (tmp1 <= 0f) {
-							t = 1f;
-							// sqrDistance = a11 + (2f) * b1 + c;
-						} else if (b1 >= 0f) {
-							t = 0f;
-							//  sqrDistance = c;
-						} else {
-							t = -b1 / a11;
-							//  sqrDistance = b1 * t + c;
-						}
-					}
-				} else if (t < 0f) { // region 6
-					tmp0 = a01 + b1;
-					tmp1 = a00 + b0;
-					if (tmp1 > tmp0) {
-						numer = tmp1 - tmp0;
-						denom = a00 - (2f) * a01 + a11;
-						if (numer >= denom) {
-							t = 1f;
-							s = 0f;
-							// sqrDistance = a11 + (2f) * b1 + c;
-						} else {
-							t = numer / denom;
-							s = 1f - t;
-							// sqrDistance = s * (a00 * s + a01 * t + (2f) * b0) + t * (a01 * s + a11 * t + (2f) * b1) + c;
-						}
-					} else {
-						t = 0f;
-						if (tmp1 <= 0f) {
-							s = 1f;
-							//sqrDistance = a00 + (2f) * b0 + c;
-						} else if (b0 >= 0f) {
-							s = 0f;
-							// sqrDistance = c;
-						} else {
-							s = -b0 / a00;
-							//  sqrDistance = b0 * s + c;
-						}
-					}
-				} else { // region 1
-					numer = a11 + b1 - a01 - b0;
-					if (numer <= 0f) {
-						s = 0f;
-						t = 1f;
-						//  sqrDistance = a11 + (2f) * b1 + c;
-					} else {
-						denom = a00 - (2f) * a01 + a11;
-						if (numer >= denom) {
-							s = 1f;
-							t = 0f;
-							//  sqrDistance = a00 + (2f) * b0 + c;
-						} else {
-							s = numer / denom;
-							t = 1f - s;
-							// sqrDistance = s * (a00 * s + a01 * t + (2f) * b0) + t * (a01 * s + a11 * t + (2f) * b1) + c;
-						}
-					}
+			// Barycentric coordinates (0,1,0)
+			if (d3 >= 0 && d4 <= d3) {
+				return b;
+			}
+
+			// Check if p is in edge region outside AB, if so return a projection of p onto AB
+			if (d1 >= 0 && d3 <= 0) {
+				var vc = d1 * d4 - d3 * d2;
+				if (vc <= 0) {
+					// Barycentric coordinates (1-v, v, 0)
+					var v = d1 / (d1 - d3);
+					return a + ab*v;
 				}
 			}
 
-			// Account for numerical round-off error.
-			//  if (sqrDistance < 0f)
-			//  {
-			//       sqrDistance = 0f;
-			//    }
+			// Check if p is in vertex region outside C
+			var cp = p - c;
+			var d5 = Vector2.Dot(ab, cp);
+			var d6 = Vector2.Dot(ac, cp);
 
-			return tr0 + s * edge0 + t * edge1;
+			// Barycentric coordinates (0,0,1)
+			if (d6 >= 0 && d5 <= d6) {
+				return c;
+			}
+
+			// Check if p is in edge region of AC, if so return a projection of p onto AC
+			if (d2 >= 0 && d6 <= 0) {
+				var vb = d5 * d2 - d1 * d6;
+				if (vb <= 0) {
+					// Barycentric coordinates (1-v, 0, v)
+					var v = d2 / (d2 - d6);
+					return a + ac*v;
+				}
+			}
+
+			// Check if p is in edge region of BC, if so return projection of p onto BC
+			if ((d4 - d3) >= 0 && (d5 - d6) >= 0) {
+				var va = d3 * d6 - d5 * d4;
+				if (va <= 0) {
+					var v = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+					return b + (c - b) * v;
+				}
+			}
+
+			return p;
 		}
+
+		/** Closest point on the triangle abc to the point p.
+		 * \see 'Real Time Collision Detection' by Christer Ericson, chapter 5.1, page 141
+		 */
+		public static Vector3 ClosestPointOnTriangle (Vector3 a, Vector3 b, Vector3 c, Vector3 p) {
+			// Check if p is in vertex region outside A
+			var ab = b - a;
+			var ac = c - a;
+			var ap = p - a;
+
+			var d1 = Vector3.Dot(ab, ap);
+			var d2 = Vector3.Dot(ac, ap);
+
+			// Barycentric coordinates (1,0,0)
+			if (d1 <= 0 && d2 <= 0)
+				return a;
+
+			// Check if p is in vertex region outside B
+			var bp = p - b;
+			var d3 = Vector3.Dot(ab, bp);
+			var d4 = Vector3.Dot(ac, bp);
+
+			// Barycentric coordinates (0,1,0)
+			if (d3 >= 0 && d4 <= d3)
+				return b;
+
+			// Check if p is in edge region outside AB, if so return a projection of p onto AB
+			var vc = d1 * d4 - d3 * d2;
+			if (d1 >= 0 && d3 <= 0 && vc <= 0) {
+				// Barycentric coordinates (1-v, v, 0)
+				var v = d1 / (d1 - d3);
+				return a + ab * v;
+			}
+
+			// Check if p is in vertex region outside C
+			var cp = p - c;
+			var d5 = Vector3.Dot(ab, cp);
+			var d6 = Vector3.Dot(ac, cp);
+
+			// Barycentric coordinates (0,0,1)
+			if (d6 >= 0 && d5 <= d6)
+				return c;
+
+			// Check if p is in edge region of AC, if so return a projection of p onto AC
+			var vb = d5 * d2 - d1 * d6;
+			if (d2 >= 0 && d6 <= 0 && vb <= 0) {
+				// Barycentric coordinates (1-v, 0, v)
+				var v = d2 / (d2 - d6);
+				return a + ac * v;
+			}
+
+			// Check if p is in edge region of BC, if so return projection of p onto BC
+			var va = d3 * d6 - d5 * d4;
+			if ((d4 - d3) >= 0 && (d5 - d6) >= 0 && va <= 0) {
+				var v = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+				return b + (c - b) * v;
+			} else {
+				// P is inside the face region. Compute the point using its barycentric coordinates (u, v, w)
+				var denom = 1f / (va + vb + vc);
+				var v = vb * denom;
+				var w = vc * denom;
+
+				// This is equal to: u*a + v*b + w*c, u = va*denom = 1 - v - w;
+				return a + ab * v + ac * w;
+			}
+		}
+
 
 		/** Get the 3D minimum distance between 2 segments
 		 * Input:  two 3D line segments S1 and S2

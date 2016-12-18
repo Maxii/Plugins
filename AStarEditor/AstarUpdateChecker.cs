@@ -172,7 +172,7 @@ namespace Pathfinding {
 			bool mecanim = GameObject.FindObjectOfType(typeof(Animator)) != null;
 			string query = updateURL+
 						   "?v="+AstarPath.Version+
-						   "&pro="+(AstarPath.HasPro ? "1" : "0")+
+						   "&pro=1"+
 						   "&check="+updateCheckRate+"&distr="+AstarPath.Distribution+
 						   "&unitypro="+(Application.HasProLicense() ? "1" : "0")+
 						   "&inscene="+(use ? "1" : "0")+

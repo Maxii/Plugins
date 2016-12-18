@@ -220,14 +220,14 @@ public class UIProgressBar : UIWidgetContainer
 
 			if (mStarted && before != value)
 			{
-				ForceUpdate();
-
 				if (notify && NGUITools.GetActive(this) && EventDelegate.IsValid(onChange))
 				{
 					current = this;
 					EventDelegate.Execute(onChange);
 					current = null;
 				}
+
+				ForceUpdate();
 			}
 #if UNITY_EDITOR
 			if (!Application.isPlaying)
@@ -301,7 +301,7 @@ public class UIProgressBar : UIWidgetContainer
 			float val = Mathf.Clamp01(mValue);
 			if (mValue != val) mValue = val;
 			if (numberOfSteps < 0) numberOfSteps = 0;
-			else if (numberOfSteps > 20) numberOfSteps = 20;
+			else if (numberOfSteps > 21) numberOfSteps = 21;
 			ForceUpdate();
 		}
 		else
@@ -309,7 +309,7 @@ public class UIProgressBar : UIWidgetContainer
 			float val = Mathf.Clamp01(mValue);
 			if (mValue != val) mValue = val;
 			if (numberOfSteps < 0) numberOfSteps = 0;
-			else if (numberOfSteps > 20) numberOfSteps = 20;
+			else if (numberOfSteps > 21) numberOfSteps = 21;
 		}
 	}
 

@@ -401,6 +401,11 @@ namespace Pathfinding {
 				EditorGUI.indentLevel--;
 			}
 
+			if (graph.rasterizeMeshes && graph.rasterizeColliders) {
+				EditorGUILayout.HelpBox("You are rasterizing both meshes and colliders, this might just be duplicating the work that is done if the colliders and meshes are similar in shape. You can use the RecastMeshObj component" +
+					" to always include some specific objects regardless of what the above settings are set to.", MessageType.Info);
+			}
+
 			Separator();
 
 			graph.forcedBoundsCenter = EditorGUILayout.Vector3Field("Center", graph.forcedBoundsCenter);

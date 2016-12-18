@@ -382,6 +382,12 @@ public class NGUISettings
 		set { SetBool("NGUI Truecolor", value); }
 	}
 
+	static public bool autoUpgradeSprites
+	{
+		get { return GetBool("NGUI AutoUpgrade", false); }
+		set { SetBool("NGUI AutoUpgrade", value); }
+	}
+
 	static public bool keepPadding
 	{
 		get { return GetBool("NGUI KeepPadding", false); }

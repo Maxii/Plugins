@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+#if UNITY_5_5_OR_NEWER
+using UnityEngine.Profiling;
+#endif
 
 using Pathfinding.Serialization;
-using Pathfinding.Serialization.JsonFx;
 using UnityEngine;
 using Math = System.Math;
 
@@ -67,6 +69,13 @@ namespace Pathfinding {
 	 *
 	 * \ingroup graphs
 	 * \nosubgrouping
+	 *
+	 * <b>Tree colliders</b>
+	 * It seems that Unity will only generate tree colliders at runtime when the game is started.
+	 * For this reason, the grid graph will not pick up tree colliders when outside of play mode
+	 * but it will pick them up once the game starts. If it still does not pick them up
+	 * make sure that the trees actually have colliders attached to them and that the tree prefabs are
+	 * in the correct layer (the layer should be included in the 'Collision Testing' mask).
 	 */
 	public class GridGraph : NavGraph, IUpdatableGraph
 		, IRaycastableGraph {
@@ -147,8 +156,6 @@ namespace Pathfinding {
 		/** Rotation of the grid in degrees */
 		[JsonMember]
 		public Vector3 rotation;
-
-		public Bounds bounds;
 
 		/** Center point of the grid */
 		[JsonMember]
@@ -361,7 +368,6 @@ namespace Pathfinding {
 		 */
 		public class TextureData {
 			public bool enabled;
-
 			public Texture2D source;
 			public float[] factors = new float[3];
 			public ChannelUse[] channels = new ChannelUse[3];
@@ -2163,45 +2169,15 @@ namespace Pathfinding {
 			}
 		}
 
-#if ASTAR_NO_JSON
-		public override void SerializeSettings (GraphSerializationContext ctx) {
-			base.SerializeSettings(ctx);
-			ctx.writer.Write(aspectRatio);
-			ctx.SerializeVector3(rotation);
-			ctx.SerializeVector3(center);
-			ctx.SerializeVector3((Vector3)unclampedSize);
-			ctx.writer.Write(nodeSize);
-			// collision
-			collision.SerializeSettings(ctx);
-
-			ctx.writer.Write(maxClimb);
-			ctx.writer.Write(maxClimbAxis);
-			ctx.writer.Write(maxSlope);
-			ctx.writer.Write(erodeIterations);
-			ctx.writer.Write(erosionUseTags);
-			ctx.writer.Write(erosionFirstTag);
-			ctx.writer.Write(autoLinkGrids);
-			ctx.writer.Write((int)neighbours);
-			ctx.writer.Write(cutCorners);
-			ctx.writer.Write(penaltyPosition);
-			ctx.writer.Write(penaltyPositionFactor);
-			ctx.writer.Write(penaltyAngle);
-			ctx.writer.Write(penaltyAngleFactor);
-			ctx.writer.Write(penaltyAnglePower);
-			ctx.writer.Write(isometricAngle);
-			ctx.writer.Write(uniformEdgeCosts);
-			ctx.writer.Write(useJumpPointSearch);
-		}
-
-		public override void DeserializeSettings (GraphSerializationContext ctx) {
-			base.DeserializeSettings(ctx);
+		public override void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
+			base.DeserializeSettingsCompatibility(ctx);
 
 			aspectRatio = ctx.reader.ReadSingle();
 			rotation = ctx.DeserializeVector3();
 			center = ctx.DeserializeVector3();
 			unclampedSize = (Vector2)ctx.DeserializeVector3();
 			nodeSize = ctx.reader.ReadSingle();
-			collision.DeserializeSettings(ctx);
+			collision.DeserializeSettingsCompatibility(ctx);
 			maxClimb = ctx.reader.ReadSingle();
 			maxClimbAxis = ctx.reader.ReadInt32();
 			maxSlope = ctx.reader.ReadSingle();
@@ -2220,7 +2196,6 @@ namespace Pathfinding {
 			uniformEdgeCosts = ctx.reader.ReadBoolean();
 			useJumpPointSearch = ctx.reader.ReadBoolean();
 		}
-#endif
 
 		public override void PostDeserialization () {
 #if ASTARDEBUG

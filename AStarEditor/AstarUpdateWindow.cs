@@ -35,12 +35,12 @@ namespace Pathfinding {
 
 		void OnGUI () {
 			if (largeStyle == null) {
-				largeStyle = EditorStyles.largeLabel;
+				largeStyle = new GUIStyle(EditorStyles.largeLabel);
 				largeStyle.fontSize = 32;
 				largeStyle.alignment = TextAnchor.UpperCenter;
 				largeStyle.richText = true;
 
-				normalStyle = EditorStyles.label;
+				normalStyle = new GUIStyle(EditorStyles.label);
 				normalStyle.wordWrap = true;
 				normalStyle.richText = true;
 			}

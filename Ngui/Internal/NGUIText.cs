@@ -10,6 +10,7 @@
 using UnityEngine;
 using System.Text;
 using System.Diagnostics;
+using System.Collections.Generic;
 
 /// <summary>
 /// Helper class containing functionality related to using dynamic fonts.
@@ -702,7 +703,7 @@ static public class NGUIText
 	/// Align the vertices to be right or center-aligned given the line width specified by NGUIText.lineWidth.
 	/// </summary>
 
-	static public void Align (BetterList<Vector3> verts, int indexOffset, float printedWidth, int elements = 4)
+	static public void Align (List<Vector3> verts, int indexOffset, float printedWidth, int elements = 4)
 	{
 		switch (alignment)
 		{
@@ -710,13 +711,13 @@ static public class NGUIText
 			{
 				float padding = rectWidth - printedWidth;
 				if (padding < 0f) return;
-#if UNITY_FLASH
-				for (int i = indexOffset; i < verts.size; ++i)
-					verts.buffer[i] = verts.buffer[i] + new Vector3(padding, 0f);
-#else
-				for (int i = indexOffset; i < verts.size; ++i)
-					verts.buffer[i].x += padding;
-#endif
+
+				for (int i = indexOffset, imax = verts.Count; i < imax; ++i)
+				{
+					var v = verts[i];
+					v.x += padding;
+					verts[i] = v;
+				}
 				break;
 			}
 
@@ -733,13 +734,13 @@ static public class NGUIText
 				bool oddWidth = (intWidth & 1) == 1;
 				if ((oddDiff && !oddWidth) || (!oddDiff && oddWidth))
 					padding += 0.5f * fontScale;
-#if UNITY_FLASH
-				for (int i = indexOffset; i < verts.size; ++i)
-					verts.buffer[i] = verts.buffer[i] + new Vector3(padding, 0f);
-#else
-				for (int i = indexOffset; i < verts.size; ++i)
-					verts.buffer[i].x += padding;
-#endif
+
+				for (int i = indexOffset, imax = verts.Count; i < imax; ++i)
+				{
+					var v = verts[i];
+					v.x += padding;
+					verts[i] = v;
+				}
 				break;
 			}
 
@@ -753,16 +754,17 @@ static public class NGUIText
 				if (padding < 1f) return;
 
 				// There must be at least two characters
-				int chars = (verts.size - indexOffset) / elements;
+				int chars = (verts.Count - indexOffset) / elements;
 				if (chars < 1) return;
 
 				float progressPerChar = 1f / (chars - 1);
 				float scale = rectWidth / printedWidth;
+				Vector3 v;
 
-				for (int i = indexOffset + elements, charIndex = 1; i < verts.size; ++charIndex)
+				for (int i = indexOffset + elements, charIndex = 1, imax = verts.Count; i < imax; ++charIndex)
 				{
-					float x0 = verts.buffer[i].x;
-					float x1 = verts.buffer[i + elements / 2].x;
+					float x0 = verts[i].x;
+					float x1 = verts[i + elements / 2].x;
 					float w = x1 - x0;
 					float x0a = x0 * scale;
 					float x1a = x0a + w;
@@ -777,36 +779,19 @@ static public class NGUIText
 
 					if (elements == 4)
 					{
-#if UNITY_FLASH
-						verts.buffer[i] = verts.buffer[i] + new Vector3(x0, 0f);
-						verts.buffer[i+1] = verts.buffer[i+1] + new Vector3(x0, 0f);
-						verts.buffer[i+2] = verts.buffer[i+2] + new Vector3(x1, 0f);
-						verts.buffer[i+3] = verts.buffer[i+3] + new Vector3(x1, 0f);
-						i += elements;
-#else
-						verts.buffer[i++].x = x0;
-						verts.buffer[i++].x = x0;
-						verts.buffer[i++].x = x1;
-						verts.buffer[i++].x = x1;
-#endif
+						v = verts[i]; v.x = x0; verts[i++] = v;
+						v = verts[i]; v.x = x0; verts[i++] = v;
+						v = verts[i]; v.x = x1; verts[i++] = v;
+						v = verts[i]; v.x = x1; verts[i++] = v;
 					}
 					else if (elements == 2)
 					{
-#if UNITY_FLASH
-						verts.buffer[i] = verts.buffer[i] + new Vector3(x0, 0f);
-						verts.buffer[i + 1] = verts.buffer[i + 1] + new Vector3(x1, 0f);
-#else
-						verts.buffer[i++].x = x0;
-						verts.buffer[i++].x = x1;
-#endif
+						v = verts[i]; v.x = x0; verts[i++] = v;
+						v = verts[i]; v.x = x1; verts[i++] = v;
 					}
 					else if (elements == 1)
 					{
-#if UNITY_FLASH
-						verts.buffer[i] = verts.buffer[i] + new Vector3(x0, 0f);
-#else
-						verts.buffer[i++].x = x0;
-#endif
+						v = verts[i]; v.x = x0; verts[i++] = v;
 					}
 				}
 				break;
@@ -819,9 +804,9 @@ static public class NGUIText
 	/// Meant to be used with the arrays created by PrintExactCharacterPositions().
 	/// </summary>
 
-	static public int GetExactCharacterIndex (BetterList<Vector3> verts, BetterList<int> indices, Vector2 pos)
+	static public int GetExactCharacterIndex (List<Vector3> verts, List<int> indices, Vector2 pos)
 	{
-		for (int i = 0; i < indices.size; ++i)
+		for (int i = 0, imax = indices.Count; i < imax; ++i)
 		{
 			int i0 = (i << 1);
 			int i1 = i0 + 1;
@@ -849,14 +834,14 @@ static public class NGUIText
 	/// Meant to be used with the arrays created by PrintApproximateCharacterPositions().
 	/// </summary>
 
-	static public int GetApproximateCharacterIndex (BetterList<Vector3> verts, BetterList<int> indices, Vector2 pos)
+	static public int GetApproximateCharacterIndex (List<Vector3> verts, List<int> indices, Vector2 pos)
 	{
 		// First sort by Y, and only then by X
 		float bestX = float.MaxValue;
 		float bestY = float.MaxValue;
 		int bestIndex = 0;
 
-		for (int i = 0; i < verts.size; ++i)
+		for (int i = 0, imax = verts.Count; i < imax; ++i)
 		{
 			float diffY = Mathf.Abs(pos.y - verts[i].y);
 			if (diffY > bestY) continue;
@@ -1359,11 +1344,11 @@ static public class NGUIText
 	/// Print the specified text into the buffers.
 	/// </summary>
 
-	static public void Print (string text, BetterList<Vector3> verts, BetterList<Vector2> uvs, BetterList<Color> cols)
+	static public void Print (string text, List<Vector3> verts, List<Vector2> uvs, List<Color> cols)
 	{
 		if (string.IsNullOrEmpty(text)) return;
 
-		int indexOffset = verts.size;
+		int indexOffset = verts.Count;
 		Prepare(text);
 
 		// Start with the white tint
@@ -1420,7 +1405,7 @@ static public class NGUIText
 				if (alignment != Alignment.Left)
 				{
 					Align(verts, indexOffset, x - finalSpacingX);
-					indexOffset = verts.size;
+					indexOffset = verts.Count;
 				}
 
 				x = 0;
@@ -1478,10 +1463,10 @@ static public class NGUIText
 				{
 					if (x == 0f) return;
 
-					if (alignment != Alignment.Left && indexOffset < verts.size)
+					if (alignment != Alignment.Left && indexOffset < verts.Count)
 					{
 						Align(verts, indexOffset, x - finalSpacingX);
-						indexOffset = verts.size;
+						indexOffset = verts.Count;
 					}
 
 					v0x -= x;
@@ -1570,10 +1555,10 @@ static public class NGUIText
 				{
 					if (x == 0f) return;
 
-					if (alignment != Alignment.Left && indexOffset < verts.size)
+					if (alignment != Alignment.Left && indexOffset < verts.Count)
 					{
 						Align(verts, indexOffset, x - finalSpacingX);
-						indexOffset = verts.size;
+						indexOffset = verts.Count;
 					}
 
 					v0x -= x;
@@ -1812,10 +1797,10 @@ static public class NGUIText
 			}
 		}
 
-		if (alignment != Alignment.Left && indexOffset < verts.size)
+		if (alignment != Alignment.Left && indexOffset < verts.Count)
 		{
 			Align(verts, indexOffset, x - finalSpacingX);
-			indexOffset = verts.size;
+			indexOffset = verts.Count;
 		}
 		mColors.Clear();
 	}
@@ -1830,14 +1815,14 @@ static public class NGUIText
 	/// Print character positions and indices into the specified buffer. Meant to be used with the "find closest vertex" calculations.
 	/// </summary>
 
-	static public void PrintApproximateCharacterPositions (string text, BetterList<Vector3> verts, BetterList<int> indices)
+	static public void PrintApproximateCharacterPositions (string text, List<Vector3> verts, List<int> indices)
 	{
 		if (string.IsNullOrEmpty(text)) text = " ";
 
 		Prepare(text);
 
 		float x = 0f, y = 0f, maxX = 0f, halfSize = fontSize * fontScale * 0.5f;
-		int textLength = text.Length, indexOffset = verts.size, ch = 0, prev = 0;
+		int textLength = text.Length, indexOffset = verts.Count, ch = 0, prev = 0;
 
 		for (int i = 0; i < textLength; ++i)
 		{
@@ -1853,7 +1838,7 @@ static public class NGUIText
 				if (alignment != Alignment.Left)
 				{
 					Align(verts, indexOffset, x - finalSpacingX, 1);
-					indexOffset = verts.size;
+					indexOffset = verts.Count;
 				}
 
 				x = 0;
@@ -1888,10 +1873,10 @@ static public class NGUIText
 					{
 						if (x == 0f) return;
 
-						if (alignment != Alignment.Left && indexOffset < verts.size)
+						if (alignment != Alignment.Left && indexOffset < verts.Count)
 						{
 							Align(verts, indexOffset, x - finalSpacingX, 1);
-							indexOffset = verts.size;
+							indexOffset = verts.Count;
 						}
 
 						x = w;
@@ -1912,10 +1897,10 @@ static public class NGUIText
 				{
 					if (x == 0f) return;
 
-					if (alignment != Alignment.Left && indexOffset < verts.size)
+					if (alignment != Alignment.Left && indexOffset < verts.Count)
 					{
 						Align(verts, indexOffset, x - finalSpacingX, 1);
-						indexOffset = verts.size;
+						indexOffset = verts.Count;
 					}
 
 					x = w;
@@ -1930,7 +1915,7 @@ static public class NGUIText
 			}
 		}
 
-		if (alignment != Alignment.Left && indexOffset < verts.size)
+		if (alignment != Alignment.Left && indexOffset < verts.Count)
 			Align(verts, indexOffset, x - finalSpacingX, 1);
 	}
 
@@ -1940,7 +1925,7 @@ static public class NGUIText
 	/// There are 2 vertices for every index: Bottom Left + Top Right.
 	/// </summary>
 
-	static public void PrintExactCharacterPositions (string text, BetterList<Vector3> verts, BetterList<int> indices)
+	static public void PrintExactCharacterPositions (string text, List<Vector3> verts, List<int> indices)
 	{
 		if (string.IsNullOrEmpty(text)) text = " ";
 
@@ -1948,7 +1933,7 @@ static public class NGUIText
 
 		float fullSize = fontSize * fontScale;
 		float x = 0f, y = 0f, maxX = 0f;
-		int textLength = text.Length, indexOffset = verts.size, ch = 0, prev = 0;
+		int textLength = text.Length, indexOffset = verts.Count, ch = 0, prev = 0;
 
 		for (int i = 0; i < textLength; ++i)
 		{
@@ -1961,7 +1946,7 @@ static public class NGUIText
 				if (alignment != Alignment.Left)
 				{
 					Align(verts, indexOffset, x - finalSpacingX, 2);
-					indexOffset = verts.size;
+					indexOffset = verts.Count;
 				}
 
 				x = 0;
@@ -1996,10 +1981,10 @@ static public class NGUIText
 					{
 						if (x == 0f) return;
 
-						if (alignment != Alignment.Left && indexOffset < verts.size)
+						if (alignment != Alignment.Left && indexOffset < verts.Count)
 						{
 							Align(verts, indexOffset, x - finalSpacingX, 2);
-							indexOffset = verts.size;
+							indexOffset = verts.Count;
 						}
 
 						x = 0f;
@@ -2024,10 +2009,10 @@ static public class NGUIText
 				{
 					if (x == 0f) return;
 
-					if (alignment != Alignment.Left && indexOffset < verts.size)
+					if (alignment != Alignment.Left && indexOffset < verts.Count)
 					{
 						Align(verts, indexOffset, x - finalSpacingX, 2);
-						indexOffset = verts.size;
+						indexOffset = verts.Count;
 					}
 
 					x = 0f;
@@ -2046,7 +2031,7 @@ static public class NGUIText
 			}
 		}
 
-		if (alignment != Alignment.Left && indexOffset < verts.size)
+		if (alignment != Alignment.Left && indexOffset < verts.Count)
 			Align(verts, indexOffset, x - finalSpacingX, 2);
 	}
 
@@ -2054,7 +2039,7 @@ static public class NGUIText
 	/// Print the caret and selection vertices. Note that it's expected that 'text' has been stripped clean of symbols.
 	/// </summary>
 
-	static public void PrintCaretAndSelection (string text, int start, int end, BetterList<Vector3> caret, BetterList<Vector3> highlight)
+	static public void PrintCaretAndSelection (string text, int start, int end, List<Vector3> caret, List<Vector3> highlight)
 	{
 		if (string.IsNullOrEmpty(text)) text = " ";
 
@@ -2069,8 +2054,8 @@ static public class NGUIText
 		}
 
 		float x = 0f, y = 0f, maxX = 0f, fs = fontSize * fontScale;
-		int caretOffset = (caret != null) ? caret.size : 0;
-		int highlightOffset = (highlight != null) ? highlight.size : 0;
+		int caretOffset = (caret != null) ? caret.Count : 0;
+		int highlightOffset = (highlight != null) ? highlight.Count : 0;
 		int textLength = text.Length, index = 0, ch = 0, prev = 0;
 		bool highlighting = false, caretSet = false;
 
@@ -2122,10 +2107,10 @@ static public class NGUIText
 					}
 
 					// Align the highlight
-					if (alignment != Alignment.Left && highlightOffset < highlight.size)
+					if (alignment != Alignment.Left && highlightOffset < highlight.Count)
 					{
 						Align(highlight, highlightOffset, x - finalSpacingX);
-						highlightOffset = highlight.size;
+						highlightOffset = highlight.Count;
 					}
 				}
 
@@ -2190,10 +2175,10 @@ static public class NGUIText
 						}
 
 						// Align the highlight
-						if (alignment != Alignment.Left && highlightOffset < highlight.size)
+						if (alignment != Alignment.Left && highlightOffset < highlight.Count)
 						{
 							Align(highlight, highlightOffset, x - finalSpacingX);
-							highlightOffset = highlight.size;
+							highlightOffset = highlight.Count;
 						}
 					}
 
@@ -2271,7 +2256,7 @@ static public class NGUIText
 			}
 
 			// Align the highlight
-			if (alignment != Alignment.Left && highlightOffset < highlight.size)
+			if (alignment != Alignment.Left && highlightOffset < highlight.Count)
 				Align(highlight, highlightOffset, x - finalSpacingX);
 		}
 	}

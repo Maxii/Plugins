@@ -81,7 +81,14 @@ namespace Pathfinding {
 			ForceUpdate();
 		}
 
-		/** Checks all NavmeshCut instances and updates graphs if needed */
+		/** Checks all NavmeshCut instances and updates graphs if needed.
+		 * \note This schedules updates for all necessary tiles to happen as soon as possible.
+		 * The pathfinding threads will continue to calculate the paths that they were calculating when this function
+		 * was called and then they will be paused and the graph updates will be carried out (this may be several frames into the
+		 * future and the graph updates themselves may take several frames to complete).
+		 * If you want to force all navmesh cutting to be completed in a single frame call this method
+		 * and immediately after call AstarPath.FlushWorkItems.
+		 */
 		public void ForceUpdate () {
 			if (handler == null) {
 				throw new System.Exception("Cannot update graphs. No TileHandler. Do not call this method in Awake.");

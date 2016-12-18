@@ -479,23 +479,10 @@ namespace Pathfinding.RVO.Sampled {
 						// (all three if we count the cutoff line)
 						// and thus inside the forbidden region in velocity space
 
-						/*float magn = ( p - origin ).sqrMagnitude;
-						 * if ( magn < sqrCutoffDistance ) {
-						 *  weight = 0;
-						 *  return Vector2.zero;
-						 * }*/
-
-
 						if (leftSide) {
 							if (det3 < radius) {
 								weight = det3*weightFactor;
 								return new Vector2(-cutoffDir.y, cutoffDir.x)*weight;
-
-								/*Vector2 dir = (p - center);
-								 * float magn = dir.magnitude;
-								 * weight = radius-magn;
-								 * dir *= (1.0f/magn)*weight;
-								 * return dir;*/
 							}
 
 							weight = det1;
@@ -504,18 +491,7 @@ namespace Pathfinding.RVO.Sampled {
 							if (det3 < radius) {
 								weight = det3*weightFactor;
 								return new Vector2(-cutoffDir.y, cutoffDir.x)*weight;
-
-								/*Vector2 dir = (p - center);
-								 * float magn = dir.magnitude;
-								 * weight = radius-magn;
-								 * dir *= (1.0f/magn)*weight;
-								 * return dir;*/
 							}
-
-							/*if ( det3 < det2 ) {
-							 *  weight = det3*0.5f;
-							 *  return new Vector2(-cutoffDir.y, cutoffDir.x)*weight;
-							 * }*/
 
 							weight = det2*weightFactor;
 							return new Vector2(-dir2.y, dir2.x)*weight;
@@ -554,37 +530,15 @@ namespace Pathfinding.RVO.Sampled {
 					float det1 = Det(line1, dir1, p);
 					float det2 = Det(line2, dir2, p);
 					if (det1 >= 0 && det2 >= 0) {
-						/*float magn = ( p - origin ).sqrMagnitude;
-						 * if ( magn < sqrCutoffDistance ) {
-						 *  weight = 0;
-						 *  return Vector2.zero;
-						 * }*/
-
-
 						if (leftSide) {
 							if (det3 < radius) {
 								return det3*weightFactor;
-
-								//return radius - (p-center).magnitude;
-								/*Vector2 dir = (p - center);
-								 * float magn = dir.magnitude;
-								 * weight = radius-magn;
-								 * dir *= (1.0f/magn)*weight;
-								 * return dir;*/
 							}
 
 							return det1*weightFactor;
 						} else {
 							if (det3 < radius) {
 								return det3*weightFactor;
-
-								//return radius - (p-center).magnitude;
-
-								/*Vector2 dir = (p - center);
-								 * float magn = dir.magnitude;
-								 * weight = radius-magn;
-								 * dir *= (1.0f/magn)*weight;
-								 * return dir;*/
 							}
 
 							return det2*weightFactor;
@@ -617,7 +571,7 @@ namespace Pathfinding.RVO.Sampled {
 
 			float wallThickness = simulator.WallThickness;
 
-			float wallWeight = simulator.algorithm == Simulator.SamplingAlgorithm.GradientDecent ? 1 : WallWeight;
+			float wallWeight = simulator.algorithm == Simulator.SamplingAlgorithm.GradientDescent ? 1 : WallWeight;
 
 			for (int i = 0; i < simulator.obstacles.Count; i++) {
 				var obstacle = simulator.obstacles[i];
@@ -709,7 +663,7 @@ namespace Pathfinding.RVO.Sampled {
 
 			Vector2 result = Vector2.zero;
 
-			if (simulator.algorithm == Simulator.SamplingAlgorithm.GradientDecent) {
+			if (simulator.algorithm == Simulator.SamplingAlgorithm.GradientDescent) {
 				if (DebugDraw) {
 					const int PlotWidth = 40;
 					const float WorldPlotWidth = 15;

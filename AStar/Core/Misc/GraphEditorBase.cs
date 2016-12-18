@@ -1,4 +1,4 @@
-using Pathfinding.Serialization.JsonFx;
+using Pathfinding.Serialization;
 
 namespace Pathfinding {
 	[JsonOptIn]

@@ -1,13 +1,15 @@
 using Math = System.Math;
-
 using  System.IO;
 using UnityEngine;
 using System.Collections.Generic;
-using Pathfinding.Serialization.JsonFx;
-using Pathfinding.Voxels;
-using Pathfinding.Serialization;
+#if UNITY_5_5_OR_NEWER
+using UnityEngine.Profiling;
+#endif
 
 namespace Pathfinding {
+	using Pathfinding.Voxels;
+	using Pathfinding.Serialization;
+
 	[System.Serializable]
 	[JsonOptIn]
 	/** Automatically generates navmesh graphs based on world geometry.
@@ -390,6 +392,13 @@ namespace Pathfinding {
 			}
 		}
 
+		/** Tile at the specified x, z coordinate pair.
+		 * The first tile is at (0,0), the last tile at (tileXCount-1, tileZCount-1).
+		 */
+		public NavmeshTile GetTile (int x, int z) {
+			return tiles[x + z * tileXCount];
+		}
+
 		/** Gets the vertex coordinate for the specified index.
 		 *
 		 * \throws IndexOutOfRangeException if the vertex index is invalid.
@@ -480,8 +489,6 @@ namespace Pathfinding {
 		 * graph.RelocateNodes (graph.matrix, m);
 		 * \endcode
 		 *
-		 * \warning Cannot be used on tiled recast graphs.
-		 *
 		 * \warning This method is lossy, so calling it many times may cause node positions to lose precision.
 		 * For example if you set the scale to 0 in one call, and then to 1 in the next call, it will not be able to
 		 * recover the correct positions since when the scale was 0, all nodes were scaled/moved to the same point.
@@ -535,10 +542,8 @@ namespace Pathfinding {
 		}
 
 		public override void GetNodes (GraphNodeDelegateCancelable del) {
-			/*if (nodes == null) return;
-			 * for (int i=0;i<nodes.Length && del (nodes[i]);i++) {}*/
 			if (tiles == null) return;
-			//
+
 			for (int i = 0; i < tiles.Length; i++) {
 				if (tiles[i] == null || tiles[i].x+tiles[i].z*tileXCount != i) continue;
 				TriangleMeshNode[] nodes = tiles[i].nodes;
@@ -550,11 +555,13 @@ namespace Pathfinding {
 		}
 
 		/** Returns the closest point of the node */
+		[System.Obsolete("Use node.ClosestPointOnNode instead")]
 		public Vector3 ClosestPointOnNode (TriangleMeshNode node, Vector3 pos) {
 			return Polygon.ClosestPointOnTriangle((Vector3)GetVertex(node.v0), (Vector3)GetVertex(node.v1), (Vector3)GetVertex(node.v2), pos);
 		}
 
 		/** Returns if the point is inside the node in XZ space */
+		[System.Obsolete("Use node.ContainsPoint instead")]
 		public bool ContainsPoint (TriangleMeshNode node, Vector3 pos) {
 			if (VectorMath.IsClockwiseXZ((Vector3)GetVertex(node.v0), (Vector3)GetVertex(node.v1), pos)
 				&& VectorMath.IsClockwiseXZ((Vector3)GetVertex(node.v1), (Vector3)GetVertex(node.v2), pos)
@@ -564,6 +571,21 @@ namespace Pathfinding {
 			return false;
 		}
 
+		/** Changes the bounds of the graph to precisely encapsulate all objects in the scene that can be included in the scanning process based on the settings.
+		 * Which objects are used depends on the settings. If an object would have affected the graph with the current settings if it would have
+		 * been inside the bounds of the graph, it will be detected and the bounds will be expanded to contain that object.
+		 *
+		 * This method corresponds to the 'Snap bounds to scene' button in the inspector.
+		 *
+		 * \see rasterizeMeshes
+		 * \see rasterizeTerrain
+		 * \see rasterizeColliders
+		 * \see mask
+		 * \see tagMask
+		 *
+		 * \see forcedBoundsCenter
+		 * \see forcedBoundsSize
+		 */
 		public void SnapForceBoundsToScene () {
 			List<ExtraMesh> meshes;
 
@@ -736,7 +758,10 @@ namespace Pathfinding {
 			return r;
 		}
 
-		/** Returns a rect containing the indices of all tiles by rounding the specified bounds to tile borders */
+		/** Returns a rect containing the indices of all tiles by rounding the specified bounds to tile borders.
+		 * This is different from GetTouchingTiles in that the tiles inside the rectangle returned from this method
+		 * may not contain the whole bounds, while that is guaranteed for GetTouchingTiles.
+		 */
 		public IntRect GetTouchingTilesRound (Bounds b) {
 			b.center -= forcedBounds.min;
 
@@ -747,11 +772,11 @@ namespace Pathfinding {
 			return r;
 		}
 
-		public GraphUpdateThreading CanUpdateAsync (GraphUpdateObject o) {
+		GraphUpdateThreading IUpdatableGraph.CanUpdateAsync (GraphUpdateObject o) {
 			return o.updatePhysics ? GraphUpdateThreading.SeparateAndUnityInit : GraphUpdateThreading.SeparateThread;
 		}
 
-		public void UpdateAreaInit (GraphUpdateObject o) {
+		void IUpdatableGraph.UpdateAreaInit (GraphUpdateObject o) {
 			if (!o.updatePhysics) {
 				return;
 			}
@@ -797,7 +822,7 @@ namespace Pathfinding {
 			AstarProfiler.EndProfile("UpdateAreaInit");
 		}
 
-		public void UpdateArea (GraphUpdateObject guo) {
+		void IUpdatableGraph.UpdateArea (GraphUpdateObject guo) {
 			// Figure out which tiles are affected
 			var r = GetTouchingTiles(guo.bounds);
 
@@ -829,8 +854,8 @@ namespace Pathfinding {
 
 
 
-			for (int x = r.xmin; x <= r.xmax; x++) {
-				for (int z = r.ymin; z <= r.ymax; z++) {
+			for (int z = r.ymin; z <= r.ymax; z++) {
+				for (int x = r.xmin; x <= r.xmax; x++) {
 					RemoveConnectionsFromTile(tiles[x + z*tileXCount]);
 				}
 			}
@@ -855,8 +880,8 @@ namespace Pathfinding {
 			AstarProfiler.StartProfile("ConnectTiles");
 			uint graphIndex = (uint)AstarPath.active.astarData.GetGraphIndex(this);
 
-			for (int x = r.xmin; x <= r.xmax; x++) {
-				for (int z = r.ymin; z <= r.ymax; z++) {
+			for (int z = r.ymin; z <= r.ymax; z++) {
+				for (int x = r.xmin; x <= r.xmax; x++) {
 					NavmeshTile tile = tiles[x + z*tileXCount];
 					GraphNode[] nodes = tile.nodes;
 
@@ -866,17 +891,17 @@ namespace Pathfinding {
 
 
 
-			//Connect the newly create tiles with the old tiles and with each other
+			// Connect the newly create tiles with the old tiles and with each other
 			r = r.Expand(1);
-			//Clamp to bounds
+			// Clamp to bounds
 			r = IntRect.Intersection(r, new IntRect(0, 0, tileXCount-1, tileZCount-1));
 
-			for (int x = r.xmin; x <= r.xmax; x++) {
-				for (int z = r.ymin; z <= r.ymax; z++) {
-					if (x < tileXCount-1 && r.Contains(x+1, z)) {
+			for (int z = r.ymin; z <= r.ymax; z++) {
+				for (int x = r.xmin; x <= r.xmax; x++) {
+					if (r.Contains(x+1, z)) {
 						ConnectTiles(tiles[x + z*tileXCount], tiles[x+1 + z*tileXCount]);
 					}
-					if (z < tileZCount-1 && r.Contains(x, z+1)) {
+					if (r.Contains(x, z+1)) {
 						ConnectTiles(tiles[x + z*tileXCount], tiles[x + (z+1)*tileXCount]);
 					}
 				}
@@ -1545,6 +1570,8 @@ namespace Pathfinding {
 
 			float tcs;
 
+			// Figure out which side that is shared between the two tiles
+			// and what coordinate index is fixed along that edge (x or z)
 			if (t1x == t2x) {
 				coord = 2;
 				altcoord = 0;
@@ -1583,48 +1610,48 @@ namespace Pathfinding {
 			TriangleMeshNode[] nodes1 = tile1.nodes;
 			TriangleMeshNode[] nodes2 = tile2.nodes;
 
-			//Find adjacent nodes on the border between the tiles
+			// Find adjacent nodes on the border between the tiles
 			for (int i = 0; i < nodes1.Length; i++) {
-				TriangleMeshNode node = nodes1[i];
-				int av = node.GetVertexCount();
+				TriangleMeshNode nodeA = nodes1[i];
+				int aVertexCount = nodeA.GetVertexCount();
 
-				for (int a = 0; a < av; a++) {
-					Int3 ap1 = node.GetVertex(a);
-					Int3 ap2 = node.GetVertex((a+1) % av);
-					if (Math.Abs(ap1[coord] - midpoint) < 2 && Math.Abs(ap2[coord] - midpoint) < 2) {
-#if ASTARDEBUG
-						Debug.DrawLine((Vector3)ap1, (Vector3)ap2, Color.red);
-#endif
+				// Loop through all *sides* of the node
+				for (int a = 0; a < aVertexCount; a++) {
+					// Vertices that the segment consists of
+					Int3 aVertex1 = nodeA.GetVertex(a);
+					Int3 aVertex2 = nodeA.GetVertex((a+1) % aVertexCount);
 
-						int minalt = Math.Min(ap1[altcoord], ap2[altcoord]);
-						int maxalt = Math.Max(ap1[altcoord], ap2[altcoord]);
+					// Check if it is really close to the tile border
+					if (Math.Abs(aVertex1[coord] - midpoint) < 2 && Math.Abs(aVertex2[coord] - midpoint) < 2) {
+						int minalt = Math.Min(aVertex1[altcoord], aVertex2[altcoord]);
+						int maxalt = Math.Max(aVertex1[altcoord], aVertex2[altcoord]);
 
-						//Degenerate edge
+						// Degenerate edge
 						if (minalt == maxalt) continue;
 
 						for (int j = 0; j < nodes2.Length; j++) {
-							TriangleMeshNode other = nodes2[j];
-							int bv = other.GetVertexCount();
-							for (int b = 0; b < bv; b++) {
-								Int3 bp1 = other.GetVertex(b);
-								Int3 bp2 = other.GetVertex((b+1) % av);
-								if (Math.Abs(bp1[coord] - midpoint) < 2 && Math.Abs(bp2[coord] - midpoint) < 2) {
-									int minalt2 = Math.Min(bp1[altcoord], bp2[altcoord]);
-									int maxalt2 = Math.Max(bp1[altcoord], bp2[altcoord]);
+							TriangleMeshNode nodeB = nodes2[j];
+							int bVertexCount = nodeB.GetVertexCount();
+							for (int b = 0; b < bVertexCount; b++) {
+								Int3 bVertex1 = nodeB.GetVertex(b);
+								Int3 bVertex2 = nodeB.GetVertex((b+1) % aVertexCount);
+								if (Math.Abs(bVertex1[coord] - midpoint) < 2 && Math.Abs(bVertex2[coord] - midpoint) < 2) {
+									int minalt2 = Math.Min(bVertex1[altcoord], bVertex2[altcoord]);
+									int maxalt2 = Math.Max(bVertex1[altcoord], bVertex2[altcoord]);
 
-									//Degenerate edge
+									// Degenerate edge
 									if (minalt2 == maxalt2) continue;
 
 									if (maxalt > minalt2 && minalt < maxalt2) {
-										//Adjacent
+										// The two nodes seem to be adjacent
 
-										//Test shortest distance between the segments (first test if they are equal since that is much faster)
-										if ((ap1 == bp1 && ap2 == bp2) || (ap1 == bp2 && ap2 == bp1) ||
-											VectorMath.SqrDistanceSegmentSegment((Vector3)ap1, (Vector3)ap2, (Vector3)bp1, (Vector3)bp2) < walkableClimb*walkableClimb) {
-											uint cost = (uint)(node.position - other.position).costMagnitude;
+										// Test shortest distance between the segments (first test if they are equal since that is much faster)
+										if ((aVertex1 == bVertex1 && aVertex2 == bVertex2) || (aVertex1 == bVertex2 && aVertex2 == bVertex1) ||
+											VectorMath.SqrDistanceSegmentSegment((Vector3)aVertex1, (Vector3)aVertex2, (Vector3)bVertex1, (Vector3)bVertex2) < walkableClimb*walkableClimb) {
+											uint cost = (uint)(nodeA.position - nodeB.position).costMagnitude;
 
-											node.AddConnection(other, cost);
-											other.AddConnection(node, cost);
+											nodeA.AddConnection(nodeB, cost);
+											nodeB.AddConnection(nodeA, cost);
 										}
 									}
 								}
@@ -1774,6 +1801,12 @@ namespace Pathfinding {
 			//This index will be ORed to the triangle indices
 			int tileIndex = x + z*tileXCount;
 			tileIndex <<= TileIndexOffset;
+
+			if (tile.verts.Length > VertexIndexMask) {
+				Debug.LogError("Too many vertices in the tile (" + tile.verts.Length + " > " + VertexIndexMask +")\nYou can enable ASTAR_RECAST_LARGER_TILES under the 'Optimizations' tab in the A* Inspector to raise this limit.");
+				tiles[tileIndex] = NewEmptyTile(x, z);
+				return;
+			}
 
 			//Create nodes and assign triangle indices
 			for (int i = 0; i < nodes.Length; i++) {
@@ -2293,45 +2326,8 @@ namespace Pathfinding {
 			GetNodes(del);
 		}
 
-#if ASTAR_NO_JSON
-		public override void SerializeSettings (GraphSerializationContext ctx) {
-			base.SerializeSettings(ctx);
-			ctx.writer.Write(characterRadius);
-			ctx.writer.Write(contourMaxError);
-			ctx.writer.Write(cellSize);
-			ctx.writer.Write(cellHeight);
-			ctx.writer.Write(walkableHeight);
-			ctx.writer.Write(maxSlope);
-			ctx.writer.Write(maxEdgeLength);
-			ctx.writer.Write(editorTileSize);
-			ctx.writer.Write(tileSizeX);
-			ctx.writer.Write(nearestSearchOnlyXZ);
-			ctx.writer.Write(useTiles);
-			ctx.writer.Write((int)relevantGraphSurfaceMode);
-			ctx.writer.Write(rasterizeColliders);
-			ctx.writer.Write(rasterizeMeshes);
-			ctx.writer.Write(rasterizeTerrain);
-			ctx.writer.Write(rasterizeTrees);
-			ctx.writer.Write(colliderRasterizeDetail);
-			ctx.SerializeVector3(forcedBoundsCenter);
-			ctx.SerializeVector3(forcedBoundsSize);
-			ctx.writer.Write(mask);
-			ctx.writer.Write(tagMask.Count);
-			for (int i = 0; i < tagMask.Count; i++) {
-				ctx.writer.Write(tagMask[i]);
-			}
-			ctx.writer.Write(showMeshOutline);
-			ctx.writer.Write(showNodeConnections);
-			ctx.writer.Write(terrainSampleSize);
-
-			ctx.writer.Write(walkableClimb);
-			ctx.writer.Write(minRegionSize);
-			ctx.writer.Write(tileSizeZ);
-			ctx.writer.Write(showMeshSurface);
-		}
-
-		public override void DeserializeSettings (GraphSerializationContext ctx) {
-			base.DeserializeSettings(ctx);
+		public override void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
+			base.DeserializeSettingsCompatibility(ctx);
 
 			characterRadius = ctx.reader.ReadSingle();
 			contourMaxError = ctx.reader.ReadSingle();
@@ -2375,7 +2371,6 @@ namespace Pathfinding {
 
 			showMeshSurface = ctx.reader.ReadBoolean();
 		}
-#endif
 
 		/** Serializes Node Info.
 		 * Should serialize:
@@ -2426,9 +2421,7 @@ namespace Pathfinding {
 
 					writer.Write(tile.verts.Length);
 					for (int i = 0; i < tile.verts.Length; i++) {
-						writer.Write(tile.verts[i].x);
-						writer.Write(tile.verts[i].y);
-						writer.Write(tile.verts[i].z);
+						ctx.SerializeInt3(tile.verts[i]);
 					}
 
 					writer.Write(tile.nodes.Length);
@@ -2493,7 +2486,7 @@ namespace Pathfinding {
 
 					tile.verts = new Int3[reader.ReadInt32()];
 					for (int i = 0; i < tile.verts.Length; i++) {
-						tile.verts[i] = new Int3(reader.ReadInt32(), reader.ReadInt32(), reader.ReadInt32());
+						tile.verts[i] = ctx.DeserializeInt3();
 					}
 
 					int nodeCount = reader.ReadInt32();

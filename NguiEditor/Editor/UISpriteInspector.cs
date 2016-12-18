@@ -66,6 +66,8 @@ public class UISpriteInspector : UIBasicSpriteEditor
 
 		SerializedProperty sp = serializedObject.FindProperty("mSpriteName");
 		NGUIEditorTools.DrawAdvancedSpriteField(atlas.objectReferenceValue as UIAtlas, sp.stringValue, SelectSprite, false);
+
+		NGUIEditorTools.DrawProperty("Material", serializedObject, "mMat");
 		return true;
 	}
 

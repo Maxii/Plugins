@@ -96,13 +96,18 @@ namespace Pathfinding {
 			return allCuts;
 		}
 
+		/** Shape of the cut */
+		[Tooltip("Shape of the cut")]
 		public MeshType type;
 
 		/** Custom mesh to use.
 		 * The contour(s) of the mesh will be extracted.
 		 * If you get the "max perturbations" error when cutting with this, check the normals on the mesh.
 		 * They should all point in the same direction. Try flipping them if that does not help.
+		 *
+		 * This mesh should only be a 2D surface, not a volume.
 		 */
+		[Tooltip("The contour(s) of the mesh will be extracted. This mesh should only be a 2D surface, not a volume (see documentation).")]
 		public Mesh mesh;
 
 		/** Size of the rectangle */
@@ -113,9 +118,12 @@ namespace Pathfinding {
 
 		/** Number of vertices on the circle */
 		public int circleResolution = 6;
+
+		/** The cut will be extruded to this height */
 		public float height = 1;
 
 		/** Scale of the custom mesh, if used */
+		[Tooltip("Scale of the custom mesh")]
 		public float meshScale = 1;
 
 		public Vector3 center;
@@ -126,11 +134,13 @@ namespace Pathfinding {
 		 *
 		 * \note Dynamic updating requires a TileHandlerHelper somewhere in the scene.
 		 */
+		[Tooltip("Distance between positions to require an update of the navmesh\nA smaller distance gives better accuracy, but requires more updates when moving the object over time, so it is often slower.")]
 		public float updateDistance = 0.4f;
 
 		/** Only makes a split in the navmesh, but does not remove the geometry to make a hole.
 		 * This is slower than a normal cut
 		 */
+		[Tooltip("Only makes a split in the navmesh, but does not remove the geometry to make a hole")]
 		public bool isDual;
 
 		/** Cuts geometry added by a NavmeshAdd component.
@@ -143,11 +153,13 @@ namespace Pathfinding {
 		 *
 		 * \note Dynamic updating requires a Tile Handler Helper somewhere in the scene.
 		 */
+		[Tooltip("How many degrees rotation that is required for an update to the navmesh. Should be between 0 and 180.")]
 		public float updateRotationDistance = 10;
 
 		/** Includes rotation in calculations.
 		 * This is slower since a lot more matrix multiplications are needed but gives more flexibility.
 		 */
+		[Tooltip("Includes rotation in calculations. This is slower since a lot more matrix multiplications are needed but gives more flexibility.")]
 		public bool useRotation;
 
 		Vector3[][] contours;
@@ -167,11 +179,11 @@ namespace Pathfinding {
 		}
 
 		public void Awake () {
+			tr = transform;
 			AddCut(this);
 		}
 
 		public void OnEnable () {
-			tr = transform;
 			lastPosition = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
 			lastRotation = tr.rotation;
 		}
@@ -296,7 +308,7 @@ namespace Pathfinding {
 
 		/** World space bounds of this cut */
 		public Bounds GetBounds () {
-			var bounds = new Bounds();
+			Bounds bounds;
 
 			switch (type) {
 			case MeshType.Rectangle:
@@ -325,36 +337,38 @@ namespace Pathfinding {
 				}
 				break;
 			case MeshType.CustomMesh:
-				if (mesh == null) break;
-
-				Bounds b = mesh.bounds;
-				if (useRotation) {
-					Matrix4x4 m = tr.localToWorldMatrix;
-					b.center *= meshScale;
-					b.size *= meshScale;
-
-					bounds = new Bounds(m.MultiplyPoint3x4(center + b.center), Vector3.zero);
-
-					Vector3 mx = b.max;
-					Vector3 mn = b.min;
-
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mx.x, mx.y, mx.z)));
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mn.x, mx.y, mx.z)));
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mn.x, mx.y, mn.z)));
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mx.x, mx.y, mn.z)));
-
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mx.x, mn.y, mx.z)));
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mn.x, mn.y, mx.z)));
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mn.x, mn.y, mn.z)));
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mx.x, mn.y, mn.z)));
-
-					Vector3 size = bounds.size;
-					size.y = Mathf.Max(size.y, height * tr.lossyScale.y);
-					bounds.size = size;
+				if (mesh == null) {
+					bounds = new Bounds();
 				} else {
-					Vector3 size = b.size*meshScale;
-					size.y = Mathf.Max(size.y, height);
-					bounds = new Bounds(transform.position+center+b.center*meshScale, size);
+					Bounds meshBounds = mesh.bounds;
+					if (useRotation) {
+						Matrix4x4 m = tr.localToWorldMatrix;
+						meshBounds.center *= meshScale;
+						meshBounds.size *= meshScale;
+
+						bounds = new Bounds(m.MultiplyPoint3x4(center + meshBounds.center), Vector3.zero);
+
+						Vector3 mx = meshBounds.max;
+						Vector3 mn = meshBounds.min;
+
+						bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mx.x, mx.y, mx.z)));
+						bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mn.x, mx.y, mx.z)));
+						bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mn.x, mx.y, mn.z)));
+						bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mx.x, mx.y, mn.z)));
+
+						bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mx.x, mn.y, mx.z)));
+						bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mn.x, mn.y, mx.z)));
+						bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mn.x, mn.y, mn.z)));
+						bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mx.x, mn.y, mn.z)));
+
+						Vector3 size = bounds.size;
+						size.y = Mathf.Max(size.y, height * tr.lossyScale.y);
+						bounds.size = size;
+					} else {
+						Vector3 size = meshBounds.size*meshScale;
+						size.y = Mathf.Max(size.y, height);
+						bounds = new Bounds(transform.position+center+meshBounds.center*meshScale, size);
+					}
 				}
 				break;
 			default:
@@ -372,15 +386,28 @@ namespace Pathfinding {
 			if (circleResolution < 3) circleResolution = 3;
 
 			Vector3 woffset = tr.position;
+
+			Matrix4x4 local2world = Matrix4x4.identity;
+
+			bool reverse = false;
+
+			// Take rotation and scaling into account
+			if (useRotation) {
+				local2world = tr.localToWorldMatrix;
+				reverse = VectorMath.ReversesFaceOrientationsXZ(local2world);
+			}
+
 			switch (type) {
 			case MeshType.Rectangle:
 				List<Pathfinding.ClipperLib.IntPoint> buffer0 = Pathfinding.Util.ListPool<Pathfinding.ClipperLib.IntPoint>.Claim();
+
+				reverse ^= (rectangleSize.x < 0) ^ (rectangleSize.y < 0);
+
 				if (useRotation) {
-					Matrix4x4 m = tr.localToWorldMatrix;
-					buffer0.Add(V3ToIntPoint(m.MultiplyPoint3x4(center + new Vector3(-rectangleSize.x, 0, -rectangleSize.y)*0.5f)));
-					buffer0.Add(V3ToIntPoint(m.MultiplyPoint3x4(center + new Vector3(rectangleSize.x, 0, -rectangleSize.y)*0.5f)));
-					buffer0.Add(V3ToIntPoint(m.MultiplyPoint3x4(center + new Vector3(rectangleSize.x, 0, rectangleSize.y)*0.5f)));
-					buffer0.Add(V3ToIntPoint(m.MultiplyPoint3x4(center + new Vector3(-rectangleSize.x, 0, rectangleSize.y)*0.5f)));
+					buffer0.Add(V3ToIntPoint(local2world.MultiplyPoint3x4(center + new Vector3(-rectangleSize.x, 0, -rectangleSize.y)*0.5f)));
+					buffer0.Add(V3ToIntPoint(local2world.MultiplyPoint3x4(center + new Vector3(rectangleSize.x, 0, -rectangleSize.y)*0.5f)));
+					buffer0.Add(V3ToIntPoint(local2world.MultiplyPoint3x4(center + new Vector3(rectangleSize.x, 0, rectangleSize.y)*0.5f)));
+					buffer0.Add(V3ToIntPoint(local2world.MultiplyPoint3x4(center + new Vector3(-rectangleSize.x, 0, rectangleSize.y)*0.5f)));
 				} else {
 					woffset += center;
 					buffer0.Add(V3ToIntPoint(woffset + new Vector3(-rectangleSize.x, 0, -rectangleSize.y)*0.5f));
@@ -388,14 +415,18 @@ namespace Pathfinding {
 					buffer0.Add(V3ToIntPoint(woffset + new Vector3(rectangleSize.x, 0, rectangleSize.y)*0.5f));
 					buffer0.Add(V3ToIntPoint(woffset + new Vector3(-rectangleSize.x, 0, rectangleSize.y)*0.5f));
 				}
+
+				if (reverse) buffer0.Reverse();
 				buffer.Add(buffer0);
 				break;
 			case MeshType.Circle:
 				buffer0 = Pathfinding.Util.ListPool<Pathfinding.ClipperLib.IntPoint>.Claim(circleResolution);
+
+				reverse ^= circleRadius < 0;
+
 				if (useRotation) {
-					Matrix4x4 m = tr.localToWorldMatrix;
 					for (int i = 0; i < circleResolution; i++) {
-						buffer0.Add(V3ToIntPoint(m.MultiplyPoint3x4(center + new Vector3(Mathf.Cos((i*2*Mathf.PI)/circleResolution), 0, Mathf.Sin((i*2*Mathf.PI)/circleResolution))*circleRadius)));
+						buffer0.Add(V3ToIntPoint(local2world.MultiplyPoint3x4(center + new Vector3(Mathf.Cos((i*2*Mathf.PI)/circleResolution), 0, Mathf.Sin((i*2*Mathf.PI)/circleResolution))*circleRadius)));
 					}
 				} else {
 					woffset += center;
@@ -403,6 +434,8 @@ namespace Pathfinding {
 						buffer0.Add(V3ToIntPoint(woffset + new Vector3(Mathf.Cos((i*2*Mathf.PI)/circleResolution), 0, Mathf.Sin((i*2*Mathf.PI)/circleResolution))*circleRadius));
 					}
 				}
+
+				if (reverse) buffer0.Reverse();
 				buffer.Add(buffer0);
 				break;
 			case MeshType.CustomMesh:
@@ -414,16 +447,15 @@ namespace Pathfinding {
 				if (contours != null) {
 					woffset += center;
 
-					bool reverse = Vector3.Dot(tr.up, Vector3.up) < 0;
+					reverse ^= meshScale < 0;
 
 					for (int i = 0; i < contours.Length; i++) {
 						Vector3[] contour = contours[i];
 
 						buffer0 = Pathfinding.Util.ListPool<Pathfinding.ClipperLib.IntPoint>.Claim(contour.Length);
 						if (useRotation) {
-							Matrix4x4 m = tr.localToWorldMatrix;
 							for (int x = 0; x < contour.Length; x++) {
-								buffer0.Add(V3ToIntPoint(m.MultiplyPoint3x4(center + contour[x]*meshScale)));
+								buffer0.Add(V3ToIntPoint(local2world.MultiplyPoint3x4(center + contour[x]*meshScale)));
 							}
 						} else {
 							for (int x = 0; x < contour.Length; x++) {
@@ -432,7 +464,6 @@ namespace Pathfinding {
 						}
 
 						if (reverse) buffer0.Reverse();
-
 						buffer.Add(buffer0);
 					}
 				}
