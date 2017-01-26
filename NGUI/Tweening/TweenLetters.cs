@@ -78,6 +78,7 @@ public class TweenLetters : UITweener
 
 		var quads = mLabel.quadsPerCharacter;
 		const int quadVerts = 4;
+		var characterCount = verts.Count / quads / quadVerts;
 
 		var pt = mLabel.printedText;
 		var newLen = string.IsNullOrEmpty(pt) ? 0 : pt.Length;
@@ -85,7 +86,6 @@ public class TweenLetters : UITweener
 		if (mLastLen != newLen)
 		{
 			mLastLen = newLen;
-			var characterCount = verts.Count / quads / quadVerts;
 			SetLetterOrder(characterCount);
 			GetLetterDuration(characterCount);
 		}
@@ -105,10 +105,10 @@ public class TweenLetters : UITweener
 
 		for (int q = 0; q < quads; ++q)
 		{
-			for (int i = 0; i < mLetter.Length; ++i)
-			{ 
+			for (int i = 0; i < characterCount; ++i)
+			{
 				letter = mLetterOrder[i]; // Choose which letter to animate.
-				firstVert = q * mLetter.Length * quadVerts + letter * quadVerts;
+				firstVert = q * characterCount * quadVerts + letter * quadVerts;
 
 				if (firstVert > verts.Count)
 				{
@@ -179,7 +179,12 @@ public class TweenLetters : UITweener
 	
 	void SetLetterOrder (int letterCount)
 	{
-		if (letterCount == 0) return;
+		if (letterCount == 0)
+		{
+			mLetter = null;
+			mLetterOrder = null;
+			return;
+		}
 
 		mLetterOrder = new int[letterCount];
 		mLetter = new LetterProperties[letterCount];

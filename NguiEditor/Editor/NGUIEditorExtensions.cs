@@ -32,7 +32,11 @@ static public class NGUIEditorExtensions
 		{
 			rt = new RenderTexture(width, height, 1);
 			rt.hideFlags = HideFlags.HideAndDontSave;
+#if UNITY_5_5_OR_NEWER
+			rt.autoGenerateMips = false;
+#else
 			rt.generateMips = false;
+#endif
 			rt.format = RenderTextureFormat.ARGB32;
 			rt.filterMode = FilterMode.Trilinear;
 			rt.anisoLevel = 4;

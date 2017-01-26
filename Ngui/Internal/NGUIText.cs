@@ -488,26 +488,31 @@ static public class NGUIText
 			switch (sub3)
 			{
 				case "[b]":
+				case "[B]":
 				bold = true;
 				index += 3;
 				return true;
 
 				case "[i]":
+				case "[I]":
 				italic = true;
 				index += 3;
 				return true;
 
 				case "[u]":
+				case "[U]":
 				underline = true;
 				index += 3;
 				return true;
 
 				case "[s]":
+				case "[S]":
 				strike = true;
 				index += 3;
 				return true;
 
 				case "[c]":
+				case "[C]":
 				ignoreColor = true;
 				index += 3;
 				return true;
@@ -523,26 +528,31 @@ static public class NGUIText
 			switch (sub4)
 			{
 				case "[/b]":
+				case "[/B]":
 				bold = false;
 				index += 4;
 				return true;
 
 				case "[/i]":
+				case "[/I]":
 				italic = false;
 				index += 4;
 				return true;
 
 				case "[/u]":
+				case "[/U]":
 				underline = false;
 				index += 4;
 				return true;
 
 				case "[/s]":
+				case "[/S]":
 				strike = false;
 				index += 4;
 				return true;
 
 				case "[/c]":
+				case "[/C]":
 				ignoreColor = false;
 				index += 4;
 				return true;
@@ -573,11 +583,13 @@ static public class NGUIText
 			switch (sub5)
 			{
 				case "[sub]":
+				case "[SUB]":
 				sub = 1;
 				index += 5;
 				return true;
 
 				case "[sup]":
+				case "[SUP]":
 				sub = 2;
 				index += 5;
 				return true;
@@ -593,16 +605,19 @@ static public class NGUIText
 			switch (sub6)
 			{
 				case "[/sub]":
+				case "[/SUB]":
 				sub = 0;
 				index += 6;
 				return true;
 
 				case "[/sup]":
+				case "[/SUP]":
 				sub = 0;
 				index += 6;
 				return true;
 
 				case "[/url]":
+				case "[/URL]":
 				index += 6;
 				return true;
 			}

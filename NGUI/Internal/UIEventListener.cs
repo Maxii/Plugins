@@ -65,6 +65,25 @@ public class UIEventListener : MonoBehaviour
 	void OnKey (KeyCode key)		{ if (isColliderEnabled && onKey != null) onKey(gameObject, key); }
 	void OnTooltip (bool show)		{ if (isColliderEnabled && onTooltip != null) onTooltip(gameObject, show); }
 
+	public void Clear ()
+	{
+		onSubmit = null;
+		onClick = null;
+		onDoubleClick = null;
+		onHover = null;
+		onPress = null;
+		onSelect = null;
+		onScroll = null;
+		onDragStart = null;
+		onDrag = null;
+		onDragOver = null;
+		onDragOut = null;
+		onDragEnd = null;
+		onDrop = null;
+		onKey = null;
+		onTooltip = null;
+	}
+
 	/// <summary>
 	/// Get or add an event listener to the specified game object.
 	/// </summary>

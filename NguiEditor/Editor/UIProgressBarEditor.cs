@@ -56,14 +56,11 @@ public class UIProgressBarEditor : UIWidgetContainerEditor
 	{
 		UIProgressBar sb = target as UIProgressBar;
 		float val = EditorGUILayout.Slider("Value", sb.value, 0f, 1f);
-		float alpha = EditorGUILayout.Slider("Alpha", sb.alpha, 0f, 1f);
 
-		if (sb.value != val ||
-			sb.alpha != alpha)
+		if (sb.value != val)
 		{
 			NGUIEditorTools.RegisterUndo("Progress Bar Change", sb);
 			sb.value = val;
-			sb.alpha = alpha;
 			NGUITools.SetDirty(sb);
 
 			for (int i = 0; i < UIScrollView.list.size; ++i)

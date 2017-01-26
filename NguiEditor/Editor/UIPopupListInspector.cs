@@ -126,15 +126,27 @@ public class UIPopupListInspector : UIWidgetContainerEditor
 			}
 		}
 
-		GUI.changed = false;
-		string sel = NGUIEditorTools.DrawList("Default", mList.items.ToArray(), mList.value);
-		if (GUI.changed) serializedObject.FindProperty("mSelectedItem").stringValue = sel;
-
 		NGUIEditorTools.DrawProperty("Position", serializedObject, "position");
 		NGUIEditorTools.DrawProperty("Alignment", serializedObject, "alignment");
 		NGUIEditorTools.DrawProperty("Open on", serializedObject, "openOn");
 		NGUIEditorTools.DrawProperty("On Top", serializedObject, "separatePanel");
 		NGUIEditorTools.DrawProperty("Localized", serializedObject, "isLocalized");
+
+		GUI.changed = false;
+		var sp = NGUIEditorTools.DrawProperty("Keep Value", serializedObject, "keepValue");
+
+		if (GUI.changed)
+		{
+			serializedObject.FindProperty("mSelectedItem").stringValue = (sp.boolValue && mList.items.Count > 0) ? mList.items[0] : "";
+		}
+
+		EditorGUI.BeginDisabledGroup(!sp.boolValue);
+		{
+			GUI.changed = false;
+			string sel = NGUIEditorTools.DrawList("Initial Value", mList.items.ToArray(), mList.value);
+			if (GUI.changed) serializedObject.FindProperty("mSelectedItem").stringValue = sel;
+		}
+		EditorGUI.EndDisabledGroup();
 
 		DrawAtlas();
 		DrawFont();

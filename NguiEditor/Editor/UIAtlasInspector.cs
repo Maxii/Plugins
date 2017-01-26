@@ -273,7 +273,7 @@ public class UIAtlasInspector : Editor
 							{
 								byte[] bytes = se.tex.EncodeToPNG();
 								File.WriteAllBytes(path, bytes);
-								AssetDatabase.ImportAsset(path);
+								//AssetDatabase.ImportAsset(path);
 								if (se.temporaryTexture) DestroyImmediate(se.tex);
 							}
 						}

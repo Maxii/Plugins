@@ -210,7 +210,9 @@ public class UIPanel : UIRect
 	static float[] mTemp = new float[4];
 	Vector2 mMin = Vector2.zero;
 	Vector2 mMax = Vector2.zero;
+#if !UNITY_5_5_OR_NEWER
 	bool mHalfPixelOffset = false;
+#endif
 	bool mSortWidgets = false;
 	bool mUpdateScroll = false;
 
@@ -339,7 +341,17 @@ public class UIPanel : UIRect
 	/// Whether the panel's drawn geometry needs to be offset by a half-pixel.
 	/// </summary>
 
-	public bool halfPixelOffset { get { return mHalfPixelOffset; } }
+	public bool halfPixelOffset
+	{
+		get
+		{
+#if UNITY_5_5_OR_NEWER
+			return false;
+#else
+			return mHalfPixelOffset;
+#endif
+		}
+	}
 
 	/// <summary>
 	/// Whether the camera is used to draw UI geometry.
@@ -369,9 +381,11 @@ public class UIPanel : UIRect
 				float pixelSize = (root != null) ? root.pixelSizeAdjustment : 1f;
 				float mod = (pixelSize / size.y) / mCam.orthographicSize;
 
-				bool x = mHalfPixelOffset;
-				bool y = mHalfPixelOffset;
-
+#if UNITY_5_5_OR_NEWER
+				bool x = false, y = false;
+#else
+				bool x = mHalfPixelOffset, y = mHalfPixelOffset;
+#endif
 				if ((Mathf.RoundToInt(size.x) & 1) == 1) x = !x;
 				if ((Mathf.RoundToInt(size.y) & 1) == 1) y = !y;
 
@@ -953,14 +967,15 @@ public class UIPanel : UIRect
 	{
 		base.Awake();
 
+#if !UNITY_5_5_OR_NEWER
 		mHalfPixelOffset = (Application.platform == RuntimePlatform.WindowsPlayer ||
-			Application.platform == RuntimePlatform.XBOX360 ||
-#if UNITY_4_7 || UNITY_5_0 || UNITY_5_1 || UNITY_5_2 || UNITY_5_3
+ #if !UNITY_5_4
 			Application.platform == RuntimePlatform.WindowsWebPlayer ||
-#endif
+ #endif
 			Application.platform == RuntimePlatform.WindowsEditor) &&
 			SystemInfo.graphicsDeviceVersion.Contains("Direct3D") &&
 			SystemInfo.graphicsShaderLevel < 40;
+#endif
 	}
 
 	/// <summary>
