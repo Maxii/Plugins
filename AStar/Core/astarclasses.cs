@@ -779,11 +779,16 @@ namespace Pathfinding {
 
 	/** How path results are logged by the system */
 	public enum PathLog {
-		None,       /**< Does not log anything */
-		Normal,     /**< Logs basic info about the paths */
-		Heavy,      /**< Includes additional info */
-		InGame,     /**< Same as heavy, but displays the info in-game using GUI */
-		OnlyErrors  /**< Same as normal, but logs only paths which returned an error */
+		/** Does not log anything. This is recommended for release since logging path results has a performance overhead. */
+		None,
+		/** Logs basic info about the paths */
+		Normal,
+		/** Includes additional info */
+		Heavy,
+		/** Same as heavy, but displays the info in-game using GUI */
+		InGame,
+		/** Same as normal, but logs only paths which returned an error */
+		OnlyErrors
 	}
 
 	/** Heuristic to use. Heuristic is the estimated cost from the current node to the target */

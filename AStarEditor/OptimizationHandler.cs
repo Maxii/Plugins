@@ -18,6 +18,21 @@ namespace Pathfinding {
 			public bool consistent;
 		}
 
+		/** Various build targets that Unity have deprecated.
+		 * There is apparently no way to figute out which these are without hard coding them.
+		 */
+		static readonly BuildTargetGroup[] deprecatedBuildTargets = new BuildTargetGroup[] {
+			BuildTargetGroup.Unknown,
+#if UNITY_5_4_OR_NEWER
+			(BuildTargetGroup)16, /* BlackBerry */
+#endif
+#if UNITY_5_5_OR_NEWER
+			(BuildTargetGroup)5, /* PS3 */
+			(BuildTargetGroup)6, /* XBox360 */
+			(BuildTargetGroup)15, /* WP8 */
+#endif
+		};
+
 		static string GetAstarPath () {
 			var paths = Directory.GetDirectories(Application.dataPath, "AstarPathfindingProject", SearchOption.AllDirectories);
 
@@ -34,7 +49,7 @@ namespace Pathfinding {
 			var buildTypes = System.Enum.GetValues(typeof(BuildTargetGroup)) as int[];
 
 			for (int i = 0; i < buildTypes.Length; i++) {
-				if (buildTypes[i] == (int)BuildTargetGroup.Unknown) continue;
+				if (deprecatedBuildTargets.Contains((BuildTargetGroup)buildTypes[i])) continue;
 
 				string defineString = PlayerSettings.GetScriptingDefineSymbolsForGroup((BuildTargetGroup)buildTypes[i]);
 				if (defineString == null) continue;

@@ -4,23 +4,18 @@ using System.Collections.Generic;
 using UnityEngine;
 using Pathfinding;
 using Pathfinding.Util;
-#if NETFX_CORE && !UNITY_EDITOR
-#if !ASTAR_NO_ZIP
-using Pathfinding.Ionic.Zip;
-#else
-using Pathfinding.Serialization.Zip;
-#endif
+using Pathfinding.WindowsStore;
 
+#if ASTAR_NO_ZIP
+using Pathfinding.Serialization.Zip;
+#elif NETFX_CORE
+// For Universal Windows Platform
+using ZipEntry = System.IO.Compression.ZipArchiveEntry;
+using ZipFile = System.IO.Compression.ZipArchive;
 #else
 using CompatFileStream = System.IO.FileStream;
-
-#if !ASTAR_NO_ZIP
 using Pathfinding.Ionic.Zip;
-#else
-using Pathfinding.Serialization.Zip;
 #endif
-#endif
-
 
 namespace Pathfinding.Serialization {
 	/** Holds information passed to custom graph serializers */
@@ -211,14 +206,6 @@ namespace Pathfinding.Serialization {
 		 */
 		static System.Text.StringBuilder GetStringBuilder () { _stringBuilder.Length = 0; return _stringBuilder; }
 
-		static void CloseOrDispose (BinaryWriter writer) {
-#if NETFX_CORE
-			writer.Dispose();
-#else
-			writer.Close();
-#endif
-		}
-
 		public AstarSerializer (AstarData data) {
 			this.data = data;
 			settings = SerializeSettings.Settings;
@@ -237,15 +224,31 @@ namespace Pathfinding.Serialization {
 			checksum = Checksum.GetChecksum(bytes, checksum);
 		}
 
+		void AddEntry (string name, byte[] bytes) {
+#if NETFX_CORE
+			var entry = zip.CreateEntry(name);
+			using (var stream = entry.Open()) {
+				stream.Write(bytes, 0, bytes.Length);
+			}
+#else
+			zip.AddEntry(name, bytes);
+#endif
+		}
+
 		public uint GetChecksum () { return checksum; }
 
 		#region Serialize
 
 		public void OpenSerialize () {
 			// Create a new zip file, here we will store all the data
+			zipStream = new MemoryStream();
+#if NETFX_CORE
+			zip = new ZipFile(zipStream, System.IO.Compression.ZipArchiveMode.Create);
+#else
 			zip = new ZipFile();
 			zip.AlternateEncoding = System.Text.Encoding.UTF8;
 			zip.AlternateEncodingUsage = ZipOption.Always;
+#endif
 			meta = new GraphMeta();
 		}
 
@@ -253,9 +256,9 @@ namespace Pathfinding.Serialization {
 			// As the last step, serialize metadata
 			byte[] bytes = SerializeMeta();
 			AddChecksum(bytes);
-			zip.AddEntry("meta"+jsonExt, bytes);
+			AddEntry("meta"+jsonExt, bytes);
 
-#if !ASTAR_NO_ZIP
+#if !ASTAR_NO_ZIP && !NETFX_CORE
 			// Set dummy dates on every file to prevent the binary data to change
 			// for identical settings and graphs.
 			// Prevents the scene from being marked as dirty in the editor
@@ -271,13 +274,14 @@ namespace Pathfinding.Serialization {
 #endif
 
 			// Save all entries to a single byte array
-			var output = new MemoryStream();
-			zip.Save(output);
-			bytes = output.ToArray();
-			output.Dispose();
+#if !NETFX_CORE
+			zip.Save(zipStream);
+#endif
 			zip.Dispose();
+			bytes = zipStream.ToArray();
 
 			zip = null;
+			zipStream = null;
 			return bytes;
 		}
 
@@ -297,7 +301,7 @@ namespace Pathfinding.Serialization {
 				byte[] bytes = Serialize(graphs[i]);
 
 				AddChecksum(bytes);
-				zip.AddEntry("graph"+i+jsonExt, bytes);
+				AddEntry("graph"+i+jsonExt, bytes);
 			}
 		}
 
@@ -384,7 +388,7 @@ namespace Pathfinding.Serialization {
 			if (maxNodeIndex2 != maxNodeIndex) throw new Exception("Some graphs are not consistent in their GetNodes calls, sequential calls give different results.");
 
 			byte[] bytes = stream.ToArray();
-			CloseOrDispose(wr);
+			wr.Close();
 
 			return bytes;
 		}
@@ -397,7 +401,7 @@ namespace Pathfinding.Serialization {
 
 			graph.SerializeExtraInfo(ctx);
 			byte[] bytes = stream.ToArray();
-			CloseOrDispose(wr);
+			wr.Close();
 
 			return bytes;
 		}
@@ -416,7 +420,7 @@ namespace Pathfinding.Serialization {
 				node.SerializeReferences(ctx);
 				return true;
 			});
-			CloseOrDispose(wr);
+			wr.Close();
 
 			var bytes = stream.ToArray();
 			return bytes;
@@ -428,23 +432,23 @@ namespace Pathfinding.Serialization {
 
 			var bytes = SerializeNodeIndices(graphs);
 			AddChecksum(bytes);
-			zip.AddEntry("graph_references"+binaryExt, bytes);
+			AddEntry("graph_references"+binaryExt, bytes);
 
 			for (int i = 0; i < graphs.Length; i++) {
 				if (graphs[i] == null) continue;
 
 				bytes = SerializeGraphExtraInfo(graphs[i]);
 				AddChecksum(bytes);
-				zip.AddEntry("graph"+i+"_extra"+binaryExt, bytes);
+				AddEntry("graph"+i+"_extra"+binaryExt, bytes);
 
 				bytes = SerializeGraphNodeReferences(graphs[i]);
 				AddChecksum(bytes);
-				zip.AddEntry("graph"+i+"_references"+binaryExt, bytes);
+				AddEntry("graph"+i+"_references"+binaryExt, bytes);
 			}
 
 			bytes = SerializeNodeLinks();
 			AddChecksum(bytes);
-			zip.AddEntry("node_link2" + binaryExt, bytes);
+			AddEntry("node_link2" + binaryExt, bytes);
 		}
 
 		byte[] SerializeNodeLinks () {
@@ -471,7 +475,7 @@ namespace Pathfinding.Serialization {
 					continue;
 
 				AddChecksum(bytes);
-				zip.AddEntry("graph"+i+"_editor"+jsonExt, bytes);
+				AddEntry("graph"+i+"_editor"+jsonExt, bytes);
 			}
 		}
 
@@ -479,13 +483,29 @@ namespace Pathfinding.Serialization {
 
 		#region Deserialize
 
+		ZipEntry GetEntry (string name) {
+#if NETFX_CORE
+			return zip.GetEntry(name);
+#else
+			return zip[name];
+#endif
+		}
+
+		bool ContainsEntry (string name) {
+			return GetEntry(name) != null;
+		}
+
 		public bool OpenDeserialize (byte[] bytes) {
 			// Copy the bytes to a stream
 			zipStream = new MemoryStream();
 			zipStream.Write(bytes, 0, bytes.Length);
 			zipStream.Position = 0;
 			try {
+#if NETFX_CORE
+				zip = new ZipFile(zipStream);
+#else
 				zip = ZipFile.Read(zipStream);
+#endif
 			} catch (Exception e) {
 				// Catches exceptions when an invalid zip file is found
 				Debug.LogError("Caught exception when loading from zip\n"+e);
@@ -494,10 +514,10 @@ namespace Pathfinding.Serialization {
 				return false;
 			}
 
-			if (zip.ContainsEntry("meta" + jsonExt)) {
-				meta = DeserializeMeta(zip["meta" + jsonExt]);
-			} else if (zip.ContainsEntry("meta" + binaryExt)) {
-				meta = DeserializeBinaryMeta(zip["meta" + binaryExt]);
+			if (ContainsEntry("meta" + jsonExt)) {
+				meta = DeserializeMeta(GetEntry("meta" + jsonExt));
+			} else if (ContainsEntry("meta" + binaryExt)) {
+				meta = DeserializeBinaryMeta(GetEntry("meta" + binaryExt));
 			} else {
 				throw new Exception("No metadata found in serialized data.");
 			}
@@ -545,11 +565,11 @@ namespace Pathfinding.Serialization {
 			var jsonName = "graph" + zipIndex + jsonExt;
 			var binName = "graph" + zipIndex + binaryExt;
 
-			if (zip.ContainsEntry(jsonName)) {
+			if (ContainsEntry(jsonName)) {
 				// Read the graph settings
-				TinyJsonDeserializer.Deserialize(GetString(zip[jsonName]), tp, graph);
-			} else if (zip.ContainsEntry(binName)) {
-				var reader = GetBinaryReader(zip[binName]);
+				TinyJsonDeserializer.Deserialize(GetString(GetEntry(jsonName)), tp, graph);
+			} else if (ContainsEntry(binName)) {
+				var reader = GetBinaryReader(GetEntry(binName));
 				var ctx = new GraphSerializationContext(reader, null, graph.graphIndex, meta);
 				graph.DeserializeSettingsCompatibility(ctx);
 			} else {
@@ -586,7 +606,7 @@ namespace Pathfinding.Serialization {
 
 		bool DeserializeExtraInfo (NavGraph graph) {
 			var zipIndex = graphIndexInZip[graph];
-			var entry = zip["graph"+zipIndex+"_extra"+binaryExt];
+			var entry = GetEntry("graph"+zipIndex+"_extra"+binaryExt);
 
 			if (entry == null)
 				return false;
@@ -618,7 +638,7 @@ namespace Pathfinding.Serialization {
 			// Get the file containing the list of all node indices
 			// This is correlated with the new indices of the nodes and a mapping from old to new
 			// is done so that references can be resolved
-			var entry = zip["graph_references"+binaryExt];
+			var entry = GetEntry("graph_references"+binaryExt);
 
 			if (entry == null) throw new Exception("Node references not found in the data. Was this loaded from an older version of the A* Pathfinding Project?");
 
@@ -642,18 +662,13 @@ namespace Pathfinding.Serialization {
 				throw new Exception((reader.BaseStream.Length / 4) + " nodes were serialized, but only data for " + (reader.BaseStream.Position / 4) + " nodes was found. The data looks corrupt.");
 			}
 
-#if NETFX_CORE
-			reader.Dispose();
-#else
 			reader.Close();
-#endif
-
 			return int2Node;
 		}
 
 		void DeserializeNodeReferences (NavGraph graph, GraphNode[] int2Node) {
 			var zipIndex = graphIndexInZip[graph];
-			var entry = zip["graph"+zipIndex+"_references"+binaryExt];
+			var entry = GetEntry("graph"+zipIndex+"_references"+binaryExt);
 
 			if (entry == null) throw new Exception("Node references for graph " + zipIndex + " not found in the data. Was this loaded from an older version of the A* Pathfinding Project?");
 
@@ -702,7 +717,7 @@ namespace Pathfinding.Serialization {
 		}
 
 		void DeserializeNodeLinks (GraphNode[] int2Node) {
-			var entry = zip["node_link2"+binaryExt];
+			var entry = GetEntry("node_link2"+binaryExt);
 
 			if (entry == null)
 				return;
@@ -734,7 +749,7 @@ namespace Pathfinding.Serialization {
 					if (graphEditors[i].target != graphs[j]) continue;
 
 					var zipIndex = graphIndexInZip[graphs[j]];
-					ZipEntry entry = zip["graph"+zipIndex+"_editor"+jsonExt];
+					ZipEntry entry = GetEntry("graph"+zipIndex+"_editor"+jsonExt);
 					if (entry == null) continue;
 
 					TinyJsonDeserializer.Deserialize(GetString(entry), graphEditors[i].GetType(), graphEditors[i]);
@@ -745,22 +760,29 @@ namespace Pathfinding.Serialization {
 
 		/** Returns a binary reader for the data in the zip entry */
 		private static BinaryReader GetBinaryReader (ZipEntry entry) {
+#if NETFX_CORE
+			return new BinaryReader(entry.Open());
+#else
 			var mem = new System.IO.MemoryStream();
 
 			entry.Extract(mem);
 			mem.Position = 0;
 			return new System.IO.BinaryReader(mem);
+#endif
 		}
 
 		/** Returns the data in the zip entry as a string */
 		private static string GetString (ZipEntry entry) {
+#if NETFX_CORE
+			var reader = new StreamReader(entry.Open());
+#else
 			var buffer = new MemoryStream();
 
 			entry.Extract(buffer);
 			buffer.Position = 0;
 			var reader = new StreamReader(buffer);
+#endif
 			string s = reader.ReadToEnd();
-			buffer.Position = 0;
 			reader.Dispose();
 			return s;
 		}
@@ -861,7 +883,7 @@ namespace Pathfinding.Serialization {
 			}
 #else
 			// Note calling through assembly is more stable on e.g WebGL
-			Type type = typeof(AstarPath).Assembly.GetType(typeNames[i]);
+			Type type = WindowsStoreCompatibility.GetTypeInfo(typeof(AstarPath)).Assembly.GetType(typeNames[i]);
 #endif
 			if (!System.Type.Equals(type, null))
 				return type;

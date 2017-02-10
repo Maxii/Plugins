@@ -3,6 +3,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Reflection;
+using System.IO;
 using TP = System.Reflection.TypeInfo;
 #else
 using TP = System.Type;
@@ -25,6 +26,20 @@ namespace Pathfinding.WindowsStore {
 			return type;
 #endif
 		}
+
+#if NETFX_CORE
+		public static void Close (this BinaryWriter stream) {
+			stream.Dispose();
+		}
+
+		public static void Close (this BinaryReader stream) {
+			stream.Dispose();
+		}
+
+		public static void Close (this StreamWriter stream) {
+			stream.Dispose();
+		}
+#endif
 	}
 
 #if NETFX_CORE

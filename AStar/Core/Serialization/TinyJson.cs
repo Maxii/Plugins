@@ -3,6 +3,10 @@ using Pathfinding;
 using System.Collections.Generic;
 using Pathfinding.WindowsStore;
 using System;
+#if NETFX_CORE
+using System.Linq;
+using WinRTLegacy;
+#endif
 
 namespace Pathfinding.Serialization {
 	public class JsonMemberAttribute : System.Attribute {}
@@ -41,10 +45,11 @@ namespace Pathfinding.Serialization {
 				return;
 			}
 
-			var tp = WindowsStoreCompatibility.GetTypeInfo(obj.GetType());
+			var tp = obj.GetType();
+			var tpInfo = WindowsStoreCompatibility.GetTypeInfo(tp);
 			if (serializers.ContainsKey(tp)) {
 				serializers[tp] (obj);
-			} else if (tp.IsEnum) {
+			} else if (tpInfo.IsEnum) {
 				output.Append('"' + obj.ToString() + '"');
 			} else if (obj is System.Collections.IList) {
 				output.Append("[");
@@ -58,12 +63,27 @@ namespace Pathfinding.Serialization {
 			} else if (obj is UnityEngine.Object) {
 				SerializeUnityObject(obj as UnityEngine.Object);
 			} else {
-				var optIn = tp.GetCustomAttributes(typeof(JsonOptInAttribute), true).Length > 0;
+#if NETFX_CORE
+				var optIn = tpInfo.CustomAttributes.Any(attr => attr.GetType() == typeof(JsonOptInAttribute));
+#else
+				var optIn = tpInfo.GetCustomAttributes(typeof(JsonOptInAttribute), true).Length > 0;
+#endif
 				output.Append("{");
+
+#if NETFX_CORE
+				var fields = tpInfo.DeclaredFields.Where(f => !f.IsStatic).ToArray();
+#else
 				var fields = tp.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+#endif
 				bool earlier = false;
 				foreach (var field in fields) {
-					if ((!optIn && field.IsPublic) || field.GetCustomAttributes(typeof(JsonMemberAttribute), true).Length > 0) {
+					if ((!optIn && field.IsPublic) ||
+#if NETFX_CORE
+						field.CustomAttributes.Any(attr => attr.GetType() == typeof(JsonMemberAttribute))
+#else
+						field.GetCustomAttributes(typeof(JsonMemberAttribute), true).Length > 0
+#endif
+						) {
 						if (earlier) {
 							output.Append(", ");
 						}
@@ -216,7 +236,7 @@ namespace Pathfinding.Serialization {
 				Eat("{");
 				while (!TryEat('}')) {
 					var name = EatField();
-					var field = tpInfo.GetField(name);
+					var field = tp.GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
 					if (field == null) {
 						SkipFieldData();
 					} else {
