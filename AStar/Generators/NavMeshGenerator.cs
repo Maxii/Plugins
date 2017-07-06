@@ -10,8 +10,6 @@ namespace Pathfinding {
 		void GetNodes (GraphNodeDelegateCancelable del);
 	}
 
-	[System.Serializable]
-	[JsonOptIn]
 	/** Generates graphs based on navmeshes.
 	 * \ingroup graphs
 	 * Navmeshes are meshes where each polygon define a walkable area.
@@ -24,8 +22,10 @@ namespace Pathfinding {
 	 * \shadowimage{navmeshgraph_inspector.png}
 	 *
 	 */
+	[JsonOptIn]
 	public class NavMeshGraph : NavGraph, INavmesh, IUpdatableGraph, INavmeshHolder
-		, IRaycastableGraph {
+		, IRaycastableGraph
+	{
 		/** Mesh to construct navmesh from */
 		[JsonMember]
 		public Mesh sourceMesh;
@@ -840,7 +840,6 @@ namespace Pathfinding {
 			// Build Axis Aligned Bounding Box Tree
 
 			BBTree bbTree = graph.bbTree;
-
 			bbTree = bbTree ?? new BBTree();
 			bbTree.RebuildFrom(graph.nodes);
 			graph.bbTree = bbTree;

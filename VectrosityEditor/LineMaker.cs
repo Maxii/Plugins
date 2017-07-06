@@ -1,5 +1,5 @@
-// Version 5.0
-// ©2015 Starscene Software. All rights reserved. Redistribution without permission not allowed.
+// Version 5.4
+// ©2017 Starscene Software. All rights reserved. Redistribution without permission not allowed.
 
 using UnityEngine;
 using UnityEditor;
@@ -36,6 +36,7 @@ public class LineMaker : ScriptableWizard {
 	byte[] byteBlock;
 	Vector3[] vectorArray;
 	bool loadedFile;
+	static LineMaker window;
 	
 	[MenuItem ("Assets/Line Maker... %l")]
 	static void CreateWizard () {
@@ -61,7 +62,7 @@ public class LineMaker : ScriptableWizard {
 		objectScale = go.transform.localScale;
 		objectScale = new Vector3(1.0f/objectScale.x, 1.0f/objectScale.y, 1.0f/objectScale.z);
 		
-		var window = ScriptableWizard.DisplayWizard<LineMaker>("Line Maker");
+		window = ScriptableWizard.DisplayWizard<LineMaker>("Line Maker");
 		window.minSize = new Vector2(360, 245);
 	}
 	
@@ -214,7 +215,7 @@ public class LineMaker : ScriptableWizard {
 		GUILayout.Space (10);
 	
 		GUILayout.BeginHorizontal();
-		int buttonWidth = Screen.width/2 - 6;
+		int buttonWidth = (int)window.position.width/2 - 6;
 		if (GUILayout.Button ("Make Line Segment", GUILayout.Width(buttonWidth))) {
 			message = "";
 			var selectionIDs = Selection.instanceIDs;

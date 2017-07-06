@@ -110,6 +110,11 @@ namespace PathologicalGames
 			if (!this.onCreatedDelegates.ContainsKey(poolName))
 			{
 				this.onCreatedDelegates.Add(poolName, createdDelegate);
+
+				Debug.Log(string.Format(
+					"Added onCreatedDelegates for pool '{0}': {1}", poolName, createdDelegate.Target)
+				);
+
 				return;
 			}
 			
@@ -125,6 +130,10 @@ namespace PathologicalGames
 				);
 			
 			this.onCreatedDelegates[poolName] -= createdDelegate;
+
+			Debug.Log(string.Format(
+				"Removed onCreatedDelegates for pool '{0}': {1}", poolName, createdDelegate.Target)
+			);
 		}
 		
 		#endregion Event Handling
@@ -311,7 +320,9 @@ namespace PathologicalGames
             }
 
             this._pools.Add(spawnPool.poolName, spawnPool);
-			
+
+			Debug.Log(string.Format("Added pool '{0}'", spawnPool.poolName));
+
 			if (this.onCreatedDelegates.ContainsKey(spawnPool.poolName))
 				 this.onCreatedDelegates[spawnPool.poolName](spawnPool);
         }

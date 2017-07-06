@@ -143,6 +143,7 @@ namespace Pathfinding {
 
 			nodePaths = null;
 			path = null;
+			callbacks = null;
 
 			base.OnEnterPool();
 		}

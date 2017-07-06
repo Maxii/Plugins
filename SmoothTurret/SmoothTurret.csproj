@@ -48,17 +48,27 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="AutoPool\AP_Manager.cs" />
+    <Compile Include="AutoPool\AP_Pool.cs" />
+    <Compile Include="AutoPool\AP_Reference.cs" />
+    <Compile Include="AutoPool\MF_StaticAutoPool.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SmoothTurret\ST_B_Turret.cs" />
+    <Compile Include="SmoothTurret\ST_B_TurretControl.cs" />
+    <Compile Include="SmoothTurret\ST_DemoTurretSwitcher.cs" />
     <Compile Include="SmoothTurret\ST_Player.cs" />
     <Compile Include="SmoothTurret\ST_Turret.cs" />
     <Compile Include="SmoothTurret\ST_TurretControl.cs" />
-    <Compile Include="SmoothTurret\ST_TurretSwitcher.cs" />
+    <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractClassify.cs" />
+    <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractComponent.cs" />
     <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractMobility.cs" />
+    <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractMunition.cs" />
     <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractNavigation.cs" />
     <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractPlatform.cs" />
     <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractPlatformControl.cs" />
     <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractSelection.cs" />
-    <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractStatus.cs" />
+    <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractSelectionManager.cs" />
+    <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractStats.cs" />
     <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractTargeting.cs" />
     <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractTargetList.cs" />
     <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_AbstractWeapon.cs" />
@@ -66,6 +76,11 @@
     <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_StaticBallistics.cs" />
     <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_StaticCompute.cs" />
     <Compile Include="_MobFarm Basics\Abstracts_Statics\MF_StaticUtilities.cs" />
+    <Compile Include="_MobFarm Basics\Attributes\InfoAttribute.cs" />
+    <Compile Include="_MobFarm Basics\Attributes\Split1Attribute.cs" />
+    <Compile Include="_MobFarm Basics\Attributes\Split2Attribute.cs" />
+    <Compile Include="_MobFarm Basics\MF_B_Classify.cs" />
+    <Compile Include="_MobFarm Basics\MF_B_Engine.cs" />
     <Compile Include="_MobFarm Basics\MF_B_Gun.cs" />
     <Compile Include="_MobFarm Basics\MF_B_Hardpoint.cs" />
     <Compile Include="_MobFarm Basics\MF_B_HardpointControl.cs" />
@@ -76,15 +91,15 @@
     <Compile Include="_MobFarm Basics\MF_B_Projectile.cs" />
     <Compile Include="_MobFarm Basics\MF_B_Scanner.cs" />
     <Compile Include="_MobFarm Basics\MF_B_Selection.cs" />
-    <Compile Include="_MobFarm Basics\MF_B_SelfDestruct.cs" />
+    <Compile Include="_MobFarm Basics\MF_B_SelectionManager.cs" />
     <Compile Include="_MobFarm Basics\MF_B_Spawner.cs" />
-    <Compile Include="_MobFarm Basics\MF_B_Status.cs" />
+    <Compile Include="_MobFarm Basics\MF_B_Stats.cs" />
     <Compile Include="_MobFarm Basics\MF_B_Targeting.cs" />
     <Compile Include="_MobFarm Basics\MF_B_TargetList.cs" />
-    <Compile Include="_MobFarm Basics\MF_B_Turret.cs" />
-    <Compile Include="_MobFarm Basics\MF_B_TurretControl.cs" />
-    <Compile Include="_MobFarm Basics\MF_SelectionManager.cs" />
+    <Compile Include="_MobFarm Basics\MF_FxController.cs" />
+    <Compile Include="_MobFarm Basics\MF_LensFlare.cs" />
     <Compile Include="_MobFarm Basics\MF_SelectionRepeater.cs" />
+    <Compile Include="_MobFarm Basics\MF_SelfDestruct.cs" />
     <Compile Include="_MobFarm Basics\MF_UtilityKeys.cs" />
   </ItemGroup>
   <ItemGroup />

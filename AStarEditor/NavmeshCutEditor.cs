@@ -27,6 +27,7 @@ namespace Pathfinding {
 		public override void OnInspectorGUI () {
 			serializedObject.Update();
 
+			EditorGUI.BeginChangeCheck();
 			EditorGUILayout.PropertyField(type);
 
 			if (!type.hasMultipleDifferentValues) {
@@ -73,6 +74,12 @@ namespace Pathfinding {
 			EditorGUILayout.PropertyField(cutsAddedGeom);
 
 			serializedObject.ApplyModifiedProperties();
+
+			if (EditorGUI.EndChangeCheck()) {
+				foreach (NavmeshCut tg in targets) {
+					tg.ForceUpdate();
+				}
+			}
 		}
 	}
 }

@@ -1,29 +1,36 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+[HelpURL("http://mobfarmgames.weebly.com/mf_b_gun.html")]
 public class MF_B_Gun : MF_AbstractWeapon {
 
-	public enum GravityUsage { Default, Gravity, No_Gravity }
+	public enum GravityUsage { Default, Gravity, NoGravity }
 
 	[Header("Projectile specific settings:")]
-	public GameObject shot;
-	[Tooltip("True: Change all shots to use gravity.\nFalse: Will use gravity only if shot rigidbody uses gravity.")]
+	public MF_B_Projectile shot;
+	public bool objectPool;
+	public float addToPool;
+	public int minPool;
+	[Tooltip("Default: Will use gravity only if shot rigidbody uses gravity.\nGravity: Change all shots to use gravity.\nNo Gravity: Change all shots to not use gravity.")]
 	public GravityUsage gravity;
 
 	bool usingGravity;
-	bool sceneLoaded;
 
 	public void OnValidate() {
-		if ( sceneLoaded == true ) {
-			usingGravity = false; // remains false if forceing no gravity or if projectil doesn't use it
+		if ( Application.isPlaying == true ) {
+			if ( CheckErrors() == true ) { return; }
+
+			usingGravity = false; // remains false if forceing no gravity or if projectile doesn't use it
 			if ( shot.GetComponent<Rigidbody>() ) { // verify rigidbody
 				if ( gravity == GravityUsage.Gravity ) { // force gravity
 					usingGravity = true;
-				} else if ( shot.GetComponent<Rigidbody>().useGravity == true && gravity == GravityUsage.Default ) { // use gravity if projectile does
-					usingGravity = true;
+				} else {
+					if ( shot.GetComponent<Rigidbody>().useGravity == true && gravity == GravityUsage.Default ) { // use gravity if projectile does
+						usingGravity = true;
+					}
 				}
 			}
-
+			curInaccuracy = inaccuracy;
 			// compute missing value: shotSpeed, maxRange, shotDuration
 			if ( shotSpeed <= 0 ) {
 				shotSpeed = maxRange / shotDuration;
@@ -35,39 +42,52 @@ public class MF_B_Gun : MF_AbstractWeapon {
 		}
 	}
 
-	public override void Start () {
+	public override void Awake () {
 		if (error == true) { return; }
-		base.Start();
-		sceneLoaded = true;
-		OnValidate();
+		base.Awake();
+		if ( objectPool == true ) {
+			MF_AutoPool.InitializeSpawn( shot.gameObject, addToPool, minPool );
+		}
 	}
 
 	// use this only if already checked if weapon is ready to fire
-	public override void DoFire () {
+	public void DoFire () {
+		DoFire( null );
+	}
+	public override void DoFire ( Transform target ) {
 		if (error == true) { return; }
 		if (active == false) { return; }
 		
 		// fire weapon
 		// create shot
+		GameObject myShot = null;
 		for (int spr=0; spr < shotsPerRound; spr++) {
-			GameObject myShot = (GameObject) Instantiate(shot, exits[curExit].transform.position, exits[curExit].transform.rotation);
-			Vector2 errorV2 = Random.insideUnitCircle * curInaccuracy;
-			myShot.transform.rotation *= Quaternion.Euler(errorV2.x, errorV2.y, 0);
-			Rigidbody _rb = myShot.GetComponent<Rigidbody>();
-			_rb.velocity = platformVelocity + (myShot.transform.forward * shotSpeed);
-			_rb.useGravity = usingGravity;
-			MF_B_Projectile shotScript = myShot.GetComponent<MF_B_Projectile>();
-			shotScript.duration = shotDuration;
+			if ( objectPool == true ) {
+				myShot = MF_AutoPool.Spawn( shot.gameObject, exits[curExit].transform.position, exits[curExit].transform.rotation );
+			} else {
+				myShot = (GameObject) Instantiate( shot.gameObject, exits[curExit].transform.position, exits[curExit].transform.rotation );
+			}
+			if ( myShot != null ) {
+				Vector2 errorV2 = Random.insideUnitCircle * curInaccuracy;
+				myShot.transform.rotation *= Quaternion.Euler(errorV2.x, errorV2.y, 0);
+				Rigidbody _rb = myShot.GetComponent<Rigidbody>();
+				_rb.velocity = platformVelocity + (myShot.transform.forward * shotSpeed);
+				_rb.useGravity = usingGravity;
+				MF_B_Projectile shotScript = myShot.GetComponent<MF_B_Projectile>();
+				shotScript.duration = shotDuration;
+			}
 		}
-
-		base.DoFire();
+		if ( myShot != null ) { // at least one shot was created
+			base.DoFire( target );
+		}
 	}
 
 	public override bool RangeCheck ( Transform target ) {
 		return RangeCheck ( target, 1f );
 	}
 	public override bool RangeCheck ( Transform target, float mult ) {
-		if (active == false) { return false; }
+		if ( active == false || target == null ) { return false; }
+
 		float _sqRange = (exits[curExit].transform.position - target.position).sqrMagnitude;
 		if ( usingGravity == true ) { // ballistic range **** does not account for height ?
 			float _ballRange = (shotSpeed*shotSpeed) / -Physics.gravity.y ;
@@ -82,11 +102,17 @@ public class MF_B_Gun : MF_AbstractWeapon {
 		return false;
 	}
 
+	public override float GetTimeOfFlight ( Transform trans ) {
+		if ( active == false || trans == null ) { return 0f; }
+
+		float _range = Vector3.Distance( exits[curExit].transform.position, trans.position );
+		return ( _range / shotSpeed ) * 1.1f; // give 10% extra time
+	}
+
 	public override bool CheckErrors () {
 		base.CheckErrors();
 
-		if ( shot == null ) { Debug.Log( this+": Weapon shot prefab hasn't been defined."); error = true; }
-		if ( shot && shot.GetComponent<MF_B_Projectile>() == null ) { Debug.Log( this+": Shot prefab does not have a compatible projectile script. (Requires MF_B_Projectile)"); error = true; }
+		if ( shot == null ) { Debug.Log( this+": Weapon shot hasn't been defined."); error = true; }
 
 		int _e1 = 0;
 		if (shotSpeed <= 0) { _e1++; }

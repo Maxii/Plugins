@@ -309,7 +309,7 @@ namespace Pathfinding {
 					EditorGUI.indentLevel++;
 					graph.penaltyAngleFactor = EditorGUILayout.FloatField(new GUIContent("Factor", "Scale of the penalty. A negative value should not be used"), graph.penaltyAngleFactor);
 					graph.penaltyAnglePower = EditorGUILayout.Slider("Power", graph.penaltyAnglePower, 0.1f, 10f);
-					HelpBox("Applies penalty to nodes based on the angle of the hit surface during the Height Testing\nPenalty applied is: P=(1-cos(angle)^power)*factor.");
+					EditorGUILayout.HelpBox("Applies penalty to nodes based on the angle of the hit surface during the Height Testing\nPenalty applied is: P=(1-cos(angle)^power)*factor.", MessageType.None);
 
 					EditorGUI.indentLevel--;
 				}
@@ -319,8 +319,8 @@ namespace Pathfinding {
 					EditorGUI.indentLevel++;
 					graph.penaltyPositionOffset = EditorGUILayout.FloatField("Offset", graph.penaltyPositionOffset);
 					graph.penaltyPositionFactor = EditorGUILayout.FloatField("Factor", graph.penaltyPositionFactor);
-					HelpBox("Applies penalty to nodes based on their Y coordinate\nSampled in Int3 space, i.e it is multiplied with Int3.Precision first ("+Int3.Precision+")\n" +
-						"Be very careful when using negative values since a negative penalty will underflow and instead get really high");
+					EditorGUILayout.HelpBox("Applies penalty to nodes based on their Y coordinate\nSampled in Int3 space, i.e it is multiplied with Int3.Precision first ("+Int3.Precision+")\n" +
+						"Be very careful when using negative values since a negative penalty will underflow and instead get really high", MessageType.None);
 					EditorGUI.indentLevel--;
 				}
 
@@ -349,6 +349,7 @@ namespace Pathfinding {
 				}
 #endif
 			}
+
 		}
 
 		/** Draws the inspector for a \link Pathfinding.GraphCollision GraphCollision class \endlink */
@@ -508,7 +509,7 @@ namespace Pathfinding {
 						help = "Nodes Y position is changed according to channel '"+channelName+"', multiplied with factor";
 
 						if (graph.collision.heightCheck) {
-							HelpBox("Getting position both from raycast and from texture. You should disable one of them");
+							EditorGUILayout.HelpBox("Getting position both from raycast and from texture. You should disable one of them", MessageType.Error);
 						}
 						break;
 					case GridGraph.TextureData.ChannelUse.WalkablePenalty:
@@ -516,7 +517,7 @@ namespace Pathfinding {
 						break;
 					}
 
-					HelpBox(help);
+					EditorGUILayout.HelpBox(help, MessageType.None);
 
 					EditorGUI.indentLevel--;
 				}
@@ -610,7 +611,11 @@ namespace Pathfinding {
 			Matrix4x4 inversed = savedMatrix.inverse;
 
 			Handles.color = AstarColor.BoundsHandles;
+#if UNITY_5_5_OR_NEWER
+			Handles.CapFunction cap = Handles.CylinderHandleCap;
+#else
 			Handles.DrawCapFunction cap = Handles.CylinderCap;
+#endif
 
 			Vector2 extents = graph.unclampedSize*0.5F;
 			Vector3 center = inversed.MultiplyPoint3x4(graph.center);

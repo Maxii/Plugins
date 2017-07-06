@@ -1,7 +1,7 @@
-//----------------------------------------------
+//-------------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2016 Tasharen Entertainment
-//----------------------------------------------
+// Copyright © 2011-2017 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using UnityEngine;
 using UnityEditor;
@@ -617,8 +617,20 @@ public class UIPanelInspector : UIRectEditor
 
 			GUI.changed = false;
 			GUILayout.BeginHorizontal();
-			int so = EditorGUILayout.IntField("Sort Order", mPanel.sortingOrder, GUILayout.Width(120f));
-			if (so == 0) GUILayout.Label("Automatic", GUILayout.MinWidth(20f));
+			var use = EditorGUILayout.Toggle("Sort Order", mPanel.useSortingOrder, GUILayout.Width(100f));
+
+			if (GUI.changed)
+			{
+				mPanel.useSortingOrder = use;
+				mPanel.RebuildAllDrawCalls();
+				EditorUtility.SetDirty(mPanel);
+			}
+
+			GUI.changed = false;
+			EditorGUI.BeginDisabledGroup(!use);
+			int so = EditorGUILayout.IntField(mPanel.sortingOrder, GUILayout.Width(40f));
+			GUILayout.Label(so == 0 ? "Automatic" : "Explicit", GUILayout.MinWidth(20f));
+			EditorGUI.EndDisabledGroup();
 			GUILayout.EndHorizontal();
 			if (GUI.changed) mPanel.sortingOrder = so;
 

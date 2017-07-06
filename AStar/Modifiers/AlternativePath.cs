@@ -68,7 +68,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public new void OnDestroy () {
+		public override void OnDestroy () {
 			destroyed = true;
 			lock (lockObject) {
 				if (!waitingForApply) {
@@ -76,7 +76,7 @@ namespace Pathfinding {
 					AstarPath.OnPathPreSearch += ClearOnDestroy;
 				}
 			}
-			(this as MonoModifier).OnDestroy();
+			base.OnDestroy();
 		}
 
 		void ClearOnDestroy (Path p) {

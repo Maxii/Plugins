@@ -1,7 +1,7 @@
-//----------------------------------------------
+//-------------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2016 Tasharen Entertainment
-//----------------------------------------------
+// Copyright © 2011-2017 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using UnityEngine;
 using UnityEditor;
@@ -570,13 +570,6 @@ public class UIAtlasMaker : EditorWindow
 		// Clear the read-only flag in texture file attributes
 		if (System.IO.File.Exists(newPath))
 		{
-#if !UNITY_4_1 && !UNITY_4_0 && !UNITY_3_5
-			if (!AssetDatabase.IsOpenForEdit(newPath))
-			{
-				Debug.LogError(newPath + " is not editable. Did you forget to do a check out?");
-				return false;
-			}
-#endif
 			System.IO.FileAttributes newPathAttrs = System.IO.File.GetAttributes(newPath);
 			newPathAttrs &= ~System.IO.FileAttributes.ReadOnly;
 			System.IO.File.SetAttributes(newPath, newPathAttrs);

@@ -128,16 +128,6 @@ namespace Pathfinding {
 			return returnValue;
 		}
 
-		/** Draws a small help box.
-		 * Works with EditorGUI.indentLevel
-		 */
-		public static void HelpBox (string label) {
-			GUILayout.BeginHorizontal();
-			GUILayout.Space(14*EditorGUI.indentLevel);
-			GUILayout.Label(label, AstarPathEditor.helpBox);
-			GUILayout.EndHorizontal();
-		}
-
 		/** Draws a toggle with a bold label to the right. Does not enable or disable GUI */
 		public bool ToggleGroup (string label, bool value) {
 			return ToggleGroup(new GUIContent(label), value);

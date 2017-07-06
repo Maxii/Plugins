@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Pathfinding {
 	/** Holds a coordinate in integers */
-	public struct Int3 {
+	public struct Int3 : System.IEquatable<Int3> {
 		public int x;
 		public int y;
 		public int z;
@@ -242,13 +242,21 @@ namespace Pathfinding {
 				   z == rhs.z;
 		}
 
+		#region IEquatable implementation
+
+		public bool Equals (Int3 other) {
+			return x == other.x && y == other.y && z == other.z;
+		}
+
+		#endregion
+
 		public override int GetHashCode () {
 			return x*73856093 ^ y*19349663 ^ z*83492791;
 		}
 	}
 
 	/** Two Dimensional Integer Coordinate Pair */
-	public struct Int2 {
+	public struct Int2 : System.IEquatable<Int2> {
 		public int x;
 		public int y;
 
@@ -290,6 +298,14 @@ namespace Pathfinding {
 
 			return x == rhs.x && y == rhs.y;
 		}
+
+		#region IEquatable implementation
+
+		public bool Equals (Int2 other) {
+			return x == other.x && y == other.y;
+		}
+
+		#endregion
 
 		public override int GetHashCode () {
 			return x*49157+y*98317;

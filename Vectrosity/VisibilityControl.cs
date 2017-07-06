@@ -1,12 +1,14 @@
-// Version 5.3
-// ©2016 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.4.2
+// ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using Vectrosity;
+using System.Collections;
 
+namespace Vectrosity {
 [AddComponentMenu("Vectrosity/VisibilityControl")]
 public class VisibilityControl : MonoBehaviour {
-
+	
 	RefInt m_objectNumber;
 	VectorLine m_vectorLine;
 	bool m_destroyed = false;
@@ -23,18 +25,25 @@ public class VisibilityControl : MonoBehaviour {
 		
 		VectorManager.VisibilitySetup (transform, line, out m_objectNumber);
 		m_vectorLine = line;
-		if (GetComponent<Renderer>().isVisible) {
-			OnBecameVisible();
-		}
-	}
-
-	void OnBecameVisible () {
-		m_vectorLine.active = true;
-		// Draw line now, otherwise's there's a 1-frame delay before the line is actually drawn in the next LateUpdate
 		VectorManager.DrawArrayLine2 (m_objectNumber.i);
+		StartCoroutine (VisibilityTest());
 	}
 	
-	void OnBecameInvisible () {
+	IEnumerator VisibilityTest () {	// Since Renderer.isVisible doesn't work in Setup and needs to wait a couple frames
+		yield return null;
+		yield return null;
+		if (!GetComponent<Renderer>().isVisible) {
+			m_vectorLine.active = false;
+		}
+	}
+	
+	IEnumerator OnBecameVisible () {
+		yield return new WaitForEndOfFrame();	// Since otherwise Unity 5.6 can't enable/disable renderers during OnBecameVisible
+		m_vectorLine.active = true;
+	}
+	
+	IEnumerator OnBecameInvisible () {
+		yield return new WaitForEndOfFrame();
 		m_vectorLine.active = false;
 	}
 	
@@ -45,8 +54,9 @@ public class VisibilityControl : MonoBehaviour {
 		if (m_dontDestroyLine) return;
 		VectorLine.Destroy (ref m_vectorLine);
 	}
-
+	
 	public void DontDestroyLine () {
 		m_dontDestroyLine = true;
 	}
+}
 }

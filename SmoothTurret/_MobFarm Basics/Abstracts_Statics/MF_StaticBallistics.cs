@@ -1,6 +1,10 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+namespace MFnum {
+	public enum ArcType { Low, High }
+}
+
 public class MFball {
 
 	public static float? BallisticAimAngle ( Vector3 targetLoc, Vector3 exitLoc, float shotSpeed, MFnum.ArcType arc ) {

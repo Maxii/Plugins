@@ -78,7 +78,8 @@ namespace Pathfinding {
 	 * in the correct layer (the layer should be included in the 'Collision Testing' mask).
 	 */
 	public class GridGraph : NavGraph, IUpdatableGraph
-		, IRaycastableGraph {
+		, IRaycastableGraph
+	{
 		/** This function will be called when this graph is destroyed */
 		public override void OnDestroy () {
 			base.OnDestroy();
@@ -1553,7 +1554,7 @@ namespace Pathfinding {
 		/** Internal function to update an area of the graph */
 		public void UpdateArea (GraphUpdateObject o) {
 			if (nodes == null || nodes.Length != width*depth) {
-				Debug.LogWarning("The Grid Graph is not scanned, cannot update area ");
+				Debug.LogWarning("The Grid Graph is not scanned, cannot update area");
 				//Not scanned
 				return;
 			}

@@ -1,7 +1,7 @@
-//----------------------------------------------
+//-------------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2016 Tasharen Entertainment
-//----------------------------------------------
+// Copyright © 2011-2017 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using UnityEngine;
 using System.Collections;
@@ -42,7 +42,7 @@ public class UIDragDropItem : MonoBehaviour
 	public float pressAndHoldDelay = 1f;
 
 	/// <summary>
-	/// Whether this drag & drop item can be interacted with. If not, only tooltips will work.
+	/// Whether this drag and drop item can be interacted with. If not, only tooltips will work.
 	/// </summary>
 
 	public bool interactable = true;
@@ -248,7 +248,7 @@ public class UIDragDropItem : MonoBehaviour
 	/// Drop the dragged item.
 	/// </summary>
 
-	public void StopDragging (GameObject go)
+	public void StopDragging (GameObject go = null)
 	{
 		if (mDragging)
 		{
@@ -383,4 +383,10 @@ public class UIDragDropItem : MonoBehaviour
 		if (mDragScrollView != null)
 			mDragScrollView.enabled = true;
 	}
+
+	/// <summary>
+	/// Application losing focus should cancel the dragging operation.
+	/// </summary>
+
+	protected void OnApplicationFocus (bool focus) { if (!focus) StopDragging(null); }
 }

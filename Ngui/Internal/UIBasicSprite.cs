@@ -978,15 +978,16 @@ public abstract class UIBasicSprite : UIWidget
 				}
 				else // Corner
 				{
-					if ((y == 0 && bottomType != AdvancedType.Invisible) || (y == 2 && topType != AdvancedType.Invisible) ||
-						(x == 0 && leftType != AdvancedType.Invisible) || (x == 2 && rightType != AdvancedType.Invisible))
-					{
-						Fill(verts, uvs, cols,
-							mTempPos[x].x, mTempPos[x2].x,
-							mTempPos[y].y, mTempPos[y2].y,
-							mTempUVs[x].x, mTempUVs[x2].x,
-							mTempUVs[y].y, mTempUVs[y2].y, c);
-					}
+					if (y == 0 && bottomType == AdvancedType.Invisible) continue;
+					if (y == 2 && topType == AdvancedType.Invisible) continue;
+					if (x == 0 && leftType == AdvancedType.Invisible) continue;
+					if (x == 2 && rightType == AdvancedType.Invisible) continue;
+
+					Fill(verts, uvs, cols,
+						mTempPos[x].x, mTempPos[x2].x,
+						mTempPos[y].y, mTempPos[y2].y,
+						mTempUVs[x].x, mTempUVs[x2].x,
+						mTempUVs[y].y, mTempUVs[y2].y, c);
 				}
 			}
 		}

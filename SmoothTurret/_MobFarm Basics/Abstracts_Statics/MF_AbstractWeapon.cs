@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+[HelpURL("http://mobfarmgames.weebly.com/mf_abstractweapon.html")]
 public abstract class MF_AbstractWeapon : MonoBehaviour {
 	
 	[Header("Shot settings:")]
@@ -38,6 +39,25 @@ public abstract class MF_AbstractWeapon : MonoBehaviour {
 	public bool active = true;
 	[Tooltip("(deg radius)\nIncrease to apparent target size. Used to cause a weapon to begin firing before completely aimed at target.")]
 	public float aimTolerance; 
+	[Tooltip("How long the weapon must be aimed at the target before firing. Aim Time also appears on the platform script, and the greater of the two values is used.")]
+	public float aimTime;
+	[Header("Target Requirements:")]
+	[Split1(true, "This weapon requires angle data on the target.\nUsed to simulate quality-of-detection concepts with scanners. Control scripts such as MF_B_HardpointControl and MF_B_TurretControl " +
+		"won't fire a weapon that requires angle data if such data hasn't been provided by a scanner.\n" +
+		"Note: MF_B_Scanner gathers angle data.")]
+	public bool requireAngle;
+	[Split2(true, "This weapon requires precision data on the target.\nUsed to simulate quality-of-detection concepts with scanners. Control scripts such as MF_B_HardpointControl and MF_B_TurretControl " +
+		"won't fire a weapon that requires precision data if such data hasn't been provided by a scanner.\n" +
+		"Note: MF_B_Scanner scanner data is considered precision data.")]
+	public bool requirePrecision;
+	[Split1(true, "This weapon requires range data on the target.\nUsed to simulate quality-of-detection concepts with scanners. Control scripts such as MF_B_HardpointControl and MF_B_TurretControl " +
+	         "won't fire a weapon that requires range data if such data hasn't been provided by a scanner.\n" +
+		"Note: MF_B_Scanner gathers range data.")]
+	public bool requireRange;
+	[Split1(true, "This weapon requires velocity data on the target.\nUsed to simulate quality-of-detection concepts with scanners. Control scripts such as MF_B_HardpointControl and MF_B_TurretControl " +
+	         "won't fire a weapon that requires velocity data if such data hasn't been provided by a scanner.\n" +
+		"Note: MF_B_Scanner gathers velocity data.")]
+	public bool requireVelocity;
 	[Header("Exit point(s) of shots")]
 	[Tooltip("If multiple exits, they will be used sequentially. (Usefull for a missile rack, or multi-barrel weapons)")]
 	public WeaponExit[] exits;
@@ -50,8 +70,8 @@ public abstract class MF_AbstractWeapon : MonoBehaviour {
 	[HideInInspector] public bool bursting;
 	[HideInInspector] public float delay;
 	
-	float lastLosCheck;
-	bool losClear;
+//	float lastLosCheck;
+//	bool losClear;
 	protected bool error;
 	
 	[System.Serializable]
@@ -60,12 +80,8 @@ public abstract class MF_AbstractWeapon : MonoBehaviour {
 		public ParticleSystem flare;
 	}
 
-	public virtual void Start () {
+	public virtual void Awake () {
 		if (CheckErrors() == true) { return; }
-		
-		curAmmoCount = maxAmmoCount;
-		curBurstCount = burstAmount;
-		curInaccuracy = inaccuracy;
 		
 		// find muzzle flash particle systems
 		for (int e=0; e < exits.Length; e++) {
@@ -82,28 +98,51 @@ public abstract class MF_AbstractWeapon : MonoBehaviour {
 			}
 		}
 	}
+
+	public virtual void OnEnable () { // reset for object pool support
+		if ( error == true ) { return; }
+
+		curAmmoCount = maxAmmoCount;
+		curBurstCount = burstAmount;
+		curInaccuracy = inaccuracy;
+//		lastLosCheck = 0f;
+		bursting = false;
+		for (int e=0; e < exits.Length; e++) {
+			if ( exits[e].transform ) {
+				if ( exits[e].flare  ) { // flare is defined
+					exits[e].flare.Stop(true);
+				}
+			}
+		}
+	}
 	
 	// use this to fire weapon
 	public virtual void Shoot () {
+		Shoot( null );
+	}
+	public virtual void Shoot ( Transform target ) {
 		if ( active == false && bursting == false ) { return; }
 		if ( ReadyCheck() == true ) {
-			DoFire();
+			DoFire( target );
 		}
 	}
 	
 	// once started, will fire a full weapon burst
 	public virtual void ShootBurst () {
+		ShootBurst( null );
+	}
+	public virtual void ShootBurst ( Transform target ) {
 		if ( active == false || bursting == true ) { return; }
 		if ( burstAmount > 0 ) {
-			StartCoroutine(DoBurst());
+			StartCoroutine( DoBurst( target ) );
 		} else {
-			Shoot();
+			Shoot( target );
 		}
 	}
 	
-	IEnumerator DoBurst () {
+	IEnumerator DoBurst ( Transform target ) {
 		if ( PrivateReadyCheck() == true ) { // handle single shots and burstReset
-			DoFire();
+			DoFire( target );
 			
 			// fire until burst runs out
 			bursting = true;
@@ -112,7 +151,7 @@ public abstract class MF_AbstractWeapon : MonoBehaviour {
 				yield return null;
 				
 				if ( PrivateReadyCheck() == true ) {
-					DoFire();
+					DoFire( target );
 				}
 			}
 			bursting = false;
@@ -149,7 +188,7 @@ public abstract class MF_AbstractWeapon : MonoBehaviour {
 	}
 	
 	// use this only if already checked if weapon is ready to fire
-	public virtual void DoFire () {
+	public virtual void DoFire ( Transform target ) {
 		if (error == true) { return; }
 		if (active == false) { return; }
 
@@ -197,6 +236,10 @@ public abstract class MF_AbstractWeapon : MonoBehaviour {
 	public virtual bool RangeCheck ( Transform target, float mult ) {
 		if (active == false) { return false; }
 		return true;
+	}
+
+	public virtual float GetTimeOfFlight ( Transform trans ) {
+		return 0f;
 	}
 	
 	public virtual bool CheckErrors () {

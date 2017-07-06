@@ -1,5 +1,5 @@
-// Version 5.3
-// ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.4
+// ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using System.Collections.Generic;
@@ -13,12 +13,12 @@ public partial class VectorLine {
 	bool WrongArrayLength (int arrayLength, FunctionName functionName) {
 		if (m_lineType == LineType.Continuous) {
 			if (arrayLength != pointsCount-1) {
-				Debug.LogError (functionNames[(int)functionName] + " array for \"" + name + "\" must be length of points array minus one for a continuous line (one entry per line segment)");
+				Debug.LogError (functionNames[(int)functionName] + " list for \"" + name + "\" must be length of points array minus one for a continuous line (one entry per line segment). Expected " + (pointsCount-1) + ", got " + arrayLength);
 				return true;
 			}
 		}
 		else if (arrayLength != pointsCount/2) {
-			Debug.LogError (functionNames[(int)functionName] + " array in \"" + name + "\" must be exactly half the length of points array for a discrete line (one entry per line segment)");
+			Debug.LogError (functionNames[(int)functionName] + " list in \"" + name + "\" must be exactly half the length of points array for a discrete line (one entry per line segment). Expected " + (pointsCount/2) + ", got " + arrayLength);
 			return true;
 		}
 		return false;
@@ -34,7 +34,7 @@ public partial class VectorLine {
 			return false;
 		}
 		if (m_lineType == LineType.Points) {
-			if (index + segments > m_pointsCount) {
+			if (index + segments > pointsCount) {
 				if (index == 0) {
 					Debug.LogError ("VectorLine." + functionNames[(int)functionName] + ": The number of segments cannot exceed the number of points in the array for \"" + name + "\"");
 					return false;
@@ -44,24 +44,24 @@ public partial class VectorLine {
 			}
 			return true;
 		}
-
+		
 		if (m_lineType == LineType.Continuous) {
-			if (index + (segments+1) > m_pointsCount) {
+			if (index + (segments+1) > pointsCount) {
 				if (index == 0) {
 					Debug.LogError ("VectorLine." + functionNames[(int)functionName] + ": The length of the array for continuous lines needs to be at least the number of segments plus one for \"" + name + "\"");
 					return false;
 				}
-				Debug.LogError ("VectorLine: Calling " + functionNames[(int)functionName] + " with an index of " + index + " would exceed the length of the Vector array for \"" + name + "\"");
+				Debug.LogError ("VectorLine: Calling " + functionNames[(int)functionName] + " with an index of " + index + " would exceed the length of the Vector array (" + pointsCount + ") for \"" + name + "\"");
 				return false;
 			}
 		}
 		else {
-			if (index + segments*2 > m_pointsCount) {
+			if (index + segments*2 > pointsCount) {
 				if (index == 0) {
 					Debug.LogError ("VectorLine." + functionNames[(int)functionName] + ": The length of the array for discrete lines needs to be at least twice the number of segments for \"" + name + "\"");
 					return false;
 				}
-				Debug.LogError ("VectorLine: Calling " + functionNames[(int)functionName] + " with an index of " + index + " would exceed the length of the Vector array for \"" + name + "\"");
+				Debug.LogError ("VectorLine: Calling " + functionNames[(int)functionName] + " with an index of " + index + " would exceed the length of the Vector array (" + pointsCount + ") for \"" + name + "\"");
 				return false;
 			}
 		}
@@ -855,7 +855,7 @@ public partial class VectorLine {
 			Debug.LogError ("VectorLine.MakeCube can only be used with Vector3 points, which \"" + name + "\" doesn't have");
 			return;
 		}
-		if (index + 24 > m_pointsCount) {
+		if (index + 24 > pointsCount) {
 			if (index == 0) {
 				Debug.LogError ("VectorLine.MakeCube: The number of Vector3 points needs to be at least 24 for \"" + name + "\"");
 				return;

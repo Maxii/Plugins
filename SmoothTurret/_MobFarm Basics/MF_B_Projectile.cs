@@ -1,39 +1,53 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
-public class MF_B_Projectile : MonoBehaviour {
+[HelpURL("http://mobfarmgames.weebly.com/mf_b_projectile.html")]
+public class MF_B_Projectile : MF_AbstractMunition {
 
-	[Tooltip("Damage of the projectile when hit.")]
-	public float damage;
-	[Tooltip("Radius to apply damage to when hit.")]
-	public float damageRadius;
-	[Tooltip("The prefab to display when hit.")]
-	public GameObject hitObject;
-	[Tooltip("The scale radius of the Hit Object. 0 = Don't change prefab scale.")]
-	public float fxRadius;
 	[Tooltip("If true, the projectile will face the direction of velocity.")]
 	public bool faceVelocity = true;
+	[Tooltip("Damage of the projectile when it hits.")]
+	public float damage;
+	[Tooltip("Radius to apply damage to when it hits.")]
+	public float damageRadius;
 
-	[HideInInspector] public float duration;
-
-	float damageID;
-	float startTime;
 	Rigidbody myRigidbody;
+
+	bool error;
 	
-	void Start () {
-		startTime = Time.time;
+	protected override void Awake () {
+		if ( CheckErrors() ) { return; }
+		base.Awake();
 		myRigidbody = GetComponent<Rigidbody>();
-		damageID = GetInstanceID() * .5f;
+	}
+
+	protected override void OnEnable () {
+		if ( error == true ) { return; }
+		base.OnEnable();
+//		if ( projectileBody ) { projectileBody.SetActive( true ); }
+	}
+
+	void OnDisable () {
+		if ( error == true ) { return; }
+		myRigidbody.velocity = Vector3.zero;
+		myRigidbody.angularVelocity = Vector3.zero;
+	}
+
+	void Update () {
+		monitor = ( Time.time - startTime ) / duration; // for fx controller
+		UpdateStats();
 	}
 
 	void FixedUpdate () {
-		// destroy self at end of duration
+		if ( error == true ) { return; }
+
 		if ( Time.time >= startTime + duration ) {
-			Destroy( gameObject );
+			DoDeath(); // projectile death
 		}
-		
+			
 		// angle towards velocity
-		if ( faceVelocity == true ) {
+		if ( faceVelocity == true && myRigidbody.velocity != Vector3.zero ) {
 			myRigidbody.rotation = Quaternion.LookRotation(myRigidbody.velocity);
 		}
 		
@@ -44,27 +58,24 @@ public class MF_B_Projectile : MonoBehaviour {
 		}
 	}
 	
-	private void DoHit ( RaycastHit hit ) {
-		Destroy( gameObject );
-		GameObject blastObj = (GameObject)Instantiate( hitObject, hit.point, Quaternion.identity );
-		if ( fxRadius != 0 ) {
-			blastObj.transform.localScale = new Vector3( fxRadius*2, fxRadius*2, fxRadius*2 );
-		}
+	void DoHit ( RaycastHit hit ) { // hit a target
 		if ( damageRadius > 0 ) {
 			DoExplode( hit );
 		} else { 
+			transform.position = hit.point; // move to hit location
 			DoDamage( hit.transform );
 		}
+		if ( fxScript ) { fxScript.TriggerFx( 0 ); } // send trigger to FxController to activate impact fx
+		DoDeath(); // projectile death for fx
 	}
 
 	private void DoExplode ( RaycastHit hit ) {
 		Collider[] colliders = Physics.OverlapSphere( hit.point, damageRadius );
-		foreach (Collider _thisCollider in colliders) {
-			// check that collider in sphere isn't blocked by another collider
-			RaycastHit _losHit = default(RaycastHit);
-			if ( Physics.Linecast( hit.point, _thisCollider.transform.position, out _losHit ) ) { 
-				if ( _losHit.collider == _thisCollider ) { // collider not blocked
-					DoDamage ( _losHit.collider.transform );
+		for ( int i=0; i < colliders.Length; i++ ) {
+			RaycastHit losHit = default(RaycastHit);
+			if ( Physics.Linecast( hit.point, colliders[i].transform.position, out losHit ) ) { 
+				if ( losHit.collider == colliders[i] ) { // collider not blocked
+					DoDamage ( losHit.collider.transform );
 				}
 			}
 		}
@@ -76,29 +87,26 @@ public class MF_B_Projectile : MonoBehaviour {
 
 	public void DoDamage ( Transform trans ) {
 		// do stuff to the target object when it gets hit
-		MF_AbstractStatus _script = null;
-		_script = FindStatusScript( trans ); // look for script in parents
-		if ( _script && !Mathf.Approximately(_script.damageID, damageID + Time.time) ) { // don't apply damage if alread damaged by this source, this frame - so explosions don't damage more than once
+		MF_AbstractStats sScript = null;
+		sScript = trans.GetComponentInParent<MF_AbstractStats>(); // look for script in parents
+
+		if ( sScript && !Mathf.Approximately( sScript.damageID, damageID + Time.time ) ) { // don't apply damage if alread damaged by this source, this frame - so explosions don't damage more than once
 			// apply damage to target
-			_script.damageID = damageID + Time.time; // mark as damaged by this source, this frame
-			_script.health -= damage;
+			sScript.damageID = damageID + Time.time; // mark as damaged by this source, this frame
+			sScript.DoDamage( damage );
 
-//			Debug.Log( trans+" > "+_script+" : "+damage );
+//			Debug.Log( trans+" > "+sScript+" : "+damage );
 		}
 	}
 
-	private MF_AbstractStatus FindStatusScript ( Transform thisTransform ) {
-		// move up tree looking for status script
-		while ( thisTransform != null ) {
-			MF_AbstractStatus _script = thisTransform.GetComponent<MF_AbstractStatus>();
-			if ( _script ) {
-				return _script;
-			} else {
-				thisTransform = thisTransform.parent;
-			}
-		}
-		return null;
+	bool CheckErrors() {
+		error = false;
+
+		if ( GetComponent<Rigidbody>() == null ) { Debug.Log( this + ": Projectile must have a Rigidbody on the root level." ); error = true; }
+
+		return error;
 	}
+
 }
 
 

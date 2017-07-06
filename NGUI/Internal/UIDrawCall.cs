@@ -1,7 +1,7 @@
-//----------------------------------------------
+//-------------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2016 Tasharen Entertainment
-//----------------------------------------------
+// Copyright © 2011-2017 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 //#define SHOW_HIDDEN_OBJECTS
 
@@ -266,7 +266,7 @@ public class UIDrawCall : MonoBehaviour
 		{
 			mTexture = value;
 			if (mBlock == null) mBlock = new MaterialPropertyBlock();
-			mBlock.SetTexture("_MainTex", value);
+			mBlock.SetTexture("_MainTex", value ?? Texture2D.whiteTexture);
 		}
 	}
 
@@ -686,13 +686,13 @@ public class UIDrawCall : MonoBehaviour
 
 		for (int i = 0; i < vertexCount; i += 4)
 		{
-			rv[index++] = i + 2;
+			rv[index++] = i;
 			rv[index++] = i + 1;
-			rv[index++] = i;
-
-			rv[index++] = i;
-			rv[index++] = i + 3;
 			rv[index++] = i + 2;
+
+			rv[index++] = i + 2;
+			rv[index++] = i + 3;
+			rv[index++] = i;
 		}
 
 		if (mCache.Count > maxIndexBufferCache) mCache.RemoveAt(0);

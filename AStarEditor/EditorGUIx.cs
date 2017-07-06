@@ -37,8 +37,7 @@ namespace Pathfinding {
 
 		Stack<FadeArea> fadeAreaStack;
 
-		static List<string> layers;
-		static string[] layerNames;
+		static Dictionary<int, string[]> layerNames = new Dictionary<int, string[]>();
 		static long lastUpdateTick;
 
 		/** Tag names and an additional 'Edit Tags...' entry.
@@ -420,14 +419,14 @@ namespace Pathfinding {
 		 * \note Unity 3.5 and up will use the EditorGUILayout.MaskField instead of a custom written one.
 		 */
 		public static LayerMask LayerMaskField (string label, LayerMask selected) {
-			if (layers == null || (System.DateTime.UtcNow.Ticks - lastUpdateTick > 10000000L && Event.current.type == EventType.Layout)) {
+			if (Event.current.type == EventType.Layout && System.DateTime.UtcNow.Ticks - lastUpdateTick > 10000000L) {
+				layerNames.Clear();
 				lastUpdateTick = System.DateTime.UtcNow.Ticks;
-				if (layers == null) {
-					layers = new List<string>();
-					layerNames = new string[4];
-				} else {
-					layers.Clear();
-				}
+			}
+
+			string[] currentLayerNames;
+			if (!layerNames.TryGetValue(selected.value, out currentLayerNames)) {
+				var layers = Pathfinding.Util.ListPool<string>.Claim();
 
 				int emptyLayers = 0;
 				for (int i = 0; i < 32; i++) {
@@ -438,17 +437,17 @@ namespace Pathfinding {
 						layers.Add(layerName);
 					} else {
 						emptyLayers++;
+						if (((selected.value >> i) & 1) != 0 && selected.value != -1) {
+							for (; emptyLayers > 0; emptyLayers--) layers.Add("Layer "+(i+1-emptyLayers));
+						}
 					}
 				}
 
-				if (layerNames.Length != layers.Count) {
-					layerNames = new string[layers.Count];
-				}
-				for (int i = 0; i < layerNames.Length; i++) layerNames[i] = layers[i];
+				currentLayerNames = layerNames[selected.value] = layers.ToArray();
+				Pathfinding.Util.ListPool<string>.Release(layers);
 			}
 
-			selected.value =  EditorGUILayout.MaskField(label, selected.value, layerNames);
-
+			selected.value = EditorGUILayout.MaskField(label, selected.value, currentLayerNames);
 			return selected;
 		}
 

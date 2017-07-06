@@ -2,6 +2,7 @@
 using System.Collections;
 using MFnum;
 
+[HelpURL ("http://mobfarmgames.weebly.com/st_turretcontrol.html")]
 public class ST_TurretControl : MF_AbstractPlatformControl {
 	
 	public enum ControlType { AI_AutoTarget, None, Player_Mouse, Player_Click }
@@ -17,33 +18,34 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 	[Tooltip("Player to control this turret if Controller is set to Player_Mouse or Player_Click.")]
 	public ST_Player playerScript;
 	[Header("Multiple weapons on a single turret:")]
-	[Tooltip("(meters)\n0 = don't angle weapons")]
+	[Split1(true, 56, "(meters)\n0 = don't angle weapons")]
 	public float fixedConvergeRange; // 0 = don't converge
-	[Tooltip("Will angle weapons slightly to converge fire baed on target range.")]
+
+	[Split2(true, 54, "Will angle weapons slightly to converge fire baed on target range.")]
 	public bool dynamicConverge;
-	[Tooltip("(deg/sec)\nWhen using Dynamic Converge.")]
+	[Split1(true, "(deg/sec)\nWhen using Dynamic Converge.")]
 	public float convergeSlewRate = 2f;
-	[Tooltip("(meters)\nWhen using Dynamic Converge, limits how far weapons will angle inwards. This is the minimum range shots will converge at.")]
+	[Split2(true, "(meters)\nWhen using Dynamic Converge, limits how far weapons will angle inwards. This is the minimum range shots will converge at.")]
 	public float minConvergeRange;
-	[Tooltip("For multiple weapons per turret.\nWill alternate their fire instead of firing all at once.")]
+	[Split1(true, "For multiple weapons per turret.\nWill alternate their fire instead of firing all at once.")]
 	public bool alternatingFire;
 	[Header("Options:")]
-	[Tooltip("Upon firing, weapons will finish a full burst according to their burst fire setting.")]
+	[Split1(true, 45, "Upon firing, weapons will finish a full burst according to their burst fire setting.")]
 	public bool fullBurst;
-	[Tooltip("Uses Raycast to check line of sight before firing. If using gravity, LoS will checked along an approximated ballistic arc.")]
+	[Split1(true, 45, "Uses Raycast to check line of sight before firing. If using gravity, LoS will checked along an approximated ballistic arc.")]
 	public bool checkLOS;
-	[Tooltip("When checking LOS:\nTrue: Always use direct line.\nFalse: Will use a ballistic LoS approximation when using gravity.")]
+	[Split2(true, 45, "Increase time between Raycast LoS checks to improve performance.\n0 = before every shot.")]
+	public float losCheckInterval; 
+	[Split1(true, 45, "When checking LOS:\nTrue: Always use direct line.\nFalse: Will use a ballistic LoS approximation when using gravity.")]
 	public bool alwaysDirectLos;
-	[Tooltip("When using ballistics, a blocked LoS using the default arc will set the weapon to try the other arc. This will reset after every shot, or every burst if full burst is used." +
+	[Split2(true, 45, "When using ballistics, a blocked LoS using the default arc will set the weapon to try the other arc. This will reset after every shot, or every burst if full burst is used." +
 		"If Use Direct Los is true, this won't have any effect.")]
 	public bool losMayChangeArc;
-	[Tooltip("Increase time between Raycast LoS checks to improve performance.\n0 = before every shot.")]
-	public float losCheckInterval; 
-	[Tooltip("Will limit inaccuracy imparted to weapons due to any turning/acceleration. If this is less than a weapon's inaccuracy, it will have no effect.")]
+	[Split1(true, "Will limit inaccuracy imparted to weapons due to any turning/acceleration. If this is less than a weapon's inaccuracy, it will have no effect.")]
 	public float maxInaccuracy;
-	[Tooltip("Try to determine target size from collider.")]
+	[Split1(true, "Try to determine target size from collider.")]
 	public bool checkTargetSize;
-	[Tooltip("(meters)\nDefault target size to fire at if none found or provided.")]
+	[Split2(true, "(meters)\nDefault target size to fire at if none found or provided.")]
 	public float targetSizeDefault;
 
 	ST_Turret turretScript;
@@ -53,7 +55,6 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 	float lastFire;
 	float oldTurnWeapInaccuracy;
 	bool? bursting = null;
-	int burstEnd;
 	bool loaded;
 
 	// the current target
@@ -86,8 +87,8 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 		}
 	}
 
-	public override void Start () {
-		base.Start();
+	public override void Awake () {
+		base.Awake();
 		if ( error == true ) { return; }
 
 		turretScript = GetComponent<ST_Turret>();
@@ -113,6 +114,17 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 
 		loaded = true;
 		OnValidate();
+	}
+
+	public override void OnEnable () { // reset for object pool support
+		base.OnEnable();
+		lastLosCheck = 0;
+		lastFire = 0f;
+		bursting = null;
+	}
+
+	void OnDisable () { // reset for object pool support
+		target = null;
 	}
 
 	void Update () {
@@ -216,14 +228,17 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 				curWeapon = MFmath.Mod(curWeapon+1, weapons.Length);
 			}
 			
-			// set shot speed for turret aim intercept / ballistics
-			turretScript.shotSpeed = weapons[curWeapon].script.shotSpeed;
-			turretScript.exitLoc = weapons[curWeapon].script.exits[ weapons[curWeapon].script.curExit ].transform.position;
-			
 			if ( l >= weapons.Length ) {
 				return; // no weapons active
 			}
+
+			// set shot speed for turret aim intercept / ballistics
+			turretScript.shotSpeed = weapons[curWeapon].script.shotSpeed;
+			turretScript.exitLoc = weapons[curWeapon].script.exits[ weapons[curWeapon].script.curExit ].transform.position;
 		}
+
+		// check target data vs weapon requirements, set platform checkData
+		if ( CheckData() == false ) { return; }
 
 		// make sure all weapons fire if a burst has already begun
 		if ( bursting == true ) {
@@ -231,12 +246,19 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 			return;
 		}
 
+		float combAimTime = Mathf.Max( aimTime,  weapons[curWeapon].script.aimTime );
+
 		if ( controller == ControlType.AI_AutoTarget ) { // AI will shoot
 			if ( weapons.Length > 0 ) {
 				if ( turretScript.AimCheck( targetSize, weapons[curWeapon].script.aimTolerance ) == true ) { // check if turret is aimed at target
-					if ( weapons[curWeapon].script.ReadyCheck() == true ) { // early out if weapon isn't ready
-						Shoot();
+					curAimTime = Mathf.Clamp( curAimTime + Time.deltaTime,		 0f,  combAimTime ); // add to aimTime
+					if ( curAimTime >= combAimTime ) {
+						if ( weapons[curWeapon].script.ReadyCheck() == true ) { // early out if weapon isn't ready
+							Shoot();
+						}
 					}
+				} else {
+					curAimTime = Mathf.Clamp( curAimTime - Time.deltaTime, 0f, combAimTime ); // subtract from aimTime
 				}
 			}
 		}
@@ -245,13 +267,17 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 			if ( weapons.Length > 0 ) {
 				if ( target == playerScript.fireObject.transform ) { // player clicked a location
 					if ( turretScript.AimCheck( targetSize, weapons[curWeapon].script.aimTolerance ) == true ) { // check if turret is aimed at target
-						
-						if ( weapons[curWeapon].script.ReadyCheck() == true ) { // early out if weapon isn't ready
-							Shoot();
-							if ( fullBurst == false ) {
-								target = playerScript.aimObject.transform;
+						curAimTime = Mathf.Clamp( curAimTime + Time.deltaTime,		 0f,  combAimTime ); // add to aimTime
+						if ( curAimTime >= combAimTime ) {
+							if ( weapons[curWeapon].script.ReadyCheck() == true ) { // early out if weapon isn't ready
+								Shoot();
+								if ( fullBurst == false ) {
+									target = playerScript.aimObject.transform;
+								}
 							}
 						}
+					} else {
+						curAimTime = Mathf.Clamp( curAimTime - Time.deltaTime, 0f, combAimTime ); // subtract from aimTime
 					}
 				}
 			}
@@ -322,12 +348,10 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 
 	void Shoot() {
 		// check line of sight
-		if ( checkLOS == false || controller == ControlType.Player_Mouse || controller == ControlType.Player_Click ) { // always clear when not using LOS or under player control
-			losClear = true;
-		} else {
+		losClear = true;
+		if ( checkLOS == true && controller != ControlType.Player_Mouse && controller != ControlType.Player_Click ) { // don't check LOS if under player control
 			if (Time.time >= lastLosCheck + losCheckInterval) {
 				RaycastHit _hit;
-				losClear = false;
 				Vector3 _startPos = weapons[curWeapon].script.exits[ weapons[curWeapon].script.curExit ].transform.position;
 
 				bool _directLos = ( turretScript.useGravity == false || alwaysDirectLos == true ) ? true : false;
@@ -355,10 +379,10 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 //							Debug.DrawLine( _apexPos, target.transform.position, Color.red, .1f );
 
 							// check los
-							if (Physics.Linecast(_startPos, _apexPos, out _hit) ) { // check exit to apex
+							if ( Physics.Linecast(_startPos, _apexPos, out _hit) ) { // check exit to apex
 								// recursively search parent of hit collider for target
 								losClear = UtilityMF.RecursiveParentTransformSearch( _target, _hit.transform );
-							} else if (Physics.Linecast(_apexPos, _target.position, out _hit) ) { // check apex to target
+							} else if ( Physics.Linecast(_apexPos, _target.position, out _hit) ) { // check apex to target
 								// recursively search parent of hit collider for target
 								losClear = UtilityMF.RecursiveParentTransformSearch( _target, _hit.transform );
 							}
@@ -374,7 +398,7 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 					}
 				}
 				if ( _directLos == true ) { // use direct los line
-					if (Physics.Raycast(_startPos, _target.position - _startPos, out _hit, weapons[curWeapon].script.maxRange)) {
+					if ( Physics.Linecast(_startPos, _target.position, out _hit) ) { 
 						// recursively search parent of hit collider for target
 						losClear = UtilityMF.RecursiveParentTransformSearch( _target, _hit.transform );
 					}
@@ -386,6 +410,14 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 		// fire weapons
 		if (losClear == true) {
 			if ( weapons[curWeapon].script.RangeCheck( _target ) == true ) {
+
+				// if targeting script can mark targets, mark when firing
+				if ( targetingScript && targetingScript.isMarkingTarg == true ) {
+					if ( weapons.Length > 0 ) {
+						targetingScript.SetMarkedTime( weapons[ curWeapon ].script.GetTimeOfFlight( _target ) );
+					}
+				}
+
 				if ( alternatingFire == true && weapons.Length > 1 ) { // alternate fire bewteen weapons
 					weapons[curWeapon].script.platformVelocity = turretScript.velocity; // send velocity to current weapon script
 
@@ -422,10 +454,10 @@ public class ST_TurretControl : MF_AbstractPlatformControl {
 							bursting = true;
 							if ( weapons[sw].burst == false ) {
 								weapons[sw].burst = true;
-								weapons[sw].script.ShootBurst(); 
+								weapons[sw].script.ShootBurst( _target ); 
 							}
 						} else { 
-							weapons[sw].script.Shoot(); 
+							weapons[sw].script.Shoot( _target ); 
 							turretScript.curArc = turretScript.defaultArc; // reset default arc 
 						}
 					}

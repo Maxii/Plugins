@@ -436,6 +436,10 @@ namespace Pathfinding {
 			if (path != null) Pathfinding.Util.ListPool<GraphNode>.Release(path);
 			vectorPath = null;
 			path = null;
+			immediateCallback = null;
+			// Clear the callback to remove a potential memory leak
+			// while the path is in the pool (which it could be for a long time).
+			callback = null;
 		}
 
 		/** Reset all values to their default values.
@@ -464,6 +468,7 @@ namespace Pathfinding {
 
 			pathHandler = null;
 			callback = null;
+			immediateCallback = null;
 			_errorLog = "";
 			pathCompleteState = PathCompleteState.NotCalculated;
 

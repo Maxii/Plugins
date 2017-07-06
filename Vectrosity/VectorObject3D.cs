@@ -1,5 +1,5 @@
-// Version 5.3
-// ©2016 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.4
+// ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,21 +18,22 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 	Mesh m_mesh;
 	VectorLine m_vectorLine;
 	Material m_material;
-	bool useCustomMaterial = false;
+	bool m_useCustomMaterial = false;
 			
-	public void SetVectorLine (VectorLine vectorLine, Texture tex, Material mat) {
+	public void SetVectorLine (VectorLine vectorLine, Texture tex, Material mat, bool useCustomMaterial) {
 		gameObject.AddComponent<MeshRenderer>();
 		gameObject.AddComponent<MeshFilter>();
 		m_vectorLine = vectorLine;
-		m_material = new Material (mat);
+		m_material = mat;
 		m_material.mainTexture = tex;
 		GetComponent<MeshRenderer>().sharedMaterial = m_material;
+		m_useCustomMaterial = useCustomMaterial;
 		SetupMesh();
 	}
 	
 	public void Destroy () {
 		Destroy (m_mesh);
-		if (!useCustomMaterial) {
+		if (!m_useCustomMaterial) {
 			Destroy (m_material);
 		}
 	}
@@ -48,7 +49,7 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 	
 	public void SetMaterial (Material mat) {
 		m_material = mat;
-		useCustomMaterial = true;
+		m_useCustomMaterial = true;
 		GetComponent<MeshRenderer>().sharedMaterial = mat;
 		GetComponent<MeshRenderer>().sharedMaterial.mainTexture = m_vectorLine.texture;
 	}

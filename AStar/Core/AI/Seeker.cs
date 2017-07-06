@@ -133,6 +133,30 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 		return path;
 	}
 
+	/** Stop calculating the current path request.
+	 * If this Seeker is currently calculating a path it will be canceled.
+	 * The callback (usually to a method named OnPathComplete) will soon be called
+	 * with a path that has the 'error' field set to true.
+	 *
+	 * This does not stop the character from moving, it just aborts
+	 * the path calculation.
+	 *
+	 * \param pool If true then the path will be pooled when the pathfinding system is done with it.
+	 */
+	public void CancelCurrentPathRequest (bool pool = true) {
+		if (!IsDone()) {
+			path.Error();
+			if (pool) {
+				// Make sure the path has had its reference count incremented and decremented once.
+				// If this is not done the system will think no pooling is used at all and will not pool the path.
+				// The particular object that is used as the parameter (in this case 'path') doesn't matter at all
+				// it just has to be *some* object.
+				path.Claim(path);
+				path.Release(path);
+			}
+		}
+	}
+
 	/** Cleans up some variables.
 	 * Releases any eventually claimed paths.
 	 * Calls OnDestroy on the #startEndModifier.
@@ -291,7 +315,8 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	/** Returns a new path instance.
 	 * The path will be taken from the path pool if path recycling is turned on.\n
 	 * This path can be sent to #StartPath(Path,OnPathDelegate,int) with no change, but if no change is required #StartPath(Vector3,Vector3,OnPathDelegate) does just that.
-	 * \code var seeker = GetComponent<Seeker>();
+	 * \code
+	 * var seeker = GetComponent<Seeker>();
 	 * Path p = seeker.GetNewPath (transform.position, transform.position+transform.forward*100);
 	 * // Disable heuristics on just this path for example
 	 * p.heuristic = Heuristic.None;
@@ -328,29 +353,28 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	 * \param start		The start point of the path
 	 * \param end		The end point of the path
 	 * \param callback	The function to call when the path has been calculated
-	 * \param graphMask	Mask used to specify which graphs should be searched for close nodes. See Pathfinding.NNConstraint.graphMask.
+	 * \param graphMask	Mask used to specify which graphs should be searched for close nodes. See #Pathfinding.NNConstraint.graphMask.
 	 *
 	 * \a callback will be called when the path has completed.
 	 * \a Callback will not be called if the path is canceled (e.g when a new path is requested before the previous one has completed) */
 	public Path StartPath (Vector3 start, Vector3 end, OnPathDelegate callback, int graphMask) {
-		return StartPath(GetNewPath(start, end), callback, graphMask);
+		return StartPath(ABPath.Construct(start, end, null), callback, graphMask);
 	}
 
 	/** Call this function to start calculating a path.
 	 *
 	 * \param p			The path to start calculating
 	 * \param callback	The function to call when the path has been calculated
-	 * \param graphMask	Mask used to specify which graphs should be searched for close nodes. See Pathfinding.NNConstraint.graphMask.
+	 * \param graphMask	Mask used to specify which graphs should be searched for close nodes. See #Pathfinding.NNConstraint.graphMask.
 	 *
-	 * \a callback will be called when the path has completed.
-	 * \a Callback will not be called if the path is canceled (e.g when a new path is requested before the previous one has completed)
+	 * The \a callback will be called when the path has been calculated (which may be several frames into the future).
+	 * The \a callback will not be called if a new path request is started before this path request has been calculated.
 	 *
 	 * \version Since 3.8.3 this method works properly if a MultiTargetPath is used.
 	 * It now behaves identically to the StartMultiTargetPath(MultiTargetPath) method.
 	 */
 	public Path StartPath (Path p, OnPathDelegate callback = null, int graphMask = -1) {
 		var mtp = p as MultiTargetPath;
-
 		if (mtp != null) {
 			// TODO: Allocation, cache
 			var callbacks = new OnPathDelegate[mtp.targetPoints.Length];
@@ -376,7 +400,7 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	/** Internal method to start a path and mark it as the currently active path */
 	void StartPathInternal (Path p, OnPathDelegate callback) {
 		// Cancel a previously requested path is it has not been processed yet and also make sure that it has not been recycled and used somewhere else
-		if (path != null && path.GetState() <= PathState.Processing && lastPathID == path.pathID) {
+		if (path != null && path.GetState() <= PathState.Processing && path.CompleteState != PathCompleteState.Error && lastPathID == path.pathID) {
 			path.Error();
 			path.LogError("Canceled path because a new one was requested.\n"+
 				"This happens when a new path is requested from the seeker when one was already being calculated.\n" +

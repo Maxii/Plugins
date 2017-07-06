@@ -1,75 +1,110 @@
 using UnityEngine;
 using System.Collections;
 
+[HelpURL("http://mobfarmgames.weebly.com/mf_b_mobilityspacearcade.html")]
 public class MF_B_MobilitySpaceArcade : MF_AbstractMobility {
+
+	public enum ThrustSource { Thruster, Custom }
 
 	[Tooltip("Allows the vehile to bank.\nIf blank, will assign this object's first child.")]
 	public Transform rollTransform;
-	[Tooltip("(deg. / sec.)\nHow fast the vehicle can turn")]
+	[Split1("(deg. / sec.)\nHow fast the vehicle can turn")]
 	public float turnRate;
-	[Tooltip("If true, will reduce thrust from engines the more the goal is angled away from within 10° of the front. At 90° away, thrust will be 0.")]
+	[Split2("If true, will reduce thrust from engines the more the goal is angled away from within 10° of the front. At 90° away, thrust will be 0.")]
 	public bool slowDownForTurns;
-	[Tooltip("(deg. / sec.)\nHow fast the vehicle will bank.")]
+	[Split1("(deg. / sec.)\nHow fast the vehicle will bank.")]
 	public float bankRate;
-	[Tooltip("The maximum angle the vehicle will attempt to bank.")]
+	[Split2("The maximum angle the vehicle will attempt to bank.")]
 	public float bankAngleMax;
+	[Split1("The minimum throttle setting as a percentage. Typically 0.")]
+	public float throttleMin = 0f;
+	[Split2("The maximum throttle setting as a percentage. Typically 1.")]
+	public float throttleMax = 1f;
+	[Tooltip("Percent of throttle that can change per second.")]
+	public float throttleRate = 1f;
 	[Tooltip("If true, will attempt to remain within the Height Range, even if the Nav Target is outside this range.")]
 	public bool maintainHeightRange;
 	[Tooltip("x = low limit, y = hight limit.")]
 	public Vector2 heightRange;
+	[Space(8f)]
+	[Tooltip("If using a rigidbody, force will be applied at the engine location. Be sure to have the engines aligned properly.")]
+	public bool thrustAtEngineLoc;
 	[Tooltip("Each thruster for the vehicle.")]
 	public ThrusterArcadeObject[] thrusters;
-	
+
+	float throttleGoal;
 	float totalThrust;
 	float terminalVel;
 	bool error;
 	
 	[System.Serializable]
 	public class ThrusterArcadeObject {
-		[Tooltip("Value of thrust at 100%")]
-		public float maxThrust;
-		[Tooltip("ParticleSystem to use for thruster fx.")]
-		public ParticleSystem particle;
-		[Tooltip("Speed of particles at 0% thrust. 0% thrust will also trun off particle emission.")]
-		public float particleLow;
-		[Tooltip("Speed of particles at 100% thrust.")]
-		public float particleHigh;
+		[Tooltip("Points to an engine object.")]
+		public MF_B_Engine engine;
+		[Tooltip("Where to get the thrust value from.")]
+		public ThrustSource thrustSource;
+		[Tooltip("If Thrust Source is Custom, this is the thrust value at 100% throttle")]
+		public float customThrust;
+		[HideInInspector] public float thrust;
 	}
 
 	void OnValidate () {
-		totalThrust = GetThrustValue();
+		totalThrust = GetThrustValue(); // also sets thrust for individual thrusters based on source
 	}
-	
-	public override void Start () {
-		if ( CheckErrors() == true ) { return; }
-		base.Start();
 
+	public override void Awake () {
+		if ( CheckErrors() == true ) { return; }
+		base.Awake();
+
+		turnSpeed = turnRate; // used by FS_Targeting to evaluate time to aim
 		terminalVel = MFcompute.FindTerminalVelocity ( totalThrust, myRigidbody );
 
 		OnValidate();
 	}
 
+	public override void OnEnable () {
+		base.OnEnable();
+		rollTransform.localRotation = Quaternion.identity; // reset roll
+		throttle = 0f;
+		throttleGoal = 0f;
+	}
+
 	public override void FixedUpdate () {
 		if ( error == true ) { return; }
 		base.FixedUpdate();
-		
-		if (_navTarget) {
+
+		float t = throttle; // store current throttle
+
+		if ( _navTarget != null ) {
 			Steer( navTargetAim );
 			float _angle = Vector3.Angle( navTargetAim - transform.position, transform.forward );
 			if ( slowDownForTurns == true ) { // reduce thrust based on angle to goal
 				if ( _angle > 90 ) {
-					Move( .01f );
+					throttleGoal = .01f;
 				} else if ( _angle > 10 ) { // between 10 - 90 deg
-					Move( 1f - (_angle / 90f) );
+					throttleGoal = 1f - (_angle / 90f);
 				} else { // within 10 deg
-					Move( 1f );
+					throttleGoal = 1f;
 				}
 			} else { // always keep speed maxed during turn
-				Move( 1f );
+				throttleGoal = 1f;
 			}
 		} else {
 			Steer( transform.position + transform.forward );
-			Move( 0f );
+			throttleGoal = 0f;
+		}
+		float mult = throttle < throttleGoal ? 1f : -1f;
+		throttle = Mathf.Clamp( throttle + ( throttleRate * mult * Time.fixedDeltaTime ),		Mathf.Min( throttle, throttleGoal ), Mathf.Max( throttle, throttleGoal ) );
+		throttle = Mathf.Clamp( throttle,		throttleMin, throttleMax );
+		Move( throttle );
+
+		if ( throttle != t ) { // value changed
+			if ( fxScript.Count > 0 ) {
+				monitor = throttle;
+				for ( int i=0; i < fxScript.Count; i++ ) {
+					if ( fxScript[i] != null ) { fxScript[i].CheckUnit(); }
+				}
+			}
 		}
 	}
 	
@@ -103,31 +138,51 @@ public class MF_B_MobilitySpaceArcade : MF_AbstractMobility {
 	}
 
 	public void Move ( float percent ) {
-		float _thrust = totalThrust * percent ;
-		if (myRigidbody) {
-			myRigidbody.AddForce( transform.forward * _thrust * Time.fixedDeltaTime);
+		if ( _navTarget && goalProx > 0 ) {
+			if ( ( transform.position - _navTarget.position ).sqrMagnitude <= goalProx*goalProx ) {
+				percent = 0f;
+			}
+		}
+		float thrust = totalThrust * percent ;
+		if ( myRigidbody ) {
+			if ( thrustAtEngineLoc == false ) { 
+				myRigidbody.AddForce( transform.forward * thrust * Time.fixedDeltaTime);
+			} else {
+				for ( int i=0; i < thrusters.Length; i++ ) {
+					if ( thrusters[i].engine ) {
+						myRigidbody.AddForceAtPosition( -thrusters[i].engine.transform.forward * thrusters[i].thrust * percent * Time.fixedDeltaTime, thrusters[i].engine.transform.position );
+					} else {
+						myRigidbody.AddForce( transform.forward * thrusters[i].thrust * percent * Time.fixedDeltaTime);
+					}
+				}
+			}
 		} else {
-			transform.position = transform.position + (transform.forward * _thrust * Time.fixedDeltaTime);
+			transform.position = transform.position + (transform.forward * thrust * Time.fixedDeltaTime);
 		}
 		// send percent to thruster objects for visuals
-		for ( int t=0; t < thrusters.Length; t++ ) {
-			if ( thrusters[t].particle ) {
-				if ( percent == 0 ) {
-					thrusters[t].particle.emissionRate = 0f;
-				} else {
-					thrusters[t].particle.emissionRate = 30f;
-					thrusters[t].particle.startSpeed = thrusters[t].particleLow + ( (thrusters[t].particleHigh - thrusters[t].particleLow) * percent );
-				}
+		for ( int i=0; i < thrusters.Length; i++ ) {
+			if ( thrusters[i].engine ) {
+				thrusters[i].engine.throttle = percent;
 			}
 		}
 	}
 
 	float GetThrustValue () {
-		float _thrust = 0f;
-		for ( int t=0; t < thrusters.Length; t++ ) {
-			_thrust += thrusters[t].maxThrust;
+		float thrust = 0f;
+		for ( int i=0; i < thrusters.Length; i++ ) {
+			if ( thrusters[i].thrustSource == ThrustSource.Custom ) {
+				thrust += thrusters[i].customThrust;
+				thrusters[i].thrust = thrusters[i].customThrust;
+			} else {
+				if ( thrusters[i].engine ) {
+					thrust += thrusters[i].engine.strength;
+					thrusters[i].thrust = thrusters[i].engine.strength;
+				} else {
+					thrusters[i].thrust = 0f;
+				}
+			}
 		}
-		return _thrust;
+		return thrust;
 	}
 	
 	public override Vector3 ModifiedPosition ( Vector3 pos ) {

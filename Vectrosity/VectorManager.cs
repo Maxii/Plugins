@@ -1,5 +1,5 @@
-// Version 5.3
-// ©2016 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.4
+// ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using System.Collections.Generic;
@@ -40,24 +40,16 @@ public class VectorManager {
 		var vcs = go.GetComponent(typeof(VisibilityControlStatic)) as VisibilityControlStatic;
 		var vca = go.GetComponent(typeof(VisibilityControlAlways)) as VisibilityControlAlways;
 		var bc = go.GetComponent(typeof(BrightnessControl)) as BrightnessControl;
-				
-		if (vc) {
-			MonoBehaviour.Destroy (vc);
-		}
-		if (vcs) {
-			MonoBehaviour.Destroy (vcs);
-		}
-		if (vca) {
-			MonoBehaviour.Destroy (vca);
-		}
 		
 		if (visibility == Visibility.Dynamic) {
 			if (vcs) {
 				vcs.DontDestroyLine();
+				MonoBehaviour.Destroy (vcs);
 				ResetLinePoints (vcs, line);
 			}
 			if (vca) {
 				vca.DontDestroyLine();
+				MonoBehaviour.Destroy (vca);
 			}
 			if (vc == null) {
 				vc = go.AddComponent (typeof(VisibilityControl)) as VisibilityControl;
@@ -70,9 +62,11 @@ public class VectorManager {
 		else if (visibility == Visibility.Static) {
 			if (vc) {
 				vc.DontDestroyLine();
+				MonoBehaviour.Destroy (vc);
 			}
 			if (vca) {
 				vca.DontDestroyLine();
+				MonoBehaviour.Destroy (vca);
 			}
 			if (vcs == null) {
 				vcs = go.AddComponent (typeof(VisibilityControlStatic)) as VisibilityControlStatic;
@@ -85,9 +79,11 @@ public class VectorManager {
 		else if (visibility == Visibility.Always) {
 			if (vc) {
 				vc.DontDestroyLine();
+				MonoBehaviour.Destroy (vc);
 			}
 			if (vcs) {
 				vcs.DontDestroyLine();
+				MonoBehaviour.Destroy (vcs);
 				ResetLinePoints (vcs, line);
 			}
 			if (vca == null) {

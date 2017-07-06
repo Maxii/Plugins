@@ -26,7 +26,7 @@ namespace Pathfinding {
 			List<GraphNode> path = p.path;
 			List<Vector3> vectorPath = p.vectorPath;
 
-			if (path == null || path.Count == 0 || vectorPath == null || vectorPath.Count != path.Count) {
+			if (path == null || path.Count == 0 || vectorPath == null || vectorPath.Count == 0) {
 				return;
 			}
 

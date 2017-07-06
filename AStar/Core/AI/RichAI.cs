@@ -465,7 +465,8 @@ namespace Pathfinding {
 
 						tr.position = position;
 					}
-				} else {
+				}
+				else {
 					if (rvoController != null && rvoController.enabled) {
 						//Use RVOController
 						rvoController.Move(Vector3.zero);

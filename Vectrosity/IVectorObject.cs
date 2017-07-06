@@ -27,7 +27,7 @@ interface IVectorObject {
 	
 	void Enable (bool enable);
 	
-	void SetVectorLine (VectorLine vectorLine, Texture texture, Material material);
+	void SetVectorLine (VectorLine vectorLine, Texture texture, Material material, bool useCustomMaterial);
 	
 	void Destroy ();
 

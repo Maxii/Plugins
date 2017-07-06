@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Diagnostics;
 
 public class MFmath {
 
@@ -8,7 +9,7 @@ public class MFmath {
 		return (((a) % b) + b) % b;
 	}
 	
-	// Determine the signed angle between two vectors around an axis
+	// Determine the signed angle between two vectors around an axis ( axis must be normalized! )
 	public static float AngleSigned( Vector3 v1, Vector3 v2, Vector3 axis ) {
 		return Mathf.Atan2(
 			Vector3.Dot(axis, Vector3.Cross(v1, v2)),
@@ -18,16 +19,20 @@ public class MFmath {
 
 public class UtilityMF {
 
+	public static Stopwatch stopwatch = new Stopwatch();
+
 	// searches starting location object, then recursively up the tree for a matching component name
-	public static Transform RecursiveParentComponentSearch ( string name, Transform location ) {
+	public static T GetComponentInParent<T> ( Transform location ) where T : Object {
+		Object type = null;
 		while ( location != null ) {
-			if ( location.GetComponent(name) ) {
-				return location;
+			type = location.GetComponent<T>();
+			if ( type != null ) {
+				return type as T;
 			} else {
-				location = location.parent;
+				location = location.parent; // will become null if at top of hierarachy
 			}
 		}
-		return null;
+		return default(T);
 	}
 
 	// searches starting location object, then recursively up the tree for a matching target. Mainly used to see if a location is within the hierarchy of target.
@@ -79,7 +84,6 @@ public class UtilityMF {
 
 		}
 		if ( foundCollider ) { // found a collider
-//			size = Mathf.Max( bounds.size.x, bounds.size.y, bounds.size.z );
 			size = ( bounds.size.x + bounds.size.y + bounds.size.z ) * .33f; // average bound size
 		}
 		return size;
@@ -105,3 +109,11 @@ public class UtilityMF {
 		return bArray;
 	}
 }
+
+
+
+
+
+
+
+

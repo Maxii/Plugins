@@ -36,6 +36,9 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
+    <Reference Include="UnityEditor">
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEditor.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
@@ -84,13 +87,18 @@
     <Compile Include="MeshCombine\MeshCombineUtility.cs" />
     <Compile Include="Player\F3DPlayerController_Legacy.cs" />
     <Compile Include="Player\F3DPlayerTurretController.cs" />
+    <Compile Include="PoolManager\Editor\F3DPoolManagerEditor.cs" />
     <Compile Include="PoolManager\F3DPool.cs" />
     <Compile Include="PoolManager\F3DPoolContainer.cs" />
     <Compile Include="PoolManager\F3DPoolManager.cs" />
     <Compile Include="PoolManager\F3DPoolManagerDB.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Turrets\Constructor\Editor\F3DTurretConstructorEditor.cs" />
+    <Compile Include="Turrets\Constructor\Editor\F3DTurretEditorWindow.cs" />
     <Compile Include="Turrets\Constructor\F3DTurretConstructor.cs" />
     <Compile Include="Turrets\Constructor\F3DTurretScriptable.cs" />
+    <Compile Include="Turrets\Editor\F3DTurretEditor.cs" />
+    <Compile Include="Turrets\Editor\F3DTurretHandles.cs" />
     <Compile Include="Turrets\F3DTurret.cs" />
   </ItemGroup>
   <ItemGroup />

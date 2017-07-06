@@ -32,7 +32,8 @@ namespace Pathfinding {
 	 */
 	[JsonOptIn]
 	public class PointGraph : NavGraph
-		, IUpdatableGraph {
+		, IUpdatableGraph
+	{
 		/** Childs of this transform are treated as nodes */
 		[JsonMember]
 		public Transform root;
@@ -281,21 +282,21 @@ namespace Pathfinding {
 					}
 				}
 			} else {
-				for (int i = 0; i < nodeCount; i++) {
-					PointNode node = nodes[i];
-					float dist = (position-(Vector3)node.position).sqrMagnitude;
+			for (int i = 0; i < nodeCount; i++) {
+				PointNode node = nodes[i];
+				float dist = (position-(Vector3)node.position).sqrMagnitude;
 
-					if (dist < minDist) {
-						minDist = dist;
-						minNode = node;
-					}
+				if (dist < minDist) {
+					minDist = dist;
+					minNode = node;
+				}
 
-					if (constraint == null || (dist < minConstDist && dist < maxDistSqr && constraint.Suitable(node))) {
-						minConstDist = dist;
-						minConstNode = node;
-					}
+				if (constraint == null || (dist < minConstDist && dist < maxDistSqr && constraint.Suitable(node))) {
+					minConstDist = dist;
+					minConstNode = node;
 				}
 			}
+		}
 
 			var nnInfo = new NNInfo(minNode);
 
@@ -561,20 +562,20 @@ namespace Pathfinding {
 							}
 						}
 					} else {
-						// Only brute force is available in the free version
-						for (int j = 0; j < nodes.Length; j++) {
-							if (i == j) continue;
+					// Only brute force is available in the free version
+					for (int j = 0; j < nodes.Length; j++) {
+						if (i == j) continue;
 
-							PointNode other = nodes[j];
+						PointNode other = nodes[j];
 
-							float dist;
-							if (IsValidConnection(node, other, out dist)) {
-								connections.Add(other);
-								/** \todo Is this equal to .costMagnitude */
-								costs.Add((uint)Mathf.RoundToInt(dist*Int3.FloatPrecision));
-							}
+						float dist;
+						if (IsValidConnection(node, other, out dist)) {
+							connections.Add(other);
+							/** \todo Is this equal to .costMagnitude */
+							costs.Add((uint)Mathf.RoundToInt(dist*Int3.FloatPrecision));
 						}
 					}
+				}
 					node.connections = connections.ToArray();
 					node.connectionCosts = costs.ToArray();
 				}

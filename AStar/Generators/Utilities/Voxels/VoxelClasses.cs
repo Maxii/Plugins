@@ -8,6 +8,7 @@ using Pathfinding.Voxels;
 #endif
 
 namespace Pathfinding.Voxels {
+
 	/** \astarpro */
 	public class VoxelArea {
 		public const uint MaxHeight = 65536;

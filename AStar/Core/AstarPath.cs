@@ -29,7 +29,7 @@ public class AstarPath : MonoBehaviour {
 	 */
 	public static System.Version Version {
 		get {
-			return new System.Version(3, 8, 8, 1);
+			return new System.Version(3, 8, 10);
 		}
 	}
 
@@ -720,6 +720,17 @@ public class AstarPath : MonoBehaviour {
 
 		//If updating graphs, graph info might be corrupt right now
 		if (pathQueue != null && pathQueue.AllReceiversBlocked && workItems.Count > 0) return;
+
+		// In Unity one can select objects in the scene view by simply clicking on them with the mouse.
+		// Graph gizmos interfere with this however. If we would draw a mesh here the user would
+		// not be able to select whatever was behind it because the gizmos would block them.
+		// (presumably Unity cannot associate the gizmos with the AstarPath component because we are using
+		// Graphics.DrawMeshNow to draw most gizmos). It turns out that when scene picking happens
+		// then Event.current.type will be 'mouseUp'. We will therefore ignore all events which are
+		// not repaint events to make sure that the gizmos do not interfere with any kind of scene picking.
+		// This will not have any visual impact as only repaint events will result in any changes on the screen.
+		// From testing it seems the only events that can happen during OnDrawGizmos are the mouseUp and repaint events.
+		if (Event.current.type != EventType.Repaint) return;
 
 		if (showNavGraphs && !manualDebugFloorRoof) {
 			debugFloor = float.PositiveInfinity;

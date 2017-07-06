@@ -1,7 +1,7 @@
-//----------------------------------------------
+//-------------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2016 Tasharen Entertainment
-//----------------------------------------------
+// Copyright © 2011-2017 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using UnityEngine;
 using System.Collections.Generic;
@@ -546,9 +546,16 @@ public class UICamera : MonoBehaviour
 		{
 			if (mCurrentKey == KeyCode.None) return ControlScheme.Touch;
 			if (mCurrentKey >= KeyCode.JoystickButton0) return ControlScheme.Controller;
-			if (current != null && mLastScheme == ControlScheme.Controller &&
-				(mCurrentKey == current.submitKey0 || mCurrentKey == current.submitKey1))
+			
+			if (current != null)
+			{
+				if (mLastScheme == ControlScheme.Controller && (mCurrentKey == current.submitKey0 || mCurrentKey == current.submitKey1))
+					return ControlScheme.Controller;
+
+				if (current.useMouse) return ControlScheme.Mouse;
+				if (current.useTouch) return ControlScheme.Touch;
 				return ControlScheme.Controller;
+			}
 			return ControlScheme.Mouse;
 		}
 		set
@@ -785,6 +792,27 @@ public class UICamera : MonoBehaviour
 
 	static public GameObject tooltipObject { get { return mTooltip; } }
 
+#if !W2
+	/// <summary>
+	/// Whether this object is a part of the UI or not.
+	/// </summary>
+
+	static public bool IsPartOfUI (GameObject go)
+	{
+		if (go == null || go == fallThrough) return false;
+		return NGUITools.FindInParents<UIRoot>(go) != null;
+	}
+#else
+	// This is a simplified path I use in the Sightseer project. You are welcome to do the same if your UI is only on one layer.
+	static public bool IsPartOfUI (GameObject go)
+	{
+		if (go == null || go == fallThrough) return false;
+		if (mUILayer == -1) mUILayer = LayerMask.NameToLayer("UI");
+		return go.layer == mUILayer;
+	}
+	static int mUILayer = -1;
+#endif
+
 	/// <summary>
 	/// Whether the last raycast was over the UI.
 	/// </summary>
@@ -793,23 +821,43 @@ public class UICamera : MonoBehaviour
 	{
 		get
 		{
-			if (currentTouch != null) return currentTouch.isOverUI;
+			var frame = Time.frameCount;
 
-			for (int i = 0, imax = activeTouches.Count; i < imax; ++i)
+			if (mLastOverCheck != frame)
 			{
-				MouseOrTouch touch = activeTouches[i];
-				if (touch.pressed != null && touch.pressed != fallThrough && NGUITools.FindInParents<UIRoot>(touch.pressed) != null) return true;
+				mLastOverCheck = frame;
+
+				if (currentTouch != null)
+				{
+					mLastOverResult = currentTouch.isOverUI;
+					return mLastOverResult;
+				}
+
+				for (int i = 0, imax = activeTouches.Count; i < imax; ++i)
+				{
+					var touch = activeTouches[i];
+
+					if (IsPartOfUI(touch.pressed))
+					{
+						mLastOverResult = true;
+						return mLastOverResult;
+					}
+				}
+
+				for (int i = 0; i < 3; ++i)
+				{
+					var m = mMouse[i];
+
+					if (IsPartOfUI(m.current))
+					{
+						mLastOverResult = true;
+						return mLastOverResult;
+					}
+				}
+
+				mLastOverResult = IsPartOfUI(controller.pressed);
 			}
-
-			for (int i = 0; i < 3; ++i)
-			{
-				var m = mMouse[i];
-				if (m.current != null && m.current != fallThrough && NGUITools.FindInParents<UIRoot>(m.current) != null) return true;
-			}
-
-			if (controller.pressed != null && controller.pressed != fallThrough && NGUITools.FindInParents<UIRoot>(controller.pressed) != null) return true;
-
-			return false;
+			return mLastOverResult;
 		}
 	}
 
@@ -821,27 +869,106 @@ public class UICamera : MonoBehaviour
 	{
 		get
 		{
-			if (inputHasFocus) return true;
-			if (currentTouch != null) return currentTouch.isOverUI;
+			var frame = Time.frameCount;
 
-			for (int i = 0, imax = activeTouches.Count; i < imax; ++i)
+			if (mLastFocusCheck != frame)
 			{
-				MouseOrTouch touch = activeTouches[i];
-				if (touch.pressed != null && touch.pressed != fallThrough && NGUITools.FindInParents<UIRoot>(touch.pressed) != null) return true;
+				mLastFocusCheck = frame;
+
+				if (inputHasFocus)
+				{
+					mLastFocusResult = true;
+					return mLastFocusResult;
+				}
+
+				if (currentTouch != null)
+				{
+					mLastFocusResult = currentTouch.isOverUI;
+					return mLastFocusResult;
+				}
+
+				for (int i = 0, imax = activeTouches.Count; i < imax; ++i)
+				{
+					var touch = activeTouches[i];
+
+					if (IsPartOfUI(touch.pressed))
+					{
+						mLastFocusResult = true;
+						return mLastFocusResult;
+					}
+				}
+
+				for (int i = 0; i < 3; ++i)
+				{
+					var m = mMouse[i];
+
+					if (IsPartOfUI(m.pressed) || IsPartOfUI(m.current))
+					{
+						mLastFocusResult = true;
+						return mLastFocusResult;
+					}
+				}
+
+				mLastFocusResult = IsPartOfUI(controller.pressed);
 			}
-
-			for (int i = 0; i < 3; ++i)
-			{
-				var m = mMouse[i];
-				if (m.pressed != null && m.pressed != fallThrough && NGUITools.FindInParents<UIRoot>(m.pressed) != null) return true;
-				if (m.current != null && m.current != fallThrough && NGUITools.FindInParents<UIRoot>(m.current) != null) return true;
-			}
-
-			if (controller.pressed != null && controller.pressed != fallThrough && NGUITools.FindInParents<UIRoot>(controller.pressed) != null) return true;
-
-			return false;
+			return mLastFocusResult;
 		}
 	}
+
+	/// <summary>
+	/// Whether there is a active current focus on the UI -- either input, or an active touch.
+	/// </summary>
+
+	static public bool interactingWithUI
+	{
+		get
+		{
+			var frame = Time.frameCount;
+
+			if (mLastInteractionCheck != frame)
+			{
+				mLastInteractionCheck = frame;
+
+				if (inputHasFocus)
+				{
+					mLastInteractionResult = true;
+					return mLastInteractionResult;
+				}
+
+				for (int i = 0, imax = activeTouches.Count; i < imax; ++i)
+				{
+					MouseOrTouch touch = activeTouches[i];
+
+					if (IsPartOfUI(touch.pressed))
+					{
+						mLastInteractionResult = true;
+						return mLastInteractionResult;
+					}
+				}
+
+				for (int i = 0; i < 3; ++i)
+				{
+					var m = mMouse[i];
+
+					if (IsPartOfUI(m.pressed))
+					{
+						mLastInteractionResult = true;
+						return mLastInteractionResult;
+					}
+				}
+
+				mLastInteractionResult = IsPartOfUI(controller.pressed);
+			}
+			return mLastInteractionResult;
+		}
+	}
+
+	static int mLastInteractionCheck = -1;
+	static bool mLastInteractionResult = false;
+	static int mLastFocusCheck = -1;
+	static bool mLastFocusResult = false;
+	static int mLastOverCheck = -1;
+	static bool mLastOverResult = false;
 
 	static GameObject mRayHitObject;
 	static GameObject mHover;
@@ -857,7 +984,7 @@ public class UICamera : MonoBehaviour
 	{
 		get
 		{
-			if (currentTouch != null && currentTouch.dragStarted) return currentTouch.current;
+			if (currentTouch != null && (currentScheme != ControlScheme.Mouse || currentTouch.dragStarted)) return currentTouch.current;
 			if (mHover && mHover.activeInHierarchy) return mHover;
 			mHover = null;
 			return null;
@@ -2000,7 +2127,7 @@ public class UICamera : MonoBehaviour
 		}
 
 		// We're currently using touches -- do nothing
-		if (currentScheme == ControlScheme.Touch) return;
+		if (currentScheme == ControlScheme.Touch && activeTouches.Count > 0) return;
 
 		currentTouch = mMouse[0];
 

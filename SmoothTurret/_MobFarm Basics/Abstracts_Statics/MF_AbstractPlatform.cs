@@ -1,8 +1,9 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+[HelpURL("http://mobfarmgames.weebly.com/mf_abstractplatform.html")]
 public abstract class MF_AbstractPlatform : MonoBehaviour {
-
+	
 	[Tooltip("Current target - this is usually provided by another script.")]
 	[SerializeField] protected Transform _target;
 	public Transform target {
@@ -15,23 +16,24 @@ public abstract class MF_AbstractPlatform : MonoBehaviour {
 	}
 	[Tooltip("Parent object for weapons.")]
 	public Transform weaponMount;
-	[Tooltip("Toggle whether to show Aim Object.")]
+	[Split1(true, 45, "Toggle whether to show Aim Object.")]
 	public bool aimObjectActive;
-	[Tooltip("Object that shows where the platform is pointed.")]
+	[Split2(40, "Object that shows where the platform is pointed.")]
 	public GameObject aimObject;
-	[Tooltip("Targeting range to use if clicking on empty space.")]
+	[Split1(true, 45, "Targeting range to use if clicking on empty space.")]
 	public float emptyAimRange = 50;
-	[Tooltip("Aim Object always appears Empty Aim Range. (Better performance)")]
+	[Split2(true, 45, "Aim Object always appears Empty Aim Range. (Better performance)")]
 	public bool fixedAimObjectRange;
 	[Header("Aiming Options:")]
-	[Tooltip("If true, will impart unit’s velocity to fired shots and be used in other calculations. Uncheck if the unit is stationary.")]
+	[Split1(true, 45, "If true, will impart unit’s velocity to fired shots and be used in other calculations. Uncheck if the unit is stationary.")]
 	public bool useRootVelocity = true;
-	[Tooltip("Assign a specific transform to be used for velocity.\n" +
-		"If blank, will assume the root object.")]
+	[Split2(40, "Assign a specific transform to be used for velocity.\n" +
+	         "If blank, will assume the root object.")]
 	public Transform velocityRoot;
 	[Tooltip("Platform will calculate aim to hit a moving target.")]
 	public bool useIntercept = true;
 
+	[HideInInspector] public bool checkData; // used to prevent aiming intercept if mission angle, range, or velocity data
 	[HideInInspector] public float? shotSpeed = null; // for ballistics / intrcept, nullable to indicate no projectile
 	[HideInInspector] public Vector3 exitLoc; // will be set by a control script when needed. used for ballistics / intrcept
 	[HideInInspector] public Vector3 targetAimLocation;
@@ -40,22 +42,23 @@ public abstract class MF_AbstractPlatform : MonoBehaviour {
 	[HideInInspector] public Rigidbody targetRigidbody;
 	[HideInInspector] public Vector3 velocity;
 	[HideInInspector] public bool playerControl;
-
+	[HideInInspector] public float turnSpeed; // used by FS_Targeting to evaluate time to aim
+	
 	Rigidbody myRigidbody;
 	Vector3 lastPlatformPosition;
 	MF_AbstractMobility mobilityScript;
 	protected bool error;
-
-	public virtual void Start () {
+	
+	public virtual void Awake () {
 		if ( CheckErrors() == true ) { return; }
-
+		
 		if ( !velocityRoot ) {
 			velocityRoot = transform.root;
 		}
 		mobilityScript = velocityRoot.GetComponent<MF_AbstractMobility>();
 		myRigidbody = velocityRoot.GetComponent<Rigidbody>();
 		exitLoc = transform.position;
-
+		
 		if ( aimObject ) { // aimObject is defined
 			if ( !aimObject.activeInHierarchy ) { // not active in hierarchy - aimObject is a prefab
 				// create aimObject from prefab
@@ -67,9 +70,13 @@ public abstract class MF_AbstractPlatform : MonoBehaviour {
 		}
 	}
 
+	public virtual void OnDisable () { // reset for object pool support
+		target = null;
+	}
+	
 	public virtual void Update () {
 		if ( error == true ) { return; }	
-
+		
 		// unit velocity - will also be read by control script and used in MF_AbstractWeapon
 		if ( useRootVelocity == true ) {
 			if ( mobilityScript ) {
@@ -78,20 +85,20 @@ public abstract class MF_AbstractPlatform : MonoBehaviour {
 				velocity = UnitVelocity();
 			}
 		}
-
+		
 		// used in various calculations
 		// **** Maybe find a way to remove this if using settings that don't require it 
 		if ( _target ) {
 			targetRange = Vector3.Distance( exitLoc, _target.position );
 		}
-
+		
 		targetAimLocation = AimLocation();
-
+		
 		if ( aimObject ) {
 			if ( aimObject.activeInHierarchy != aimObjectActive ) {
 				aimObject.SetActive( aimObjectActive );
 			}
-
+			
 			if ( aimObjectActive == true ) {
 				if ( fixedAimObjectRange == false ) { // move aimObject based on raycast
 					Ray _ray = new Ray( weaponMount.position, weaponMount.forward );
@@ -109,14 +116,14 @@ public abstract class MF_AbstractPlatform : MonoBehaviour {
 			}
 		}
 	}
-
+	
 	public virtual Vector3 AimLocation () {
 		// adjust aim location to hit target 
 		Vector3 _aimLoc = Vector3.zero;
 		if ( _target ) {
 			_aimLoc = _target.position;
-
-			if ( useIntercept == true && shotSpeed != null ) { 
+			
+			if ( useIntercept == true && checkData == true && shotSpeed != null ) { 
 				Vector3 _targetVelocity = Vector3.zero;
 				// target velocity
 				if ( targetRigidbody ) { // if target has a rigidbody, use velocity
@@ -137,28 +144,28 @@ public abstract class MF_AbstractPlatform : MonoBehaviour {
 		}
 		return _aimLoc;
 	}
-
+	
 	// check if the platform is aimed at the target
 	public virtual bool AimCheck ( float targetSize, float aimTolerance ) {
 		if (error == true) { return false; }
-
+		
 		bool _ready = false;
 		if ( _target ) {
 			if ( targetRange == 0 ) { // assume target range hasn't been evaluated yet. This can happen due to timing of other scripts upon gaining an intital target
 				targetRange = Vector3.Distance( weaponMount.position, _target.position );
 			}
-			float _targetFovRadius = Mathf.Clamp(   (Mathf.Atan( (targetSize / 2f) / targetRange ) * Mathf.Rad2Deg) + aimTolerance,    0, 180 );
+			float _targetFovRadius = Mathf.Clamp(   (Mathf.Atan( (targetSize * .5f) / targetRange ) * Mathf.Rad2Deg) + aimTolerance,    0f, 180f );
 			if ( Vector3.Angle( weaponMount.forward, targetAimLocation - weaponMount.position ) <= _targetFovRadius ) {
 				_ready = true;
 			}
 		}
 		return _ready;
 	}
-
+	
 	public virtual bool TargetWithinLimits ( Transform targ ) {
 		return true;
 	}
-
+	
 	// used if velocity information is needed, and not using MF_AbstractMobility
 	Vector3 UnitVelocity () {
 		Vector3 _vel;
@@ -170,10 +177,10 @@ public abstract class MF_AbstractPlatform : MonoBehaviour {
 		}
 		return _vel;
 	}
-
+	
 	bool CheckErrors () {
 		error = false;
-
+		
 		if ( weaponMount == false ) { Debug.Log( this+": Weapon mount part hasn't been defined." ); error = true; }
 		
 		return error;

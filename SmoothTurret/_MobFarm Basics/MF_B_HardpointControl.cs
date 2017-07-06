@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+[HelpURL("http://mobfarmgames.weebly.com/mf_b_hardpointcontrol.html")]
 public class MF_B_HardpointControl : MF_AbstractPlatformControl {
 
 	public enum ControlType { AI_AutoTarget, None }
@@ -24,14 +25,12 @@ public class MF_B_HardpointControl : MF_AbstractPlatformControl {
 	public bool checkTargetSize;
 	[Tooltip("(meters)\nDefault target size to fire at if none found or provided.")]
 	public float targetSizeDefault;
-	
-	MF_AbstractPlatform platformScript;
+
 	float targetSize;
 	float lastLosCheck;
 	bool losClear;
 	float lastFire;
 	bool? bursting = null;
-	int burstEnd;
 	bool loaded;
 	
 	// the current target
@@ -60,14 +59,22 @@ public class MF_B_HardpointControl : MF_AbstractPlatformControl {
 		}
 	}
 	
-	public override void Start () {
-		base.Start(); // will CheckErrors() from base
+	public override void Awake () {
+		base.Awake(); // will CheckErrors() from base
 		if ( error == true )  { return; }
 		
-		platformScript = GetComponent<MF_AbstractPlatform>();
+//		platformScript = GetComponent<MF_AbstractPlatform>();
 		
 		loaded = true;
 		OnValidate();
+	}
+
+	public override void OnEnable () { // reset for object pool support
+		base.OnEnable();
+		target = null;
+		lastLosCheck = 0;
+		lastFire = 0f;
+		bursting = null;
 	}
 	
 	void Update () {
@@ -83,8 +90,8 @@ public class MF_B_HardpointControl : MF_AbstractPlatformControl {
 		if ( fullBurst == true ) {
 			DoFullBurst();
 		}
-		
-		// check aim and fire
+
+		// check aim and data, then fire
 		if ( _target ) {
 			DoAimFire();
 		}
@@ -103,7 +110,7 @@ public class MF_B_HardpointControl : MF_AbstractPlatformControl {
 			}
 			break;
 			
-		case ControlType.None : // AI will aim if given a target, but targets must be supplied some other way
+		case ControlType.None : // Turret is deactivated
 			target = null;
 			break;
 			
@@ -111,7 +118,7 @@ public class MF_B_HardpointControl : MF_AbstractPlatformControl {
 			break;
 		}
 	}
-	
+
 	void DoAimFire() {
 		if ( weapons.Length > 0 ) {
 			// if weapon is not active, find one that is active
@@ -119,28 +126,36 @@ public class MF_B_HardpointControl : MF_AbstractPlatformControl {
 			while ( weapons[curWeapon].script.active == false && l++ <= weapons.Length ) {
 				curWeapon = MFmath.Mod(curWeapon+1, weapons.Length);
 			}
-			
-			// set shot speed for turret aim intercept
-			platformScript.shotSpeed = weapons[curWeapon].script.shotSpeed;
-			platformScript.exitLoc = weapons[curWeapon].script.exits[ weapons[curWeapon].script.curExit ].transform.position;
-			
 			if ( l >= weapons.Length ) {
 				return; // no weapons active
 			}
+			// set shot speed for hardpoint aim intercept
+			platformScript.shotSpeed = weapons[curWeapon].script.shotSpeed;
+			platformScript.exitLoc = weapons[curWeapon].script.exits[ weapons[curWeapon].script.curExit ].transform.position;
 		}
+
+		// check target data vs weapon requirements, set platform checkData
+		if ( CheckData() == false ) { return; }
 		
 		// make sure all weapons fire if a burst has already begun
 		if ( bursting == true ) {
 			Shoot();
 			return;
 		}
+
+		float combAimTime = Mathf.Max( aimTime,  weapons[curWeapon].script.aimTime );
 		
 		if ( controller == ControlType.AI_AutoTarget ) { // AI will shoot
 			if ( weapons.Length > 0 ) {
 				if ( platformScript.AimCheck( targetSize, weapons[curWeapon].script.aimTolerance ) == true ) { // check if turret is aimed at target
-					if ( weapons[curWeapon].script.ReadyCheck() == true ) { // early out if weapon isn't ready
-						Shoot();
+					curAimTime = Mathf.Clamp( curAimTime + Time.deltaTime,		 0f, combAimTime ); // add to aimTime
+					if ( curAimTime >= combAimTime ) {
+						if ( weapons[curWeapon].script.ReadyCheck() == true ) { // early out if weapon isn't ready
+							Shoot();
+						}	
 					}
+				} else {
+					curAimTime = Mathf.Clamp( curAimTime - Time.deltaTime, 0f, combAimTime ); // subtract from aimTime
 				}
 			}
 		}
@@ -169,16 +184,14 @@ public class MF_B_HardpointControl : MF_AbstractPlatformControl {
 		}
 	}
 	
-	void Shoot() {
+	void Shoot () {
 		// check line of sight
-		if ( checkLOS == false ) { // always clear when not using LOS
-			losClear = true;
-		} else {
+		losClear = true;
+		if ( checkLOS == true ) {
 			if (Time.time >= lastLosCheck + losCheckInterval) {
 				RaycastHit _hit;
-				losClear = false;
 				Vector3 _startPos = weapons[curWeapon].script.exits[ weapons[curWeapon].script.curExit ].transform.position;
-				if (Physics.Raycast(_startPos, _target.position - _startPos, out _hit, weapons[curWeapon].script.maxRange)) {
+				if ( Physics.Linecast(_startPos, _target.position, out _hit) ) { 
 					// recursively search parent of hit collider for target
 					losClear = UtilityMF.RecursiveParentTransformSearch( _target, _hit.transform );
 				}
@@ -189,6 +202,14 @@ public class MF_B_HardpointControl : MF_AbstractPlatformControl {
 		// fire weapons
 		if (losClear == true) {
 			if ( weapons[curWeapon].script.RangeCheck( _target ) == true ) {
+
+				// if targeting script can mark targets, mark when firing
+				if ( targetingScript.isMarkingTarg == true ) {
+					if ( weapons.Length > 0 ) {
+						targetingScript.SetMarkedTime( weapons[ curWeapon ].script.GetTimeOfFlight( _target ) );
+					}
+				}
+
 				if ( alternatingFire == true && weapons.Length > 1 ) { // alternate fire bewteen weapons
 					weapons[curWeapon].script.platformVelocity = platformScript.velocity; // send velocity to weapon script
 
@@ -218,15 +239,14 @@ public class MF_B_HardpointControl : MF_AbstractPlatformControl {
 				} else { // fire all weapons at once
 					for (int sw=0; sw < weapons.Length; sw++) {
 						weapons[sw].script.platformVelocity = platformScript.velocity; // send velocity to weapon script
-
 						if ( fullBurst == true && bursting != null ) { 
 							bursting = true;
 							if ( weapons[sw].burst == false ) {
 								weapons[sw].burst = true;
-								weapons[sw].script.ShootBurst(); 
+								weapons[sw].script.ShootBurst( _target ); 
 							}
 						} else { 
-							weapons[sw].script.Shoot(); 
+							weapons[sw].script.Shoot( _target ); 
 						}
 					}
 				}
@@ -237,7 +257,7 @@ public class MF_B_HardpointControl : MF_AbstractPlatformControl {
 	public override bool CheckErrors () {
 		base.CheckErrors();
 		
-		if ( !GetComponent<MF_AbstractPlatform>() ) { Debug.Log( this+": No platform script found." ); error = true; }
+//		if ( !GetComponent<MF_AbstractPlatform>() ) { Debug.Log( this+": No platform script found." ); error = true; }
 		
 		return error;
 	}

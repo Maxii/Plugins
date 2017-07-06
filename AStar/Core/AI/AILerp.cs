@@ -21,7 +21,7 @@ using Pathfinding;
  * \ingroup movementscripts
  */
 [RequireComponent(typeof(Seeker))]
-[AddComponentMenu("Pathfinding/AI/AISimpleLerp (2D,3D generic)")]
+[AddComponentMenu("Pathfinding/AI/AILerp (2D,3D generic)")]
 [HelpURL("http://arongranberg.com/astar/docs/class_a_i_lerp.php")]
 public class AILerp : MonoBehaviour {
 	/** Determines how often it will search for new paths.

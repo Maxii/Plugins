@@ -1,7 +1,7 @@
-//----------------------------------------------
+//-------------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2016 Tasharen Entertainment
-//----------------------------------------------
+// Copyright © 2011-2017 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using UnityEngine;
 using System.Collections;
@@ -170,8 +170,8 @@ public abstract class UITweener : MonoBehaviour
 
 	protected void DoUpdate ()
 	{
-		float delta = ignoreTimeScale && !useFixedUpdate ? RealTime.deltaTime : Time.deltaTime;
-		float time = ignoreTimeScale && !useFixedUpdate ? RealTime.time : Time.time;
+		float delta = ignoreTimeScale && !useFixedUpdate ? Time.unscaledDeltaTime : Time.deltaTime;
+		float time = ignoreTimeScale && !useFixedUpdate ? Time.unscaledTime : Time.time;
 
 		if (!mStarted)
 		{

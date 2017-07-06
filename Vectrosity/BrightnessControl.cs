@@ -1,9 +1,10 @@
-// Version 5.3
-// ©2016 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.4
+// ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using Vectrosity;
 
+namespace Vectrosity {
 [AddComponentMenu("Vectrosity/BrightnessControl")]
 public class BrightnessControl : MonoBehaviour {
 
@@ -51,4 +52,5 @@ public class BrightnessControl : MonoBehaviour {
 			VectorLine.Destroy (ref m_vectorLine);
 		}
 	}
+}
 }

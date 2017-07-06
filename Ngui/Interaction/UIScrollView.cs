@@ -1,7 +1,7 @@
-//----------------------------------------------
+//-------------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2016 Tasharen Entertainment
-//----------------------------------------------
+// Copyright © 2011-2017 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using UnityEngine;
 
@@ -779,6 +779,7 @@ public class UIScrollView : MonoBehaviour
 			}
 			else if (centerOnChild)
 			{
+				if (mDragStarted && onDragFinished != null) onDragFinished();
 				centerOnChild.Recenter();
 			}
 			else

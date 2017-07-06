@@ -1,6 +1,8 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
+[HelpURL("http://mobfarmgames.weebly.com/mf_abstractselection.html")]
 public abstract class MF_AbstractSelection : MonoBehaviour {
 	// abstract so as to accomodate multiple selection type scripts
 	// other scripts need to reference some of these variables, and therefore they need a common reference point.
@@ -17,7 +19,7 @@ public abstract class MF_AbstractSelection : MonoBehaviour {
 	public bool NoTargetingScript;
 	[Tooltip("Disables automatic navigation script search. Use in case auto search would find a script you don't want.")]
 	public bool NoNavigationScript;
-	[Tooltip("The base object returned from a click. Also should be the location of MF_AbstractStatus, if any.\n" +
+	[Tooltip("The base object returned from a click. Also should be the location of MF_AbstractClassify, if any.\n" +
 			"This allows the clicky collider to be anywhere in the object and still return the correct base object.\n" +
 	         "If blank: assumes the same object.")] // no way to auto search - no standard criteria to look for
 	public GameObject clickObjectBase;
@@ -33,30 +35,26 @@ public abstract class MF_AbstractSelection : MonoBehaviour {
 	[Header("Target Options:")]
 	[Tooltip("When another object is selected, this object may be clicked to become a target. Does not affect other targeting methods.")]
 	public bool clickTargetable = true;
-	[Header("Brackets (Leave blank to use defaults)")]
+	[Space(8f)]
 	[Tooltip("Selection Manager should be the same prefab for all clickable objects in the scene. It will be automatically added to the scene at runtime and all clickable objects will reference it.")]
-	public GameObject selectionManager;
-	[Tooltip("May specify custom bracket size. If 0: will try to determine size from collider bounds. If no collider found, will use the first collider found on immediate children.")]
-	[SerializeField] public float bracketSize;
+	public MF_AbstractSelectionManager selectionManager;
+	[Header("Marks (Leave blank to use defaults)")]
+	public bool showSelected = true;
+	public bool showNavigation = true;
+	public bool showTargeting = true;
+	[Split1("(Diameter in meters)\nMay specify custom mark size. If 0: will try to determine size from collider bounds. If no collider found, will use the first collider found on immediate children.")]
+	[SerializeField] public float markSize;
+
+	public Dictionary<int, MF_AbstractSelection> detectingMeList = new Dictionary<int, MF_AbstractSelection>();
 	
-	[HideInInspector] public MF_SelectionManager selectionManagerScript;
+	[HideInInspector] public MF_AbstractTargeting[] otherTargScripts;
 	[HideInInspector] public int myId;
+	
+	[HideInInspector] public MF_AbstractClassify cScript; 
 
 	protected bool error;
 
-	void Awake () {
-		if (CheckErrors() == true) { return; }
-		// create the SelectionManager if not already instantiated, then make that the reference for all selection scripts
-		GameObject _sm = GameObject.Find( selectionManager.name+"(Clone)" );
-		if ( _sm ) { // found the SelectionManager
-			selectionManager = _sm;
-		} else { // create the SelectionManager
-			selectionManager = (GameObject)Instantiate( selectionManager, Vector3.zero, Quaternion.identity );
-		}
-		selectionManagerScript = selectionManager.GetComponent<MF_SelectionManager>();
-	}
-
-	public virtual void Start () {
+	public virtual void Awake () {
 		if (error) { return; }
 
 		// cache instanceID
@@ -64,56 +62,122 @@ public abstract class MF_AbstractSelection : MonoBehaviour {
 			clickObjectBase = gameObject;
 		}
 		myId = clickObjectBase.GetInstanceID();
+		cScript = transform.root.GetComponent<MF_AbstractClassify>();
+
 	}
 
-	public virtual void OnMouseOver () { }
+	public virtual void OnDisable () { // reset for object pool support
+		if ( selectionManager && selectionManager.sScript == this ) { selectionManager.sScript = null; } // clear selection
+	}
+
+	public virtual void LeftClick() {
+		if ( selectionManager.sScript == this ) {
+			// clear selection
+			selectionManager.sScript = null;
+		} else {
+			if ( selectable == true ) {
+				selectionManager.sScript = this;
+			}
+		}
+	}
+
+	public void OnMouseOver () {
+		if ( error ) { return; }
+		
+		if ( Input.anyKeyDown ) {
+			// cache references
+			if ( Input.GetKey(KeyCode.Mouse0) ) { // left click
+				if ( Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.LeftControl) ) { // holding shift or control
+					ShiftClick();
+				} else { // not holding shift or control
+					LeftClick();
+				}
+			}
+			if ( Input.GetKey(KeyCode.Mouse1) ) {
+				if ( Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ) { // holding shift
+					// nothing
+				} else { // not holding shift
+					ShiftClick();
+				}
+			}
+		}
+	}
+
+	void ShiftClick () {
+		bool _priority = false;
+		if ( Input.GetKey(KeyCode.Mouse1) || Input.GetKey(KeyCode.LeftControl) ) {
+			_priority = true;
+		}
+		if ( selectionManager.sScript && selectionManager.sScript.allowClickTargeting == true ) {
+			if ( selectionManager.sScript != this ) { // there's a selected object and it isn't this object
+				if ( selectionManager.sScript.targetListScript ) { // does selected have a target list?
+					MF_AbstractTargetList _tlScript = selectionManager.sScript.targetListScript; // cache target list script
+					// search for clicked target in selected objects target list
+					if ( _tlScript.ContainsKey( myId ) == true ) { // found clicked object in target list
+						if ( _priority == true ) {
+							// don't remove, make priority
+							_tlScript.SetClickedPriority( myId, true );
+						} else {
+							// click removes object from target list
+							_tlScript.ClickRemove( myId ); // marks for removal
+						}
+					} else if ( clickTargetable == true ) { // not found on target list
+						// click adds to target list
+						// new record
+						_tlScript.ClickAdd( myId, clickObjectBase.transform, clickObjectBase.GetComponent<MF_AbstractClassify>(), clickObjectBase.GetComponent<MF_AbstractStats>(),
+						                   _priority, selectionManager.sScript.clickTargetPersistance ); 
+						
+						// other data
+					}
+				}
+			}
+		}
+	}
 
 	// create brackets
-	public GameObject MakeBracket( GameObject prefab ) {
+	public GameObject MakeMark( GameObject prefab ) {
 		if ( prefab == null ) { return null; }
-		GameObject newBracket = (GameObject)Instantiate ( prefab, transform.position, transform.rotation );
-		newBracket.transform.SetParent(transform);
-		if ( bracketSize == 0 ) { // try to determine size from collider bounds
-			bracketSize = UtilityMF.FindColliderBoundsSize( clickObjectBase.transform, true ) * 3f;
-			if ( bracketSize == 0 ) { bracketSize = 1; } // if no collider found, set to 1
+		GameObject newMark = (GameObject)Instantiate ( prefab, transform.position, transform.rotation );
+		newMark.transform.SetParent(transform);
+		if ( markSize == 0 ) { // try to determine size from collider bounds
+			markSize = UtilityMF.FindColliderBoundsSize( clickObjectBase.transform, true ) * 3f;
+			if ( markSize == 0 ) { markSize = 1; } // if no collider found, set to 1
 		}
-		newBracket.GetComponent<ParticleSystem>().startSize = bracketSize;
-		newBracket.SetActive(false);
-		return newBracket;
+		ParticleSystem.MainModule ps = newMark.GetComponent<ParticleSystem>().main;
+		ps.startSize = markSize;
+		newMark.SetActive(false);
+		return newMark;
 	}
+
+	public virtual void Remove ( int key ) {
+		if ( detectingMeList.ContainsKey( key ) == true ) {
+			detectingMeList.Remove( key );
+			DoVisibility();
+		}
+	}
+	
+	public virtual void Add ( int key, MF_AbstractSelection script ) {
+		if ( detectingMeList.ContainsKey( key ) == false ) {
+			detectingMeList.Add( key, script );
+			DoVisibility();
+		}
+	}
+
+	protected virtual void DoVisibility () {}
 
 	public virtual bool CheckErrors () {
 		error = false;
 
-		Transform rps;
-
-		if ( selectionManager ) { 
-			if ( !selectionManager.GetComponent<MF_SelectionManager>() ) {
-				Debug.Log( this+": No MF_SelectionManager script found on defined selection manager."); error = true;
-			}
-		} else { 
-			Debug.Log( this+": No Selection Manager defined."); error = true;
-		}
-
 		if ( !targetListScript && NoTargetList == false ) {
-			rps = UtilityMF.RecursiveParentComponentSearch( "MF_AbstractTargetList", transform );
-			if ( rps != null ) {
-				targetListScript = rps.GetComponent<MF_AbstractTargetList>();
-			}
+			targetListScript = UtilityMF.GetComponentInParent<MF_AbstractTargetList>( transform );
 		}
 
 		if ( !targetingScript && NoTargetingScript == false ) {
-			rps = UtilityMF.RecursiveParentComponentSearch( "MF_AbstractTargeting", transform );
-			if ( rps != null ) {
-				targetingScript = rps.GetComponent<MF_AbstractTargeting>();
-			}
+			targetingScript = UtilityMF.GetComponentInParent<MF_AbstractTargeting>( transform );
 		}
 
 		if ( !navigationScript && NoNavigationScript == false ) {
-			rps = UtilityMF.RecursiveParentComponentSearch( "MF_AbstractNavigation", transform );
-			if ( rps != null ) {
-				navigationScript = rps.GetComponent<MF_AbstractNavigation>();
-			}
+			navigationScript = UtilityMF.GetComponentInParent<MF_AbstractNavigation>( transform );
 		}
 		
 		return error;

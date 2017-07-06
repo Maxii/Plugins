@@ -1,7 +1,7 @@
-//----------------------------------------------
+//-------------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2016 Tasharen Entertainment
-//----------------------------------------------
+// Copyright © 2011-2017 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 #if !UNITY_EDITOR && (UNITY_IPHONE || UNITY_ANDROID || UNITY_WP8 || UNITY_WP_8_1 || UNITY_BLACKBERRY || UNITY_WINRT || UNITY_METRO)
 #define MOBILE
@@ -1167,7 +1167,7 @@ public class UIInput : MonoBehaviour
 
 	protected string GetLeftText ()
 	{
-		int min = Mathf.Min(mSelectionStart, mSelectionEnd);
+		int min = Mathf.Min(mSelectionStart, mSelectionEnd, mValue.Length);
 		return (string.IsNullOrEmpty(mValue) || min < 0) ? "" : mValue.Substring(0, min);
 	}
 

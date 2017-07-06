@@ -5,7 +5,7 @@ using System.Collections;
 using System.Text;
 using Pathfinding;
 
-[AddComponentMenu("Pathfinding/Debugger")]
+[AddComponentMenu("Pathfinding/Pathfinding Debugger")]
 [ExecuteInEditMode]
 /** Debugger for the A* Pathfinding Project.
  * This class can be used to profile different parts of the pathfinding system
@@ -102,8 +102,10 @@ public class AstarDebugger : MonoBehaviour {
 
 		graph = new GraphPoint[graphBufferSize];
 
-		for (int i = 0; i < fpsDrops.Length; i++) {
-			fpsDrops[i] = 1F / Time.deltaTime;
+		if (Time.unscaledDeltaTime > 0) {
+			for (int i = 0; i < fpsDrops.Length; i++) {
+				fpsDrops[i] = 1F / Time.unscaledDeltaTime;
+			}
 		}
 	}
 
@@ -112,7 +114,6 @@ public class AstarDebugger : MonoBehaviour {
 
 	PathTypeDebug[] debugTypes = new PathTypeDebug[] {
 		new PathTypeDebug("ABPath", () => PathPool.GetSize(typeof(ABPath)), () => PathPool.GetTotalCreated(typeof(ABPath)))
-#if !AstarFree && FALSE
 		,
 		new PathTypeDebug("MultiTargetPath", () => PathPool.GetSize(typeof(MultiTargetPath)), () => PathPool.GetTotalCreated(typeof(MultiTargetPath))),
 		new PathTypeDebug("RandomPath", () => PathPool.GetSize(typeof(RandomPath)), () => PathPool.GetTotalCreated(typeof(RandomPath))),
@@ -120,7 +121,6 @@ public class AstarDebugger : MonoBehaviour {
 		new PathTypeDebug("ConstantPath", () => PathPool.GetSize(typeof(ConstantPath)), () => PathPool.GetTotalCreated(typeof(ConstantPath))),
 		new PathTypeDebug("FloodPath", () => PathPool.GetSize(typeof(FloodPath)), () => PathPool.GetTotalCreated(typeof(FloodPath))),
 		new PathTypeDebug("FloodPathTracer", () => PathPool.GetSize(typeof(FloodPathTracer)), () => PathPool.GetTotalCreated(typeof(FloodPathTracer)))
-#endif
 	};
 
 	struct PathTypeDebug {
@@ -142,8 +142,11 @@ public class AstarDebugger : MonoBehaviour {
 		}
 	}
 
-	public void Update () {
+	public void LateUpdate () {
 		if (!show || (!Application.isPlaying && !showInEditor)) return;
+
+		if (Time.unscaledDeltaTime <= 0.0001f)
+			return;
 
 		int collCount = System.GC.CollectionCount(0);
 
@@ -151,7 +154,7 @@ public class AstarDebugger : MonoBehaviour {
 			lastCollectNum = collCount;
 			delta = Time.realtimeSinceStartup-lastCollect;
 			lastCollect = Time.realtimeSinceStartup;
-			lastDeltaTime = Time.deltaTime;
+			lastDeltaTime = Time.unscaledDeltaTime;
 			collectAlloc = allocMem;
 		}
 
@@ -164,7 +167,7 @@ public class AstarDebugger : MonoBehaviour {
 			int diff = allocMem - lastAllocMemory;
 			lastAllocMemory = allocMem;
 			lastAllocSet = Time.realtimeSinceStartup;
-			delayedDeltaTime = Time.deltaTime;
+			delayedDeltaTime = Time.unscaledDeltaTime;
 
 			if (diff >= 0) {
 				allocRate = diff;
@@ -172,9 +175,9 @@ public class AstarDebugger : MonoBehaviour {
 		}
 
 		if (Application.isPlaying) {
-			fpsDrops[Time.frameCount % fpsDrops.Length] = Time.deltaTime != 0 ? 1F / Time.deltaTime : float.PositiveInfinity;
+			fpsDrops[Time.frameCount % fpsDrops.Length] = Time.unscaledDeltaTime > 0.00001f ? 1F / Time.unscaledDeltaTime : 0;
 			int graphIndex = Time.frameCount % graph.Length;
-			graph[graphIndex].fps = Time.deltaTime < Mathf.Epsilon ? 0 : 1F / Time.deltaTime;
+			graph[graphIndex].fps = Time.unscaledDeltaTime < 0.00001f ? 1F / Time.unscaledDeltaTime : 0;
 			graph[graphIndex].collectEvent = collectEvent;
 			graph[graphIndex].memory = allocMem;
 		}
@@ -198,40 +201,15 @@ public class AstarDebugger : MonoBehaviour {
 			for (int i = 0; i < graph.Length-1; i++) {
 				if (i == currentGraphIndex) continue;
 
-				//Debug.DrawLine (m.MultiplyPoint (new Vector3 (i/(float)graph.Length, Mathfx.MapTo (minMem, maxMem, graph[i].memory), -1)),
-				//	m.MultiplyPoint (new Vector3 ((i+1)/(float)graph.Length, Mathfx.MapTo (minMem, maxMem, graph[i+1].memory), -1)), Color.blue);
-
-				//Debug.DrawLine (m.MultiplyPoint (Vector3.zero), m.MultiplyPoint (-Vector3.one), Color.red);
-				//Debug.Log (Mathfx.MapTo (minMem, maxMem, graph[i].memory)  + " " + graph[i].memory);
 				DrawGraphLine(i, m, i/(float)graph.Length, (i+1)/(float)graph.Length, AstarMath.MapTo(minMem, maxMem, graph[i].memory), AstarMath.MapTo(minMem, maxMem, graph[i+1].memory), Color.blue);
-
 				DrawGraphLine(i, m, i/(float)graph.Length, (i+1)/(float)graph.Length, AstarMath.MapTo(minFPS, maxFPS, graph[i].fps), AstarMath.MapTo(minFPS, maxFPS, graph[i+1].fps), Color.green);
-
-				//Debug.DrawLine (m.MultiplyPoint (new Vector3 (i/(float)graph.Length, Mathfx.MapTo (minFPS, maxFPS, graph[i].fps), -1)),
-				//	m.MultiplyPoint (new Vector3 ((i+1)/(float)graph.Length, Mathfx.MapTo (minFPS, maxFPS, graph[i+1].fps), -1)), Color.green);
 			}
-
-
-
-			/*Cross (new Vector3(0,0,1));
-			 * Cross (new Vector3(1,1,1));
-			 * Cross (new Vector3(0,1,1));
-			 * Cross (new Vector3(1,0,1));
-			 * Cross (new Vector3(-1,0,1));
-			 * Debug.DrawLine (m.MultiplyPoint(Vector3.zero), m.MultiplyPoint(new Vector3(0,0,-5)),Color.blue);*/
 		}
 	}
 
-	public void DrawGraphLine (int index, Matrix4x4 m, float x1, float x2, float y1, float y2, Color col) {
+	void DrawGraphLine (int index, Matrix4x4 m, float x1, float x2, float y1, float y2, Color col) {
 		Debug.DrawLine(cam.ScreenToWorldPoint(m.MultiplyPoint3x4(new Vector3(x1, y1))), cam.ScreenToWorldPoint(m.MultiplyPoint3x4(new Vector3(x2, y2))), col);
 	}
-
-	public void Cross (Vector3 p) {
-		p = cam.cameraToWorldMatrix.MultiplyPoint(p);
-		Debug.DrawLine(p-Vector3.up*0.2f, p+Vector3.up*0.2f, Color.red);
-		Debug.DrawLine(p-Vector3.right*0.2f, p+Vector3.right*0.2f, Color.red);
-	}
-
 
 	public void OnGUI () {
 		if (!show || (!Application.isPlaying && !showInEditor)) return;
@@ -284,7 +262,8 @@ public class AstarDebugger : MonoBehaviour {
 			if (showFPS) {
 				text.AppendLine();
 				text.AppendLine();
-				text.Append("FPS".PadRight(25)).Append((1F/delayedDeltaTime).ToString("0.0 fps"));
+				var delayedFPS = delayedDeltaTime > 0.00001f ? 1F/delayedDeltaTime : 0;
+				text.Append("FPS".PadRight(25)).Append(delayedFPS.ToString("0.0 fps"));
 
 
 				float minFps = Mathf.Infinity;
@@ -305,7 +284,6 @@ public class AstarDebugger : MonoBehaviour {
 				} else {
 #if ProfileAstar
 					double searchSpeed = (double)AstarPath.TotalSearchedNodes*10000 / (double)AstarPath.TotalSearchTime;
-
 					text.Append("\nSearch Speed	(nodes/ms)	").Append(searchSpeed.ToString("0")).Append(" ("+AstarPath.TotalSearchedNodes+" / ").Append(((double)AstarPath.TotalSearchTime/10000F).ToString("0")+")");
 #endif
 
@@ -345,25 +323,20 @@ public class AstarDebugger : MonoBehaviour {
 
 			float line;
 			GUI.color = Color.blue;
-			//Round to nearest x.x MB
-			line = Mathf.RoundToInt(maxMem/(100.0f*1000));  // *1000*100
+			// Round to nearest x.x MB
+			line = Mathf.RoundToInt(maxMem/(100.0f*1000));
 			GUI.Label(new Rect(5, Screen.height - AstarMath.MapTo(minMem, maxMem, 0 + graphOffset, graphHeight + graphOffset, line*1000*100) - 10, 100, 20), (line/10.0f).ToString("0.0 MB"));
 
-
-
-			line = Mathf.Round(minMem/(100.0f*1000));  // *1000*100
+			line = Mathf.Round(minMem/(100.0f*1000));
 			GUI.Label(new Rect(5, Screen.height - AstarMath.MapTo(minMem, maxMem, 0 + graphOffset, graphHeight + graphOffset, line*1000*100) - 10, 100, 20), (line/10.0f).ToString("0.0 MB"));
-
 
 			GUI.color = Color.green;
-			//Round to nearest x.x MB
-			line = Mathf.Round(maxFPS);  // *1000*100
-			GUI.Label(new Rect(55, Screen.height - AstarMath.MapTo(minFPS, maxFPS, 0 + graphOffset, graphHeight + graphOffset, line) - 10, 100, 20), (line).ToString("0 FPS"));
+			// Round to nearest x.x MB
+			line = Mathf.Round(maxFPS);
+			GUI.Label(new Rect(55, Screen.height - AstarMath.MapTo(minFPS, maxFPS, 0 + graphOffset, graphHeight + graphOffset, line) - 10, 100, 20), line.ToString("0 FPS"));
 
-
-
-			line = Mathf.Round(minFPS);  // *1000*100
-			GUI.Label(new Rect(55, Screen.height - AstarMath.MapTo(minFPS, maxFPS, 0 + graphOffset, graphHeight + graphOffset, line) - 10, 100, 20), (line).ToString("0 FPS"));
+			line = Mathf.Round(minFPS);
+			GUI.Label(new Rect(55, Screen.height - AstarMath.MapTo(minFPS, maxFPS, 0 + graphOffset, graphHeight + graphOffset, line) - 10, 100, 20), line.ToString("0 FPS"));
 		}
 	}
 }

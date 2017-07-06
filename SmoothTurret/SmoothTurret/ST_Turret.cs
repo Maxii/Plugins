@@ -1,43 +1,30 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-namespace MFnum {
-	public enum ArcType { Low, High }
-}
-
+[HelpURL ("http://mobfarmgames.weebly.com/st_turret.html")]
 public class ST_Turret : MF_AbstractPlatform {
 	
-	[Tooltip("Will aim shots as if they are affected by gravity. Projectiles need to be configured to use gravity as well.")]
+	[Split1("Will aim shots as if they are affected by gravity. Projectiles need to be configured to use gravity as well.")]
 	public bool useGravity;
-	[Tooltip("When using gravity, which arc to use.")]
+	[Split2("When using gravity, which arc to use.")]
 	public MFnum.ArcType defaultArc;
-	[Tooltip("When also using intercept - the number of low arc ballistic computations to run.\nMore = better accuracy, but more cpu usage.")]
+	[Split1(true, "When also using intercept - the number of low arc ballistic computations to run.\nMore = better accuracy, but more cpu usage.")]
 	public int ballisticIterations = 1;
-	[Tooltip("When also using intercept - the number of high arc ballistic computations to run.\nMore = better accuracy, but more cpu usage.\n" +
+	[Split2(true, "When also using intercept - the number of high arc ballistic computations to run.\nMore = better accuracy, but more cpu usage.\n" +
 		"High arc generally requires more iterations to hit the target.")]
 	public int highArcBallisticIterations = 5;
-	[Header("Turning Properties: (1-720)")]
-	[Tooltip("(deg/sec)\nBest within 1-720 as jitter begins to occur at high rotation/elevation rates. " +
-			 "Conider using Constant Turn Rate with high motion rates, as this will eliminate any jitter.\n" +
-	         "Also used to adjust pitch for rotation sounds.")]
-	[Range(1, 720)]
+	[Header("Turning Properties:")]
+	[Split1(true, "(deg/sec) Also used to adjust pitch for rotation sounds.")]
 	public float rotationRateMax = 50f;
-	[Tooltip("(deg/sec)\nBest within 1-720 as jitter begins to occur at high rotation/elevation rates. " +
-	         "Conider using Constant Turn Rate with high motion rates, as this will eliminate jitter.\n" +
-	         "Also used to adjust pitch for elevation sounds.")]
-	[Range(1, 720)]
+	[Split2(true, "(deg/sec) \nAlso used to adjust pitch for elevation sounds.")]
 	public float elevationRateMax = 50f;
-	[Tooltip("(deg/sec)\nBest within 1-720 as jitter begins to occur at high rotation/elevation rates. " +
-	         "Conider using Constant Turn Rate with high motion rates, as this will eliminate jitter.")]
-	[Range(1, 720)]
+	[Split1(true, "(deg/sec)")]
 	public float rotationAccel = 50f;
-	[Tooltip("(deg/sec)\nBest within 1-720 as jitter begins to occur at high rotation/elevation rates. " +
-	         "Conider using Constant Turn Rate with high motion rates, as this will eliminate jitter.")]
-	[Range(1, 720)]
+	[Split2(true, "(deg/sec)")]
 	public float elevationAccel = 50f;
-	[Tooltip("Multiplier. Causes decelleration to be different than accelleration.")]
+	[Split1(true, "Multiplier. Causes decelleration to be different than accelleration. Higher values allow quicker and later deceleration.")]
 	public float decelerateMult = 1f;
-	[Tooltip("Best for fast precision turning, or to eliminate any jitter resulting from high-speed rotation/elevation.\n" +
+	[Split2(true, "Best for fast precision turning, or to eliminate any jitter resulting from high-speed rotation/elevation.\n" +
 	         "Rotation Accel and Elevation Accel used as rates.")]
 	public bool constantTurnRate;
 	[Header("Turn Arc Limits: (-180 to 180)")]
@@ -47,14 +34,14 @@ public class ST_Turret : MF_AbstractPlatform {
 	[Range(0, 90)] public float limitUp = 90f;
 	[Range(-90, 0)] public float limitDown = -10f;
 	[Header("Rest Angle: (x = elevation, y = rotation)")]
-	[Tooltip("Position when turret has no target.")]
+	[Split1(60, "Position when turret has no target.")]
 	public Vector2 restAngle;
-	[Tooltip("Time without a target before turret will move to rest position.")]
+	[Split2(60, "Time without a target before turret will move to rest position.")]
 	public float restDelay;
 	[Header("Aiming Error:")]
-	[Tooltip("(deg radius)\nWill cause the turret to point in a random offset from target. Recomend value less than 1.")]
+	[Split1(true, "(deg radius)\nWill cause the turret to point in a random offset from target. Recomend value less than 1.")]
 	public float aimError; // 0 = no error, will skip aimError routine if turningAimInaccuracy is also 0
-	[Tooltip("How often to generate a new error offset.\n0 = every frame, but only if Aim Error is greater than 0.")]
+	[Split2(true, "How often to generate a new error offset.\n0 = every frame, but only if Aim Error is greater than 0.")]
 	public float aimErrorInterval = 0f;
 //	[Header("Turret aim inaccuracy due to turn/elevate: ")]
 //	[Tooltip("(additive deg radius, per deg of motion/sec)\nRecommend small values, " +
@@ -62,7 +49,7 @@ public class ST_Turret : MF_AbstractPlatform {
 //				"Uses Aim Error Interval and added to any Aim Error. ")]
 //	public float turningAimInaccuracy; // additive per degree per second
 	[Header("Weapon inaccuracy due to turn/elevate:")]
-	[Tooltip("(additive deg radius, per deg of motion/sec)\nWill not affect turret aim; error is sent to weapons. Recommend small values.")]
+	[Split1(true, 70, "(additive deg radius, per deg of motion/sec)\nWill not affect turret aim; error is sent to weapons. Recommend small values.")]
 	public float turningWeapInaccuracy; // additive per degree per second
 	[Header("Parts:")]
 	[Tooltip("Object that rotates around the y axis.")]
@@ -98,15 +85,29 @@ public class ST_Turret : MF_AbstractPlatform {
 	[System.Serializable]
 	public class AudioObject {
 		public AudioSource audioSource;
-		public float pitchMax = 1;
-		public float pitchMin;
+		[Split1()] public float pitchMin;
+		[Split2()] public float pitchMax = 1;
 		[HideInInspector] public float stopTime;
 	}
 
-	public override void Start () {
+	public override void Awake () {
 		if (CheckErrors() == true) { return; }
-		base.Start();
+		base.Awake();
 
+		// used by FS_Targeting to evaluate time to aim
+		if ( constantTurnRate == true ) {
+			turnSpeed = rotationAccel;
+		} else {
+			turnSpeed = rotationRateMax; 
+		}
+		lastRotation = rotator.localRotation;
+		lastElevation = elevator.localRotation;
+		timeSinceTarget = -restDelay;
+		curArc = defaultArc;
+	}
+
+	void OnEnable () { // reset for object pool support
+		if ( error == true ) { return; }
 		lastRotation = rotator.localRotation;
 		lastElevation = elevator.localRotation;
 		timeSinceTarget = -restDelay;
@@ -170,13 +171,12 @@ public class ST_Turret : MF_AbstractPlatform {
 			// find target's location in elevation plane as if rotator is already facing target, as rotation will eventualy bring it to front. (don't elevate past 90/-90 degrees to reach target)
 			Vector3 _cross = Vector3.Cross( rotator.up, targetAimLocation - weaponMount.position );
 			Vector3 _level = Vector3.Cross( _cross, rotator.up ); // find direction towards target but level with local plane
-			float _angle = Vector3.Angle( _level, targetAimLocation - weaponMount.position ); 
-			if ( _localTarget.y < elevator.localPosition.y + weaponMount.localPosition.y ) { _angle *= -1; } // should angle be negative?
+			float _angle = MFmath.AngleSigned( _level, targetAimLocation - weaponMount.position, -_cross.normalized );
 			elevatorPlaneTarget = weaponMount.position + (Quaternion.AngleAxis( _angle, -rotator.right ) * rotator.forward * 1000f);
 
 //			Debug.DrawRay( weaponMount.position, _cross, Color.red, .01f );
 //			Debug.DrawRay( weaponMount.position, _level, Color.green, .01f );
-//			Debug.DrawRay( weaponMount.position, targetAimLocation - weaponMount.position, Color.cyan, .01f );
+//			Debug.DrawRay( weaponMount.position, elevatorPlaneTarget - weaponMount.position, Color.cyan, .01f );
 //			Debug.Log( _angle );
 
 		} else { // no target
@@ -206,15 +206,16 @@ public class ST_Turret : MF_AbstractPlatform {
 		}
 
 		Quaternion _rot;
+		Vector3 _localMount = rotator.InverseTransformPoint( weaponMount.position ); 
 		if (constantTurnRate == true) { // no variation in rotation speed. more accurate, lightweight, less realistic.
 			// apply rotation
-			_rot = Quaternion.LookRotation( rotatorPlaneTarget - rotator.position, transform.up );
+			_rot = Quaternion.LookRotation( rotatorPlaneTarget - rotator.TransformPoint( new Vector3(_localMount.x, 0f, _localMount.z) ), transform.up );
 			rotator.rotation = Quaternion.RotateTowards( rotator.rotation, _rot, Mathf.Min(_modAccel, rotationRateMax) * Time.deltaTime );
-			
+
 			// apply elevation
 			_rot = Quaternion.LookRotation( elevatorPlaneTarget - weaponMount.position, rotator.up );
 			elevator.rotation = Quaternion.RotateTowards( elevator.rotation, _rot, Mathf.Min(elevationAccel, elevationRateMax) * Time.deltaTime );
-			
+
 		} else { // accellerate/decellerate to rotation goal
 			// find closure rate of angle to target. 
 			float _closureTurnRate = (_curRotSeperation - lastRotSeperation) / Time.deltaTime;
@@ -224,12 +225,22 @@ public class ST_Turret : MF_AbstractPlatform {
 			lastEleSeperation = _curEleSeperation;
 
 			// apply rotation
-			curRotRate = MFcompute.SmoothRateChange(_modSeperation, _closureTurnRate, curRotRate, rotationAccel, decelerateMult, rotationRateMax);
-			rotator.rotation = Quaternion.AngleAxis(curRotRate * Time.deltaTime, transform.up) * rotator.rotation;
-			
+			curRotRate = MFcompute.SmoothRateChange( _modSeperation, _closureTurnRate, curRotRate, rotationAccel, decelerateMult, rotationRateMax );
+			if ( Mathf.Abs(_closureTurnRate * Time.deltaTime) - rotationAccel * Time.deltaTime <= Mathf.Abs(rotationAccel * Time.deltaTime) && Mathf.Abs(_modSeperation) <= rotationAccel * Time.deltaTime*.1f ) {
+				// snap to target to eliminate jitter
+				rotator.rotation = Quaternion.LookRotation( rotatorPlaneTarget - rotator.TransformPoint( new Vector3(_localMount.x, 0f, _localMount.z) ), transform.up );
+			} else {
+				rotator.rotation = Quaternion.AngleAxis( curRotRate * Time.deltaTime, transform.up) * rotator.rotation;
+			}
+
 			// apply elevation
-			curEleRate = MFcompute.SmoothRateChange(_curEleSeperation, _closureEleRate, curEleRate, elevationAccel, decelerateMult, elevationRateMax);
-			elevator.rotation = Quaternion.AngleAxis(curEleRate * Time.deltaTime, -rotator.right) * elevator.rotation; 
+			curEleRate = MFcompute.SmoothRateChange( _curEleSeperation, _closureEleRate, curEleRate, elevationAccel, decelerateMult, elevationRateMax );
+			if ( Mathf.Abs(_closureEleRate * Time.deltaTime) - elevationAccel * Time.deltaTime <= Mathf.Abs(elevationAccel * Time.deltaTime) && Mathf.Abs(_curEleSeperation) <= elevationAccel * Time.deltaTime*.1f ) {
+				// snap to target to eliminate jitter
+				elevator.rotation = Quaternion.LookRotation( elevatorPlaneTarget - weaponMount.position, transform.up );
+			} else {
+				elevator.rotation = Quaternion.AngleAxis( curEleRate * Time.deltaTime, -elevator.right ) * elevator.rotation; 
+			}
 		}
 		
 		CheckGimbalLimits();
@@ -302,7 +313,7 @@ public class ST_Turret : MF_AbstractPlatform {
 			if ( _localTarget.y < elevator.localPosition.y + weaponMount.localPosition.y ) { _angle *= -1; } // should angle be negative?
 			elevatorPlaneTarget = weaponMount.position + (Quaternion.AngleAxis( _angle, -rotator.right ) * rotator.forward * 1000f);
 
-			_testAngle = MFmath.AngleSigned( rotator.forward, elevatorPlaneTarget - elevator.position, -rotator.right );
+			_testAngle = MFmath.AngleSigned( rotator.forward, elevatorPlaneTarget - weaponMount.position, -rotator.right );
 			if (_testAngle < limitDown || _testAngle > limitUp) {
 				return false;
 			}  
@@ -317,7 +328,7 @@ public class ST_Turret : MF_AbstractPlatform {
 		if ( _target ) {
 			Vector3 _targetVelocity = Vector3.zero;
 			targetLoc = _target.position;
-			if ( useIntercept == true && shotSpeed != null ) { 
+			if ( useIntercept == true && checkData == true && shotSpeed != null ) { 
 				// target velocity
 				if (targetRigidbody) { // if target has a rigidbody, use velocity
 					_targetVelocity = targetRigidbody.velocity;
@@ -334,7 +345,7 @@ public class ST_Turret : MF_AbstractPlatform {
 				if ( _ballAim == null ) {
 					target = null;
 				} else {
-					if ( useIntercept == true && playerControl == false ) { // ballistic + intercept
+					if ( useIntercept == true && checkData == true && playerControl == false ) { // ballistic + intercept
 						// iterate for better ballistic accuracy when also using intercept
 						int bi = 0;
 						int biMax;
@@ -356,7 +367,7 @@ public class ST_Turret : MF_AbstractPlatform {
 					}
 				}
 			} else { // no gravity
-				if ( useIntercept == true && playerControl == false && shotSpeed != null ) {
+				if ( useIntercept == true && checkData == true && playerControl == false && shotSpeed != null ) {
 					// point at linear intercept position
 					Vector3? _interceptAim = MFcompute.Intercept( exitLoc, velocity, (float)shotSpeed, targetLoc, _targetVelocity );
 					if ( _interceptAim == null ) {

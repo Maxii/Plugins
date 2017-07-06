@@ -1067,6 +1067,7 @@ public class AstarPathEditor : Editor {
 			GUILayout.EndHorizontal();
 
 			AstarProfiler.EndProfile("LoadFromFile");
+
 		}
 
 		AstarProfiler.StartProfile("SerializationEndFadeArea");

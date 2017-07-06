@@ -1,5 +1,5 @@
-// Version 5.3
-// ©2016 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.4
+// ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -17,7 +17,7 @@ enum CanvasState {None, OnCanvas, OffCanvas}
 [System.Serializable]
 public partial class VectorLine {
 	public static string Version () {
-		return "Vectrosity version 5.3";
+		return "Vectrosity version 5.4.2";
 	}
 	
 	[SerializeField]
@@ -1138,14 +1138,6 @@ public partial class VectorLine {
 	}
 	
 	public static void SetCanvasCamera (Camera cam) {
-		SetCanvasCamera (cam, 0);
-	}
-	
-	public static void SetCanvasCamera (Camera cam, int id) {
-		if (id < 0) {
-			Debug.LogError ("VectorLine.SetCanvasCamera: id must be >= 0");
-			return;
-		}
 		if (m_canvas == null) {
 			SetupVectorCanvas();
 		}
@@ -1185,17 +1177,25 @@ public partial class VectorLine {
 		}
 		m_go.transform.SetParent (canvas.transform, worldPositionStays);
 	}
-	
+
 	public void SetMask (GameObject maskObject) {
+		SetMask (maskObject, true);
+	}
+	
+	public void SetMask (GameObject maskObject, bool worldPositionStays) {
 		var mask = maskObject.GetComponent<Mask>();
 		if (mask == null) {
 			Debug.LogError ("VectorLine.SetMask: mask object must have a Mask component");
 			return;
 		}
-		SetMask (mask);
+		SetMask (mask, worldPositionStays);
+	}
+
+	public void SetMask (Mask mask) {
+		SetMask (mask, true);
 	}
 	
-	public void SetMask (Mask mask) {
+	public void SetMask (Mask mask, bool worldPositionStays) {
 		if (m_canvasState == CanvasState.OffCanvas) {
 			Debug.LogError ("VectorLine.SetMask only works with lines made with Draw, not Draw3D.");
 			return;
@@ -1204,7 +1204,7 @@ public partial class VectorLine {
 			Debug.LogError ("VectorLine.SetMask: mask must not be null");
 			return;
 		}
-		m_go.transform.SetParent (mask.transform, true);
+		m_go.transform.SetParent (mask.transform, worldPositionStays);
 	}
 	
 	private bool CheckCamera3D () {
@@ -1312,7 +1312,7 @@ public partial class VectorLine {
 			return;
 		}
 		if (endCap != EndCap.Front && endCap != EndCap.Back) {
-			Debug.Log ("VectorLine.SetEndCapIndex: endCap must be EndCap.Front or EndCap.Back");
+			Debug.LogError ("VectorLine.SetEndCapIndex: endCap must be EndCap.Front or EndCap.Back");
 			return;
 		}
 		if (index < 0) {
@@ -1889,7 +1889,7 @@ public partial class VectorLine {
 			else {
 				m_vectorObject = m_go.GetComponent<VectorObject2D>();
 			}
-			m_vectorObject.SetVectorLine (this, m_texture, m_material);
+			m_vectorObject.SetVectorLine (this, m_texture, m_material, false);
 			return;
 		}
 		// OffCanvas
@@ -1900,20 +1900,21 @@ public partial class VectorLine {
 			Object.DestroyImmediate (m_go.GetComponent<VectorObject2D>());
 			Object.DestroyImmediate (m_go.GetComponent<CanvasRenderer>());
 		}
-		if (m_go.GetComponent<VectorObject3D>() == null) {
+		m_vectorObject = m_go.GetComponent<VectorObject3D>();
+		if (m_vectorObject == null) {
 			m_vectorObject = m_go.AddComponent<VectorObject3D>();
-			if (m_material == null) {
-				m_material = Resources.Load ("DefaultLine3D") as Material;
-				if (m_material == null) {
-					Debug.LogError ("No DefaultLine3D material found in Resources");
-					return;
-				}
+		}
+		var useCustomMaterial = true;
+		if (m_material == null) {
+			var mat = Resources.Load ("DefaultLine3D") as Material;
+			if (mat == null) {
+				Debug.LogError ("No DefaultLine3D material found in Resources");
+				return;
 			}
+			m_material = new Material(mat);
+			useCustomMaterial = false;
 		}
-		else {
-			m_vectorObject = m_go.GetComponent<VectorObject3D>();
-		}
-		m_vectorObject.SetVectorLine (this, m_texture, m_material);
+		m_vectorObject.SetVectorLine (this, m_texture, m_material, useCustomMaterial);
 	}
 	
 	public void Draw () {
@@ -1975,6 +1976,7 @@ public partial class VectorLine {
 			idx = start*2;
 		}
 		float normalizedDistance = 0.0f;
+		bool doSmooth = (smoothWidth == true && m_lineWidths.Length > 1);
 		
 		for (int i = start; i < end; i += add) {
 			if (useTransformMatrix) {
@@ -2000,7 +2002,7 @@ public partial class VectorLine {
 				px *= normalizedDistance * m_lineWidths[widthIdx];
 				m_lineVertices[idx  ].x = p1.x - px.x; m_lineVertices[idx  ].y = p1.y - px.y; 
 				m_lineVertices[idx+3].x = p1.x + px.x; m_lineVertices[idx+3].y = p1.y + px.y;
-				if (m_smoothWidth && i < end-add) {
+				if (doSmooth && i < end-add) {
 					px.x = p2.y - p1.y; px.y = p1.x - p2.x;
 					px *= normalizedDistance * m_lineWidths[widthIdx+1];
 				}
@@ -2015,7 +2017,7 @@ public partial class VectorLine {
 				px = v1 * m_lineWidths[widthIdx];
 				m_lineVertices[idx  ].x = p1.x - px.x; m_lineVertices[idx  ].y = p1.y - px.y;
 				m_lineVertices[idx+3].x = p1.x + px.x; m_lineVertices[idx+3].y = p1.y + px.y;
-				if (m_smoothWidth && i < end-add) {
+				if (doSmooth && i < end-add) {
 					px = v1 * m_lineWidths[widthIdx+1];
 				}
 			}
@@ -2058,6 +2060,7 @@ public partial class VectorLine {
 		var cameraPlane = new Plane(camTransform.forward, camTransform.position + camTransform.forward * cam3D.nearClipPlane);
 		var ray = new Ray(v3zero, v3zero);
 		float screenHeight = Screen.height;
+		bool doSmooth = (smoothWidth == true && m_lineWidths.Length > 1);
 		
 		for (int i = start; i < end; i += add) {
 			if (useTransformMatrix) {
@@ -2082,7 +2085,7 @@ public partial class VectorLine {
 				px.x *= normalizedDistance * m_lineWidths[widthIdx]; px.y *= normalizedDistance * m_lineWidths[widthIdx];
 				m_lineVertices[idx  ].x = pos1.x - px.x; m_lineVertices[idx  ].y = pos1.y - px.y;
 				m_lineVertices[idx+3].x = pos1.x + px.x; m_lineVertices[idx+3].y = pos1.y + px.y;
-				if (m_smoothWidth && i < end - add) {
+				if (doSmooth && i < end - add) {
 					px.x = pos2.y - pos1.y; px.y = pos1.x - pos2.x;
 					px.x *= normalizedDistance * m_lineWidths[widthIdx+1]; px.y *= normalizedDistance * m_lineWidths[widthIdx+1];
 				}
@@ -2097,7 +2100,7 @@ public partial class VectorLine {
 				px = v1 * m_lineWidths[widthIdx];
 				m_lineVertices[idx  ].x = pos1.x - px.x; m_lineVertices[idx  ].y = pos1.y - px.y;
 				m_lineVertices[idx+3].x = pos1.x + px.x; m_lineVertices[idx+3].y = pos1.y + px.y;
-				if (m_smoothWidth && i < end-add) {
+				if (doSmooth && i < end-add) {
 					px = v1 * m_lineWidths[widthIdx+1];
 				}
 			}
@@ -2107,7 +2110,7 @@ public partial class VectorLine {
 			widthIdx += widthIdxAdd;
 		}
 		
-		if (m_joins == Joins.Weld) {
+		if (m_joins == Joins.Weld && end - start > 1) { // Only weld if there's more than one segment
 			if (m_lineType == LineType.Continuous) {
 				WeldJoins (start*4 + (start == 0? 4 : 0), end*4, start == 0 && end == m_pointsCount-1 && Approximately (m_points3[0], m_points3[m_pointsCount-1]));
 			}
@@ -2156,6 +2159,7 @@ public partial class VectorLine {
 		SetupDrawStartEnd (out start, out end, true);
 		Matrix4x4 thisMatrix;
 		bool useTransformMatrix = UseMatrix (out thisMatrix);
+		bool doSmooth = (smoothWidth == true && m_lineWidths.Length > 1);
 		
 		int idx = 0, widthIdxAdd = 0;
 		if (m_lineWidths.Length > 1) {
@@ -2202,7 +2206,7 @@ public partial class VectorLine {
 			m_screenPoints[idx+3].x = pos1.x + px.x; m_screenPoints[idx+3].y = pos1.y + px.y; m_screenPoints[idx+3].z = pos1.z + px.z; 
 			m_lineVertices[idx  ] = cam3D.ScreenToWorldPoint (m_screenPoints[idx]);
 			m_lineVertices[idx+3] = cam3D.ScreenToWorldPoint (m_screenPoints[idx+3]);
-			if (smoothWidth && i < end-add) {
+			if (doSmooth && i < end-add) {
 				px.x = thisLine.x * m_lineWidths[widthIdx+1]; px.y = thisLine.y * m_lineWidths[widthIdx+1];
 			}
 			m_screenPoints[idx+2].x = pos2.x + px.x; m_screenPoints[idx+2].y = pos2.y + px.y; m_screenPoints[idx+2].z = pos2.z + px.z;
@@ -2288,7 +2292,12 @@ public partial class VectorLine {
 		
 		if (m_is2D) {
 			for (int i = start; i <= end; i++) {
-				p1 = useMatrix? thisMatrix.MultiplyPoint3x4 (m_points2[i]) : (Vector3)m_points2[i];
+				if (useMatrix) {
+					p1 = thisMatrix.MultiplyPoint3x4 (m_points2[i]);
+				}
+				else {
+					p1.x = m_points2[i].x; p1.y = m_points2[i].y;
+				}
 				if (m_viewportDraw) {
 					p1.x *= scaleFactor.x; p1.y *= scaleFactor.y;
 				}
@@ -2854,8 +2863,8 @@ public partial class VectorLine {
 	
 	public void SetDistances () {
 		if (m_lineType == LineType.Points) return;
-		if (m_distances == null || m_distances.Length != ((m_lineType != LineType.Discrete)? m_pointsCount : m_pointsCount/2 + 1)) {
-			m_distances = new float[(m_lineType != LineType.Discrete)? m_pointsCount : m_pointsCount/2 + 1];
+		if (m_distances == null || m_distances.Length != ((m_lineType != LineType.Discrete)? pointsCount : pointsCount/2 + 1)) {
+			m_distances = new float[(m_lineType != LineType.Discrete)? pointsCount : pointsCount/2 + 1];
 		}
 		
 		var totalDistance = 0.0d;

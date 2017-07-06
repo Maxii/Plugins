@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{C67BF06A-F39D-41CC-939C-9BB856E12F7A}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>GridFramework</RootNamespace>
+    <AssemblyName>GridFramework</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="UnityEngine">
+      <HintPath>..\..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\AssemblyVersionInfo.cs">
+      <Link>Properties\AssemblyVersionInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
+      <Link>Properties\SharedAssemblyInfo.cs</Link>
+    </Compile>
+    <Compile Include="Extensions\Align\Hexagonal.cs" />
+    <Compile Include="Extensions\Align\Rectangular.cs" />
+    <Compile Include="Extensions\Conversion\Polar.cs" />
+    <Compile Include="Extensions\Nearest\Hexagonal.cs" />
+    <Compile Include="Extensions\Nearest\Polar.cs" />
+    <Compile Include="Extensions\Nearest\Rectangular.cs" />
+    <Compile Include="Extensions\Nearest\Spherical.cs" />
+    <Compile Include="Extensions\Scale\Rectangular.cs" />
+    <Compile Include="Extensions\Vectrosity\Points.cs" />
+    <Compile Include="Grids\Grid.cs" />
+    <Compile Include="Grids\Layered\Hexagonal\HexGrid.cs" />
+    <Compile Include="Grids\Layered\LayeredGrid.cs" />
+    <Compile Include="Grids\Layered\Polar\PolarGrid.cs" />
+    <Compile Include="Grids\Rectangular\RectGrid.cs" />
+    <Compile Include="Grids\Spherical\SphereGrid.cs" />
+    <Compile Include="Matrices\Matrix3x3.cs" />
+    <Compile Include="Matrices\Matrix3x4.cs" />
+    <Compile Include="Matrices\Matrix4x3.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Renderers\GridRenderer.cs" />
+    <Compile Include="Renderers\HexagonalRenderer.cs" />
+    <Compile Include="Renderers\Hexagonal\Cone.cs" />
+    <Compile Include="Renderers\Hexagonal\Herringbone.cs" />
+    <Compile Include="Renderers\Hexagonal\Rectangle.cs" />
+    <Compile Include="Renderers\Hexagonal\Rhombus.cs" />
+    <Compile Include="Renderers\PolarRenderer.cs" />
+    <Compile Include="Renderers\Polar\Cylinder.cs" />
+    <Compile Include="Renderers\RectangularRenderer.cs" />
+    <Compile Include="Renderers\Rectangular\Parallelepiped.cs" />
+    <Compile Include="Renderers\SphericalRenderer.cs" />
+    <Compile Include="Renderers\Spherical\Sphere.cs" />
+    <Compile Include="Rendering\GridCamera.cs" />
+    <Compile Include="Rendering\RendererManager.cs" />
+    <Compile Include="Test\GridDebugger.cs" />
+    <Compile Include="Test\HexConversionDebugger.cs" />
+    <Compile Include="Test\PolarConversionDebugger.cs" />
+    <Compile Include="Vectors\Vector6.cs" />
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+[HelpURL("http://mobfarmgames.weebly.com/mf_selectionrepeater.html")]
 public class MF_SelectionRepeater : MonoBehaviour {
 
 	// allows objects with more than one collider to have multiple clickable colliders. Clicks are sent to a single selection script.
@@ -24,15 +25,10 @@ public class MF_SelectionRepeater : MonoBehaviour {
 
 	public virtual bool CheckErrors () {
 		error = false;
-		
-		Transform rps;
+
 		if ( !selectionScript ) {
-			rps = UtilityMF.RecursiveParentComponentSearch( "MF_AbstractSelection", transform );
-			if ( rps != null ) {
-				selectionScript = rps.GetComponent<MF_AbstractSelection>();
-			} else {
-				Debug.Log( this+": No selection script found."); error = true;
-			}
+			selectionScript = UtilityMF.GetComponentInParent<MF_AbstractSelection>( transform );
+			if ( selectionScript == null ) { Debug.Log( this+": No selection script found."); error = true; }
 		}
 
 		return error;

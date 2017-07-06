@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+[HelpURL ("http://mobfarmgames.weebly.com/st_player.html")]
 public class ST_Player : MonoBehaviour {
 
 	public bool turretControl = true;
@@ -55,21 +56,24 @@ public class ST_Player : MonoBehaviour {
 		
 		if ( turretControl == true && aimObject ) {
 			// find mouse position in world
-			Ray _ray = Camera.main.ScreenPointToRay( Input.mousePosition );
-			RaycastHit _hit;
-			Vector3 _objPos;
+			Ray _ray = default(Ray);
+			if ( Camera.main ) { 
+				_ray = Camera.main.ScreenPointToRay( Input.mousePosition );
+				RaycastHit _hit;
+				Vector3 _objPos;
 
-			if ( Physics.Raycast( _ray, out _hit, Mathf.Infinity ) ) { // hit collider
-				if ( fixedAimObjectRange == true ) {
+				if ( Physics.Raycast( _ray, out _hit, Mathf.Infinity ) ) { // hit collider
+					if ( fixedAimObjectRange == true ) {
+						_objPos = _ray.origin + (_ray.direction * emptyAimRange);
+					} else {
+						_objPos = _hit.point;
+					}
+				} else { // hit nothing
 					_objPos = _ray.origin + (_ray.direction * emptyAimRange);
-				} else {
-					_objPos = _hit.point;
 				}
-			} else { // hit nothing
-				_objPos = _ray.origin + (_ray.direction * emptyAimRange);
+				// move aimObject to mouse location
+				aimObject.transform.position = _objPos;
 			}
-			// move aimObject to mouse location
-			aimObject.transform.position = _objPos;
 		}
 	}
 

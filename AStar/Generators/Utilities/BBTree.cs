@@ -642,5 +642,6 @@ namespace Pathfinding {
 		static IntRect ExpandToContain (IntRect r, IntRect r2) {
 			return IntRect.Union(r, r2);
 		}
+
 	}
 }

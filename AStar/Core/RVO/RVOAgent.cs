@@ -658,6 +658,8 @@ namespace Pathfinding.RVO.Sampled {
 					voCount++;
 					if (DebugDraw) DrawVO(position2D + voBoundingOrigin*inverseAgentTimeHorizon + voCenter, totalRadius*inverseAgentTimeHorizon, position2D + voCenter);
 				}
+
+
 			}
 
 

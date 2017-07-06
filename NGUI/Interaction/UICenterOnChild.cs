@@ -1,7 +1,7 @@
-//----------------------------------------------
+//-------------------------------------------------
 //            NGUI: Next-Gen UI kit
-// Copyright © 2011-2016 Tasharen Entertainment
-//----------------------------------------------
+// Copyright © 2011-2017 Tasharen Entertainment Inc
+//-------------------------------------------------
 
 using UnityEngine;
 using System.Collections.Generic;
@@ -174,7 +174,7 @@ public class UICenterOnChild : MonoBehaviour
 					}
 					case UIScrollView.Movement.Vertical:
 					{
-						delta = totalDelta.y;
+						delta = -totalDelta.y;
 						break;
 					}
 					default:

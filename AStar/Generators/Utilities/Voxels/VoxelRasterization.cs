@@ -356,6 +356,7 @@ namespace Pathfinding.Voxels {
 				//AstarProfiler.EndProfile ("Rasterize...");
 			}
 			AstarProfiler.EndProfile("Voxelizing - Step 2");
+
 		}
 
 		public void DebugDrawSpans () {

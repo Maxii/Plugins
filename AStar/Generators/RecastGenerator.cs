@@ -10,8 +10,6 @@ namespace Pathfinding {
 	using Pathfinding.Voxels;
 	using Pathfinding.Serialization;
 
-	[System.Serializable]
-	[JsonOptIn]
 	/** Automatically generates navmesh graphs based on world geometry.
 	 * The recast graph is based on Recast (http://code.google.com/p/recastnavigation/).\n
 	 * I have translated a good portion of it to C# to run it natively in Unity. The Recast process is described as follows:
@@ -49,6 +47,7 @@ namespace Pathfinding {
 	 *
 	 * \astarpro
 	 */
+	[JsonOptIn]
 	public class RecastGraph : NavGraph, INavmesh, IRaycastableGraph, IUpdatableGraph, INavmeshHolder {
 		/** Enables graph updating.
 		 * Uses more memory if enabled.
@@ -1125,23 +1124,20 @@ namespace Pathfinding {
 			//----
 
 			//Voxel grid size
-			int gw = (int)(forcedBounds.size.x/cellSize + 0.5f);
-			int gd = (int)(forcedBounds.size.z/cellSize + 0.5f);
+			int totalVoxelWidth = Mathf.Max((int)(forcedBounds.size.x/cellSize + 0.5f), 1);
+			int totalVoxelDepth = Mathf.Max((int)(forcedBounds.size.z/cellSize + 0.5f), 1);
 
 			if (!useTiles) {
-				tileSizeX = gw;
-				tileSizeZ = gd;
+				tileSizeX = totalVoxelWidth;
+				tileSizeZ = totalVoxelDepth;
 			} else {
 				tileSizeX = editorTileSize;
 				tileSizeZ = editorTileSize;
 			}
 
 			//Number of tiles
-			int tw = (gw + tileSizeX-1) / tileSizeX;
-			int td = (gd + tileSizeZ-1) / tileSizeZ;
-
-			tileXCount = tw;
-			tileZCount = td;
+			tileXCount = (totalVoxelWidth + tileSizeX-1) / tileSizeX;
+			tileZCount = (totalVoxelDepth + tileSizeZ-1) / tileSizeZ;
 
 			if (tileXCount * tileZCount > TileIndexMask+1) {
 				throw new System.Exception("Too many tiles ("+(tileXCount * tileZCount)+") maximum is "+(TileIndexMask+1)+
@@ -1156,8 +1152,8 @@ namespace Pathfinding {
 
 			// If this is true, just fill the graph with empty tiles
 			if (scanEmptyGraph) {
-				for (int z = 0; z < td; z++) {
-					for (int x = 0; x < tw; x++) {
+				for (int z = 0; z < tileZCount; z++) {
+					for (int x = 0; x < tileXCount; x++) {
 						tiles[z*tileXCount + x] = NewEmptyTile(x, z);
 					}
 				}
@@ -1189,11 +1185,11 @@ namespace Pathfinding {
 			var watch = System.Diagnostics.Stopwatch.StartNew();
 
 			//Generate all tiles
-			for (int z = 0; z < td; z++) {
-				for (int x = 0; x < tw; x++) {
+			for (int z = 0; z < tileZCount; z++) {
+				for (int x = 0; x < tileXCount; x++) {
 					int tileNum = z*tileXCount + x;
 #if !NETFX_CORE || UNITY_EDITOR
-					System.Console.WriteLine("Generating Tile #"+(tileNum) + " of " + td*tw);
+					System.Console.WriteLine("Generating Tile #"+(tileNum) + " of " + tileZCount*tileXCount);
 #endif
 
 					//Call statusCallback only 10 times since it is very slow in the editor
@@ -1224,13 +1220,13 @@ namespace Pathfinding {
 			};
 			GetNodes(del);
 
-			for (int z = 0; z < td; z++) {
-				for (int x = 0; x < tw; x++) {
+			for (int z = 0; z < tileZCount; z++) {
+				for (int x = 0; x < tileXCount; x++) {
 #if !NETFX_CORE
-					System.Console.WriteLine("Connecing Tile #"+(z*tileXCount + x) + " of " + td*tw);
+					System.Console.WriteLine("Connecing Tile #"+(z*tileXCount + x) + " of " + tileZCount*tileXCount);
 #endif
-					if (x < tw-1) ConnectTiles(tiles[x + z*tileXCount], tiles[x+1 + z*tileXCount]);
-					if (z < td-1) ConnectTiles(tiles[x + z*tileXCount], tiles[x + (z+1)*tileXCount]);
+					if (x < tileXCount-1) ConnectTiles(tiles[x + z*tileXCount], tiles[x+1 + z*tileXCount]);
+					if (z < tileZCount-1) ConnectTiles(tiles[x + z*tileXCount], tiles[x + (z+1)*tileXCount]);
 				}
 			}
 

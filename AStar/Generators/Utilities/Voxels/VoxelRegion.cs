@@ -23,6 +23,7 @@ namespace Pathfinding.Voxels {
 
 					for (int i = (int)c.index, ni = (int)(c.index+c.count); i < ni; i++) {
 						if (voxelArea.dist[i] >= level && srcReg[i] == 0 && voxelArea.areaTypes[i] != UnwalkableArea) {
+
 							st2.Add(x);
 							st2.Add(z);
 							st2.Add(i);
@@ -620,12 +621,14 @@ namespace Pathfinding.Voxels {
 			//bool visited = new bool[voxelArea.compactSpanCount];
 
 			for (;; level -= 2) {
+
 				int ocount = st1.Count;
 				int expandCount = 0;
 
 				if (ocount == 0) {
 					//int c = 0;
 					for (int q = 0; q < basins.Count; q++) {
+
 						if (srcReg[basins[q].y] == 0 && voxelArea.dist[basins[q].y] >= level) {
 							srcReg[basins[q].y] = 1;
 							st1.Add(basins[q]);
@@ -695,6 +698,7 @@ namespace Pathfinding.Voxels {
 						if (expandCount == 8 || j == st1.Count-1) {
 							//int c = 0;
 							for (int q = 0; q < basins.Count; q++) {
+
 								if (srcReg[basins[q].y] == 0 && voxelArea.dist[basins[q].y] >= level) {
 									srcReg[basins[q].y] = 1;
 									st1.Add(basins[q]);

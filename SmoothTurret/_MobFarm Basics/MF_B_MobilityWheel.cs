@@ -1,13 +1,13 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+[HelpURL("http://mobfarmgames.weebly.com/mf_b_mobilitywheel.html")]
 public class MF_B_MobilityWheel : MF_AbstractMobility {
 
 	[Tooltip("Percentage of the throttle to apply per second. Use to avoin spinning wheels due to abrupt accelleration.")]
 	[Range( 0f, 1f )] public float throttleRate;
 	public WheelObject[] wheels;
-	
-	float curThrottle;
+
 	bool error;
 
 	[System.Serializable]
@@ -22,9 +22,9 @@ public class MF_B_MobilityWheel : MF_AbstractMobility {
 		public Transform wheelObject;
 	}
 
-	public override void Start () {
+	public override void Awake () {
 		if ( CheckErrors() == true ) { return; }
-		base.Start();
+		base.Awake();
 
 		for ( int w=0; w < wheels.Length; w++ ) {
 			if ( !wheels[w].wheelObject ) {
@@ -33,6 +33,7 @@ public class MF_B_MobilityWheel : MF_AbstractMobility {
 				}
 			}
 		}
+
 	}
 
 	// modifies the Vector3 to be same height as unit - allows the vehicle to project the waypoint/target to the height of ground
@@ -44,12 +45,23 @@ public class MF_B_MobilityWheel : MF_AbstractMobility {
 		if ( error == true ) { return; }
 		base.FixedUpdate();
 
+		float t = throttle; // store current throttle
+
 		if (_navTarget) {
 			Steer( navTargetAim );
 			Move( 1f );
 		} else {
 			Steer( transform.position + transform.forward );
 			Move( 0f );
+		}
+
+		if ( throttle != t ) { // value changed
+			if ( fxScript.Count > 0 ) {
+				monitor = throttle;
+				for ( int i=0; i < fxScript.Count; i++ ) {
+					if ( fxScript[i] != null ) { fxScript[i].CheckUnit(); }
+				}
+			}
 		}
 	}
 
@@ -93,8 +105,13 @@ public class MF_B_MobilityWheel : MF_AbstractMobility {
 	}
 
 	public void Move ( float percent ) {
-		float _factor = Mathf.Clamp( percent, -1f, 1f ) >= curThrottle ? 1f : -1f;
-		curThrottle = Mathf.Clamp( curThrottle + ( _factor * throttleRate * Time.deltaTime ), 	-1f, 1f );
+		if ( _navTarget && goalProx > 0 ) {
+			if ( ( transform.position - _navTarget.position ).sqrMagnitude <= goalProx*goalProx ) {
+				percent = 0f;
+			}
+		}
+		float _factor = Mathf.Clamp( percent, -1f, 1f ) >= throttle ? 1f : -1f;
+		throttle = Mathf.Clamp( throttle + ( _factor * throttleRate * Time.deltaTime ), 	-1f, 1f );
 
 		for ( int w=0; w < wheels.Length; w++ ) {
 			if ( wheels[w].torque > 0 ) {
@@ -103,7 +120,7 @@ public class MF_B_MobilityWheel : MF_AbstractMobility {
 					wheels[w].wheelCollider.motorTorque = 0f; 
 				} else {
 					wheels[w].wheelCollider.brakeTorque = 0f;
-					wheels[w].wheelCollider.motorTorque = wheels[w].torque * curThrottle; 
+					wheels[w].wheelCollider.motorTorque = wheels[w].torque * throttle; 
 				}
 			}
 		}

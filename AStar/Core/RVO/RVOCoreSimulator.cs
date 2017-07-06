@@ -343,6 +343,7 @@ namespace Pathfinding.RVO {
 				agents[i].simulator = null;
 			}
 			agents.Clear();
+
 		}
 
 		public void OnDestroy () {
@@ -800,25 +801,18 @@ namespace Pathfinding.RVO {
 			public float[] sampleSize = new float[50];
 		}
 
-		private class Worker {
-			[System.NonSerialized]
-			public Thread thread;
+		class Worker {
 			public int start, end;
-			public int task = 0;
-
-			public AutoResetEvent runFlag = new AutoResetEvent(false);
-
-			public ManualResetEvent waitFlag = new ManualResetEvent(true);
-
-			public Simulator simulator;
-
-			private bool terminate = false;
-
-			private WorkerContext context = new WorkerContext();
+			readonly AutoResetEvent runFlag = new AutoResetEvent(false);
+			readonly ManualResetEvent waitFlag = new ManualResetEvent(true);
+			readonly Simulator simulator;
+			int task = 0;
+			bool terminate = false;
+			WorkerContext context = new WorkerContext();
 
 			public Worker (Simulator sim) {
 				this.simulator = sim;
-				thread = new Thread(new ThreadStart(Run));
+				var thread = new Thread(new ThreadStart(Run));
 				thread.IsBackground = true;
 				thread.Name = "RVO Simulator Thread";
 				thread.Start();
@@ -831,11 +825,13 @@ namespace Pathfinding.RVO {
 			}
 
 			public void WaitOne () {
-				waitFlag.WaitOne();
+				if (!terminate) waitFlag.WaitOne();
 			}
 
 			public void Terminate () {
+				WaitOne();
 				terminate = true;
+				Execute(-1);
 			}
 
 			public void Run () {
@@ -856,10 +852,6 @@ namespace Pathfinding.RVO {
 							}
 						} else if (task == 2) {
 							simulator.BuildQuadtree();
-							/*} else if (task == 2) {
-							 *  for (int i=start;i<end;i++) {
-							 *      agents[i].BufferSwitch ();
-							 *  }*/
 						} else {
 							Debug.LogError("Invalid Task Number: " + task);
 							throw new System.Exception("Invalid Task Number: " + task);

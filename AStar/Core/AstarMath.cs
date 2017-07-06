@@ -882,9 +882,13 @@ namespace Pathfinding {
 
 		/** Maps a value between startMin and startMax to be between 0 and 1 */
 		public static float MapTo (float startMin, float startMax, float value) {
-			value -= startMin;
-			value /= (startMax-startMin);
-			value = Mathf.Clamp01(value);
+			if (startMax != startMin) {
+				value -= startMin;
+				value /= (startMax - startMin);
+				value = Mathf.Clamp01(value);
+			} else {
+				value = 0;
+			}
 			return value;
 		}
 

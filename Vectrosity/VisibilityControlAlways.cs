@@ -1,9 +1,10 @@
-// Version 5.3
-// ©2016 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.4
+// ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
 using Vectrosity;
 
+namespace Vectrosity {
 [AddComponentMenu("Vectrosity/VisibilityControlAlways")]
 public class VisibilityControlAlways : MonoBehaviour {
 
@@ -33,4 +34,5 @@ public class VisibilityControlAlways : MonoBehaviour {
 	public void DontDestroyLine () {
 		m_dontDestroyLine = true;
 	}
+}
 }

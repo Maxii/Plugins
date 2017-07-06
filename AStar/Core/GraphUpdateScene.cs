@@ -122,6 +122,8 @@ namespace Pathfinding {
 
 		/** Do some stuff at start */
 		public void Start () {
+			if (!Application.isPlaying) return;
+
 			//If firstApplied is true, that means the graph was scanned during Awake.
 			//So we shouldn't apply it again because then we would end up applying it two times
 			if (!firstApplied && applyOnStart) {

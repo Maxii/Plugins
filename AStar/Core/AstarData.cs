@@ -503,6 +503,7 @@ namespace Pathfinding {
 					graphs[i] = graph;
 					graph.graphIndex = (uint)i;
 					foundEmpty = true;
+					break;
 				}
 			}
 

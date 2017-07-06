@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
+[HelpURL("http://mobfarmgames.weebly.com/mf_b_targeting.html")]
 public class MF_B_Targeting : MF_AbstractTargeting {
 
 	// to add more priority types, add a name to the enum PriorityType.
@@ -26,18 +27,20 @@ public class MF_B_Targeting : MF_AbstractTargeting {
 				"even if another target is better according to the selected priority. Target will switch if a clicked priority is made, unless current target is also a click priority.")]
 	public bool keepCurrentTarget; // keep choosen target even if a better one appears, until target is out of range or dies
 	[Header("Additional Criteria:")]
-	[Tooltip("If targeting for a weapon, target must be within weapon range.")]
+	[Split1(true, "If targeting for a weapon, target must be within weapon range.")]
 	public bool checkWeapRange;
-	[Tooltip("Target must be within arc limits of the receiving object.")]
+	[Split2(true, "Target must be within arc limits of the receiving object.")]
 	public bool checkArcLimits;
 
 	bool readyChoose;
 	
-	new void Start () {
-		base.Start();
+	public override void Awake () {
+		base.Awake();
 		if ( error == true) { return; }
 
 		priority = _priority;
+
+		// check for selection script and adds itself to list of targeting scripts
 	}
 	
 	void LateUpdate () { // to always run after a target list update 
@@ -53,7 +56,7 @@ public class MF_B_Targeting : MF_AbstractTargeting {
 			// choose target
 			if ( readyChoose == true ) {
 				readyChoose = false;
-				if ( (keepCurrentTarget == true) && (target != null) ) { // see if target still exsists in list
+				if ( keepCurrentTarget == true && target != null ) { // see if target still exsists in list
 					// check for a clicked priority
 					if ( targetListScript.targetList.ContainsKey( target.GetInstanceID() ) ) { // make sure target is in list
 						if ( targetListScript.targetList[ target.GetInstanceID() ].clickedPriority == false ) { // current target not click priority
@@ -64,27 +67,30 @@ public class MF_B_Targeting : MF_AbstractTargeting {
 								}
 							}
 						}
-					}
-					if ( !targetListScript.targetList.ContainsKey( target.GetInstanceID() ) ) { // target not in list but still exsists in scene, may have gone out of range
-						target = null;
+					} else { // target not in list but still exsists in scene, may have gone out of range
+						target = ChooseTarget( null );
 					}
 				}
-				if ( (target == null) || (keepCurrentTarget == false) ) { // check for new target if always supposed to or if no target
+				if ( target == null || keepCurrentTarget == false ) { // check for new target if always supposed to, or if no target
 					target = ChooseTarget( platformScript, _priority, targetListScript );
 				}
 			}
 		}
 	}
-	
-	
+
+	GameObject ChooseTarget ( GameObject targ ) {
+		hasPrecision = MFnum.ScanSource.None; hasAngle = MFnum.ScanSource.None; hasRange = MFnum.ScanSource.None; hasVelocity = MFnum.ScanSource.None;
+		return targ;
+	}
 	GameObject ChooseTarget ( MF_AbstractPlatform receivingObjectScript, PriorityType priority, MF_B_TargetList targetListScript ) {
-		GameObject _bestTarget = null;
+		int? _bestKey = null;
 		float? _bestValue = null;
 		bool _priorityFound = false;
 
 		foreach ( int key in targetListScript.targetList.Keys ) { // iterate through target list
 			if ( targetListScript.targetList[key] == null ) { continue; } // skip null entries
 			if ( targetListScript.targetList[key].transform == null ) { continue; } // skip missing objects
+			// if ( targetListScript.targetList[key].poi.isPoi == true ) { continue; } // skip points of interest
 			if ( checkArcLimits == true && receivingObjectScript ) {
 				if ( receivingObjectScript.TargetWithinLimits( targetListScript.targetList[key].transform ) == false ) { continue; } // check arc limits
 			}
@@ -100,60 +106,60 @@ public class MF_B_Targeting : MF_AbstractTargeting {
 				}
 			} else { // _priorityFound == false
 				if ( targetListScript.targetList[key].clickedPriority == true ) { // found first priority target
-					_bestTarget = targetListScript.targetList[key].transform.gameObject;
-					_bestValue = targetListScript.targetList[key].sqrMagnitude;
+					_bestKey = key;
+					_bestValue = ( transform.position - targetListScript.targetList[key].transform.position ).sqrMagnitude;
 					_priorityFound = true;
 					continue;
 				}
 			}
 
-			float? _value;
+			float? _value = null;
 			switch ( priority ) {
 			case PriorityType.Closest :
 				if ( _bestValue == null ) { _bestValue = Mathf.Infinity; } // initialize _bestValue
-				_value = targetListScript.targetList[key].sqrMagnitude;
+				_value = ( transform.position - targetListScript.targetList[key].transform.position ).sqrMagnitude;
 				if ( _value < _bestValue ) {
-					_bestTarget = targetListScript.targetList[key].transform.gameObject;
+					_bestKey = key;
 					_bestValue = _value;
 				}
 				break;
 			case PriorityType.Furthest :
 				if ( _bestValue == null ) { _bestValue = -Mathf.Infinity; } // initialize _bestValue
-				_value = targetListScript.targetList[key].sqrMagnitude;
+				_value = ( transform.position - targetListScript.targetList[key].transform.position ).sqrMagnitude;
 				if ( _value > _bestValue ) {
-					_bestTarget = targetListScript.targetList[key].transform.gameObject;
+					_bestKey = key;
 					_bestValue = _value;
 				}
 				break;
 			case PriorityType.MostHealth :
 				if ( _bestValue == null ) { _bestValue = -Mathf.Infinity; } // initialize _bestValue
-				_value = targetListScript.targetList[key].script.health;
+				_value = targetListScript.targetList[key].sScript.health;
 				if ( _value > _bestValue ) {
-					_bestTarget = targetListScript.targetList[key].transform.gameObject;
+					_bestKey = key;
 					_bestValue = _value;
 				}
 				break;
 			case PriorityType.LeastHealth :
 				if ( _bestValue == null ) { _bestValue = Mathf.Infinity; } // initialize _bestValue
-				_value = targetListScript.targetList[key].script.health;
+				_value = targetListScript.targetList[key].sScript.health;
 				if ( _value < _bestValue ) {
-					_bestTarget = targetListScript.targetList[key].transform.gameObject;
+					_bestKey = key;
 					_bestValue = _value;
 				}
 				break;
 			case PriorityType.MostHealthPercent :
 				if ( _bestValue == null ) { _bestValue = -Mathf.Infinity; } // initialize _bestValue
-				_value = targetListScript.targetList[key].script.health / targetListScript.targetList[key].script.maxHealth;;
+				_value = targetListScript.targetList[key].sScript.health / targetListScript.targetList[key].sScript.healthMax;
 				if ( _value > _bestValue ) {
-					_bestTarget = targetListScript.targetList[key].transform.gameObject;
+					_bestKey = key;
 					_bestValue = _value;
 				}
 				break;
 			case PriorityType.LeastHealthPercent :
 				if ( _bestValue == null ) { _bestValue = Mathf.Infinity; } // initialize _bestValue
-				_value = targetListScript.targetList[key].script.health / targetListScript.targetList[key].script.maxHealth;;
+				_value = targetListScript.targetList[key].sScript.health / targetListScript.targetList[key].sScript.healthMax;
 				if ( _value < _bestValue ) {
-					_bestTarget = targetListScript.targetList[key].transform.gameObject;
+					_bestKey = key;
 					_bestValue = _value;
 				}
 				break;
@@ -164,21 +170,27 @@ public class MF_B_Targeting : MF_AbstractTargeting {
 				break;
 			}
 		}
-		return _bestTarget;
+
+		if ( _bestKey != null ) {
+			MF_B_TargetList.TargetData tlk = targetListScript.targetList[ (int)_bestKey ];
+			hasPrecision = tlk.hasPrecision;
+			hasAngle = tlk.hasAngle;
+			hasRange = tlk.hasRange;
+			hasVelocity = tlk.hasVelocity;
+			return tlk.transform.gameObject;
+		} else {
+			hasPrecision = MFnum.ScanSource.None; hasAngle = MFnum.ScanSource.None; hasRange = MFnum.ScanSource.None; hasVelocity = MFnum.ScanSource.None;
+			return null;
+		}
 	}
 	
 	
 	public override bool CheckErrors () {
 		base.CheckErrors();
-		Transform rps;
 
 		if ( !targetListScript ) {
-			rps = UtilityMF.RecursiveParentComponentSearch( "MF_B_TargetList", transform );
-			if ( rps != null ) {
-				targetListScript = rps.GetComponent<MF_B_TargetList>();
-			} else {
-				Debug.Log( this+": No target list found." ); error = true;
-			}
+			targetListScript = UtilityMF.GetComponentInParent<MF_B_TargetList>( transform );
+			if ( targetListScript == null ) { Debug.Log( this+": No target list found."); error = true; }
 		}
 
 		return error;

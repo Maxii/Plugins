@@ -1,5 +1,9 @@
-// Version 5.2
-// ©2015 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+// Version 5.4
+// ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
+
+#if UNITY_5_4 || UNITY_5_5
+#define OLDUNITY
+#endif
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -80,6 +84,7 @@ public class VectorObject2DEditor : Editor {
 	static float oldScenePointSize;
 		
 	static Vector3 v3right = Vector3.right;
+	static Vector3 v3forward = Vector3.forward;
 	static Vector3 v3up = Vector3.up;
 	static Vector2 v2right = Vector2.right;
 	static GUILayoutOption width40 = GUILayout.Width(40);
@@ -700,7 +705,7 @@ public class VectorObject2DEditor : Editor {
 		}
 		
 		Handles.BeginGUI ();
-		GUILayout.BeginArea (new Rect(Screen.width - 180, Screen.height - 150, 170, 102), "", "box");
+		GUILayout.BeginArea (new Rect((Screen.width/EditorGUIUtility.pixelsPerPoint) - 180, (Screen.height/EditorGUIUtility.pixelsPerPoint) - 150, 170, 102), "", "box");
 		GUILayout.Label (nameString, EditorStyles.boldLabel);
 		if (showWarning) {
 			GUILayout.Label (warnMessage, wrapLabel);
@@ -738,7 +743,11 @@ public class VectorObject2DEditor : Editor {
 		if (showWarning) return;
 		
 		for (int i = 0; i < points.Count; i++) {
-			Vector2 sliderPoint = Handles.Slider2D (AdjustedPoint (vline.points2[i]), v3right, v3right, v3up, scenePointSize, Handles.SphereCap, 1.0f);
+#if OLDUNITY
+			Vector2 sliderPoint = Handles.Slider2D (AdjustedPoint (vline.points2[i]), v3forward, v3right, v3up, scenePointSize, Handles.SphereCap, 1.0f);
+#else
+			Vector2 sliderPoint = Handles.Slider2D (AdjustedPoint (vline.points2[i]), v3forward, v3right, v3up, scenePointSize, Handles.SphereHandleCap, 1.0f);
+#endif
 			vline.points2[i] = InverseAdjustedPoint (sliderPoint);
 			if (points[i].x != vline.points2[i].x || points[i].y != vline.points2[i].y) {
 				points[i].x = vline.points2[i].x;
@@ -780,8 +789,12 @@ public class VectorObject2DEditor : Editor {
 		if (lineType == LineType.Continuous || (lineType == LineType.Discrete && (points.Count & 1) != 0)) {
 			Handles.DrawDottedLine (mousePos, AdjustedPoint (vline.points2[idx]), 4);
 		}
-		
+
+#if OLDUNITY
 		if (Handles.Button (mousePos, Quaternion.identity, scenePointSize, scenePointSize, Handles.SphereCap)) {
+#else
+		if (Handles.Button (mousePos, Quaternion.identity, scenePointSize, scenePointSize, Handles.SphereHandleCap)) {
+#endif
 			if (idx == 0) {
 				InsertPoint (0, adjustedMousePos);
 			}
@@ -790,7 +803,11 @@ public class VectorObject2DEditor : Editor {
 			}
 		}
 		// Work-around for not being able to set Handles.selectedColor...draw on top of the button
+#if OLDUNITY
 		Handles.SphereCap (0, mousePos, Quaternion.identity, scenePointSize);
+#else
+		Handles.SphereHandleCap (0, mousePos, Quaternion.identity, scenePointSize, EventType.Repaint);
+#endif
 		Handles.color = handlesColor;
 		
 		if (showPointCoords) {
@@ -808,19 +825,35 @@ public class VectorObject2DEditor : Editor {
 		Handles.color = Color.red;
 		int idx;
 		var distance = ClosestPointDistance (adjustedMousePos, out idx);
+#if OLDUNITY
 		Handles.SphereCap (0, AdjustedPoint (vline.points2[idx]), Quaternion.identity, scenePointSize);
+#else
+		Handles.SphereHandleCap (0, AdjustedPoint (vline.points2[idx]), Quaternion.identity, scenePointSize, EventType.Repaint);
+#endif
 		if (distance > 40.0f) {
 			Handles.DrawDottedLine (mousePos, AdjustedPoint (vline.points2[idx]), 10);
 		}
 		if (lineType == LineType.Discrete) {
 			int idx2 = ((idx & 1) != 0)? idx-1 : idx+1;
+#if OLDUNITY
 			Handles.SphereCap (0, AdjustedPoint (vline.points2[idx2]), Quaternion.identity, scenePointSize);
+#else
+			Handles.SphereHandleCap (0, AdjustedPoint (vline.points2[idx2]), Quaternion.identity, scenePointSize, EventType.Repaint);
+#endif
 			Handles.DrawDottedLine (mousePos, AdjustedPoint (vline.points2[idx2]), 10);
 		}
+#if OLDUNITY
 		if (Handles.Button (mousePos, Quaternion.identity, scenePointSize, scenePointSize, Handles.RectangleCap)) {
+#else
+		if (Handles.Button (mousePos, Quaternion.identity, scenePointSize, scenePointSize, Handles.RectangleHandleCap)) {
+#endif
 			RemovePoint (idx);
 		}
+#if OLDUNITY
 		Handles.RectangleCap (0, mousePos, Quaternion.identity, scenePointSize);
+#else
+		Handles.RectangleHandleCap (0, mousePos, Quaternion.identity, scenePointSize, EventType.Repaint);
+#endif
 		Handles.color = handlesColor;
 	}
 	
@@ -846,12 +879,20 @@ public class VectorObject2DEditor : Editor {
 		}
 		else {
 			for (int i = 0; i < vline.points2.Count; i++) {
+#if OLDUNITY
 				Handles.DotCap (0, AdjustedPoint (vline.points2[i]) + offset, Quaternion.identity, lineWidth);
+#else
+				Handles.DotHandleCap (0, AdjustedPoint (vline.points2[i]) + offset, Quaternion.identity, lineWidth, EventType.Repaint);
+#endif
 			}
 		}
 		Handles.color = handlesColor;
 		
+#if OLDUNITY
 		if (Handles.Button (mousePos, Quaternion.identity, scenePointSize, scenePointSize, Handles.DotCap)) {
+#else
+		if (Handles.Button (mousePos, Quaternion.identity, scenePointSize, scenePointSize, Handles.DotHandleCap)) {
+#endif
 			for (int i = 0; i < vline.points2.Count; i++) {
 				vline.points2[i] = vline.points2[i] + offset;
 			}
@@ -888,10 +929,6 @@ public class VectorObject2DEditor : Editor {
 		drawStart = vline.drawStart;
 		drawEnd = vline.drawEnd;
 		EditorUtility.SetDirty (vobject);
-#if UNITY_5_2
-		EditorApplication.MarkSceneDirty();
-#else
 		UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty (UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
-#endif
 	}
 }
