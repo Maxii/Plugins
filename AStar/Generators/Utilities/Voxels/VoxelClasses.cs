@@ -1,15 +1,11 @@
 using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
-using Pathfinding;
-using Pathfinding.Voxels;
 #if NETFX_CORE && !UNITY_EDITOR
 //using MarkerMetro.Unity.WinLegacy.IO;
 #endif
 
 namespace Pathfinding.Voxels {
-
-	/** \astarpro */
+	/** Stores a voxel field. \astarpro */
 	public class VoxelArea {
 		public const uint MaxHeight = 65536;
 		public const int MaxHeightInt = 65536;
@@ -323,7 +319,14 @@ namespace Pathfinding.Voxels {
 		}
 	}
 
-	/** Represents a custom mesh.
+	/** Represents a mesh. \deprecated Use RasterizationMesh instead */
+	[System.Obsolete("Use RasterizationMesh instead")]
+	public class ExtraMesh : RasterizationMesh {
+		public ExtraMesh (Vector3[] vertices, int[] triangles, Bounds bounds) : base(vertices, triangles, bounds) {}
+		public ExtraMesh (Vector3[] vertices, int[] triangles, Bounds bounds, Matrix4x4 matrix) : base(vertices, triangles, bounds, matrix) {}
+	}
+
+	/** Represents a mesh which will be rasterized.
 	 * The vertices will be multiplied with the matrix when rasterizing it to voxels.
 	 * The vertices and triangles array may be used in multiple instances, it is not changed when voxelizing.
 	 *
@@ -331,7 +334,7 @@ namespace Pathfinding.Voxels {
 	 *
 	 * \astarpro
 	 */
-	public struct ExtraMesh {
+	public class RasterizationMesh {
 		/** Source of the mesh.
 		 * May be null if the source was not a mesh filter
 		 */
@@ -346,20 +349,23 @@ namespace Pathfinding.Voxels {
 
 		public Matrix4x4 matrix;
 
-		public ExtraMesh (Vector3[] v, int[] t, Bounds b) {
+		public RasterizationMesh () {
+		}
+
+		public RasterizationMesh (Vector3[] vertices, int[] triangles, Bounds bounds) {
 			matrix = Matrix4x4.identity;
-			vertices = v;
-			triangles = t;
-			bounds = b;
+			this.vertices = vertices;
+			this.triangles = triangles;
+			this.bounds = bounds;
 			original = null;
 			area = 0;
 		}
 
-		public ExtraMesh (Vector3[] v, int[] t, Bounds b, Matrix4x4 matrix) {
+		public RasterizationMesh (Vector3[] vertices, int[] triangles, Bounds bounds, Matrix4x4 matrix) {
 			this.matrix = matrix;
-			vertices = v;
-			triangles = t;
-			bounds = b;
+			this.vertices = vertices;
+			this.triangles = triangles;
+			this.bounds = bounds;
 			original = null;
 			area = 0;
 		}
@@ -400,8 +406,16 @@ namespace Pathfinding.Voxels {
 	 * \astarpro
 	 */
 	public struct VoxelMesh {
+		/** Vertices of the mesh */
 		public Int3[] verts;
+
+		/** Triangles of the mesh.
+		 * Each element points to a vertex in the #verts array
+		 */
 		public int[] tris;
+
+		/** Area index for each triangle */
+		public int[] areas;
 	}
 
 	/** VoxelCell used for recast graphs.

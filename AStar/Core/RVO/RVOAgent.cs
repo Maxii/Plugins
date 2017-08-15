@@ -1,77 +1,148 @@
 using UnityEngine;
 using System.Collections.Generic;
-using Pathfinding;
-using Pathfinding.RVO;
 
 namespace Pathfinding.RVO.Sampled {
+	using Pathfinding;
+	using Pathfinding.RVO;
+	using Pathfinding.Util;
+
+	/** Internal agent for the RVO system.
+	 * Usually you will interface with the IAgent interface instead.
+	 *
+	 * \see IAgent
+	 */
 	public class Agent : IAgent {
-		Vector3 smoothPos;
-
-		public Vector3 Position {
-			get;
-			private set;
-		}
-
-		public Vector3 InterpolatedPosition {
-			get { return smoothPos; }
-		}
-
-		public Vector3 DesiredVelocity { get; set; }
-
-		public void Teleport (Vector3 pos) {
-			Position = pos;
-			smoothPos = pos;
-			prevSmoothPos = pos;
-		}
-
-		public void SetYPosition (float yCoordinate) {
-			Position = new Vector3(Position.x, yCoordinate, Position.z);
-			smoothPos.y = yCoordinate;
-			prevSmoothPos.y = yCoordinate;
-		}
-
 		//Current values for double buffer calculation
 
-		public float radius, height, maxSpeed, neighbourDist, agentTimeHorizon, obstacleTimeHorizon, weight;
-		public bool locked = false;
+		internal float radius, height, desiredSpeed, maxSpeed, agentTimeHorizon, obstacleTimeHorizon;
+		internal bool locked = false;
 
 		RVOLayer layer, collidesWith;
 
-		public int maxNeighbours;
-		public Vector3 position, desiredVelocity, prevSmoothPos;
+		int maxNeighbours;
+		internal Vector2 position;
+		float elevationCoordinate;
+		Vector2 currentVelocity;
 
+		/** Desired target point - position */
+		Vector2 desiredTargetPointInVelocitySpace;
+		Vector2 desiredVelocity;
+
+		Vector2 nextTargetPoint;
+		float nextDesiredSpeed;
+		float nextMaxSpeed;
+		Vector2 collisionNormal;
+		bool manuallyControlled;
+		bool debugDraw;
+
+		#region IAgent Properties
+
+		/** \copydoc Pathfinding::RVO::IAgent::Position */
+		public Vector2 Position { get; set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::ElevationCoordinate */
+		public float ElevationCoordinate { get; set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::CalculatedTargetPoint */
+		public Vector2 CalculatedTargetPoint { get; private set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::CalculatedSpeed */
+		public float CalculatedSpeed { get; private set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::Locked */
+		public bool Locked { get; set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::Radius */
+		public float Radius { get; set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::Height */
+		public float Height { get; set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::AgentTimeHorizon */
+		public float AgentTimeHorizon { get; set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::ObstacleTimeHorizon */
+		public float ObstacleTimeHorizon { get; set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::MaxNeighbours */
+		public int MaxNeighbours { get; set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::NeighbourCount */
+		public int NeighbourCount { get; private set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::Layer */
 		public RVOLayer Layer { get; set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::CollidesWith */
 		public RVOLayer CollidesWith { get; set; }
 
-		public bool Locked { get; set; }
-		public float Radius { get; set; }
-		public float Height { get; set; }
-		public float MaxSpeed { get; set; }
-		public float NeighbourDist { get; set; }
-		public float AgentTimeHorizon { get; set; }
-		public float ObstacleTimeHorizon { get; set; }
-		public Vector3 Velocity { get; set; }
-		public bool DebugDraw { get; set; }
+		/** \copydoc Pathfinding::RVO::IAgent::DebugDraw */
+		public bool DebugDraw {
+			get {
+				return debugDraw;
+			}
+			set {
+				debugDraw = value && simulator != null && !simulator.Multithreading;
+			}
+		}
 
-		public int MaxNeighbours { get; set; }
+		/** \copydoc Pathfinding::RVO::IAgent::Priority */
+		public float Priority { get; set; }
+
+		/** \copydoc Pathfinding::RVO::IAgent::PreCalculationCallback */
+		public System.Action PreCalculationCallback { private get; set; }
+
+		#endregion
+
+		#region IAgent Methods
+
+		/** \copydoc Pathfinding::RVO::IAgent::SetTarget */
+		public void SetTarget (Vector2 targetPoint, float desiredSpeed, float maxSpeed) {
+			maxSpeed = System.Math.Max(maxSpeed, 0);
+			desiredSpeed = System.Math.Min(System.Math.Max(desiredSpeed, 0), maxSpeed);
+
+			nextTargetPoint = targetPoint;
+			nextDesiredSpeed = desiredSpeed;
+			nextMaxSpeed = maxSpeed;
+		}
+
+		/** \copydoc Pathfinding::RVO::IAgent::SetCollisionNormal */
+		public void SetCollisionNormal (Vector2 normal) {
+			collisionNormal = normal;
+		}
+
+		/** \copydoc Pathfinding::RVO::IAgent::ForceSetVelocity */
+		public void ForceSetVelocity (Vector2 velocity) {
+			// A bit hacky, but it is approximately correct
+			// assuming the agent does not move significantly
+			CalculatedTargetPoint = position + velocity * 1000;
+			CalculatedSpeed = velocity.magnitude;
+			manuallyControlled = true;
+		}
+
+		#endregion
 
 		/** Used internally for a linked list */
 		internal Agent next;
 
-		private Vector3 velocity;
-		internal Vector3 newVelocity;
+		float calculatedSpeed;
+		Vector2 calculatedTargetPoint;
 
 		/** Simulator which handles this agent.
 		 * Used by this script as a reference and to prevent
 		 * adding this agent to multiple simulations.
 		 */
-		public Simulator simulator;
+		internal Simulator simulator;
 
-		public List<Agent> neighbours = new List<Agent>();
-		public List<float> neighbourDists = new List<float>();
+		List<Agent> neighbours = new List<Agent>();
+		List<float> neighbourDists = new List<float>();
 		List<ObstacleVertex> obstaclesBuffered = new List<ObstacleVertex>();
 		List<ObstacleVertex> obstacles = new List<ObstacleVertex>();
-		List<float> obstacleDists = new List<float>();
+
+		const float DesiredVelocityWeight = 0.1f;
+
+		/** Extra weight that walls will have */
+		const float WallWeight = 5;
 
 		public List<ObstacleVertex> NeighbourObstacles {
 			get {
@@ -79,113 +150,123 @@ namespace Pathfinding.RVO.Sampled {
 			}
 		}
 
-		public Agent (Vector3 pos) {
-			MaxSpeed = 2;
-			NeighbourDist = 15;
+		public Agent (Vector2 pos, float elevationCoordinate) {
 			AgentTimeHorizon = 2;
 			ObstacleTimeHorizon = 2;
 			Height = 5;
 			Radius = 5;
 			MaxNeighbours = 10;
 			Locked = false;
-
-			position = pos;
-			Position = position;
-			prevSmoothPos = position;
-			smoothPos = position;
-
+			Position = pos;
+			ElevationCoordinate = elevationCoordinate;
 			Layer = RVOLayer.DefaultAgent;
 			CollidesWith = (RVOLayer)(-1);
+			Priority = 0.5f;
+			CalculatedTargetPoint = pos;
+			CalculatedSpeed = 0;
+			SetTarget(pos, 0, 0);
 		}
 
+		/** Reads public properties and stores them in internal fields.
+		 * This is required because multithreading is used and if another script
+		 * updated the fields at the same time as this class used them in another thread
+		 * weird things could happen.
+		 *
+		 * Will also set CalculatedTargetPoint and CalculatedSpeed to the result
+		 * which was last calculated.
+		 */
 		public void BufferSwitch () {
-			// <==
+			// <== Read public properties
 			radius = Radius;
 			height = Height;
-			maxSpeed = MaxSpeed;
-			neighbourDist = NeighbourDist;
+			maxSpeed = nextMaxSpeed;
+			desiredSpeed = nextDesiredSpeed;
 			agentTimeHorizon = AgentTimeHorizon;
 			obstacleTimeHorizon = ObstacleTimeHorizon;
 			maxNeighbours = MaxNeighbours;
-			desiredVelocity = DesiredVelocity;
 			locked = Locked;
+			position = Position;
+			elevationCoordinate = ElevationCoordinate;
 			collidesWith = CollidesWith;
 			layer = Layer;
 
-			//position = Position;
+			desiredTargetPointInVelocitySpace = nextTargetPoint - position;
 
-			// ==>
-			Velocity = velocity;
+			// Estimate our current velocity
+			// This is necessary because other agents need to know
+			// how this agent is moving to be able to avoid it
+			currentVelocity = (CalculatedTargetPoint - position).normalized * CalculatedSpeed;
+
+			// Calculate the desired velocity from the point we want to reach
+			desiredVelocity = desiredTargetPointInVelocitySpace.normalized*desiredSpeed;
+
+			if (collisionNormal != Vector2.zero) {
+				collisionNormal.Normalize();
+				var dot = Vector2.Dot(currentVelocity, collisionNormal);
+
+				// Check if the velocity is going into the wall
+				if (dot < 0) {
+					// If so: remove that component from the velocity
+					currentVelocity -= collisionNormal * dot;
+				}
+
+				// Clear the normal
+				collisionNormal = Vector2.zero;
+			}
+		}
+
+		public void PreCalculation () {
+			if (PreCalculationCallback != null) {
+				PreCalculationCallback();
+			}
+		}
+
+		public void PostCalculation () {
+			// ==> Set public properties
+			if (!manuallyControlled) {
+				CalculatedTargetPoint = calculatedTargetPoint;
+				CalculatedSpeed = calculatedSpeed;
+			}
+
 			List<ObstacleVertex> tmp = obstaclesBuffered;
 			obstaclesBuffered = obstacles;
 			obstacles = tmp;
+
+			manuallyControlled = false;
 		}
 
-		// Update is called once per frame
-		public void Update () {
-			velocity = newVelocity;
-
-			prevSmoothPos = smoothPos;
-
-			//Note the case P/p
-			//position = Position;
-			position = prevSmoothPos;
-
-			position = position + velocity * simulator.DeltaTime;
-			Position = position;
-		}
-
-		public void Interpolate (float t) {
-			smoothPos = prevSmoothPos + (Position-prevSmoothPos)*t;
-		}
-
-		public static System.Diagnostics.Stopwatch watch1 = new System.Diagnostics.Stopwatch();
-		public static System.Diagnostics.Stopwatch watch2 = new System.Diagnostics.Stopwatch();
-
+		/** Populate the neighbours and neighbourDists lists with the closest agents to this agent */
 		public void CalculateNeighbours () {
 			neighbours.Clear();
 			neighbourDists.Clear();
 
-			float rangeSq;
+			if (MaxNeighbours > 0 && !locked) simulator.Quadtree.Query(position, maxSpeed, agentTimeHorizon, radius, this);
 
-			if (locked) return;
-
-			//watch1.Start ();
-			if (MaxNeighbours > 0) {
-				rangeSq = neighbourDist*neighbourDist;
-
-				//simulator.KDTree.GetAgentNeighbours (this, rangeSq);
-				simulator.Quadtree.Query(new Vector2(position.x, position.z), neighbourDist, this);
-			}
-			//watch1.Stop ();
-
-			obstacles.Clear();
-			obstacleDists.Clear();
-
-			rangeSq = (obstacleTimeHorizon * maxSpeed + radius);
-			rangeSq *= rangeSq;
-			// Obstacles disabled at the moment
-			//simulator.KDTree.GetObstacleNeighbours (this, rangeSq);
+			NeighbourCount = neighbours.Count;
 		}
 
-		float Sqr (float x) {
+		/** Square a number */
+		static float Sqr (float x) {
 			return x*x;
 		}
 
-		public float InsertAgentNeighbour (Agent agent, float rangeSq) {
-			if (this == agent) return rangeSq;
+		/** Used by the Quadtree.
+		 * \see CalculateNeighbours
+		 */
+		internal float InsertAgentNeighbour (Agent agent, float rangeSq) {
+			// Check if this agent collides with the other agent
+			if (this == agent || (agent.layer & collidesWith) == 0) return rangeSq;
 
-			if ((agent.layer & collidesWith) == 0) return rangeSq;
-
-			//2D Dist
-			float dist = Sqr(agent.position.x-position.x) + Sqr(agent.position.z - position.z);
+			// 2D distance
+			float dist = (agent.position - position).sqrMagnitude;
 
 			if (dist < rangeSq) {
 				if (neighbours.Count < maxNeighbours) {
-					neighbours.Add(agent);
-					neighbourDists.Add(dist);
+					neighbours.Add(null);
+					neighbourDists.Add(float.PositiveInfinity);
 				}
 
+				// Insert the agent into the ordered list of neighbours
 				int i = neighbours.Count-1;
 				if (dist < neighbourDists[i]) {
 					while (i != 0 && dist < neighbourDists[i-1]) {
@@ -204,56 +285,30 @@ namespace Pathfinding.RVO.Sampled {
 			return rangeSq;
 		}
 
-		/*public void UpdateNeighbours () {
-		 *  neighbours.Clear ();
-		 *  float sqrDist = neighbourDistance*neighbourDistance;
-		 *  for ( int i = 0; i < simulator.agents.Count; i++ ) {
-		 *      float dist = (simulator.agents[i].position - position).sqrMagnitude;
-		 *      if ( dist <= sqrDist ) {
-		 *          neighbours.Add ( simulator.agents[i] );
-		 *      }
-		 *  }
-		 * }*/
 
-		public void InsertObstacleNeighbour (ObstacleVertex ob1, float rangeSq) {
-			ObstacleVertex ob2 = ob1.next;
-
-			float dist = VectorMath.SqrDistancePointSegment(ob1.position, ob2.position, Position);
-
-			if (dist < rangeSq) {
-				obstacles.Add(ob1);
-				obstacleDists.Add(dist);
-
-				int i = obstacles.Count-1;
-				while (i != 0 && dist < obstacleDists[i-1]) {
-					obstacles[i] = obstacles[i-1];
-					obstacleDists[i] = obstacleDists[i-1];
-					i--;
-				}
-				obstacles[i] = ob1;
-				obstacleDists[i] = dist;
-			}
-		}
-
-		static Vector3 To3D (Vector2 p) {
+		/** (x, 0, y) */
+		static Vector3 FromXZ (Vector2 p) {
 			return new Vector3(p.x, 0, p.y);
 		}
 
-		static void DrawCircle (Vector2 _p, float radius, Color col) {
-			DrawCircle(_p, radius, 0, 2*Mathf.PI, col);
+		/** (x, z) */
+		static Vector2 ToXZ (Vector3 p) {
+			return new Vector2(p.x, p.z);
 		}
 
-		static void DrawCircle (Vector2 _p, float radius, float a0, float a1, Color col) {
-			Vector3 p = To3D(_p);
-
-			while (a0 > a1) a0 -= 2*Mathf.PI;
-
-			Vector3 prev = new Vector3(Mathf.Cos(a0)*radius, 0, Mathf.Sin(a0)*radius);
-			const float steps = 40.0f;
-			for (int i = 0; i <= steps; i++) {
-				Vector3 c = new Vector3(Mathf.Cos(Mathf.Lerp(a0, a1, i/steps))*radius, 0, Mathf.Sin(Mathf.Lerp(a0, a1, i/steps))*radius);
-				Debug.DrawLine(p+prev, p+c, col);
-				prev = c;
+		/** Converts a 3D vector to a 2D vector in the movement plane.
+		 * If movementPlane is XZ it will be projected onto the XZ plane
+		 * and the elevation coordinate will be the Y coordinate
+		 * otherwise it will be projected onto the XY plane and elevation
+		 * will be the Z coordinate.
+		 */
+		Vector2 To2D (Vector3 p, out float elevation) {
+			if (simulator.movementPlane == MovementPlane.XY) {
+				elevation = p.z;
+				return new Vector2(p.x, p.y);
+			} else {
+				elevation = p.y;
+				return new Vector2(p.x, p.z);
 			}
 		}
 
@@ -262,7 +317,7 @@ namespace Pathfinding.RVO.Sampled {
 			float gamma = radius/(origin-circleCenter).magnitude;
 			float delta = gamma <= 1.0f ? Mathf.Abs(Mathf.Acos(gamma)) : 0;
 
-			DrawCircle(circleCenter, radius, alpha-delta, alpha+delta, Color.black);
+			Draw.Debug.CircleXZ(FromXZ(circleCenter), radius, Color.black, alpha-delta, alpha+delta);
 			Vector2 p1 = new Vector2(Mathf.Cos(alpha-delta), Mathf.Sin(alpha-delta)) * radius;
 			Vector2 p2 = new Vector2(Mathf.Cos(alpha+delta), Mathf.Sin(alpha+delta)) * radius;
 
@@ -271,122 +326,61 @@ namespace Pathfinding.RVO.Sampled {
 			p1 += circleCenter;
 			p2 += circleCenter;
 
-			Debug.DrawRay(To3D(p1), To3D(p1t).normalized*100, Color.black);
-			Debug.DrawRay(To3D(p2), To3D(p2t).normalized*100, Color.black);
+			Debug.DrawRay(FromXZ(p1), FromXZ(p1t).normalized*100, Color.black);
+			Debug.DrawRay(FromXZ(p2), FromXZ(p2t).normalized*100, Color.black);
 		}
 
-		static void DrawCross (Vector2 p, float size = 1) {
-			DrawCross(p, Color.white, size);
-		}
-
-		static void DrawCross (Vector2 p, Color col, float size = 1) {
-			size *= 0.5f;
-			Debug.DrawLine(new Vector3(p.x, 0, p.y) - Vector3.right*size, new Vector3(p.x, 0, p.y) + Vector3.right*size, col);
-			Debug.DrawLine(new Vector3(p.x, 0, p.y) - Vector3.forward*size, new Vector3(p.x, 0, p.y) + Vector3.forward*size, col);
-		}
-
-		public struct VO {
-			public Vector2 origin, center;
-
+		/** Velocity Obstacle.
+		 * This is a struct to avoid too many allocations.
+		 *
+		 * \see https://en.wikipedia.org/wiki/Velocity_obstacle
+		 */
+		internal struct VO {
 			Vector2 line1, line2, dir1, dir2;
 
 			Vector2 cutoffLine, cutoffDir;
-
-			float sqrCutoffDistance;
-			bool leftSide;
+			Vector2 circleCenter;
 
 			bool colliding;
-
 			float radius;
-
 			float weightFactor;
+			float weightBonus;
 
-			/** Creates a VO to avoid the half plane created by the point \a p0 and has a tangent in the direction of \a dir.
-			 * \param p0 A point on the half plane border
-			 * \param dir The normalized tangent to the half plane
-			 * \param weightFactor relative amount of influence this VO should have on the agent
+			Vector2 segmentStart, segmentEnd;
+			bool segment;
+
+			/** Creates a VO for avoiding another agent.
+			 * \param center The position of the other agent relative to this agent.
+			 * \param offset Offset of the velocity obstacle. For example to account for the agents' relative velocities.
+			 * \param radius Combined radius of the two agents (radius1 + radius2).
+			 * \param inverseDt 1 divided by the local avoidance time horizon (e.g avoid agents that we will hit within the next 2 seconds).
+			 * \param inverseDeltaTime 1 divided by the time step length.
 			 */
-			public VO (Vector2 offset, Vector2 p0, Vector2 dir, float weightFactor) {
-				colliding = true;
-				line1 = p0;
-				dir1 = -dir;
-
-				// Fully initialize the struct, compiler complains otherwise
-				origin = Vector2.zero;
-				center = Vector2.zero;
-				line2 = Vector2.zero;
-				dir2 = Vector2.zero;
-				cutoffLine = Vector2.zero;
-				cutoffDir = Vector2.zero;
-				sqrCutoffDistance = 0;
-				leftSide = false;
-				radius = 0;
-
+			public VO (Vector2 center, Vector2 offset, float radius, float inverseDt, float inverseDeltaTime) {
 				// Adjusted so that a parameter weightFactor of 1 will be the default ("natural") weight factor
-				this.weightFactor = weightFactor*0.5f;
-
-				//Debug.DrawRay ( To3D(offset + line1), To3D(dir1)*10, Color.red);
-			}
-
-			/** Creates a VO to avoid the three half planes with {point, tangent}s of {p1, p2-p1}, {p1, tang1}, {p2, tang2}.
-			 * tang1 and tang2 should be normalized.
-			 */
-			public VO (Vector2 offset, Vector2 p1, Vector2 p2, Vector2 tang1, Vector2 tang2, float weightFactor) {
-				// Adjusted so that a parameter weightFactor of 1 will be the default ("natural") weight factor
-				this.weightFactor = weightFactor*0.5f;
-
-				colliding = false;
-				cutoffLine = p1;
-				/** \todo Square root can theoretically be removed by passing another parameter */
-				cutoffDir = (p2-p1).normalized;
-				line1 = p1;
-				dir1 = tang1;
-				line2 = p2;
-				dir2 = tang2;
-
-				//dir1 = -dir1;
-				dir2 = -dir2;
-				cutoffDir = -cutoffDir;
-
-				// Fully initialize the struct, compiler complains otherwise
-				origin = Vector2.zero;
-				center = Vector2.zero;
-				sqrCutoffDistance = 0;
-				leftSide = false;
-				radius = 0;
-
-				weightFactor = 5;
-
-				//Debug.DrawRay (To3D(cutoffLine+offset), To3D(cutoffDir)*10, Color.blue);
-				//Debug.DrawRay (To3D(line1+offset), To3D(dir1)*10, Color.blue);
-				//Debug.DrawRay (To3D(line2+offset), To3D(dir2)*10, Color.cyan);
-			}
-
-			/** Creates a VO for avoiding another agent */
-			public VO (Vector2 center, Vector2 offset, float radius, Vector2 sideChooser, float inverseDt, float weightFactor) {
-				// Adjusted so that a parameter weightFactor of 1 will be the default ("natural") weight factor
-				this.weightFactor = weightFactor*0.5f;
+				this.weightFactor = 1;
+				weightBonus = 0;
 
 				//this.radius = radius;
 				Vector2 globalCenter;
-				this.origin = offset;
-				weightFactor = 0.5f;
 
+				circleCenter = center*inverseDt + offset;
+
+				this.weightFactor = 4*Mathf.Exp(-Sqr(center.sqrMagnitude/(radius*radius))) + 1;
 				// Collision?
 				if (center.magnitude < radius) {
 					colliding = true;
-					leftSide = false;
 
-					line1 = center.normalized * (center.magnitude - radius);
+					// 0.001 is there to make sure lin1.magnitude is not so small that the normalization
+					// below will return Vector2.zero as that will make the VO invalid and it will be ignored.
+					line1 = center.normalized * (center.magnitude - radius - 0.001f) * 0.3f * inverseDeltaTime;
 					dir1 = new Vector2(line1.y, -line1.x).normalized;
 					line1 += offset;
 
 					cutoffDir = Vector2.zero;
 					cutoffLine = Vector2.zero;
-					sqrCutoffDistance = 0;
 					dir2 = Vector2.zero;
 					line2 = Vector2.zero;
-					this.center = Vector2.zero;
 					this.radius = 0;
 				} else {
 					colliding = false;
@@ -395,14 +389,14 @@ namespace Pathfinding.RVO.Sampled {
 					radius *= inverseDt;
 					globalCenter = center+offset;
 
-					sqrCutoffDistance = center.magnitude - radius;
+					// 0.001 is there to make sure cutoffDistance is not so small that the normalization
+					// below will return Vector2.zero as that will make the VO invalid and it will be ignored.
+					var cutoffDistance = center.magnitude - radius + 0.001f;
 
-					this.center = center;
-					cutoffLine = center.normalized * sqrCutoffDistance;
+					cutoffLine = center.normalized * cutoffDistance;
 					cutoffDir = new Vector2(-cutoffLine.y, cutoffLine.x).normalized;
 					cutoffLine += offset;
 
-					sqrCutoffDistance *= sqrCutoffDistance;
 					float alpha = Mathf.Atan2(-center.y, -center.x);
 
 					float delta = Mathf.Abs(Mathf.Acos(radius/center.magnitude));
@@ -411,487 +405,293 @@ namespace Pathfinding.RVO.Sampled {
 
 					// Bounding Lines
 
-					leftSide = VectorMath.RightOrColinear(Vector2.zero, center, sideChooser);
+					// Point on circle
+					line1 = new Vector2(Mathf.Cos(alpha+delta), Mathf.Sin(alpha+delta));
+					// Vector tangent to circle which is the correct line tangent
+					// Note that this vector is normalized
+					dir1 = new Vector2(line1.y, -line1.x);
 
 					// Point on circle
-					line1 = new Vector2(Mathf.Cos(alpha+delta), Mathf.Sin(alpha+delta)) * radius;
+					line2 = new Vector2(Mathf.Cos(alpha-delta), Mathf.Sin(alpha-delta));
 					// Vector tangent to circle which is the correct line tangent
-					dir1 = new Vector2(line1.y, -line1.x).normalized;
+					// Note that this vector is normalized
+					dir2 = new Vector2(line2.y, -line2.x);
 
-					// Point on circle
-					line2 = new Vector2(Mathf.Cos(alpha-delta), Mathf.Sin(alpha-delta)) * radius;
-					// Vector tangent to circle which is the correct line tangent
-					dir2 = new Vector2(line2.y, -line2.x).normalized;
-
-					line1 += globalCenter;
-					line2 += globalCenter;
-
-					//Debug.DrawRay ( To3D(line1), To3D(dir1), Color.cyan );
-					//Debug.DrawRay ( To3D(line2), To3D(dir2), Color.cyan );
+					line1 = line1 * radius + globalCenter;
+					line2 = line2 * radius + globalCenter;
 				}
+
+				segmentStart = Vector2.zero;
+				segmentEnd = Vector2.zero;
+				segment = false;
 			}
 
-			/** Returns if \a p lies on the left side of a line which with one point in \a a and has a tangent in the direction of \a dir.
-			 * Also returns true if the points are colinear.
+			/** Complex number multiplication.
+			 * Used to rotate vectors in an efficient way.
+			 *
+			 * \see https://en.wikipedia.org/wiki/Complex_number#Multiplication_and_division
 			 */
-			public static bool Left (Vector2 a, Vector2 dir, Vector2 p) {
-				return (dir.x) * (p.y - a.y) - (p.x - a.x) * (dir.y) <= 0;
+			static Vector2 ComplexMultiply (Vector2 a, Vector2 b) {
+				return new Vector2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+			}
+
+			/** Creates a VO for avoiding another agent.
+			 * Note that the segment is directed, the agent will want to be on the left side of the segment.
+			 */
+			public static VO SegmentObstacle (Vector2 segmentStart, Vector2 segmentEnd, Vector2 offset, float radius, float inverseDt, float inverseDeltaTime) {
+				var vo = new VO();
+
+				// Adjusted so that a parameter weightFactor of 1 will be the default ("natural") weight factor
+				vo.weightFactor = 1;
+				// Just higher than anything else
+				vo.weightBonus = Mathf.Max(radius, 1)*40;
+
+				var closestOnSegment = VectorMath.ClosestPointOnSegment(segmentStart, segmentEnd, Vector2.zero);
+
+				// Collision?
+				if (closestOnSegment.magnitude <= radius) {
+					vo.colliding = true;
+
+					vo.line1 = closestOnSegment.normalized * (closestOnSegment.magnitude - radius) * 0.3f * inverseDeltaTime;
+					vo.dir1 = new Vector2(vo.line1.y, -vo.line1.x).normalized;
+					vo.line1 += offset;
+
+					vo.cutoffDir = Vector2.zero;
+					vo.cutoffLine = Vector2.zero;
+					vo.dir2 = Vector2.zero;
+					vo.line2 = Vector2.zero;
+					vo.radius = 0;
+
+					vo.segmentStart = Vector2.zero;
+					vo.segmentEnd = Vector2.zero;
+					vo.segment = false;
+				} else {
+					vo.colliding = false;
+
+					segmentStart *= inverseDt;
+					segmentEnd *= inverseDt;
+					radius *= inverseDt;
+
+					var cutoffTangent = (segmentEnd - segmentStart).normalized;
+					vo.cutoffDir = cutoffTangent;
+					vo.cutoffLine = segmentStart + new Vector2(-cutoffTangent.y, cutoffTangent.x) * radius;
+					vo.cutoffLine += offset;
+
+					// See documentation for details
+					// The call to Max is just to prevent floating point errors causing NaNs to appear
+					var startSqrMagnitude = segmentStart.sqrMagnitude;
+					var normal1 = -ComplexMultiply(segmentStart, new Vector2(radius, Mathf.Sqrt(Mathf.Max(0, startSqrMagnitude - radius*radius)))) / startSqrMagnitude;
+					var endSqrMagnitude = segmentEnd.sqrMagnitude;
+					var normal2 = -ComplexMultiply(segmentEnd, new Vector2(radius, -Mathf.Sqrt(Mathf.Max(0, endSqrMagnitude - radius*radius)))) / endSqrMagnitude;
+
+					vo.line1 = segmentStart + normal1 * radius + offset;
+					vo.line2 = segmentEnd + normal2 * radius + offset;
+
+					// Note that the normals are already normalized
+					vo.dir1 = new Vector2(normal1.y, -normal1.x);
+					vo.dir2 = new Vector2(normal2.y, -normal2.x);
+
+					vo.segmentStart = segmentStart;
+					vo.segmentEnd = segmentEnd;
+					vo.radius = radius;
+					vo.segment = true;
+				}
+
+				return vo;
 			}
 
 			/** Returns a negative number of if \a p lies on the left side of a line which with one point in \a a and has a tangent in the direction of \a dir.
 			 * The number can be seen as the double signed area of the triangle {a, a+dir, p} multiplied by the length of \a dir.
-			 * If length(dir)=1 this is also the distance from p to the line {a, a+dir}.
+			 * If dir.magnitude=1 this is also the distance from p to the line {a, a+dir}.
 			 */
-			public static float Det (Vector2 a, Vector2 dir, Vector2 p) {
+			public static float SignedDistanceFromLine (Vector2 a, Vector2 dir, Vector2 p) {
 				return (p.x - a.x) * (dir.y) - (dir.x) * (p.y - a.y);
 			}
 
-			public Vector2 Sample (Vector2 p, out float weight) {
+			/** Gradient and value of the cost function of this VO.
+			 * Very similar to the #Gradient method however the gradient
+			 * and value have been scaled and tweaked slightly.
+			 */
+			public Vector2 ScaledGradient (Vector2 p, out float weight) {
+				var grad = Gradient(p, out weight);
+
+				if (weight > 0) {
+					const float Scale = 2;
+					grad *= Scale * weightFactor;
+					weight *= Scale * weightFactor;
+					weight += 1 + weightBonus;
+				}
+
+				return grad;
+			}
+
+			/** Gradient and value of the cost function of this VO.
+			 * The VO has a cost function which is 0 outside the VO
+			 * and increases inside it as the point moves further into
+			 * the VO.
+			 *
+			 * This is the negative gradient of that function as well as its
+			 * value (the weight). The negative gradient points in the direction
+			 * where the function decreases the fastest.
+			 *
+			 * The value of the function is the distance to the closest edge
+			 * of the VO and the gradient is normalized.
+			 */
+			public Vector2 Gradient (Vector2 p, out float weight) {
 				if (colliding) {
 					// Calculate double signed area of the triangle consisting of the points
 					// {line1, line1+dir1, p}
-					float l1 = Det(line1, dir1, p);
+					float l1 = SignedDistanceFromLine(line1, dir1, p);
 
 					// Serves as a check for which side of the line the point p is
 					if (l1 >= 0) {
-						/*float dot1 = Vector2.Dot ( p - line1, dir1 );
-						 *
-						 * Vector2 c1 = dot1 * dir1 + line1;
-						 * return (c1-p);*/
-						weight = l1*weightFactor;
-						return new Vector2(-dir1.y, dir1.x)*weight*GlobalIncompressibility; // 10 is an arbitrary constant signifying incompressability
-						// (the higher the value, the more the agents will avoid penetration)
+						weight = l1;
+						return new Vector2(-dir1.y, dir1.x);
 					} else {
 						weight = 0;
 						return new Vector2(0, 0);
 					}
 				}
 
-				float det3 = Det(cutoffLine, cutoffDir, p);
+				float det3 = SignedDistanceFromLine(cutoffLine, cutoffDir, p);
 				if (det3 <= 0) {
 					weight = 0;
 					return Vector2.zero;
 				} else {
-					float det1 = Det(line1, dir1, p);
-					float det2 = Det(line2, dir2, p);
+					// Signed distances to the two edges along the sides of the VO
+					float det1 = SignedDistanceFromLine(line1, dir1, p);
+					float det2 = SignedDistanceFromLine(line2, dir2, p);
 					if (det1 >= 0 && det2 >= 0) {
 						// We are inside both of the half planes
 						// (all three if we count the cutoff line)
 						// and thus inside the forbidden region in velocity space
 
-						if (leftSide) {
-							if (det3 < radius) {
-								weight = det3*weightFactor;
-								return new Vector2(-cutoffDir.y, cutoffDir.x)*weight;
-							}
+						// Actually the negative gradient because we want the
+						// direction where it slopes the most downwards, not upwards
+						Vector2 gradient;
 
-							weight = det1;
-							return new Vector2(-dir1.y, dir1.x)*weight;
-						} else {
-							if (det3 < radius) {
-								weight = det3*weightFactor;
-								return new Vector2(-cutoffDir.y, cutoffDir.x)*weight;
+						// Check if we are in the semicircle region near the cap of the VO
+						if (Vector2.Dot(p - line1, dir1) > 0 && Vector2.Dot(p - line2, dir2) < 0) {
+							if (segment) {
+								// This part will only be reached for line obstacles (i.e not other agents)
+								if (det3 < radius) {
+									var closestPointOnLine = (Vector2)VectorMath.ClosestPointOnSegment(segmentStart, segmentEnd, p);
+									var dirFromCenter = p - closestPointOnLine;
+									float distToCenter;
+									gradient = VectorMath.Normalize(dirFromCenter, out distToCenter);
+									// The weight is the distance to the edge
+									weight = radius - distToCenter;
+									return gradient;
+								}
+							} else {
+								var dirFromCenter = p - circleCenter;
+								float distToCenter;
+								gradient = VectorMath.Normalize(dirFromCenter, out distToCenter);
+								// The weight is the distance to the edge
+								weight = radius - distToCenter;
+								return gradient;
 							}
-
-							weight = det2*weightFactor;
-							return new Vector2(-dir2.y, dir2.x)*weight;
 						}
-					}
-				}
 
-				weight = 0;
-				return new Vector2(0, 0);
+						if (segment && det3 < det1 && det3 < det2) {
+							weight = det3;
+							gradient = new Vector2(-cutoffDir.y, cutoffDir.x);
+							return gradient;
+						}
+
+						// Just move towards the closest edge
+						// The weight is the distance to the edge
+						if (det1 < det2) {
+							weight = det1;
+							gradient = new Vector2(-dir1.y, dir1.x);
+						} else {
+							weight = det2;
+							gradient = new Vector2(-dir2.y, dir2.x);
+						}
+
+						return gradient;
+					}
+
+					weight = 0;
+					return Vector2.zero;
+				}
+			}
+		}
+
+		/** Very simple list.
+		 * Cannot use a List<T> because when indexing into a List<T> and T is
+		 * a struct (which VO is) then the whole struct will be copied.
+		 * When indexing into an array, that copy can be skipped.
+		 */
+		internal class VOBuffer {
+			public VO[] buffer;
+			public int length;
+
+			public void Clear () {
+				length = 0;
 			}
 
-			public float ScalarSample (Vector2 p) {
-				if (colliding) {
-					// Calculate double signed area of the triangle consisting of the points
-					// {line1, line1+dir1, p}
-					float l1 = Det(line1, dir1, p);
+			public VOBuffer (int n) {
+				buffer = new VO[n];
+				length = 0;
+			}
 
-					// Serves as a check for which side of the line the point p is
-					if (l1 >= 0) {
-						/*float dot1 = Vector2.Dot ( p - line1, dir1 );
-						 *
-						 * Vector2 c1 = dot1 * dir1 + line1;
-						 * return (c1-p);*/
-						return l1*GlobalIncompressibility*weightFactor;
-					} else {
-						return 0;
-					}
+			public void Add (VO vo) {
+				if (length >= buffer.Length) {
+					var nbuffer = new VO[buffer.Length * 2];
+					buffer.CopyTo(nbuffer, 0);
+					buffer = nbuffer;
 				}
-
-				float det3 = Det(cutoffLine, cutoffDir, p);
-				if (det3 <= 0) {
-					return 0;
-				}
-
-				{
-					float det1 = Det(line1, dir1, p);
-					float det2 = Det(line2, dir2, p);
-					if (det1 >= 0 && det2 >= 0) {
-						if (leftSide) {
-							if (det3 < radius) {
-								return det3*weightFactor;
-							}
-
-							return det1*weightFactor;
-						} else {
-							if (det3 < radius) {
-								return det3*weightFactor;
-							}
-
-							return det2*weightFactor;
-						}
-					}
-				}
-
-				return 0;
+				buffer[length++] = vo;
 			}
 		}
 
 		internal void CalculateVelocity (Pathfinding.RVO.Simulator.WorkerContext context) {
-			if (locked) {
-				newVelocity = Vector2.zero;
+			if (manuallyControlled) {
 				return;
 			}
 
-			if (context.vos.Length < neighbours.Count+simulator.obstacles.Count) {
-				context.vos = new VO[Mathf.Max(context.vos.Length*2, neighbours.Count+simulator.obstacles.Count)];
+			if (locked) {
+				calculatedSpeed = 0;
+				calculatedTargetPoint = position;
+				return;
 			}
 
-			Vector2 position2D = new Vector2(position.x, position.z);
-
+			// Buffer which will be filled up with velocity obstacles (VOs)
 			var vos = context.vos;
-			var voCount = 0;
+			vos.Clear();
 
-			Vector2 optimalVelocity = new Vector2(velocity.x, velocity.z);
+			GenerateObstacleVOs(vos);
+			GenerateNeighbourAgentVOs(vos);
 
-			float inverseAgentTimeHorizon = 1.0f/agentTimeHorizon;
+			bool insideAnyVO = BiasDesiredVelocity(vos, ref desiredVelocity, ref desiredTargetPointInVelocitySpace, simulator.symmetryBreakingBias);
 
-			float wallThickness = simulator.WallThickness;
-
-			float wallWeight = simulator.algorithm == Simulator.SamplingAlgorithm.GradientDescent ? 1 : WallWeight;
-
-			for (int i = 0; i < simulator.obstacles.Count; i++) {
-				var obstacle = simulator.obstacles[i];
-				var vertex = obstacle;
-				do {
-					if (vertex.ignore || position.y > vertex.position.y + vertex.height || position.y+height < vertex.position.y || (vertex.layer & collidesWith) == 0) {
-						vertex = vertex.next;
-						continue;
-					}
-
-					float cross = VO.Det(new Vector2(vertex.position.x, vertex.position.z), vertex.dir, position2D);// vertex.dir.x * ( vertex.position.z - position.z ) - vertex.dir.y * ( vertex.position.x - position.x );
-
-					// Signed distance from the line (not segment), lines are infinite
-					// Usually divided by vertex.dir.magnitude, but that is known to be 1
-					float signedDist = cross;
-
-					float dotFactor = Vector2.Dot(vertex.dir, position2D - new Vector2(vertex.position.x, vertex.position.z));
-
-					// It is closest to the segment
-					// if the dotFactor is <= 0 or >= length of the segment
-					// WallThickness*0.1 is added as a margin to avoid false positives when moving along the edges of square obstacles
-					bool closestIsEndpoints = dotFactor <= wallThickness*0.05f || dotFactor >= (new Vector2(vertex.position.x, vertex.position.z) - new Vector2(vertex.next.position.x, vertex.next.position.z)).magnitude - wallThickness*0.05f;
-
-					if (Mathf.Abs(signedDist) < neighbourDist) {
-						if (signedDist <= 0 && !closestIsEndpoints && signedDist > -wallThickness) {
-							// Inside the wall on the "wrong" side
-							vos[voCount] = new VO(position2D, new Vector2(vertex.position.x, vertex.position.z) - position2D, vertex.dir, wallWeight*2);
-							voCount++;
-						} else if (signedDist > 0) {
-							//Debug.DrawLine (position, (vertex.position+vertex.next.position)*0.5f, Color.yellow);
-							Vector2 p1 = new Vector2(vertex.position.x, vertex.position.z) - position2D;
-							Vector2 p2 = new Vector2(vertex.next.position.x, vertex.next.position.z) - position2D;
-							Vector2 tang1 = (p1).normalized;
-							Vector2 tang2 = (p2).normalized;
-							vos[voCount] = new VO(position2D, p1, p2, tang1, tang2, wallWeight);
-							voCount++;
-						}
-					}
-					vertex = vertex.next;
-				} while (vertex != obstacle);
+			if (!insideAnyVO) {
+				// Desired velocity can be used directly since it was not inside any velocity obstacle.
+				// No need to run optimizer because this will be the global minima.
+				// This is also a special case in which we can set the
+				// calculated target point to the desired target point
+				// instead of calculating a point based on a calculated velocity
+				// which is an important difference when the agent is very close
+				// to the target point
+				// TODO: Not actually guaranteed to be global minima if desiredTargetPointInVelocitySpace.magnitude < desiredSpeed
+				// maybe do something different here?
+				calculatedTargetPoint = desiredTargetPointInVelocitySpace + position;
+				calculatedSpeed = desiredSpeed;
+				if (DebugDraw) Draw.Debug.CrossXZ(FromXZ(calculatedTargetPoint), Color.white);
+				return;
 			}
-
-			for (int o = 0; o < neighbours.Count; o++) {
-				Agent other = neighbours[o];
-
-				if (other == this) continue;
-
-				float maxY = System.Math.Min(position.y+height, other.position.y+other.height);
-				float minY = System.Math.Max(position.y, other.position.y);
-
-				//The agents cannot collide since they
-				//are on different y-levels
-				if (maxY - minY < 0) {
-					continue;
-				}
-
-				Vector2 otherOptimalVelocity = new Vector2(other.Velocity.x, other.velocity.z);
-
-
-				float totalRadius = radius + other.radius;
-
-				// Describes a circle on the border of the VO
-				//float boundingRadius = totalRadius * inverseAgentTimeHorizon;
-				Vector2 voBoundingOrigin = new Vector2(other.position.x, other.position.z) - position2D;
-
-				//float boundingDist = voBoundingOrigin.magnitude;
-
-				Vector2 relativeVelocity = optimalVelocity - otherOptimalVelocity;
-
-				{
-					//voBoundingOrigin *= inverseAgentTimeHorizon;
-					//boundingDist *= inverseAgentTimeHorizon;
-
-					// Common case, no collision
-
-					Vector2 voCenter;
-					if (other.locked) {
-						voCenter = otherOptimalVelocity;
-					} else {
-						voCenter = (optimalVelocity + otherOptimalVelocity)*0.5f;
-					}
-
-					vos[voCount] = new VO(voBoundingOrigin, voCenter, totalRadius, relativeVelocity, inverseAgentTimeHorizon, 1);
-					voCount++;
-					if (DebugDraw) DrawVO(position2D + voBoundingOrigin*inverseAgentTimeHorizon + voCenter, totalRadius*inverseAgentTimeHorizon, position2D + voCenter);
-				}
-
-
-			}
-
 
 			Vector2 result = Vector2.zero;
 
-			if (simulator.algorithm == Simulator.SamplingAlgorithm.GradientDescent) {
-				if (DebugDraw) {
-					const int PlotWidth = 40;
-					const float WorldPlotWidth = 15;
+			result = GradientDescent(vos, currentVelocity, desiredVelocity);
 
-					for (int x = 0; x < PlotWidth; x++) {
-						for (int y = 0; y < PlotWidth; y++) {
-							Vector2 p = new Vector2(x*WorldPlotWidth / PlotWidth, y*WorldPlotWidth / PlotWidth);
+			if (DebugDraw) Draw.Debug.CrossXZ(FromXZ(result+position), Color.white);
+			//Debug.DrawRay (To3D (position), To3D (result));
 
-							Vector2 dir = Vector2.zero;
-							float weight = 0;
-							for (int i = 0; i < voCount; i++) {
-								float w;
-								dir += vos[i].Sample(p-position2D, out w);
-								if (w > weight) weight = w;
-							}
-							Vector2 d2 = (new Vector2(desiredVelocity.x, desiredVelocity.z) - (p-position2D));
-							dir += d2*DesiredVelocityScale;
-
-							if (d2.magnitude * DesiredVelocityWeight > weight) weight = d2.magnitude * DesiredVelocityWeight;
-
-							if (weight > 0) dir /= weight;
-
-							//Vector2 d3 = simulator.SampleDensity (p+position2D);
-							Debug.DrawRay(To3D(p), To3D(d2*0.00f), Color.blue);
-							//simulator.Plot (p, Rainbow(weight*simulator.colorScale));
-
-							float sc = 0;
-							Vector2 p0 = p - Vector2.one*WorldPlotWidth*0.5f;
-							Vector2 p1 = Trace(vos, voCount, p0, 0.01f, out sc);
-							if ((p0 - p1).sqrMagnitude < Sqr(WorldPlotWidth / PlotWidth)*2.6f) {
-								Debug.DrawRay(To3D(p1 + position2D), Vector3.up*1, Color.red);
-							}
-						}
-					}
-				}
-
-				//if ( debug ) {
-				float best = float.PositiveInfinity;
-
-				float cutoff = new Vector2(velocity.x, velocity.z).magnitude*simulator.qualityCutoff;
-
-				//for ( int i = 0; i < 10; i++ ) {
-				{
-					result = Trace(vos, voCount, new Vector2(desiredVelocity.x, desiredVelocity.z), cutoff, out best);
-					if (DebugDraw) DrawCross(result+position2D, Color.yellow, 0.5f);
-				}
-
-				// Can be uncommented for higher quality local avoidance
-				/*for ( int i = 0; i < 3; i++ ) {
-				 *  Vector2 p = desiredVelocity + new Vector2(Mathf.Cos(Mathf.PI*2*(i/3.0f)), Mathf.Sin(Mathf.PI*2*(i/3.0f)));
-				 *  float score;
-				 *  Vector2 res = Trace ( vos, voCount, p, velocity.magnitude*simulator.qualityCutoff, out score );
-				 *
-				 *  if ( score < best ) {
-				 *      //if ( score < best*0.9f ) Debug.Log ("Better " + score + " < " + best);
-				 *      result = res;
-				 *      best = score;
-				 *  }
-				 * }*/
-
-				{
-					Vector2 p = Velocity;
-					float score;
-					Vector2 res = Trace(vos, voCount, p, cutoff, out score);
-
-					if (score < best) {
-						//if ( score < best*0.9f ) Debug.Log ("Better " + score + " < " + best);
-						result = res;
-						best = score;
-					}
-					if (DebugDraw) DrawCross(res+position2D, Color.magenta, 0.5f);
-				}
-			} else {
-				// Adaptive sampling
-
-				Vector2[] samplePos = context.samplePos;
-				float[] sampleSize = context.sampleSize;
-				int samplePosCount = 0;
-
-
-				Vector2 desired2D = new Vector2(desiredVelocity.x, desiredVelocity.z);
-				float sampleScale = Mathf.Max(radius, Mathf.Max(desired2D.magnitude, Velocity.magnitude));
-				samplePos[samplePosCount] = desired2D;
-				sampleSize[samplePosCount] = sampleScale*0.3f;
-				samplePosCount++;
-
-				const float GridScale = 0.3f;
-
-				// Initial 9 samples
-				samplePos[samplePosCount] = optimalVelocity;
-				sampleSize[samplePosCount] = sampleScale*GridScale;
-				samplePosCount++;
-
-				{
-					Vector2 fw = optimalVelocity * 0.5f;
-					Vector2 rw = new Vector2(fw.y, -fw.x);
-
-					const int Steps = 8;
-					for (int i = 0; i < Steps; i++) {
-						samplePos[samplePosCount] = rw * Mathf.Sin(i*Mathf.PI*2 / Steps) + fw * (1 + Mathf.Cos(i*Mathf.PI*2 / Steps));
-						sampleSize[samplePosCount] = (1.0f - (Mathf.Abs(i - Steps*0.5f)/Steps))*sampleScale*0.5f;
-						samplePosCount++;
-					}
-
-					const float InnerScale = 0.6f;
-					fw *= InnerScale;
-					rw *= InnerScale;
-
-					const int Steps2 = 6;
-					for (int i = 0; i < Steps2; i++) {
-						samplePos[samplePosCount] = rw * Mathf.Cos((i+0.5f)*Mathf.PI*2 / Steps2) + fw * ((1.0f/InnerScale) + Mathf.Sin((i+0.5f)*Mathf.PI*2 / Steps2));
-						sampleSize[samplePosCount] = sampleScale*0.3f;
-						samplePosCount++;
-					}
-
-					const float TargetScale = 0.2f;
-
-					const int Steps3 = 6;
-					for (int i = 0; i < Steps3; i++) {
-						samplePos[samplePosCount] = optimalVelocity + new Vector2(sampleScale * TargetScale * Mathf.Cos((i+0.5f)*Mathf.PI*2 / Steps3), sampleScale * TargetScale * Mathf.Sin((i+0.5f)*Mathf.PI*2 / Steps3));
-						sampleSize[samplePosCount] = sampleScale*TargetScale*2;
-						samplePosCount++;
-					}
-				}
-
-				samplePos[samplePosCount] = optimalVelocity*0.5f;
-				sampleSize[samplePosCount] = sampleScale*0.4f;
-				samplePosCount++;
-
-				const int KeepCount = Simulator.WorkerContext.KeepCount;
-				Vector2[] bestPos = context.bestPos;
-				float[] bestSizes = context.bestSizes;
-				float[] bestScores = context.bestScores;
-
-				for (int i = 0; i < KeepCount; i++) {
-					bestScores[i] = float.PositiveInfinity;
-				}
-				bestScores[KeepCount] = float.NegativeInfinity;
-
-				Vector2 bestEver = optimalVelocity;
-				float bestEverScore = float.PositiveInfinity;
-
-				for (int sub = 0; sub < 3; sub++) {
-					for (int i = 0; i < samplePosCount; i++) {
-						float score = 0;
-						for (int vo = 0; vo < voCount; vo++) {
-							score = System.Math.Max(score, vos[vo].ScalarSample(samplePos[i]));
-						}
-						// Note that velocity is a vector and speed is a scalar, not the same thing
-						float bonusForDesiredVelocity = (samplePos[i] - desired2D).magnitude;
-
-						// This didn't work out as well as I though
-						// Code left here because I might reenable it later
-						//float bonusForDesiredSpeed = Mathf.Abs (samplePos[i].magnitude - desired2D.magnitude);
-
-						float biasedScore = score + bonusForDesiredVelocity*DesiredVelocityWeight;// + bonusForDesiredSpeed*0;
-						score += bonusForDesiredVelocity*0.001f;
-
-						if (DebugDraw) {
-							DrawCross(position2D + samplePos[i], Rainbow(Mathf.Log(score+1)*5), sampleSize[i]*0.5f);
-						}
-
-						if (biasedScore < bestScores[0]) {
-							for (int j = 0; j < KeepCount; j++) {
-								if (biasedScore >= bestScores[j+1]) {
-									bestScores[j] = biasedScore;
-									bestSizes[j] = sampleSize[i];
-									bestPos[j] = samplePos[i];
-									break;
-								}
-							}
-						}
-
-						if (score < bestEverScore) {
-							bestEver = samplePos[i];
-							bestEverScore = score;
-
-							if (score == 0) {
-								sub = 100;
-								break;
-							}
-						}
-					}
-
-					samplePosCount = 0;
-
-					for (int i = 0; i < KeepCount; i++) {
-						Vector2 p = bestPos[i];
-						float s = bestSizes[i];
-						bestScores[i] = float.PositiveInfinity;
-
-						const float Half = 0.6f;
-
-						float offset = s * Half * 0.5f;
-
-						samplePos[samplePosCount+0] = (p + new Vector2(+offset, +offset));
-						samplePos[samplePosCount+1] = (p + new Vector2(-offset, +offset));
-						samplePos[samplePosCount+2] = (p + new Vector2(-offset, -offset));
-						samplePos[samplePosCount+3] = (p + new Vector2(+offset, -offset));
-
-						s *= s * Half;
-						sampleSize[samplePosCount+0] = (s);
-						sampleSize[samplePosCount+1] = (s);
-						sampleSize[samplePosCount+2] = (s);
-						sampleSize[samplePosCount+3] = (s);
-						samplePosCount += 4;
-					}
-				}
-
-				result = bestEver;
-			}
-
-
-			if (DebugDraw) DrawCross(result+position2D);
-
-
-			newVelocity = To3D(Vector2.ClampMagnitude(result, maxSpeed));
+			calculatedTargetPoint = position + result;
+			calculatedSpeed = Mathf.Min(result.magnitude, maxSpeed);
 		}
-
-		public static float DesiredVelocityWeight = 0.02f;
-		public static float DesiredVelocityScale = 0.1f;
-		//public static float DesiredSpeedScale = 0.0f;
-		public static float GlobalIncompressibility = 30;
-
-		/** Extra weight that walls will have */
-		const float WallWeight = 5;
 
 		static Color Rainbow (float v) {
 			Color c = new Color(v, 0, 0);
@@ -901,88 +701,260 @@ namespace Pathfinding.RVO.Sampled {
 			return c;
 		}
 
+		void GenerateObstacleVOs (VOBuffer vos) {
+			var range = maxSpeed * obstacleTimeHorizon;
+
+			// Iterate through all obstacles that we might need to avoid
+			for (int i = 0; i < simulator.obstacles.Count; i++) {
+				var obstacle = simulator.obstacles[i];
+				var vertex = obstacle;
+				// Iterate through all edges (defined by vertex and vertex.dir) in the obstacle
+				do {
+					// Ignore the edge if the agent should not collide with it
+					if (vertex.ignore || (vertex.layer & collidesWith) == 0) {
+						vertex = vertex.next;
+						continue;
+					}
+
+					// Start and end points of the current segment
+					float elevation1, elevation2;
+					var p1 = To2D(vertex.position, out elevation1);
+					var p2 = To2D(vertex.next.position, out elevation2);
+
+					Vector2 dir = (p2 - p1).normalized;
+
+					// Signed distance from the line (not segment, lines are infinite)
+					// TODO: Can be optimized
+					float dist = VO.SignedDistanceFromLine(p1, dir, position);
+
+					if (dist >= -0.01f && dist < range) {
+						float factorAlongSegment = Vector2.Dot(position - p1, p2 - p1) / (p2 - p1).sqrMagnitude;
+
+						// Calculate the elevation (y) coordinate of the point on the segment closest to the agent
+						var segmentY = Mathf.Lerp(elevation1, elevation2, factorAlongSegment);
+
+						// Calculate distance from the segment (not line)
+						var sqrDistToSegment = (Vector2.Lerp(p1, p2, factorAlongSegment) - position).sqrMagnitude;
+
+						// Ignore the segment if it is too far away
+						// or the agent is too high up (or too far down) on the elevation axis (usually y axis) to avoid it
+						if (sqrDistToSegment < range*range && elevationCoordinate <= segmentY + vertex.height && elevationCoordinate+height >= segmentY) {
+							vos.Add(VO.SegmentObstacle(p2 - position, p1 - position, Vector2.zero, radius * 0.01f, 1f / ObstacleTimeHorizon, 1f / simulator.DeltaTime));
+						}
+					}
+
+					vertex = vertex.next;
+				} while (vertex != obstacle && vertex != null && vertex.next != null);
+			}
+		}
+
+		void GenerateNeighbourAgentVOs (VOBuffer vos) {
+			float inverseAgentTimeHorizon = 1.0f/agentTimeHorizon;
+
+			// The RVO algorithm assumes we will continue to
+			// move in roughly the same direction
+			Vector2 optimalVelocity = currentVelocity;
+
+			for (int o = 0; o < neighbours.Count; o++) {
+				Agent other = neighbours[o];
+
+				// Don't avoid ourselves
+				if (other == this)
+					continue;
+
+				// Interval along the y axis in which the agents overlap
+				float maxY = System.Math.Min(elevationCoordinate + height, other.elevationCoordinate + other.height);
+				float minY = System.Math.Max(elevationCoordinate, other.elevationCoordinate);
+
+				// The agents cannot collide since they are on different y-levels
+				if (maxY - minY < 0) {
+					continue;
+				}
+
+				float totalRadius = radius + other.radius;
+
+				// Describes a circle on the border of the VO
+				Vector2 voBoundingOrigin = other.position - position;
+
+				float avoidanceStrength;
+				if (other.locked || other.manuallyControlled) {
+					avoidanceStrength = 1;
+				} else if (other.Priority > 0.00001f || Priority > 0.00001f) {
+					avoidanceStrength = other.Priority / (Priority + other.Priority);
+				} else {
+					// Both this agent's priority and the other agent's priority is zero or negative
+					// Assume they have the same priority
+					avoidanceStrength = 0.5f;
+				}
+
+				// We assume that the other agent will continue to move with roughly the same velocity if the priorities for the agents are similar.
+				// If the other agent has a higher priority than this agent (avoidanceStrength > 0.5) then we will assume it will move more along its
+				// desired velocity. This will have the effect of other agents trying to clear a path for where a high priority agent wants to go.
+				// If this is not done then even high priority agents can get stuck when it is really crowded and they have had to slow down.
+				Vector2 otherOptimalVelocity = Vector2.Lerp(other.currentVelocity, other.desiredVelocity, 2*avoidanceStrength - 1);
+
+				var voCenter = Vector2.Lerp(optimalVelocity, otherOptimalVelocity, avoidanceStrength);
+
+				vos.Add(new VO(voBoundingOrigin, voCenter, totalRadius, inverseAgentTimeHorizon, 1 / simulator.DeltaTime));
+				if (DebugDraw)
+					DrawVO(position + voBoundingOrigin * inverseAgentTimeHorizon + voCenter, totalRadius * inverseAgentTimeHorizon, position + voCenter);
+			}
+		}
+
+		Vector2 GradientDescent (VOBuffer vos, Vector2 sampleAround1, Vector2 sampleAround2) {
+			float score1;
+			var minima1 = Trace(vos, sampleAround1, out score1);
+
+			if (DebugDraw) Draw.Debug.CrossXZ(FromXZ(minima1 + position), Color.yellow, 0.5f);
+
+			// Can be uncommented for higher quality local avoidance
+			// for ( int i = 0; i < 3; i++ ) {
+			//	Vector2 p = desiredVelocity + new Vector2(Mathf.Cos(Mathf.PI*2*(i/3.0f)), Mathf.Sin(Mathf.PI*2*(i/3.0f)));
+			//	float score;Vector2 res = Trace ( vos, p, velocity.magnitude*simulator.qualityCutoff, out score );
+			//
+			//	if ( score < best ) {
+			//		result = res;
+			//		best = score;
+			//	}
+			// }
+
+			float score2;
+			Vector2 minima2 = Trace(vos, sampleAround2, out score2);
+			if (DebugDraw) Draw.Debug.CrossXZ(FromXZ(minima2 + position), Color.magenta, 0.5f);
+
+			return score1 < score2 ? minima1 : minima2;
+		}
+
+
+		/** Bias towards the right side of agents.
+		 * Rotate desiredVelocity at most [value] number of radians. 1 radian ≈ 57°
+		 * This breaks up symmetries.
+		 *
+		 * The desired velocity will only be rotated if it is inside a velocity obstacle (VO).
+		 * If it is inside one, it will not be rotated further than to the edge of it
+		 *
+		 * The targetPointInVelocitySpace will be rotated by the same amount as the desired velocity
+		 *
+		 * \returns True if the desired velocity was inside any VO
+		 */
+		static bool BiasDesiredVelocity (VOBuffer vos, ref Vector2 desiredVelocity, ref Vector2 targetPointInVelocitySpace, float maxBiasRadians) {
+			var desiredVelocityMagn = desiredVelocity.magnitude;
+			var maxValue = 0f;
+
+			for (int i = 0; i < vos.length; i++) {
+				float value;
+				// The value is approximately the distance to the edge of the VO
+				// so taking the maximum will give us the distance to the edge of the VO
+				// which the desired velocity is furthest inside
+				vos.buffer[i].Gradient(desiredVelocity, out value);
+				maxValue = Mathf.Max(maxValue, value);
+			}
+
+			// Check if the agent was inside any VO
+			var inside = maxValue > 0;
+
+			// Avoid division by zero below
+			if (desiredVelocityMagn < 0.001f) {
+				return inside;
+			}
+
+			// Rotate the desired velocity clockwise (to the right) at most maxBiasRadians number of radians
+			// Assuming maxBiasRadians is small, we can just move it instead and it will give approximately the same effect
+			// See https://en.wikipedia.org/wiki/Small-angle_approximation
+			var angle = Mathf.Min(maxBiasRadians, maxValue / desiredVelocityMagn);
+			desiredVelocity += new Vector2(desiredVelocity.y, -desiredVelocity.x) * angle;
+			targetPointInVelocitySpace += new Vector2(targetPointInVelocitySpace.y, -targetPointInVelocitySpace.x) * angle;
+			return inside;
+		}
+
+		/** Evaluate gradient and value of the cost function at velocity p */
+		Vector2 EvaluateGradient (VOBuffer vos, Vector2 p, out float value) {
+			Vector2 gradient = Vector2.zero;
+
+			value = 0;
+
+			// Avoid other agents
+			for (int i = 0; i < vos.length; i++) {
+				float w;
+				var grad = vos.buffer[i].ScaledGradient(p, out w);
+				if (w > value) {
+					value = w;
+					gradient = grad;
+				}
+			}
+
+			// Move closer to the desired velocity
+			var dirToDesiredVelocity = desiredVelocity - p;
+			var distToDesiredVelocity = dirToDesiredVelocity.magnitude;
+			if (distToDesiredVelocity > 0.0001f) {
+				gradient += dirToDesiredVelocity * (DesiredVelocityWeight/distToDesiredVelocity);
+				value += distToDesiredVelocity * DesiredVelocityWeight;
+			}
+
+			// Prefer speeds lower or equal to the desired speed
+			// and avoid speeds greater than the max speed
+			var sqrSpeed = p.sqrMagnitude;
+			if (sqrSpeed > desiredSpeed*desiredSpeed) {
+				var speed = Mathf.Sqrt(sqrSpeed);
+
+				if (speed > maxSpeed) {
+					const float MaxSpeedWeight = 3;
+					value += MaxSpeedWeight * (speed - maxSpeed);
+					gradient -= MaxSpeedWeight * (p/speed);
+				}
+
+				// Scale needs to be strictly greater than DesiredVelocityWeight
+				// otherwise the agent will not prefer the desired speed over
+				// the maximum speed
+				float scale = 2*DesiredVelocityWeight;
+				value += scale * (speed - desiredSpeed);
+				gradient -= scale * (p/speed);
+			}
+
+			return gradient;
+		}
+
 		/** Traces the vector field constructed out of the velocity obstacles.
 		 * Returns the position which gives the minimum score (approximately).
+		 *
+		 * \see https://en.wikipedia.org/wiki/Gradient_descent
 		 */
-		Vector2 Trace (VO[] vos, int voCount, Vector2 p, float cutoff, out float score) {
-			score = 0;
-			float stepScale = simulator.stepScale;
+		Vector2 Trace (VOBuffer vos, Vector2 p, out float score) {
+			// Pick a reasonable initial step size
+			float stepSize = Mathf.Max(radius, 0.2f * desiredSpeed);
 
 			float bestScore = float.PositiveInfinity;
 			Vector2 bestP = p;
 
-			for (int s = 0; s < 50; s++) {
-				float step = 1.0f - (s/50.0f);
-				step *= stepScale;
+			// TODO: Add momentum to speed up convergence?
 
-				Vector2 dir = Vector2.zero;
-				float mx = 0;
-				for (int i = 0; i < voCount; i++) {
-					float w;
-					Vector2 d = vos[i].Sample(p, out w);
-					dir += d;
+			const int MaxIterations = 50;
 
-					if (w > mx) mx = w;
-					//mx = System.Math.Max (mx, d.sqrMagnitude);
+			for (int s = 0; s < MaxIterations; s++) {
+				float step = 1.0f - (s/(float)MaxIterations);
+				step = Sqr(step) * stepSize;
+
+				float value;
+				var gradient = EvaluateGradient(vos, p, out value);
+
+				if (value < bestScore) {
+					bestScore = value;
+					bestP = p;
 				}
 
+				// TODO: Add cutoff for performance
 
-				// This didn't work out as well as I though
-				// Code left here because I might reenable it later
-				//Vector2 bonusForDesiredSpeed = p.normalized *  new Vector2(desiredVelocity.x,desiredVelocity.z).magnitude - p;
+				gradient.Normalize();
 
-				Vector2 bonusForDesiredVelocity = (new Vector2(desiredVelocity.x, desiredVelocity.z) - p);
-
-				float weight = bonusForDesiredVelocity.magnitude*DesiredVelocityWeight;// + bonusForDesiredSpeed.magnitude*DesiredSpeedScale;
-				dir += bonusForDesiredVelocity*DesiredVelocityScale;// + bonusForDesiredSpeed*DesiredSpeedScale;
-				mx = System.Math.Max(mx, weight);
-
-
-				score = mx;
-
-
-
-				if (score < bestScore) {
-					bestScore = score;
-				}
-
-				bestP = p;
-				if (score <= cutoff && s > 10) break;
-
-				float sq = dir.sqrMagnitude;
-				if (sq > 0) dir *= mx/Mathf.Sqrt(sq);
-
-				dir *= step;
+				gradient *= step;
 				Vector2 prev = p;
-				p += dir;
-				if (DebugDraw) Debug.DrawLine(To3D(prev)+position, To3D(p)+position, Rainbow(0.1f/score) * new Color(1, 1, 1, 0.2f));
-			}
+				p += gradient;
 
+				if (DebugDraw) Debug.DrawLine(FromXZ(prev + position), FromXZ(p + position), Rainbow(s*0.1f) * new Color(1, 1, 1, 1f));
+			}
 
 			score = bestScore;
 			return bestP;
-		}
-
-		/** Returns the intersection factors for line 1 and line 2. The intersection factors is a distance along the line \a start - \a end where the other line intersects it.\n
-		 * \code intersectionPoint = start1 + factor1 * (end1-start1) \endcode
-		 * \code intersectionPoint2 = start2 + factor2 * (end2-start2) \endcode
-		 * Lines are treated as infinite.\n
-		 * false is returned if the lines are parallel and true if they are not.
-		 */
-		public static bool IntersectionFactor (Vector2 start1, Vector2 dir1, Vector2 start2, Vector2 dir2, out float factor) {
-			float den = dir2.y*dir1.x - dir2.x * dir1.y;
-
-			// Parallel
-			if (den == 0) {
-				factor = 0;
-				return false;
-			}
-
-			float nom = dir2.x*(start1.y-start2.y)- dir2.y*(start1.x-start2.x);
-
-			factor = nom/den;
-
-			return true;
 		}
 	}
 }

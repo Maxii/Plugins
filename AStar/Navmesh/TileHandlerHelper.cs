@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Pathfinding.Util;
 
 namespace Pathfinding {
+#if !ASTAR_NO_RECAST_GRAPH || !ASTAR_NO_NAVMESH_GRAPH
 	/** Helper for navmesh cut objects.
 	 * Adding an instance of this component into the scene makes
 	 * sure that NavmeshCut components update the recast graph correctly when they move around.
@@ -10,7 +11,7 @@ namespace Pathfinding {
 	 * \astarpro
 	 */
 	[HelpURL("http://arongranberg.com/astar/docs/class_pathfinding_1_1_tile_handler_helper.php")]
-	public class TileHandlerHelper : MonoBehaviour {
+	public class TileHandlerHelper : VersionedMonoBehaviour {
 		TileHandler handler;
 
 		/** How often to check if an update needs to be done (real seconds between checks).
@@ -23,30 +24,53 @@ namespace Pathfinding {
 		 */
 		public float updateInterval;
 
-		float lastUpdateTime = -999;
+		float lastUpdateTime = float.NegativeInfinity;
 
-		readonly List<Bounds> forcedReloadBounds = new List<Bounds>();
+		readonly List<IntRect> forcedReloadRects = new List<IntRect>();
 
 		/** Use the specified handler, will create one at start if not called */
-		public void UseSpecifiedHandler (TileHandler handler) {
-			this.handler = handler;
+		public void UseSpecifiedHandler (TileHandler newHandler) {
+			if (!enabled) throw new System.InvalidOperationException("TileHandlerHelper is disabled");
+
+			if (handler != null) {
+				NavmeshClipper.RemoveEnableCallback(HandleOnEnableCallback, HandleOnDisableCallback);
+				handler.graph.OnRecalculatedTiles -= OnRecalculatedTiles;
+			}
+
+			handler = newHandler;
+
+			if (handler != null) {
+				NavmeshClipper.AddEnableCallback(HandleOnEnableCallback, HandleOnDisableCallback);
+				handler.graph.OnRecalculatedTiles += OnRecalculatedTiles;
+			}
 		}
 
 		void OnEnable () {
-			NavmeshCut.OnDestroyCallback += HandleOnDestroyCallback;
+			if (handler != null) {
+				NavmeshClipper.AddEnableCallback(HandleOnEnableCallback, HandleOnDisableCallback);
+				handler.graph.OnRecalculatedTiles += OnRecalculatedTiles;
+			}
+			forcedReloadRects.Clear();
 		}
 
 		void OnDisable () {
-			NavmeshCut.OnDestroyCallback -= HandleOnDestroyCallback;
+			if (handler != null) {
+				NavmeshClipper.RemoveEnableCallback(HandleOnEnableCallback, HandleOnDisableCallback);
+				forcedReloadRects.Clear();
+				handler.graph.OnRecalculatedTiles -= OnRecalculatedTiles;
+			}
 		}
 
+		/** Discards all pending updates caused by moved or modified navmesh cuts */
 		public void DiscardPending () {
-			List<NavmeshCut> cuts = NavmeshCut.GetAll();
-			for (int i = 0; i < cuts.Count; i++) {
-				if (cuts[i].RequiresUpdate()) {
-					cuts[i].NotifyUpdated();
+			if (handler != null) {
+				for (var cut = handler.cuts.AllItems; cut != null; cut = cut.next) {
+					if (cut.obj.RequiresUpdate()) {
+						cut.obj.NotifyUpdated();
+					}
 				}
 			}
+			forcedReloadRects.Clear();
 		}
 
 		void Start () {
@@ -56,29 +80,55 @@ namespace Pathfinding {
 				return;
 			}
 
-			if (handler == null) {
-				if (AstarPath.active == null || AstarPath.active.astarData.recastGraph == null) {
-					Debug.LogWarning("No AstarPath object in the scene or no RecastGraph on that AstarPath object");
-				}
+			if (handler == null) FindGraph();
+		}
 
-				handler = new TileHandler(AstarPath.active.astarData.recastGraph);
-				handler.CreateTileTypesFromGraph();
+		void FindGraph () {
+			if (AstarPath.active != null) {
+				var graph = AstarPath.active.data.recastGraph as NavmeshBase ?? AstarPath.active.data.navmesh;
+				if (graph != null) {
+					UseSpecifiedHandler(new TileHandler(graph));
+					handler.CreateTileTypesFromGraph();
+				}
 			}
 		}
 
-		/** Called when a NavmeshCut is destroyed */
-		void HandleOnDestroyCallback (NavmeshCut obj) {
-			forcedReloadBounds.Add(obj.LastBounds);
-			lastUpdateTime = -999;
+		/** Called when some recast graph tiles have been completely recalculated */
+		void OnRecalculatedTiles (NavmeshTile[] tiles) {
+			if (!handler.isValid) {
+				UseSpecifiedHandler(new TileHandler(handler.graph));
+			}
+
+			handler.OnRecalculatedTiles(tiles);
+		}
+
+		/** Called when a NavmeshCut or NavmeshAdd is enabled */
+		void HandleOnEnableCallback (NavmeshClipper obj) {
+			var graphSpaceBounds = obj.GetBounds(handler.graph.transform);
+			var touchingTiles = handler.graph.GetTouchingTilesInGraphSpace(graphSpaceBounds);
+
+			handler.cuts.Add(obj, touchingTiles);
+			obj.ForceUpdate();
+		}
+
+		/** Called when a NavmeshCut or NavmeshAdd is disabled */
+		void HandleOnDisableCallback (NavmeshClipper obj) {
+			var root = handler.cuts.GetRoot(obj);
+
+			if (root != null) {
+				forcedReloadRects.Add(root.previousBounds);
+				handler.cuts.Remove(obj);
+			}
+			lastUpdateTime = float.NegativeInfinity;
 		}
 
 		/** Update is called once per frame */
 		void Update () {
-			if (updateInterval == -1 || Time.realtimeSinceStartup - lastUpdateTime < updateInterval || handler == null) {
-				return;
-			}
+			if (handler == null) FindGraph();
 
-			ForceUpdate();
+			if (handler != null && !AstarPath.active.isScanning && ((updateInterval >= 0 && Time.realtimeSinceStartup - lastUpdateTime > updateInterval) || !handler.isValid)) {
+				ForceUpdate();
+			}
 		}
 
 		/** Checks all NavmeshCut instances and updates graphs if needed.
@@ -90,19 +140,34 @@ namespace Pathfinding {
 		 * and immediately after call AstarPath.FlushWorkItems.
 		 */
 		public void ForceUpdate () {
-			if (handler == null) {
-				throw new System.Exception("Cannot update graphs. No TileHandler. Do not call this method in Awake.");
-			}
+			if (handler == null) throw new System.Exception("Cannot update graphs. No TileHandler. Do not call the ForceUpdate method in Awake.");
 
 			lastUpdateTime = Time.realtimeSinceStartup;
 
-			List<NavmeshCut> cuts = NavmeshCut.GetAll();
+			if (!handler.isValid) {
+				// Check if the graph has been destroyed
+				if (!handler.graph.exists) {
+					UseSpecifiedHandler(null);
+					return;
+				}
 
-			if (forcedReloadBounds.Count == 0) {
+				Debug.Log("TileHandler no longer matched the underlaying graph (possibly because of a graph scan). Recreating TileHandler...");
+				UseSpecifiedHandler(new TileHandler(handler.graph));
+				handler.CreateTileTypesFromGraph();
+
+				// Reload in huge bounds. This will cause all tiles to be updated.
+				forcedReloadRects.Add(new IntRect(int.MinValue, int.MinValue, int.MaxValue, int.MaxValue));
+			}
+
+			// Get all navmesh cuts in the scene
+			var allCuts = handler.cuts.AllItems;
+
+			if (forcedReloadRects.Count == 0) {
 				int any = 0;
 
-				for (int i = 0; i < cuts.Count; i++) {
-					if (cuts[i].RequiresUpdate()) {
+				// Check if any navmesh cuts need updating
+				for (var cut = allCuts; cut != null; cut = cut.next) {
+					if (cut.obj.RequiresUpdate()) {
 						any++;
 						break;
 					}
@@ -112,33 +177,40 @@ namespace Pathfinding {
 				if (any == 0) return;
 			}
 
+			// Start batching tile updates which is good for performance
+			// if we are updating a lot of them
 			bool end = handler.StartBatchLoad();
 
-			//Debug.Log ("Updating...");
-
-			for (int i = 0; i < forcedReloadBounds.Count; i++) {
-				handler.ReloadInBounds(forcedReloadBounds[i]);
+			for (int i = 0; i < forcedReloadRects.Count; i++) {
+				handler.ReloadInBounds(forcedReloadRects[i]);
 			}
-			forcedReloadBounds.Clear();
+			forcedReloadRects.Clear();
 
-			for (int i = 0; i < cuts.Count; i++) {
-				if (cuts[i].enabled) {
-					if (cuts[i].RequiresUpdate()) {
-						handler.ReloadInBounds(cuts[i].LastBounds);
-						handler.ReloadInBounds(cuts[i].GetBounds());
-					}
-				} else if (cuts[i].RequiresUpdate()) {
-					handler.ReloadInBounds(cuts[i].LastBounds);
+			// Reload all bounds touching the previous bounds and current bounds
+			// of navmesh cuts that have moved or changed in some other way
+			for (var cut = allCuts; cut != null; cut = cut.next) {
+				if (cut.obj.RequiresUpdate()) {
+					// Make sure the tile where it was is updated
+					handler.ReloadInBounds(cut.previousBounds);
+
+					var newGraphSpaceBounds = cut.obj.GetBounds(handler.graph.transform);
+					var newTouchingTiles = handler.graph.GetTouchingTilesInGraphSpace(newGraphSpaceBounds);
+					handler.cuts.Move(cut.obj, newTouchingTiles);
+					handler.ReloadInBounds(newTouchingTiles);
 				}
 			}
 
-			for (int i = 0; i < cuts.Count; i++) {
-				if (cuts[i].RequiresUpdate()) {
-					cuts[i].NotifyUpdated();
+			// Notify navmesh cuts that they have been updated
+			// This will cause RequiresUpdate to return false
+			// until it is changed again
+			for (var cut = allCuts; cut != null; cut = cut.next) {
+				if (cut.obj.RequiresUpdate()) {
+					cut.obj.NotifyUpdated();
 				}
 			}
 
 			if (end) handler.EndBatchLoad();
 		}
 	}
+#endif
 }

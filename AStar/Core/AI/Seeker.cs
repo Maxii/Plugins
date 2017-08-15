@@ -4,15 +4,17 @@ using Pathfinding;
 
 /** Handles path calls for a single unit.
  * \ingroup relevant
- * This is a component which is meant to be attached to a single unit (AI, Robot, Player, whatever) to handle it's pathfinding calls.
+ * This is a component which is meant to be attached to a single unit (AI, Robot, Player, whatever) to handle its pathfinding calls.
  * It also handles post-processing of paths using modifiers.
+ *
+ * \shadowimage{seeker_inspector.png}
+ *
  * \see \ref calling-pathfinding
+ * \see \ref modifiers
  */
 [AddComponentMenu("Pathfinding/Seeker")]
 [HelpURL("http://arongranberg.com/astar/docs/class_seeker.php")]
-public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
-	//====== SETTINGS ======
-
+public class Seeker : VersionedMonoBehaviour {
 	/** Enables drawing of the last calculated path using Gizmos.
 	 * The path will show up in green.
 	 *
@@ -61,8 +63,6 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	 */
 	[HideInInspector]
 	public int[] tagPenalties = new int[32];
-
-	//====== SETTINGS ======
 
 	/** Callback for when a path is completed.
 	 * Movement scripts should register to this delegate.\n
@@ -120,7 +120,8 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	}
 
 	/** Initializes a few variables */
-	void Awake () {
+	protected override void Awake () {
+		base.Awake();
 		startEndModifier.Awake(this);
 	}
 
@@ -186,16 +187,16 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	}
 
 	/** Called by modifiers to register themselves */
-	public void RegisterModifier (IPathModifier mod) {
-		modifiers.Add(mod);
+	public void RegisterModifier (IPathModifier modifier) {
+		modifiers.Add(modifier);
 
 		// Sort the modifiers based on their specified order
 		modifiers.Sort((a, b) => a.Order.CompareTo(b.Order));
 	}
 
 	/** Called by modifiers when they are disabled or destroyed */
-	public void DeregisterModifier (IPathModifier mod) {
-		modifiers.Remove(mod);
+	public void DeregisterModifier (IPathModifier modifier) {
+		modifiers.Remove(modifier);
 	}
 
 	/** Post Processes the path.
@@ -243,7 +244,7 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	 * \version Behaviour changed in 3.2
 	 */
 	public bool IsDone () {
-		return path == null || path.GetState() >= PathState.Returned;
+		return path == null || path.PipelineState >= PathState.Returned;
 	}
 
 	/** Called when a path has completed.
@@ -322,7 +323,9 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	 * p.heuristic = Heuristic.None;
 	 * seeker.StartPath (p, OnPathComplete);
 	 * \endcode
+	 * \deprecated Use ABPath.Construct(start, end, null) instead.
 	 */
+	[System.Obsolete("Use ABPath.Construct(start, end, null) instead")]
 	public ABPath GetNewPath (Vector3 start, Vector3 end) {
 		// Construct a path with start and end points
 		return ABPath.Construct(start, end, null);
@@ -375,6 +378,7 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	 */
 	public Path StartPath (Path p, OnPathDelegate callback = null, int graphMask = -1) {
 		var mtp = p as MultiTargetPath;
+
 		if (mtp != null) {
 			// TODO: Allocation, cache
 			var callbacks = new OnPathDelegate[mtp.targetPoints.Length];
@@ -400,7 +404,7 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	/** Internal method to start a path and mark it as the currently active path */
 	void StartPathInternal (Path p, OnPathDelegate callback) {
 		// Cancel a previously requested path is it has not been processed yet and also make sure that it has not been recycled and used somewhere else
-		if (path != null && path.GetState() <= PathState.Processing && path.CompleteState != PathCompleteState.Error && lastPathID == path.pathID) {
+		if (path != null && path.PipelineState <= PathState.Processing && path.CompleteState != PathCompleteState.Error && lastPathID == path.pathID) {
 			path.Error();
 			path.LogError("Canceled path because a new one was requested.\n"+
 				"This happens when a new path is requested from the seeker when one was already being calculated.\n" +
@@ -482,6 +486,8 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 	 *
 	 * \version Since 3.8.3 calling this method behaves identically to calling StartPath with a MultiTargetPath.
 	 * \version Since 3.8.3 this method also sets enabledTags and tagPenalties on the path object.
+	 *
+	 * \deprecated You can use StartPath instead of this method now. It will behave identically.
 	 */
 	[System.Obsolete("You can use StartPath instead of this method now. It will behave identically.")]
 	public MultiTargetPath StartMultiTargetPath (MultiTargetPath p, OnPathDelegate callback = null, int graphMask = -1) {
@@ -514,15 +520,11 @@ public class Seeker : MonoBehaviour, ISerializationCallbackReceiver {
 		}
 	}
 
-	/** Handle serialization backwards compatibility */
-	void ISerializationCallbackReceiver.OnBeforeSerialize () {
-	}
-
-	/** Handle serialization backwards compatibility */
-	void ISerializationCallbackReceiver.OnAfterDeserialize () {
-		if (traversableTagsCompatibility != null && traversableTagsCompatibility.tagsChange != -1) {
+	protected override int OnUpgradeSerializedData (int version) {
+		if (version == 0 && traversableTagsCompatibility != null && traversableTagsCompatibility.tagsChange != -1) {
 			traversableTags = traversableTagsCompatibility.tagsChange;
 			traversableTagsCompatibility = new TagMask(-1, -1);
 		}
+		return 1;
 	}
 }

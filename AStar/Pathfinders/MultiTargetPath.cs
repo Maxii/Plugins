@@ -129,7 +129,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void OnEnterPool () {
+		protected override void OnEnterPool () {
 			if (vectorPaths != null)
 				for (int i = 0; i < vectorPaths.Length; i++)
 					if (vectorPaths[i] != null) Util.ListPool<Vector3>.Release(vectorPaths[i]);
@@ -185,7 +185,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void ReturnPath () {
+		protected override void ReturnPath () {
 			if (error) {
 				// Call all callbacks
 				if (callbacks != null) {
@@ -271,7 +271,7 @@ namespace Pathfinding {
 		}
 
 		protected void RebuildOpenList () {
-			BinaryHeapM heap = pathHandler.GetHeap();
+			BinaryHeap heap = pathHandler.heap;
 
 			for (int j = 0; j < heap.numberOfItems; j++) {
 				PathNode nodeR = heap.GetNode(j);
@@ -279,12 +279,12 @@ namespace Pathfinding {
 				heap.SetF(j, nodeR.F);
 			}
 
-			pathHandler.RebuildHeap();
+			pathHandler.heap.Rebuild();
 		}
 
-		public override void Prepare () {
+		protected override void Prepare () {
 			nnConstraint.tags = enabledTags;
-			NNInfo startNNInfo  = AstarPath.active.GetNearest(startPoint, nnConstraint, startHint);
+			var startNNInfo  = AstarPath.active.GetNearest(startPoint, nnConstraint);
 			startNode = startNNInfo.node;
 
 			if (startNode == null) {
@@ -316,11 +316,11 @@ namespace Pathfinding {
 			bool anyNotNull = false;
 
 			for (int i = 0; i < targetPoints.Length; i++) {
-				NNInfo endNNInfo = AstarPath.active.GetNearest(targetPoints[i], nnConstraint);
+				var endNNInfo = AstarPath.active.GetNearest(targetPoints[i], nnConstraint);
 
 				targetNodes[i] = endNNInfo.node;
 
-				targetPoints[i] = endNNInfo.clampedPosition;
+				targetPoints[i] = endNNInfo.position;
 				if (targetNodes[i] != null) {
 					anyNotNull = true;
 					endNode = targetNodes[i];
@@ -347,7 +347,7 @@ namespace Pathfinding {
 				}
 			}
 
-			startPoint = startNNInfo.clampedPosition;
+			startPoint = startNNInfo.position;
 
 			startIntPoint = (Int3)startPoint;
 
@@ -489,7 +489,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void Initialize () {
+		protected override void Initialize () {
 			// Reset the start node to prevent
 			// old info from previous paths to be used
 			PathNode startRNode = pathHandler.GetPathNode(startNode);
@@ -526,17 +526,17 @@ namespace Pathfinding {
 			searchedNodes++;
 
 			//any nodes left to search?
-			if (pathHandler.HeapEmpty()) {
+			if (pathHandler.heap.isEmpty) {
 				LogError("No open points, the start node didn't open any nodes");
 				Error();
 				return;
 			}
 
 			// Take the first node off the heap
-			currentR = pathHandler.PopNode();
+			currentR = pathHandler.heap.Remove();
 		}
 
-		public override void Cleanup () {
+		protected override void Cleanup () {
 			// Make sure that the shortest path is set
 			// after the path has been calculated
 			ChooseShortestPath();
@@ -553,7 +553,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void CalculateStep (long targetTick) {
+		protected override void CalculateStep (long targetTick) {
 			int counter = 0;
 
 			// Continue to search while there hasn't ocurred an error and the end hasn't been found
@@ -583,14 +583,14 @@ namespace Pathfinding {
 				currentR.node.Open(this, currentR, pathHandler);
 
 				// Any nodes left to search?
-				if (pathHandler.HeapEmpty()) {
+				if (pathHandler.heap.isEmpty) {
 					CompleteState = PathCompleteState.Complete;
 					break;
 				}
 
 				// Select the node with the lowest F score and remove it from the open list
 				AstarProfiler.StartFastProfile(7);
-				currentR = pathHandler.PopNode();
+				currentR = pathHandler.heap.Remove();
 				AstarProfiler.EndFastProfile(7);
 
 				// Check for time every 500 nodes, roughly every 0.5 ms usually
@@ -629,7 +629,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override string DebugString (PathLog logMode) {
+		internal override string DebugString (PathLog logMode) {
 			if (logMode == PathLog.None || (!error && logMode == PathLog.OnlyErrors)) {
 				return "";
 			}
@@ -682,7 +682,7 @@ namespace Pathfinding {
 					text.Append("\n	Graph: ");
 					text.Append(startNode.GraphIndex);
 					text.Append("\nBinary Heap size at completion: ");
-					text.AppendLine(pathHandler.GetHeap() == null ? "Null" : (pathHandler.GetHeap().numberOfItems-2).ToString());  // -2 because numberOfItems includes the next item to be added and item zero is not used
+					text.AppendLine(pathHandler.heap == null ? "Null" : (pathHandler.heap.numberOfItems-2).ToString());  // -2 because numberOfItems includes the next item to be added and item zero is not used
 				}
 			}
 

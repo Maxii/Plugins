@@ -1,12 +1,11 @@
 using UnityEngine;
-using System.Collections;
 using UnityEditor;
 
 namespace Pathfinding {
 	[CustomEditor(typeof(NavmeshCut))]
 	[CanEditMultipleObjects]
 	public class NavmeshCutEditor : Editor {
-		SerializedProperty type, mesh, rectangleSize, circleRadius, circleResolution, height, meshScale, center, updateDistance, isDual, cutsAddedGeom, updateRotationDistance, useRotation;
+		SerializedProperty type, mesh, rectangleSize, circleRadius, circleResolution, height, meshScale, center, updateDistance, isDual, cutsAddedGeom, updateRotationDistance, useRotationAndScale;
 
 		void OnEnable () {
 			type = serializedObject.FindProperty("type");
@@ -21,7 +20,7 @@ namespace Pathfinding {
 			isDual = serializedObject.FindProperty("isDual");
 			cutsAddedGeom = serializedObject.FindProperty("cutsAddedGeom");
 			updateRotationDistance = serializedObject.FindProperty("updateRotationDistance");
-			useRotation = serializedObject.FindProperty("useRotation");
+			useRotationAndScale = serializedObject.FindProperty("useRotationAndScale");
 		}
 
 		public override void OnInspectorGUI () {
@@ -60,8 +59,8 @@ namespace Pathfinding {
 
 			EditorGUILayout.Separator();
 			EditorGUILayout.PropertyField(updateDistance);
-			EditorGUILayout.PropertyField(useRotation);
-			if (useRotation.boolValue) {
+			EditorGUILayout.PropertyField(useRotationAndScale);
+			if (useRotationAndScale.boolValue) {
 				EditorGUI.indentLevel++;
 				EditorGUILayout.PropertyField(updateRotationDistance);
 				if (!updateRotationDistance.hasMultipleDifferentValues) {
@@ -79,6 +78,11 @@ namespace Pathfinding {
 				foreach (NavmeshCut tg in targets) {
 					tg.ForceUpdate();
 				}
+			}
+
+			// Only the TileHandlerHelper uses the OnEnableCallback, so use that as a quick test to see if one exists
+			if (Application.isPlaying && !NavmeshClipper.AnyEnableListeners) {
+				EditorGUILayout.HelpBox("No active TileHandlerHelper component exists in the scene. NavmeshCut components will not affect any graphs", MessageType.Error);
 			}
 		}
 	}

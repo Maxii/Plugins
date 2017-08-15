@@ -1,4 +1,3 @@
-using System;
 #if NETFX_CORE
 using System.Threading;
 using System.Threading.Tasks;
@@ -68,7 +67,7 @@ namespace Pathfinding.WindowsStore {
 				return this._task != null && !this._task.IsCompleted;
 			}
 			set {
-				throw new NotImplementedException();
+				throw new System.NotImplementedException();
 			}
 		}
 

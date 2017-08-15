@@ -43,7 +43,7 @@ namespace Pathfinding {
 		public bool useGraphRaycasting;
 
 		List<GraphNode> connectionBuffer;
-		GraphNodeDelegate connectionBufferAddDelegate;
+		System.Action<GraphNode> connectionBufferAddDelegate;
 
 		public override void Apply (Path _p) {
 			var p = _p as ABPath;
@@ -115,7 +115,7 @@ namespace Pathfinding {
 					// The connectionBufferAddDelegate delegate simply adds whatever node
 					// it is called with to the connectionBuffer
 					connectionBuffer = connectionBuffer ?? new List<GraphNode>();
-					connectionBufferAddDelegate = connectionBufferAddDelegate ?? (GraphNodeDelegate)connectionBuffer.Add;
+					connectionBufferAddDelegate = connectionBufferAddDelegate ?? (System.Action<GraphNode>)connectionBuffer.Add;
 
 					// Adjacent node to either the start node or the end node in the path
 					adjacentNode = path.path[Mathf.Clamp(index + (start ? 1 : -1), 0, path.path.Count-1)];

@@ -1,8 +1,4 @@
-using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
-using Pathfinding;
-using Pathfinding.Voxels;
 
 namespace Pathfinding.Voxels {
 	public partial class Voxelize {
@@ -23,7 +19,6 @@ namespace Pathfinding.Voxels {
 
 					for (int i = (int)c.index, ni = (int)(c.index+c.count); i < ni; i++) {
 						if (voxelArea.dist[i] >= level && srcReg[i] == 0 && voxelArea.areaTypes[i] != UnwalkableArea) {
-
 							st2.Add(x);
 							st2.Add(z);
 							st2.Add(i);
@@ -182,6 +177,9 @@ namespace Pathfinding.Voxels {
 				// Check if any of the neighbours already have a valid region set.
 				ushort ar = 0;
 
+				// Loop through four neighbours
+				// then check one neighbour of the neighbour
+				// to get the diagonal neighbour
 				for (int dir = 0; dir < 4; dir++) {
 					// 8 connected
 					if (cs.GetConnection(dir) != NotConnected) {
@@ -198,12 +196,17 @@ namespace Pathfinding.Voxels {
 						if ((nr & BorderReg) == BorderReg) // Do not take borders into account.
 							continue;
 
-						if (nr != 0 && nr != r)
+						if (nr != 0 && nr != r) {
 							ar = nr;
+							// Found a valid region, skip checking the rest
+							break;
+						}
 
 						CompactVoxelSpan aspan = voxelArea.compactSpans[ai];
 
+						// Rotate dir 90 degrees
 						int dir2 = (dir+1) & 0x3;
+						// Check the diagonal connection
 						if (aspan.GetConnection(dir2) != NotConnected) {
 							int ax2 = ax + voxelArea.DirectionX[dir2];
 							int az2 = az + voxelArea.DirectionZ[dir2];
@@ -213,9 +216,11 @@ namespace Pathfinding.Voxels {
 							if (voxelArea.areaTypes[ai2] != area)
 								continue;
 
-							nr = srcReg[ai2];
-							if (nr != 0 && nr != r) {
-								ar = nr;
+							ushort nr2 = srcReg[ai2];
+							if (nr2 != 0 && nr2 != r) {
+								ar = nr2;
+								// Found a valid region, skip checking the rest
+								break;
 							}
 						}
 					}
@@ -621,14 +626,12 @@ namespace Pathfinding.Voxels {
 			//bool visited = new bool[voxelArea.compactSpanCount];
 
 			for (;; level -= 2) {
-
 				int ocount = st1.Count;
 				int expandCount = 0;
 
 				if (ocount == 0) {
 					//int c = 0;
 					for (int q = 0; q < basins.Count; q++) {
-
 						if (srcReg[basins[q].y] == 0 && voxelArea.dist[basins[q].y] >= level) {
 							srcReg[basins[q].y] = 1;
 							st1.Add(basins[q]);
@@ -698,7 +701,6 @@ namespace Pathfinding.Voxels {
 						if (expandCount == 8 || j == st1.Count-1) {
 							//int c = 0;
 							for (int q = 0; q < basins.Count; q++) {
-
 								if (srcReg[basins[q].y] == 0 && voxelArea.dist[basins[q].y] >= level) {
 									srcReg[basins[q].y] = 1;
 									st1.Add(basins[q]);
@@ -868,11 +870,17 @@ namespace Pathfinding.Voxels {
 			AstarProfiler.EndProfile("Build Regions");
 		}
 
+		/** Find method in the UnionFind data structure.
+		 * \see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
+		 */
 		static int union_find_find (int[] arr, int x) {
 			if (arr[x] < 0) return x;
 			return arr[x] = union_find_find(arr, arr[x]);
 		}
 
+		/** Join method in the UnionFind data structure.
+		 * \see https://en.wikipedia.org/wiki/Disjoint-set_data_structure
+		 */
 		static void union_find_union (int[] arr, int a, int b) {
 			a = union_find_find(arr, a);
 			b = union_find_find(arr, b);

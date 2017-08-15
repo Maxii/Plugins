@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections.Generic;
-using Pathfinding;
 
 namespace Pathfinding.RVO {
 	/** Base class for simple RVO colliders.
@@ -15,7 +14,7 @@ namespace Pathfinding.RVO {
 	 *
 	 * \astarpro
 	 */
-	public abstract class RVOObstacle : MonoBehaviour {
+	public abstract class RVOObstacle : VersionedMonoBehaviour {
 		/** Mode of the obstacle.
 		 * Determines winding order of the vertices */
 		public ObstacleVertexWinding obstacleMode;
@@ -25,9 +24,10 @@ namespace Pathfinding.RVO {
 		/** RVO Obstacle Modes.
 		 * Determines winding order of obstacle vertices */
 		public enum ObstacleVertexWinding {
-			KeepOut, /**< Keeps agents from entering the obstacle */
-			KeepIn,  /**< Keeps agents inside the obstacle */
-			//Both     /**< Keeps agents from crossing the obstacle border in either direction */
+			/** Keeps agents from entering the obstacle */
+			KeepOut,
+			/** Keeps agents inside the obstacle */
+			KeepIn,
 		}
 
 		/** Reference to simulator */
@@ -100,6 +100,8 @@ namespace Pathfinding.RVO {
 			gizmoDrawing = true;
 
 			Gizmos.color = new Color(0.615f, 1, 0.06f, selected ? 1.0f : 0.7f);
+			var movementPlane = RVOSimulator.active != null ? RVOSimulator.active.movementPlane : MovementPlane.XZ;
+			var up = movementPlane == MovementPlane.XZ ? Vector3.up : -Vector3.forward;
 
 			if (gizmoVerts == null || AreGizmosDirty() || _obstacleMode != obstacleMode) {
 				_obstacleMode = obstacleMode;
@@ -118,22 +120,21 @@ namespace Pathfinding.RVO {
 					Gizmos.DrawLine(m.MultiplyPoint3x4(verts[j]), m.MultiplyPoint3x4(verts[q]));
 				}
 
-				if (selected) { //&& obstacleMode != ObstacleVertexWinding.Both) {
-					for (int j = 0, q = verts.Length-1; j < verts.Length; q = j++) {
-						Gizmos.DrawLine(m.MultiplyPoint3x4(verts[j]) + Vector3.up*Height, m.MultiplyPoint3x4(verts[q]) + Vector3.up*Height);
-
-						Gizmos.DrawLine(m.MultiplyPoint3x4(verts[j]), m.MultiplyPoint3x4(verts[j]) + Vector3.up*Height);
-					}
-
+				if (selected) {
 					for (int j = 0, q = verts.Length-1; j < verts.Length; q = j++) {
 						Vector3 a = m.MultiplyPoint3x4(verts[q]);
 						Vector3 b = m.MultiplyPoint3x4(verts[j]);
+
+						if (movementPlane != MovementPlane.XY) {
+							Gizmos.DrawLine(a + up*Height, b + up*Height);
+							Gizmos.DrawLine(a, a + up*Height);
+						}
 
 						Vector3 avg = (a + b) * 0.5f;
 						Vector3 tang = (b - a).normalized;
 						if (tang == Vector3.zero) continue;
 
-						Vector3 normal = Vector3.Cross(Vector3.up, tang);
+						Vector3 normal = Vector3.Cross(up, tang);
 
 						Gizmos.DrawLine(avg, avg+normal);
 						Gizmos.DrawLine(avg+normal, avg+normal*0.5f+tang*0.5f);
@@ -216,11 +217,8 @@ namespace Pathfinding.RVO {
 		 * \throws System.InvalidOperationException When no RVOSimulator could be found.
 		 */
 		protected void FindSimulator () {
-			var rvosim = FindObjectOfType(typeof(RVOSimulator)) as RVOSimulator;
-
-			if (rvosim == null) throw new System.InvalidOperationException("No RVOSimulator could be found in the scene. Please add one to any GameObject");
-
-			sim = rvosim.GetSimulator();
+			if (RVOSimulator.active == null) throw new System.InvalidOperationException("No RVOSimulator could be found in the scene. Please add one to any GameObject");
+			sim = RVOSimulator.active.GetSimulator();
 		}
 
 		/** Adds an obstacle with the specified vertices.
@@ -229,11 +227,9 @@ namespace Pathfinding.RVO {
 			if (vertices == null) throw new System.ArgumentNullException("Vertices Must Not Be Null");
 			if (height < 0) throw new System.ArgumentOutOfRangeException("Height must be non-negative");
 			if (vertices.Length < 2) throw new System.ArgumentException("An obstacle must have at least two vertices");
+			if (sim == null) FindSimulator();
 
 			if (gizmoDrawing) {
-				//Matrix4x4 m = GetMatrix();
-				//if (!m.isIdentity) for (int i=0;i<vertices.Length;i++) vertices[i] = m.MultiplyPoint3x4(vertices[i]);
-
 				var v = new Vector3[vertices.Length];
 				WindCorrectly(vertices);
 				System.Array.Copy(vertices, v, vertices.Length);
@@ -241,21 +237,14 @@ namespace Pathfinding.RVO {
 				return;
 			}
 
-			if (sim == null) FindSimulator();
 
 			if (vertices.Length == 2) {
 				AddObstacleInternal(vertices, height);
 				return;
 			}
 
-			/*if (obstacleMode == ObstacleVertexWinding.Both) {
-			 *  for (int i=0,j=vertices.Length-1;i<vertices.Length;j = i++) {
-			 *      AddObstacleInternal (new Vector3[] {vertices[j],vertices[i]},height);
-			 *  }
-			 * } else {*/
 			WindCorrectly(vertices);
 			AddObstacleInternal(vertices, height);
-			//}
 		}
 
 		/** Adds an obstacle.
@@ -270,22 +259,36 @@ namespace Pathfinding.RVO {
 		 * Winding order is determined from #obstacleMode.
 		 */
 		private void WindCorrectly (Vector3[] vertices) {
-			//if (obstacleMode == ObstacleVertexWinding.Both) return;
-
 			int leftmost = 0;
 			float leftmostX = float.PositiveInfinity;
 
+			var matrix = GetMatrix();
+
 			for (int i = 0; i < vertices.Length; i++) {
-				if (vertices[i].x < leftmostX) {
+				var x = matrix.MultiplyPoint3x4(vertices[i]).x;
+				if (x < leftmostX) {
 					leftmost = i;
-					leftmostX = vertices[i].x;
+					leftmostX = x;
 				}
 			}
 
-			if (VectorMath.IsClockwiseXZ(vertices[(leftmost-1 + vertices.Length) % vertices.Length], vertices[leftmost], vertices[(leftmost+1) % vertices.Length])) {
-				if (obstacleMode == ObstacleVertexWinding.KeepOut) System.Array.Reverse(vertices);
-			} else {
-				if (obstacleMode == ObstacleVertexWinding.KeepIn) System.Array.Reverse(vertices);
+			var p1 = matrix.MultiplyPoint3x4(vertices[(leftmost-1 + vertices.Length) % vertices.Length]);
+			var p2 = matrix.MultiplyPoint3x4(vertices[leftmost]);
+			var p3 = matrix.MultiplyPoint3x4(vertices[(leftmost+1) % vertices.Length]);
+
+			MovementPlane movementPlane;
+			if (sim != null) movementPlane = sim.movementPlane;
+			else if (RVOSimulator.active) movementPlane = RVOSimulator.active.movementPlane;
+			else movementPlane = MovementPlane.XZ;
+
+			if (movementPlane == MovementPlane.XY) {
+				p1.z = p1.y;
+				p2.z = p2.y;
+				p3.z = p3.y;
+			}
+
+			if (VectorMath.IsClockwiseXZ(p1, p2, p3) != (obstacleMode == ObstacleVertexWinding.KeepIn)) {
+				System.Array.Reverse(vertices);
 			}
 		}
 	}

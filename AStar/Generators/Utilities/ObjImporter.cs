@@ -6,10 +6,8 @@
  */
 
 using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 #if NETFX_CORE && !UNITY_EDITOR
 //using MarkerMetro.Unity.WinLegacy.IO;
 #endif

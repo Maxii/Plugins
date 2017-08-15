@@ -6,9 +6,7 @@ using Pathfinding.Serialization;
 namespace Pathfinding {
 	/**  Base class for all graphs */
 	public abstract class NavGraph {
-		/** Reference to the AstarPath object in the scene.
-		 * Might not be entirely safe to use, it's better to use AstarPath.active
-		 */
+		/** Reference to the AstarPath object in the scene */
 		public AstarPath active;
 
 		/** Used as an ID of the graph, considered to be unique.
@@ -21,7 +19,7 @@ namespace Pathfinding {
 		[JsonMember]
 		public uint initialPenalty;
 
-		/**  Is the graph open in the editor */
+		/** Is the graph open in the editor */
 		[JsonMember]
 		public bool open;
 
@@ -34,6 +32,10 @@ namespace Pathfinding {
 		[JsonMember]
 		public string name;
 
+		/** Enable to draw gizmos in the Unity scene view.
+		 * In the inspector this value corresponds to the state of
+		 * the 'eye' icon in the top left corner of every graph inspector.
+		 */
 		[JsonMember]
 		public bool drawGizmos = true;
 
@@ -44,126 +46,130 @@ namespace Pathfinding {
 		[JsonMember]
 		public bool infoScreenOpen;
 
-		/** Count nodes in the graph.
+		/** True if the graph exists, false if it has been destroyed */
+		internal bool exists { get { return active != null; } }
+
+		/** Number of nodes in the graph.
 		 * Note that this is, unless the graph type has overriden it, an O(n) operation.
 		 *
-		 * \todo GridGraph should override this
+		 * This is an O(1) operation for grid graphs and point graphs.
+		 * For layered grid graphs it is an O(n) operation.
 		 */
 		public virtual int CountNodes () {
 			int count = 0;
-			GraphNodeDelegateCancelable del = node => {
-				count++;
-				return true;
-			};
 
-			GetNodes(del);
+			GetNodes(node => count++);
 			return count;
 		}
 
+		/** Calls a delegate with all nodes in the graph until the delegate returns false */
+		public void GetNodes (System.Func<GraphNode, bool> action) {
+			bool cont = true;
+
+			GetNodes(node => {
+				if (cont) cont &= action(node);
+			});
+		}
+
 		/** Calls a delegate with all nodes in the graph.
-		 * This is the primary way of "looping" through all nodes in a graph.
+		 * This is the primary way of iterating through all nodes in a graph.
 		 *
-		 * This function should not change anything in the graph structure.
+		 * Do not change the graph structure inside the delegate.
 		 *
 		 * \code
-		 * myGraph.GetNodes ((node) => {
+		 * myGraph.GetNodes (node => {
 		 *     Debug.Log ("I found a node at position " + (Vector3)node.Position);
-		 *     return true;
 		 * });
 		 * \endcode
+		 *
+		 * If you want to store all nodes in a list you can do this
+		 * \code
+		 * List<GraphNode> nodes = new List<GraphNode>();
+		 * myGraph.GetNodes(nodes.Add);
+		 * \endcode
 		 */
-		public abstract void GetNodes (GraphNodeDelegateCancelable del);
+		public abstract void GetNodes (System.Action<GraphNode> action);
 
 		/** A matrix for translating/rotating/scaling the graph.
-		 * Not all graph generators sets this variable though.
-		 *
-		 * \note Do not set directly, use SetMatrix
-		 *
-		 * \note This value is not serialized. It is expected that graphs regenerate this
-		 * field after deserialization has completed.
+		 * \deprecated Use the transform field (only available on some graph types) instead
 		 */
+		[System.Obsolete("Use the transform field (only available on some graph types) instead", true)]
 		public Matrix4x4 matrix = Matrix4x4.identity;
 
 		/** Inverse of \a matrix.
-		 *
-		 * \note Do not set directly, use SetMatrix
-		 *
-		 * \see matrix
+		 * \deprecated Use the transform field (only available on some graph types) instead
 		 */
+		[System.Obsolete("Use the transform field (only available on some graph types) instead", true)]
 		public Matrix4x4 inverseMatrix = Matrix4x4.identity;
 
-		/** Use to set both matrix and inverseMatrix at the same time */
+		/** Use to set both matrix and inverseMatrix at the same time.
+		 * \deprecated Use the transform field (only available on some graph types) instead
+		 */
+		[System.Obsolete("Use the transform field (only available on some graph types) instead", true)]
 		public void SetMatrix (Matrix4x4 m) {
 			matrix = m;
 			inverseMatrix = m.inverse;
 		}
 
-		/** Relocates the nodes in this graph.
-		 * Assumes the nodes are already transformed using the "oldMatrix", then transforms them
-		 * such that it will look like they have only been transformed using the "newMatrix".
-		 * The "oldMatrix" is not required by all implementations of this function though (e.g the NavMesh generator).
-		 *
-		 * The matrix the graph is transformed with is typically stored in the #matrix field, so the typical usage for this method is
-		 * \code
-		 * var myNewMatrix = Matrix4x4.TRS (...);
-		 * myGraph.RelocateNodes (myGraph.matrix, myNewMatrix);
-		 * \endcode
-		 *
-		 * So for example if you want to move all your nodes in e.g a point graph 10 units along the X axis from the initial position
-		 * \code
-		 * var graph = AstarPath.astarData.pointGraph;
-		 * var m = Matrix4x4.TRS (new Vector3(10,0,0), Quaternion.identity, Vector3.one);
-		 * graph.RelocateNodes (graph.matrix, m);
-		 * \endcode
-		 *
-		 * \note For grid graphs it is recommended to use the helper method RelocateNodes which takes parameters for
-		 * center and nodeSize (and additional parameters) instead since it is both easier to use and is less likely
-		 * to mess up pathfinding.
-		 *
-		 * \warning This method is lossy, so calling it many times may cause node positions to lose precision.
-		 * For example if you set the scale to 0 in one call, and then to 1 in the next call, it will not be able to
-		 * recover the correct positions since when the scale was 0, all nodes were scaled/moved to the same point.
-		 * The same thing happens for other - less extreme - values as well, but to a lesser degree.
-		 *
-		 * \version Prior to version 3.6.1 the oldMatrix and newMatrix parameters were reversed by mistake.
+		/** Moves nodes in this graph.
+		 * \deprecated Use RelocateNodes(Matrix4x4) instead.
+		 *  To keep the same behavior you can call RelocateNodes(newMatrix * oldMatrix.inverse).
 		 */
-		public virtual void RelocateNodes (Matrix4x4 oldMatrix, Matrix4x4 newMatrix) {
-			Matrix4x4 inv = oldMatrix.inverse;
+		[System.Obsolete("Use RelocateNodes(Matrix4x4) instead. To keep the same behavior you can call RelocateNodes(newMatrix * oldMatrix.inverse).")]
+		public void RelocateNodes (Matrix4x4 oldMatrix, Matrix4x4 newMatrix) {
+			RelocateNodes(newMatrix * oldMatrix.inverse);
+		}
 
-			Matrix4x4 m = newMatrix * inv;
-
-			GetNodes(delegate(GraphNode node) {
-				//Vector3 tmp = inv.MultiplyPoint3x4 ((Vector3)nodes[i].position);
-				node.position = ((Int3)m.MultiplyPoint((Vector3)node.position));
-				return true;
-			});
-			SetMatrix(newMatrix);
+		/** Moves the nodes in this graph.
+		 * Multiplies all node positions by \a deltaMatrix.
+		 *
+		 * For example if you want to move all your nodes in e.g a point graph 10 units along the X axis from the initial position
+		 * \code
+		 * var graph = AstarPath.data.pointGraph;
+		 * var m = Matrix4x4.TRS (new Vector3(10,0,0), Quaternion.identity, Vector3.one);
+		 * graph.RelocateNodes (m);
+		 * \endcode
+		 *
+		 * \note For grid graphs, navmesh graphs and recast graphs it is recommended to
+		 * use their custom overloads of the RelocateNodes method which take parameters
+		 * for e.g center and nodeSize (and additional parameters) instead since
+		 * they are both easier to use and are less likely to mess up pathfinding.
+		 *
+		 * \warning This method is lossy for PointGraphs, so calling it many times may
+		 * cause node positions to lose precision. For example if you set the scale
+		 * to 0 in one call then all nodes will be scaled/moved to the same point and
+		 * you will not be able to recover their original positions. The same thing
+		 * happens for other - less extreme - values as well, but to a lesser degree.
+		 */
+		public virtual void RelocateNodes (Matrix4x4 deltaMatrix) {
+			GetNodes(node => node.position = ((Int3)deltaMatrix.MultiplyPoint((Vector3)node.position)));
 		}
 
 		/** Returns the nearest node to a position using the default NNConstraint.
 		 * \param position The position to try to find a close node to
 		 * \see Pathfinding.NNConstraint.None
 		 */
-		public NNInfo GetNearest (Vector3 position) {
+		public NNInfoInternal GetNearest (Vector3 position) {
 			return GetNearest(position, NNConstraint.None);
 		}
 
 		/** Returns the nearest node to a position using the specified NNConstraint.
 		 * \param position The position to try to find a close node to
 		 * \param constraint Can for example tell the function to try to return a walkable node. If you do not get a good node back, consider calling GetNearestForce. */
-		public NNInfo GetNearest (Vector3 position, NNConstraint constraint) {
+		public NNInfoInternal GetNearest (Vector3 position, NNConstraint constraint) {
 			return GetNearest(position, constraint, null);
 		}
 
 		/** Returns the nearest node to a position using the specified NNConstraint.
 		 * \param position The position to try to find a close node to
 		 * \param hint Can be passed to enable some graph generators to find the nearest node faster.
-		 * \param constraint Can for example tell the function to try to return a walkable node. If you do not get a good node back, consider calling GetNearestForce. */
-		public virtual NNInfo GetNearest (Vector3 position, NNConstraint constraint, GraphNode hint) {
+		 * \param constraint Can for example tell the function to try to return a walkable node. If you do not get a good node back, consider calling GetNearestForce.
+		 */
+		public virtual NNInfoInternal GetNearest (Vector3 position, NNConstraint constraint, GraphNode hint) {
 			// This is a default implementation and it is pretty slow
 			// Graphs usually override this to provide faster and more specialised implementations
 
-			float maxDistSqr = constraint.constrainDistance ? AstarPath.active.maxNearestNodeDistanceSqr : float.PositiveInfinity;
+			float maxDistSqr = constraint == null || constraint.constrainDistance ? AstarPath.active.maxNearestNodeDistanceSqr : float.PositiveInfinity;
 
 			float minDist = float.PositiveInfinity;
 			GraphNode minNode = null;
@@ -180,14 +186,13 @@ namespace Pathfinding {
 					minNode = node;
 				}
 
-				if (dist < minConstDist && dist < maxDistSqr && constraint.Suitable(node)) {
+				if (dist < minConstDist && dist < maxDistSqr && (constraint == null || constraint.Suitable(node))) {
 					minConstDist = dist;
 					minConstNode = node;
 				}
-				return true;
 			});
 
-			var nnInfo = new NNInfo(minNode);
+			var nnInfo = new NNInfoInternal(minNode);
 
 			nnInfo.constrainedNode = minConstNode;
 
@@ -205,15 +210,8 @@ namespace Pathfinding {
 		 * Returns the nearest node to a position using the specified \link Pathfinding.NNConstraint constraint \endlink.
 		 * \returns an NNInfo. This method will only return an empty NNInfo if there are no nodes which comply with the specified constraint.
 		 */
-		public virtual NNInfo GetNearestForce (Vector3 position, NNConstraint constraint) {
+		public virtual NNInfoInternal GetNearestForce (Vector3 position, NNConstraint constraint) {
 			return GetNearest(position, constraint);
-		}
-
-		/**
-		 * This will be called on the same time as Awake on the gameObject which the AstarPath script is attached to. (remember, not in the editor)
-		 * Use this for any initialization code which can't be placed in Scan
-		 */
-		public virtual void Awake () {
 		}
 
 		/** Function for cleaning up references.
@@ -223,14 +221,19 @@ namespace Pathfinding {
 		 * All nodes should be destroyed in this function otherwise a memory leak will arise.
 		 */
 		public virtual void OnDestroy () {
-			//Destroy all nodes
-			GetNodes(delegate(GraphNode node) {
-				node.Destroy();
-				return true;
-			});
+			DestroyAllNodesInternal();
+			active = null;
 		}
 
-		/*
+		/** Destroys all nodes in the graph.
+		 * \warning This is an internal method. Unless you have a very good reason, you should probably not call it.
+		 */
+		internal virtual void DestroyAllNodesInternal () {
+			GetNodes(node => node.Destroy());
+		}
+
+		/** Partially scan the graph.
+		 *
 		 * Consider using AstarPath.Scan () instead since this function might screw things up if there is more than one graph.
 		 * This function does not perform all necessary postprocessing for the graph to work with pathfinding (e.g flood fill).
 		 * See the source of the AstarPath.Scan function to see how it can be used.
@@ -245,7 +248,8 @@ namespace Pathfinding {
 				AstarPath.OnGraphPreScan(this);
 			}
 
-			ScanInternal();
+			var scan = ScanInternal().GetEnumerator();
+			while (scan.MoveNext()) {}
 
 			if (AstarPath.OnGraphPostScan != null) {
 				AstarPath.OnGraphPostScan(this);
@@ -261,58 +265,14 @@ namespace Pathfinding {
 			throw new System.Exception("This method is deprecated. Please use AstarPath.active.Scan or if you really want this.ScanInternal which has the same functionality as this method had.");
 		}
 
-		/** Internal method for scanning graphs */
-		public void ScanInternal () {
-			ScanInternal(null);
-		}
-
 		/**
-		 * Scans the graph, called from AstarPath.ScanLoop.
-		 * Override this function to implement custom scanning logic
-		 * The statusCallback may be optionally called to show progress info in the editor
+		 * Internal method to scan the graph.
+		 * Called from AstarPath.ScanAsync.
+		 * Override this function to implement custom scanning logic.
+		 * Progress objects can be yielded to show progress info in the editor and to split up processing
+		 * over several frames when using async scanning.
 		 */
-		public abstract void ScanInternal (OnScanStatus statusCallback);
-
-		/* Color to use for gizmos.
-		 * Returns a color to be used for the specified node with the current debug settings (editor only).
-		 *
-		 * \version Since 3.6.1 this method will not handle null nodes
-		 */
-		public virtual Color NodeColor (GraphNode node, PathHandler data) {
-			Color c = AstarColor.NodeConnection;
-
-			switch (AstarPath.active.debugMode) {
-			case GraphDebugMode.Areas:
-				c = AstarColor.GetAreaColor(node.Area);
-				break;
-			case GraphDebugMode.Penalty:
-				c = Color.Lerp(AstarColor.ConnectionLowLerp, AstarColor.ConnectionHighLerp, ((float)node.Penalty-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
-				break;
-			case GraphDebugMode.Tags:
-				c = AstarColor.GetAreaColor(node.Tag);
-				break;
-			default:
-				if (data == null) return AstarColor.NodeConnection;
-
-				PathNode nodeR = data.GetPathNode(node);
-
-				switch (AstarPath.active.debugMode) {
-				case GraphDebugMode.G:
-					c = Color.Lerp(AstarColor.ConnectionLowLerp, AstarColor.ConnectionHighLerp, ((float)nodeR.G-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
-					break;
-				case GraphDebugMode.H:
-					c = Color.Lerp(AstarColor.ConnectionLowLerp, AstarColor.ConnectionHighLerp, ((float)nodeR.H-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
-					break;
-				case GraphDebugMode.F:
-					c = Color.Lerp(AstarColor.ConnectionLowLerp, AstarColor.ConnectionHighLerp, ((float)nodeR.F-AstarPath.active.debugFloor) / (AstarPath.active.debugRoof-AstarPath.active.debugFloor));
-					break;
-				}
-				break;
-			}
-
-			c.a *= 0.5F;
-			return c;
-		}
+		public abstract IEnumerable<Progress> ScanInternal ();
 
 		/** Serializes graph type specific node data.
 		 * This function can be overriden to serialize extra node information (or graph information for that matter)
@@ -347,57 +307,35 @@ namespace Pathfinding {
 			name = ctx.reader.ReadString();
 			drawGizmos = ctx.reader.ReadBoolean();
 			infoScreenOpen = ctx.reader.ReadBoolean();
-
-			for (int i = 0; i < 4; i++) {
-				Vector4 row = Vector4.zero;
-				for (int j = 0; j < 4; j++) {
-					row[j] = ctx.reader.ReadSingle();
-				}
-				matrix.SetRow(i, row);
-			}
-		}
-
-		/** Returns if the node is in the search tree of the path.
-		 * Only guaranteed to be correct if \a path is the latest path calculated.
-		 * Use for gizmo drawing only.
-		 */
-		public static bool InSearchTree (GraphNode node, Path path) {
-			if (path == null || path.pathHandler == null) return true;
-			PathNode nodeR = path.pathHandler.GetPathNode(node);
-			return nodeR.pathID == path.pathID;
 		}
 
 		/** Draw gizmos for the graph */
-		public virtual void OnDrawGizmos (bool drawNodes) {
+		public virtual void OnDrawGizmos (RetainedGizmos gizmos, bool drawNodes) {
 			if (!drawNodes) {
 				return;
 			}
 
-			// This is the relatively slow default implementation
+			// This is a relatively slow default implementation.
 			// subclasses of the base graph class may override
 			// this method to draw gizmos in a more optimized way
 
-			PathHandler data = AstarPath.active.debugPathData;
-			GraphNode node = null;
+			var hasher = new RetainedGizmos.Hasher(active);
+			GetNodes(node => hasher.HashNode(node));
 
-			// Use this delegate to draw connections
-			// from the #node variable to #otherNode
-			GraphNodeDelegate drawConnection = otherNode => Gizmos.DrawLine((Vector3)node.position, (Vector3)otherNode.position);
-
-			GetNodes(_node => {
-				// Set the #node variable so that #drawConnection can use it
-				node = _node;
-
-				Gizmos.color = NodeColor(node, AstarPath.active.debugPathData);
-				if (AstarPath.active.showSearchTree && !InSearchTree(node, AstarPath.active.debugPath)) return true;
-
-				PathNode nodeR = data != null ? data.GetPathNode(node) : null;
-				if (AstarPath.active.showSearchTree && nodeR != null && nodeR.parent != null) {
-					Gizmos.DrawLine((Vector3)node.position, (Vector3)nodeR.parent.node.position);
-				} else {
-					node.GetConnections(drawConnection);
+			// Update the gizmo mesh if necessary
+			if (!gizmos.Draw(hasher)) {
+				using (var helper = gizmos.GetGizmoHelper(active, hasher)) {
+					GetNodes((System.Action<GraphNode>)helper.DrawConnections);
 				}
-				return true;
+			}
+
+			if (active.showUnwalkableNodes) DrawUnwalkableNodes(active.unwalkableNodeDebugSize);
+		}
+
+		protected void DrawUnwalkableNodes (float size) {
+			Gizmos.color = AstarColor.UnwalkableNode;
+			GetNodes(node => {
+				if (!node.Walkable) Gizmos.DrawCube((Vector3)node.position, Vector3.one*size);
 			});
 		}
 
@@ -408,11 +346,13 @@ namespace Pathfinding {
 
 
 	/** Handles collision checking for graphs.
-	 * Mostly used by grid based graphs */
+	 * Mostly used by grid based graphs
+	 */
 	[System.Serializable]
 	public class GraphCollision {
 		/** Collision shape to use.
-		 * Pathfinding.ColliderType */
+		 * Pathfinding.ColliderType
+		 */
 		public ColliderType type = ColliderType.Capsule;
 
 		/** Diameter of capsule or sphere when checking for collision.
@@ -424,6 +364,16 @@ namespace Pathfinding {
 		 * If #type is set to Sphere, this does not affect anything
 		 */
 		public float height = 2F;
+
+		/** Height above the ground that collision checks should be done.
+		 * For example, if the ground was found at y=0, collisionOffset = 2
+		 * type = Capsule and height = 3 then the physics system
+		 * will be queried to see if there are any colliders in a capsule
+		 * for which the bottom sphere that is made up of is centered at y=2
+		 * and the top sphere has its center at y=2+3=5.
+		 *
+		 * If type = Sphere then the sphere's center would be at y=2 in this case.
+		 */
 		public float collisionOffset;
 
 		/** Direction of the ray when checking for collision.
@@ -476,7 +426,9 @@ namespace Pathfinding {
 		 * \see Initialize */
 		private float finalRadius;
 
-		/** #thickRaycastDiameter * scale * 0.5. Where \a scale usually is \link Pathfinding.GridGraph.nodeSize nodeSize \endlink \see Initialize */
+		/** #thickRaycastDiameter * scale * 0.5.
+		 * Where \a scale usually is \link Pathfinding.GridGraph.nodeSize nodeSize \endlink \see Initialize
+		 */
 		private float finalRaycastRadius;
 
 		/** Offset to apply after each raycast to make sure we don't hit the same point again in CheckHeightAll */
@@ -488,8 +440,8 @@ namespace Pathfinding {
 		 * \see GraphCollision.finalRadius
 		 * \see GraphCollision.finalRaycastRadius
 		 */
-		public void Initialize (Matrix4x4 matrix, float scale) {
-			up = matrix.MultiplyVector(Vector3.up);
+		public void Initialize (GraphTransform transform, float scale) {
+			up = (transform.Transform(Vector3.up) - transform.Transform(Vector3.zero)).normalized;
 			upheight = up*height;
 			finalRadius = diameter*scale*0.5F;
 			finalRaycastRadius = thickRaycastDiameter*scale*0.5F;
@@ -532,7 +484,9 @@ namespace Pathfinding {
 			}
 		}
 
-		/** Returns the position with the correct height. If #heightCheck is false, this will return \a position.\n */
+		/** Returns the position with the correct height.
+		 * If #heightCheck is false, this will return \a position.
+		 */
 		public Vector3 CheckHeight (Vector3 position) {
 			RaycastHit hit;
 			bool walkable;
@@ -543,7 +497,8 @@ namespace Pathfinding {
 		/** Returns the position with the correct height.
 		 * If #heightCheck is false, this will return \a position.\n
 		 * \a walkable will be set to false if nothing was hit.
-		 * The ray will check a tiny bit further than to the grids base to avoid floating point errors when the ground is exactly at the base of the grid */
+		 * The ray will check a tiny bit further than to the grids base to avoid floating point errors when the ground is exactly at the base of the grid
+		 */
 		public Vector3 CheckHeight (Vector3 position, out RaycastHit hit, out bool walkable) {
 			walkable = true;
 
@@ -572,7 +527,8 @@ namespace Pathfinding {
 
 		/** Same as #CheckHeight, except that the raycast will always start exactly at \a origin.
 		 * \a walkable will be set to false if nothing was hit.
-		 * The ray will check a tiny bit further than to the grids base to avoid floating point errors when the ground is exactly at the base of the grid */
+		 * The ray will check a tiny bit further than to the grids base to avoid floating point errors when the ground is exactly at the base of the grid
+		 */
 		public Vector3 Raycast (Vector3 origin, out RaycastHit hit, out bool walkable) {
 			walkable = true;
 

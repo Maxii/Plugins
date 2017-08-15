@@ -1,5 +1,4 @@
 using Math = System.Math;
-using  System.IO;
 using UnityEngine;
 using System.Collections.Generic;
 #if UNITY_5_5_OR_NEWER
@@ -9,6 +8,9 @@ using UnityEngine.Profiling;
 namespace Pathfinding {
 	using Pathfinding.Voxels;
 	using Pathfinding.Serialization;
+	using Pathfinding.Recast;
+	using Pathfinding.Util;
+	using System.Threading;
 
 	/** Automatically generates navmesh graphs based on world geometry.
 	 * The recast graph is based on Recast (http://code.google.com/p/recastnavigation/).\n
@@ -48,19 +50,13 @@ namespace Pathfinding {
 	 * \astarpro
 	 */
 	[JsonOptIn]
-	public class RecastGraph : NavGraph, INavmesh, IRaycastableGraph, IUpdatableGraph, INavmeshHolder {
-		/** Enables graph updating.
-		 * Uses more memory if enabled.
-		 */
-		public bool dynamic = true;
-
-
+	public class RecastGraph : NavmeshBase, IUpdatableGraph {
 		[JsonMember]
 		/** Radius of the agent which will traverse the navmesh.
 		 * The navmesh will be eroded with this radius.
 		 * \shadowimage{recast/character_radius.gif}
 		 */
-		public float characterRadius = 0.5F;
+		public float characterRadius = 1.5F;
 
 		/** Max distance from simplified edge to real edge.
 		 * \shadowimage{recast/max_edge_error.gif}
@@ -75,10 +71,6 @@ namespace Pathfinding {
 		 */
 		[JsonMember]
 		public float cellSize = 0.5F;
-
-		/** Voxel sample size (y) */
-		[JsonMember]
-		public float cellHeight = 0.01F;
 
 		/** Character height.
 		 * \shadowimage{recast/walkable_height.gif}
@@ -144,11 +136,6 @@ namespace Pathfinding {
 		 */
 		[JsonMember]
 		public int tileSizeZ = 128;
-
-		/** Perform nearest node searches in XZ space only.
-		 */
-		[JsonMember]
-		public bool nearestSearchOnlyXZ;
 
 
 		/** If true, divide the graph into tiles, otherwise use a single tile covering the whole graph */
@@ -252,15 +239,6 @@ namespace Pathfinding {
 		[JsonMember]
 		public float colliderRasterizeDetail = 10;
 
-		/** Center of the bounding box.
-		 * Scanning will only be done inside the bounding box */
-		[JsonMember]
-		public Vector3 forcedBoundsCenter;
-
-		/** Size of the bounding box. */
-		[JsonMember]
-		public Vector3 forcedBoundsSize = new Vector3(100, 40, 100);
-
 		/** Layer mask which filters which objects to include.
 		 * \see tagMask
 		 */
@@ -275,299 +253,77 @@ namespace Pathfinding {
 		[JsonMember]
 		public List<string> tagMask = new List<string>();
 
-		/** Show an outline of the polygons in the Unity Editor */
-		[JsonMember]
-		public bool showMeshOutline = true;
-
-		/** Show the connections between the polygons in the Unity Editor */
-		[JsonMember]
-		public bool showNodeConnections;
-
-		/** Show the surface of the navmesh */
-		[JsonMember]
-		public bool showMeshSurface;
-
 		/** Controls how large the sample size for the terrain is.
 		 * A higher value is faster to scan but less accurate
 		 */
 		[JsonMember]
 		public int terrainSampleSize = 3;
 
+		/** Rotation of the graph in degrees */
+		[JsonMember]
+		public Vector3 rotation;
+
+		/** Center of the bounding box.
+		 * Scanning will only be done inside the bounding box */
+		[JsonMember]
+		public Vector3 forcedBoundsCenter;
+
 		private Voxelize globalVox;
+
+		public const int BorderVertexMask = 1;
+		public const int BorderVertexOffset = 31;
+
+		/** List of tiles that have been calculated in a graph update, but have not yet been added to the graph.
+		 * When updating the graph in a separate thread, large changes cannot be made directly to the graph
+		 * as other scripts might use the graph data structures at the same time in another thread.
+		 * So the tiles are calculated, but they are not yet connected to the existing tiles
+		 * that will be done in UpdateAreaPost which runs in the Unity thread.
+		 */
+		List<NavmeshTile> stagingTiles = new List<NavmeshTile>();
+
+		public override float TileWorldSizeX {
+			get {
+				return tileSizeX*cellSize;
+			}
+		}
+
+		public override float TileWorldSizeZ {
+			get {
+				return tileSizeZ*cellSize;
+			}
+		}
+
+		protected override float MaxTileConnectionEdgeDistance {
+			get {
+				return walkableClimb;
+			}
+		}
 
 		/** World bounds for the graph.
 		 * Defined as a bounds object with size #forcedBoundsSize and centered at #forcedBoundsCenter
+		 * \deprecated Obsolete since this is not accurate when the graph is rotated (rotation was not supported when this property was created)
 		 */
+		[System.Obsolete("Obsolete since this is not accurate when the graph is rotated (rotation was not supported when this property was created)")]
 		public Bounds forcedBounds {
 			get {
 				return new Bounds(forcedBoundsCenter, forcedBoundsSize);
 			}
 		}
 
-		/** Number of tiles along the X-axis */
-		public int tileXCount;
-		/** Number of tiles along the Z-axis */
-		public int tileZCount;
-
-		/** All tiles.
-		 * A tile can be got from a tile coordinate as tiles[x + z*tileXCount]
+		/** Returns the closest point of the node.
+		 * \deprecated Use #Pathfinding.TriangleMeshNode.ClosestPointOnNode instead
 		 */
-		NavmeshTile[] tiles;
-
-		/** Currently updating tiles in a batch */
-		bool batchTileUpdate;
-
-		/** List of tiles updating during batch */
-		List<int> batchUpdatedTiles = new List<int>();
-
-#if ASTAR_RECAST_LARGER_TILES
-		// Larger tiles
-		public const int VertexIndexMask = 0xFFFFF;
-
-		public const int TileIndexMask = 0x7FF;
-		public const int TileIndexOffset = 20;
-#else
-		// Larger worlds
-		public const int VertexIndexMask = 0xFFF;
-
-		public const int TileIndexMask = 0x7FFFF;
-		public const int TileIndexOffset = 12;
-#endif
-
-		public const int BorderVertexMask = 1;
-		public const int BorderVertexOffset = 31;
-
-		public class NavmeshTile : INavmeshHolder, INavmesh {
-			/** Tile triangles */
-			public int[] tris;
-
-			/** Tile vertices */
-			public Int3[] verts;
-
-			/** Tile X Coordinate */
-			public int x;
-
-			/** Tile Z Coordinate */
-			public int z;
-
-			/** Width, in tile coordinates.
-			 * Usually 1.
-			 */
-			public int w;
-
-			/** Depth, in tile coordinates.
-			 * Usually 1.
-			 */
-			public int d;
-
-			/** All nodes in the tile */
-			public TriangleMeshNode[] nodes;
-
-			/** Bounding Box Tree for node lookups */
-			public BBTree bbTree;
-
-			/** Temporary flag used for batching */
-			public bool flag;
-
-			public void GetTileCoordinates (int tileIndex, out int x, out int z) {
-				x = this.x;
-				z = this.z;
-			}
-
-			public int GetVertexArrayIndex (int index) {
-				return index & VertexIndexMask;
-			}
-
-			/** Get a specific vertex in the tile */
-			public Int3 GetVertex (int index) {
-				int idx = index & VertexIndexMask;
-
-				return verts[idx];
-			}
-
-			public void GetNodes (GraphNodeDelegateCancelable del) {
-				if (nodes == null) return;
-				for (int i = 0; i < nodes.Length && del(nodes[i]); i++) {}
-			}
-		}
-
-		/** Tile at the specified x, z coordinate pair.
-		 * The first tile is at (0,0), the last tile at (tileXCount-1, tileZCount-1).
-		 */
-		public NavmeshTile GetTile (int x, int z) {
-			return tiles[x + z * tileXCount];
-		}
-
-		/** Gets the vertex coordinate for the specified index.
-		 *
-		 * \throws IndexOutOfRangeException if the vertex index is invalid.
-		 * \throws NullReferenceException if the tile the vertex is in is not calculated.
-		 *
-		 * \see NavmeshTile.GetVertex
-		 */
-		public Int3 GetVertex (int index) {
-			int tileIndex = (index >> TileIndexOffset) & TileIndexMask;
-
-			return tiles[tileIndex].GetVertex(index);
-		}
-
-		/** Returns a tile index from a vertex index */
-		public int GetTileIndex (int index) {
-			return (index >> TileIndexOffset) & TileIndexMask;
-		}
-
-		public int GetVertexArrayIndex (int index) {
-			return index & VertexIndexMask;
-		}
-
-		/** Returns tile coordinates from a tile index */
-		public void GetTileCoordinates (int tileIndex, out int x, out int z) {
-			//z = System.Math.DivRem (tileIndex, tileXCount, out x);
-			z = tileIndex/tileXCount;
-			x = tileIndex - z*tileXCount;
-		}
-
-		/** Get all tiles.
-		 * \warning Do not modify this array
-		 */
-		public NavmeshTile[] GetTiles () {
-			return tiles;
-		}
-
-		/** Returns an XZ bounds object with the bounds of a group of tiles.
-		 * The bounds object is defined in world units.
-		 */
-		public Bounds GetTileBounds (IntRect rect) {
-			return GetTileBounds(rect.xmin, rect.ymin, rect.Width, rect.Height);
-		}
-
-		/** Returns an XZ bounds object with the bounds of a group of tiles.
-		 * The bounds object is defined in world units.
-		 */
-		public Bounds GetTileBounds (int x, int z, int width = 1, int depth = 1) {
-			var b = new Bounds();
-
-			b.SetMinMax(
-				new Vector3(x*tileSizeX*cellSize, 0, z*tileSizeZ*cellSize) + forcedBounds.min,
-				new Vector3((x+width)*tileSizeX*cellSize, forcedBounds.size.y, (z+depth)*tileSizeZ*cellSize) + forcedBounds.min
-				);
-			return b;
-		}
-
-		/** Returns the tile coordinate which contains the point \a p.
-		 * Is not necessarily a valid tile (i.e, it could be out of bounds).
-		 */
-		public Int2 GetTileCoordinates (Vector3 p) {
-			p -= forcedBounds.min;
-			p.x /= cellSize*tileSizeX;
-			p.z /= cellSize*tileSizeZ;
-			return new Int2((int)p.x, (int)p.z);
-		}
-
-		public override void OnDestroy () {
-			base.OnDestroy();
-
-			// Cleanup
-			TriangleMeshNode.SetNavmeshHolder(active.astarData.GetGraphIndex(this), null);
-		}
-
-		/** Relocates the nodes in this graph.
-		 * Assumes the nodes are already transformed using the "oldMatrix", then transforms them
-		 * such that it will look like they have only been transformed using the "newMatrix".
-		 *
-		 * The matrix the graph is transformed with is typically stored in the #matrix field, so the typical usage for this method is
-		 * \code
-		 * var myNewMatrix = Matrix4x4.TRS (...);
-		 * myGraph.RelocateNodes (myGraph.matrix, myNewMatrix);
-		 * \endcode
-		 *
-		 * So for example if you want to move all your nodes in e.g a recast graph 10 units along the X axis from the initial position
-		 * \code
-		 * var graph = AstarPath.astarData.recastGraph;
-		 * var m = Matrix4x4.TRS (new Vector3(10,0,0), Quaternion.identity, Vector3.one);
-		 * graph.RelocateNodes (graph.matrix, m);
-		 * \endcode
-		 *
-		 * \warning This method is lossy, so calling it many times may cause node positions to lose precision.
-		 * For example if you set the scale to 0 in one call, and then to 1 in the next call, it will not be able to
-		 * recover the correct positions since when the scale was 0, all nodes were scaled/moved to the same point.
-		 * The same thing happens for other - less extreme - values as well, but to a lesser degree.
-		 *
-		 * \version Prior to version 3.6.1 the oldMatrix and newMatrix parameters were reversed by mistake.
-		 */
-		public override void RelocateNodes (Matrix4x4 oldMatrix, Matrix4x4 newMatrix) {
-			// Move all the vertices in each tile
-			if (tiles != null) {
-				Matrix4x4 inv = oldMatrix.inverse;
-				Matrix4x4 m = newMatrix * inv;
-
-				if (tiles.Length > 1) {
-					throw new System.Exception("RelocateNodes cannot be used on tiled recast graphs");
-				}
-
-				for (int tileIndex = 0; tileIndex < tiles.Length; tileIndex++) {
-					var tile = tiles[tileIndex];
-					if (tile != null) {
-						var tileVerts = tile.verts;
-						for (int vertexIndex = 0; vertexIndex < tileVerts.Length; vertexIndex++) {
-							tileVerts[vertexIndex] = ((Int3)m.MultiplyPoint((Vector3)tileVerts[vertexIndex]));
-						}
-
-						for (int nodeIndex = 0; nodeIndex < tile.nodes.Length; nodeIndex++) {
-							var node = tile.nodes[nodeIndex];
-							node.UpdatePositionFromVertices();
-						}
-						tile.bbTree.RebuildFrom(tile.nodes);
-					}
-				}
-			}
-
-			SetMatrix(newMatrix);
-		}
-
-		/** Creates a single new empty tile */
-		static NavmeshTile NewEmptyTile (int x, int z) {
-			var tile = new NavmeshTile();
-
-			tile.x = x;
-			tile.z = z;
-			tile.w = 1;
-			tile.d = 1;
-			tile.verts = new Int3[0];
-			tile.tris = new int[0];
-			tile.nodes = new TriangleMeshNode[0];
-			tile.bbTree = new BBTree();
-			return tile;
-		}
-
-		public override void GetNodes (GraphNodeDelegateCancelable del) {
-			if (tiles == null) return;
-
-			for (int i = 0; i < tiles.Length; i++) {
-				if (tiles[i] == null || tiles[i].x+tiles[i].z*tileXCount != i) continue;
-				TriangleMeshNode[] nodes = tiles[i].nodes;
-
-				if (nodes == null) continue;
-
-				for (int j = 0; j < nodes.Length && del(nodes[j]); j++) {}
-			}
-		}
-
-		/** Returns the closest point of the node */
 		[System.Obsolete("Use node.ClosestPointOnNode instead")]
 		public Vector3 ClosestPointOnNode (TriangleMeshNode node, Vector3 pos) {
-			return Polygon.ClosestPointOnTriangle((Vector3)GetVertex(node.v0), (Vector3)GetVertex(node.v1), (Vector3)GetVertex(node.v2), pos);
+			return node.ClosestPointOnNode(pos);
 		}
 
-		/** Returns if the point is inside the node in XZ space */
+		/** Returns if the point is inside the node in XZ space.
+		 * \deprecated Use #Pathfinding.TriangleMeshNode.ContainsPoint instead
+		 */
 		[System.Obsolete("Use node.ContainsPoint instead")]
 		public bool ContainsPoint (TriangleMeshNode node, Vector3 pos) {
-			if (VectorMath.IsClockwiseXZ((Vector3)GetVertex(node.v0), (Vector3)GetVertex(node.v1), pos)
-				&& VectorMath.IsClockwiseXZ((Vector3)GetVertex(node.v1), (Vector3)GetVertex(node.v2), pos)
-				&& VectorMath.IsClockwiseXZ((Vector3)GetVertex(node.v2), (Vector3)GetVertex(node.v0), pos)) {
-				return true;
-			}
-			return false;
+			return node.ContainsPoint((Int3)pos);
 		}
 
 		/** Changes the bounds of the graph to precisely encapsulate all objects in the scene that can be included in the scanning process based on the settings.
@@ -586,9 +342,7 @@ namespace Pathfinding {
 		 * \see forcedBoundsSize
 		 */
 		public void SnapForceBoundsToScene () {
-			List<ExtraMesh> meshes;
-
-			CollectMeshes(out meshes, new Bounds(Vector3.zero, new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity)));
+			var meshes = CollectMeshes(new Bounds(Vector3.zero, new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity)));
 
 			if (meshes.Count == 0) {
 				return;
@@ -604,184 +358,13 @@ namespace Pathfinding {
 			forcedBoundsSize = bounds.size;
 		}
 
-		/** Find all relevant RecastMeshObj components and create ExtraMeshes for them */
-		public void GetRecastMeshObjs (Bounds bounds, List<ExtraMesh> buffer) {
-			List<RecastMeshObj> buffer2 = Util.ListPool<RecastMeshObj>.Claim();
-
-			// Get all recast mesh objects inside the bounds
-			RecastMeshObj.GetAllInBounds(buffer2, bounds);
-
-			var cachedVertices = new Dictionary<Mesh, Vector3[]>();
-			var cachedTris = new Dictionary<Mesh, int[]>();
-
-			// Create an ExtraMesh object
-			// for each RecastMeshObj
-			for (int i = 0; i < buffer2.Count; i++) {
-				MeshFilter filter = buffer2[i].GetMeshFilter();
-				Renderer rend = filter != null ? filter.GetComponent<Renderer>() : null;
-
-				if (filter != null && rend != null) {
-					Mesh mesh = filter.sharedMesh;
-
-					var smesh = new ExtraMesh();
-					smesh.matrix = rend.localToWorldMatrix;
-					smesh.original = filter;
-					smesh.area = buffer2[i].area;
-
-					// Don't read the vertices and triangles from the
-					// mesh if we have seen the same mesh previously
-					if (cachedVertices.ContainsKey(mesh)) {
-						smesh.vertices = cachedVertices[mesh];
-						smesh.triangles = cachedTris[mesh];
-					} else {
-						smesh.vertices = mesh.vertices;
-						smesh.triangles = mesh.triangles;
-						cachedVertices[mesh] = smesh.vertices;
-						cachedTris[mesh] = smesh.triangles;
-					}
-
-					smesh.bounds = rend.bounds;
-
-					buffer.Add(smesh);
-				} else {
-					Collider coll = buffer2[i].GetCollider();
-
-					if (coll == null) {
-						Debug.LogError("RecastMeshObject ("+buffer2[i].gameObject.name +") didn't have a collider or MeshFilter+Renderer attached");
-						continue;
-					}
-
-					ExtraMesh smesh = RasterizeCollider(coll);
-					smesh.area = buffer2[i].area;
-
-					//Make sure a valid ExtraMesh was returned
-					if (smesh.vertices != null) buffer.Add(smesh);
-				}
-			}
-
-			//Clear cache to avoid memory leak
-			capsuleCache.Clear();
-
-			Util.ListPool<RecastMeshObj>.Release(buffer2);
-		}
-
-		static void GetSceneMeshes (Bounds bounds, List<string> tagMask, LayerMask layerMask, List<ExtraMesh> meshes) {
-			if ((tagMask != null && tagMask.Count > 0) || layerMask != 0) {
-				var filters = GameObject.FindObjectsOfType(typeof(MeshFilter)) as MeshFilter[];
-
-				var filteredFilters = new List<MeshFilter>(filters.Length/3);
-
-				for (int i = 0; i < filters.Length; i++) {
-					MeshFilter filter = filters[i];
-					Renderer rend = filter.GetComponent<Renderer>();
-
-					if (rend != null && filter.sharedMesh != null && rend.enabled && (((1 << filter.gameObject.layer) & layerMask) != 0 || tagMask.Contains(filter.tag))) {
-						if (filter.GetComponent<RecastMeshObj>() == null) {
-							filteredFilters.Add(filter);
-						}
-					}
-				}
-
-				var cachedVertices = new Dictionary<Mesh, Vector3[]>();
-				var cachedTris = new Dictionary<Mesh, int[]>();
-
-				bool containedStatic = false;
-
-				for (int i = 0; i < filteredFilters.Count; i++) {
-					MeshFilter filter = filteredFilters[i];
-
-					// Note, guaranteed to have a renderer
-					Renderer rend = filter.GetComponent<Renderer>();
-
-					//Workaround for statically batched meshes
-					if (rend.isPartOfStaticBatch) {
-						containedStatic = true;
-					} else {
-						//Only include it if it intersects with the graph
-						if (rend.bounds.Intersects(bounds)) {
-							Mesh mesh = filter.sharedMesh;
-							var smesh = new ExtraMesh();
-							smesh.matrix = rend.localToWorldMatrix;
-							smesh.original = filter;
-							if (cachedVertices.ContainsKey(mesh)) {
-								smesh.vertices = cachedVertices[mesh];
-								smesh.triangles = cachedTris[mesh];
-							} else {
-								smesh.vertices = mesh.vertices;
-								smesh.triangles = mesh.triangles;
-								cachedVertices[mesh] = smesh.vertices;
-								cachedTris[mesh] = smesh.triangles;
-							}
-
-							smesh.bounds = rend.bounds;
-
-							meshes.Add(smesh);
-						}
-					}
-
-					if (containedStatic)
-						Debug.LogWarning("Some meshes were statically batched. These meshes can not be used for navmesh calculation" +
-							" due to technical constraints.\nDuring runtime scripts cannot access the data of meshes which have been statically batched.\n" +
-							"One way to solve this problem is to use cached startup (Save & Load tab in the inspector) to only calculate the graph when the game is not playing.");
-				}
-
-	#if ASTARDEBUG
-				int y = 0;
-				foreach (ExtraMesh smesh in meshes) {
-					y++;
-					Vector3[] vecs = smesh.vertices;
-					int[] tris = smesh.triangles;
-
-					for (int i = 0; i < tris.Length; i += 3) {
-						Vector3 p1 = smesh.matrix.MultiplyPoint3x4(vecs[tris[i+0]]);
-						Vector3 p2 = smesh.matrix.MultiplyPoint3x4(vecs[tris[i+1]]);
-						Vector3 p3 = smesh.matrix.MultiplyPoint3x4(vecs[tris[i+2]]);
-
-						Debug.DrawLine(p1, p2, Color.red, 1);
-						Debug.DrawLine(p2, p3, Color.red, 1);
-						Debug.DrawLine(p3, p1, Color.red, 1);
-					}
-				}
-	#endif
-			}
-		}
-
-		/** Returns a rect containing the indices of all tiles touching the specified bounds */
-		public IntRect GetTouchingTiles (Bounds b) {
-			b.center -= forcedBounds.min;
-
-			//Calculate world bounds of all affected tiles
-			var r = new IntRect(Mathf.FloorToInt(b.min.x / (tileSizeX*cellSize)), Mathf.FloorToInt(b.min.z / (tileSizeZ*cellSize)), Mathf.FloorToInt(b.max.x / (tileSizeX*cellSize)), Mathf.FloorToInt(b.max.z / (tileSizeZ*cellSize)));
-			//Clamp to bounds
-			r = IntRect.Intersection(r, new IntRect(0, 0, tileXCount-1, tileZCount-1));
-			return r;
-		}
-
-		/** Returns a rect containing the indices of all tiles by rounding the specified bounds to tile borders.
-		 * This is different from GetTouchingTiles in that the tiles inside the rectangle returned from this method
-		 * may not contain the whole bounds, while that is guaranteed for GetTouchingTiles.
-		 */
-		public IntRect GetTouchingTilesRound (Bounds b) {
-			b.center -= forcedBounds.min;
-
-			//Calculate world bounds of all affected tiles
-			var r = new IntRect(Mathf.RoundToInt(b.min.x / (tileSizeX*cellSize)), Mathf.RoundToInt(b.min.z / (tileSizeZ*cellSize)), Mathf.RoundToInt(b.max.x / (tileSizeX*cellSize))-1, Mathf.RoundToInt(b.max.z / (tileSizeZ*cellSize))-1);
-			//Clamp to bounds
-			r = IntRect.Intersection(r, new IntRect(0, 0, tileXCount-1, tileZCount-1));
-			return r;
-		}
-
 		GraphUpdateThreading IUpdatableGraph.CanUpdateAsync (GraphUpdateObject o) {
-			return o.updatePhysics ? GraphUpdateThreading.SeparateAndUnityInit : GraphUpdateThreading.SeparateThread;
+			return o.updatePhysics ? GraphUpdateThreading.UnityInit | GraphUpdateThreading.SeparateThread | GraphUpdateThreading.UnityPost : GraphUpdateThreading.SeparateThread;
 		}
 
 		void IUpdatableGraph.UpdateAreaInit (GraphUpdateObject o) {
 			if (!o.updatePhysics) {
 				return;
-			}
-
-			if (!dynamic) {
-				throw new System.Exception("Recast graph must be marked as dynamic to enable graph updates");
 			}
 
 			AstarProfiler.Reset();
@@ -794,28 +377,17 @@ namespace Pathfinding {
 			IntRect touchingTiles = GetTouchingTiles(o.bounds);
 			Bounds tileBounds = GetTileBounds(touchingTiles);
 
-			int voxelCharacterRadius = Mathf.CeilToInt(characterRadius/cellSize);
-			int borderSize = voxelCharacterRadius + 3;
+			// Expand TileBorderSizeInWorldUnits voxels on each side
+			tileBounds.Expand(new Vector3(1, 0, 1)*TileBorderSizeInWorldUnits*2);
 
-			//Expand borderSize voxels on each side
-			tileBounds.Expand(new Vector3(borderSize, 0, borderSize)*cellSize*2);
+			var meshes = CollectMeshes(tileBounds);
 
-			List<ExtraMesh> extraMeshes;
-
-			CollectMeshes(out extraMeshes, tileBounds);
-
-			Voxelize vox = globalVox;
-
-			if (vox == null) {
-				//Create the voxelizer and set all settings
-				vox = new Voxelize(cellHeight, cellSize, walkableClimb, walkableHeight, maxSlope);
-
-				vox.maxEdgeLength = maxEdgeLength;
-
-				if (dynamic) globalVox = vox;
+			if (globalVox == null) {
+				// Create the voxelizer and set all settings
+				globalVox = new Voxelize(CellHeight, cellSize, walkableClimb, walkableHeight, maxSlope, maxEdgeLength);
 			}
 
-			vox.inputExtraMeshes = extraMeshes;
+			globalVox.inputMeshes = meshes;
 
 			AstarProfiler.EndProfile("CollectMeshes");
 			AstarProfiler.EndProfile("UpdateAreaInit");
@@ -823,21 +395,16 @@ namespace Pathfinding {
 
 		void IUpdatableGraph.UpdateArea (GraphUpdateObject guo) {
 			// Figure out which tiles are affected
-			var r = GetTouchingTiles(guo.bounds);
+			var affectedTiles = GetTouchingTiles(guo.bounds);
 
 			if (!guo.updatePhysics) {
-				for (int z = r.ymin; z <= r.ymax; z++) {
-					for (int x = r.xmin; x <= r.xmax; x++) {
+				for (int z = affectedTiles.ymin; z <= affectedTiles.ymax; z++) {
+					for (int x = affectedTiles.xmin; x <= affectedTiles.xmax; x++) {
 						NavmeshTile tile = tiles[z*tileXCount + x];
 						NavMeshGraph.UpdateArea(guo, tile);
 					}
 				}
-
 				return;
-			}
-
-			if (!dynamic) {
-				throw new System.Exception("Recast graph must be marked as dynamic to enable graph updates with updatePhysics = true");
 			}
 
 			Voxelize vox = globalVox;
@@ -846,286 +413,98 @@ namespace Pathfinding {
 				throw new System.InvalidOperationException("No Voxelizer object. UpdateAreaInit should have been called before this function.");
 			}
 
-
-
-			AstarProfiler.StartProfile("Init");
-			AstarProfiler.StartProfile("RemoveConnections");
-
-
-
-			for (int z = r.ymin; z <= r.ymax; z++) {
-				for (int x = r.xmin; x <= r.xmax; x++) {
-					RemoveConnectionsFromTile(tiles[x + z*tileXCount]);
-				}
-			}
-
-
-
-			AstarProfiler.EndProfile("RemoveConnections");
-
 			AstarProfiler.StartProfile("Build Tiles");
 
-			for (int x = r.xmin; x <= r.xmax; x++) {
-				for (int z = r.ymin; z <= r.ymax; z++) {
-					BuildTileMesh(vox, x, z);
+			// Build the new tiles
+			for (int x = affectedTiles.xmin; x <= affectedTiles.xmax; x++) {
+				for (int z = affectedTiles.ymin; z <= affectedTiles.ymax; z++) {
+					stagingTiles.Add(BuildTileMesh(vox, x, z));
 				}
 			}
 
+			uint graphIndex = (uint)AstarPath.active.data.GetGraphIndex(this);
 
+			// Set the correct graph index
+			for (int i = 0; i < stagingTiles.Count; i++) {
+				NavmeshTile tile = stagingTiles[i];
+				GraphNode[] nodes = tile.nodes;
 
+				for (int j = 0; j < nodes.Length; j++) nodes[j].GraphIndex = graphIndex;
+			}
+
+			ListPool<RasterizationMesh>.Release(vox.inputMeshes);
+			vox.inputMeshes = null;
 			AstarProfiler.EndProfile("Build Tiles");
+		}
 
+		/** Called on the Unity thread to complete a graph update */
+		void IUpdatableGraph.UpdateAreaPost (GraphUpdateObject guo) {
+			Profiler.BeginSample("RemoveConnections");
+			// Remove connections from existing tiles destroy the nodes
+			// Replace the old tile by the new tile
+			for (int i = 0; i < stagingTiles.Count; i++) {
+				var tile = stagingTiles[i];
+				int index = tile.x + tile.z * tileXCount;
+				var oldTile = tiles[index];
 
-			AstarProfiler.StartProfile("ConnectTiles");
-			uint graphIndex = (uint)AstarPath.active.astarData.GetGraphIndex(this);
-
-			for (int z = r.ymin; z <= r.ymax; z++) {
-				for (int x = r.xmin; x <= r.xmax; x++) {
-					NavmeshTile tile = tiles[x + z*tileXCount];
-					GraphNode[] nodes = tile.nodes;
-
-					for (int i = 0; i < nodes.Length; i++) nodes[i].GraphIndex = graphIndex;
+				// Destroy the previous nodes
+				for (int j = 0; j < oldTile.nodes.Length; j++) {
+					oldTile.nodes[j].Destroy();
 				}
+
+				tiles[index] = tile;
 			}
 
+			Profiler.EndSample();
 
-
-			// Connect the newly create tiles with the old tiles and with each other
-			r = r.Expand(1);
-			// Clamp to bounds
-			r = IntRect.Intersection(r, new IntRect(0, 0, tileXCount-1, tileZCount-1));
-
-			for (int z = r.ymin; z <= r.ymax; z++) {
-				for (int x = r.xmin; x <= r.xmax; x++) {
-					if (r.Contains(x+1, z)) {
-						ConnectTiles(tiles[x + z*tileXCount], tiles[x+1 + z*tileXCount]);
-					}
-					if (r.Contains(x, z+1)) {
-						ConnectTiles(tiles[x + z*tileXCount], tiles[x + (z+1)*tileXCount]);
-					}
-				}
+			Profiler.BeginSample("Connect With Neighbours");
+			// Connect the new tiles with their neighbours
+			for (int i = 0; i < stagingTiles.Count; i++) {
+				var tile = stagingTiles[i];
+				ConnectTileWithNeighbours(tile, false);
 			}
 
-			AstarProfiler.EndProfile("ConnectTiles");
-			AstarProfiler.PrintResults();
+			// This may be used to update the tile again to take into
+			// account NavmeshCut components.
+			// It is not the super efficient, but it works.
+			// Usually you only use either normal graph updates OR navmesh
+			// cutting, not both.
+			if (OnRecalculatedTiles != null) {
+				OnRecalculatedTiles(stagingTiles.ToArray());
+			}
+
+			stagingTiles.Clear();
+			Profiler.EndSample();
 		}
 
-		public void ConnectTileWithNeighbours (NavmeshTile tile) {
-			if (tile.x > 0) {
-				int x = tile.x-1;
-				for (int z = tile.z; z < tile.z+tile.d; z++) ConnectTiles(tiles[x + z*tileXCount], tile);
-			}
-			if (tile.x+tile.w < tileXCount) {
-				int x = tile.x+tile.w;
-				for (int z = tile.z; z < tile.z+tile.d; z++) ConnectTiles(tiles[x + z*tileXCount], tile);
-			}
-			if (tile.z > 0) {
-				int z = tile.z-1;
-				for (int x = tile.x; x < tile.x+tile.w; x++) ConnectTiles(tiles[x + z*tileXCount], tile);
-			}
-			if (tile.z+tile.d < tileZCount) {
-				int z = tile.z+tile.d;
-				for (int x = tile.x; x < tile.x+tile.w; x++) ConnectTiles(tiles[x + z*tileXCount], tile);
-			}
-		}
+		public override IEnumerable<Progress> ScanInternal () {
+			TriangleMeshNode.SetNavmeshHolder(AstarPath.active.data.GetGraphIndex(this), this);
 
-		public void RemoveConnectionsFromTile (NavmeshTile tile) {
-			if (tile.x > 0) {
-				int x = tile.x-1;
-				for (int z = tile.z; z < tile.z+tile.d; z++) RemoveConnectionsFromTo(tiles[x + z*tileXCount], tile);
-			}
-			if (tile.x+tile.w < tileXCount) {
-				int x = tile.x+tile.w;
-				for (int z = tile.z; z < tile.z+tile.d; z++) RemoveConnectionsFromTo(tiles[x + z*tileXCount], tile);
-			}
-			if (tile.z > 0) {
-				int z = tile.z-1;
-				for (int x = tile.x; x < tile.x+tile.w; x++) RemoveConnectionsFromTo(tiles[x + z*tileXCount], tile);
-			}
-			if (tile.z+tile.d < tileZCount) {
-				int z = tile.z+tile.d;
-				for (int x = tile.x; x < tile.x+tile.w; x++) RemoveConnectionsFromTo(tiles[x + z*tileXCount], tile);
-			}
-		}
-
-		public void RemoveConnectionsFromTo (NavmeshTile a, NavmeshTile b) {
-			if (a == null || b == null) return;
-			//Same tile, possibly from a large tile (one spanning several x,z tile coordinates)
-			if (a == b) return;
-
-			int tileIdx = b.x + b.z*tileXCount;
-
-			for (int i = 0; i < a.nodes.Length; i++) {
-				TriangleMeshNode node = a.nodes[i];
-				if (node.connections == null) continue;
-				for (int j = 0;; j++) {
-					//Length will not be constant if connections are removed
-					if (j >= node.connections.Length) break;
-
-					var other = node.connections[j] as TriangleMeshNode;
-
-					//Only evaluate TriangleMeshNodes
-					if (other == null) continue;
-
-					int tileIdx2 = other.GetVertexIndex(0);
-					tileIdx2 = (tileIdx2 >> TileIndexOffset) & TileIndexMask;
-
-					if (tileIdx2 == tileIdx) {
-						node.RemoveConnection(node.connections[j]);
-						j--;
-					}
-				}
-			}
-		}
-
-		public override NNInfo GetNearest (Vector3 position, NNConstraint constraint, GraphNode hint) {
-			return GetNearestForce(position, null);
-		}
-
-		public override NNInfo GetNearestForce (Vector3 position, NNConstraint constraint) {
-			if (tiles == null) return new NNInfo();
-
-			Vector3 localPosition = position - forcedBounds.min;
-			int tx = Mathf.FloorToInt(localPosition.x / (cellSize*tileSizeX));
-			int tz = Mathf.FloorToInt(localPosition.z / (cellSize*tileSizeZ));
-
-			// Clamp to graph borders
-			tx = Mathf.Clamp(tx, 0, tileXCount-1);
-			tz = Mathf.Clamp(tz, 0, tileZCount-1);
-
-			int wmax = Math.Max(tileXCount, tileZCount);
-
-			var best = new NNInfo();
-			float bestDistance = float.PositiveInfinity;
-
-			bool xzSearch = nearestSearchOnlyXZ || (constraint != null && constraint.distanceXZ);
-
-			// Search outwards in a diamond pattern from the closest tile
-			for (int w = 0; w < wmax; w++) {
-				if (!xzSearch && bestDistance < (w-1)*cellSize*Math.Max(tileSizeX, tileSizeZ)) break;
-
-				int zmax = Math.Min(w+tz +1, tileZCount);
-				for (int z = Math.Max(-w+tz, 0); z < zmax; z++) {
-					// Solve for z such that abs(x-tx) + abs(z-tx) == w
-					// Delta X coordinate
-					int dx = Math.Abs(w - Math.Abs(z-tz));
-					// Solution is dx + tx and -dx + tx
-
-					// First solution negative delta x
-					if (-dx + tx >= 0) {
-						// Absolute x coordinate
-						int x = -dx + tx;
-						NavmeshTile tile = tiles[x + z*tileXCount];
-
-						if (tile != null) {
-							if (xzSearch) {
-								best = tile.bbTree.QueryClosestXZ(position, constraint, ref bestDistance, best);
-								if (bestDistance < float.PositiveInfinity) break;
-							} else {
-								best = tile.bbTree.QueryClosest(position, constraint, ref bestDistance, best);
-							}
-						}
-					}
-
-					// Other solution, make sure it is not the same solution by checking x != 0
-					if (dx != 0 && dx + tx < tileXCount) {
-						// Absolute x coordinate
-						int x = dx + tx;
-						NavmeshTile tile = tiles[x + z*tileXCount];
-						if (tile != null) {
-							if (xzSearch) {
-								best = tile.bbTree.QueryClosestXZ(position, constraint, ref bestDistance, best);
-								if (bestDistance < float.PositiveInfinity) break;
-							} else {
-								best = tile.bbTree.QueryClosest(position, constraint, ref bestDistance, best);
-							}
-						}
-					}
-				}
+			if (!Application.isPlaying) {
+				RelevantGraphSurface.FindAllGraphSurfaces();
 			}
 
-			best.node = best.constrainedNode;
-			best.constrainedNode = null;
-			best.clampedPosition = best.constClampedPosition;
+			RelevantGraphSurface.UpdateAllPositions();
 
-			return best;
-		}
 
-		/** Finds the first node which contains \a position.
-		 * "Contains" is defined as \a position is inside the triangle node when seen from above. So only XZ space matters.
-		 * In case of a multilayered environment, which node of the possibly several nodes
-		 * containing the point is undefined.
-		 *
-		 * Returns null if there was no node containing the point. This serves as a quick
-		 * check for "is this point on the navmesh or not".
-		 *
-		 * Note that the behaviour of this method is distinct from the GetNearest method.
-		 * The GetNearest method will return the closest node to a point,
-		 * which is not necessarily the one which contains it in XZ space.
-		 *
-		 * \see GetNearest
-		 */
-		public GraphNode PointOnNavmesh (Vector3 position, NNConstraint constraint) {
-			if (tiles == null) return null;
-
-			Vector3 localPosition = position - forcedBounds.min;
-			int tx = Mathf.FloorToInt(localPosition.x / (cellSize*tileSizeX));
-			int tz = Mathf.FloorToInt(localPosition.z / (cellSize*tileSizeZ));
-
-			// Graph borders
-			if (tx < 0 || tz < 0 || tx >= tileXCount || tz >= tileZCount) return null;
-
-			NavmeshTile tile = tiles[tx + tz*tileXCount];
-
-			if (tile != null) {
-				GraphNode node = tile.bbTree.QueryInside(position, constraint);
-				return node;
+			foreach (var progress in ScanAllTiles()) {
+				yield return progress;
 			}
-
-			return null;
-		}
-
-		/** Represents a unity mesh to be used in the recast graph rasterization.
-		 *
-		 * \see ExtraMesh
-		 */
-		public struct SceneMesh {
-			public Mesh mesh;
-			public Matrix4x4 matrix;
-			public Bounds bounds;
-		}
-
-		public override void ScanInternal (OnScanStatus statusCallback) {
-			AstarProfiler.Reset();
-			AstarProfiler.StartProfile("Base Scan");
-			//AstarProfiler.InitializeFastProfile (new string[] {"Rasterize", "Rasterize Inner 1", "Rasterize Inner 2", "Rasterize Inner 3"});
-
-			TriangleMeshNode.SetNavmeshHolder(AstarPath.active.astarData.GetGraphIndex(this), this);
-
-
-			ScanTiledNavmesh(statusCallback);
 
 
 #if DEBUG_REPLAY
 			DebugReplay.WriteToFile();
 #endif
-			AstarProfiler.PrintFastResults();
 		}
 
-		protected void ScanTiledNavmesh (OnScanStatus statusCallback) {
-			ScanAllTiles(statusCallback);
+		public override GraphTransform CalculateTransform () {
+			return new GraphTransform(Matrix4x4.TRS(forcedBoundsCenter, Quaternion.Euler(rotation), Vector3.one) * Matrix4x4.TRS(-forcedBoundsSize*0.5f, Quaternion.identity, Vector3.one));
 		}
 
-		protected void ScanAllTiles (OnScanStatus statusCallback) {
-#if ASTARDEBUG
-			System.Console.WriteLine("Recast Graph -- Collecting Meshes");
-#endif
-
-			//----
-
-			//Voxel grid size
-			int totalVoxelWidth = Mathf.Max((int)(forcedBounds.size.x/cellSize + 0.5f), 1);
-			int totalVoxelDepth = Mathf.Max((int)(forcedBounds.size.z/cellSize + 0.5f), 1);
+		void InitializeTileInfo () {
+			// Voxel grid size
+			int totalVoxelWidth = (int)(forcedBoundsSize.x/cellSize + 0.5f);
+			int totalVoxelDepth = (int)(forcedBoundsSize.z/cellSize + 0.5f);
 
 			if (!useTiles) {
 				tileSizeX = totalVoxelWidth;
@@ -1135,7 +514,7 @@ namespace Pathfinding {
 				tileSizeZ = editorTileSize;
 			}
 
-			//Number of tiles
+			// Number of tiles
 			tileXCount = (totalVoxelWidth + tileSizeX-1) / tileSizeX;
 			tileZCount = (totalVoxelDepth + tileSizeZ-1) / tileSizeZ;
 
@@ -1145,118 +524,286 @@ namespace Pathfinding {
 			}
 
 			tiles = new NavmeshTile[tileXCount*tileZCount];
+		}
 
-#if ASTARDEBUG
-			System.Console.WriteLine("Recast Graph -- Creating Voxel Base");
-#endif
+		void BuildTiles (Queue<Int2> tileQueue, List<RasterizationMesh>[] meshBuckets, ManualResetEvent doneEvent, int threadIndex) {
+			try {
+				// Create the voxelizer and set all settings
+				var vox = new Voxelize(CellHeight, cellSize, walkableClimb, walkableHeight, maxSlope, maxEdgeLength);
+
+				while (true) {
+					Int2 tile;
+					lock (tileQueue) {
+						if (tileQueue.Count == 0) {
+							return;
+						}
+
+						tile = tileQueue.Dequeue();
+					}
+
+					vox.inputMeshes = meshBuckets[tile.x + tile.y*tileXCount];
+					tiles[tile.x + tile.y*tileXCount] = BuildTileMesh(vox, tile.x, tile.y, threadIndex);
+				}
+			} catch (System.Exception e) {
+				Debug.LogException(e);
+			} finally {
+				if (doneEvent != null) doneEvent.Set();
+			}
+		}
+
+		/** Connects all tiles in the queue with the tiles to the right (x+1) side of them or above them (z+1) depending on xDirection and zDirection */
+		void ConnectTiles (Queue<Int2> tileQueue, ManualResetEvent doneEvent, bool xDirection, bool zDirection) {
+			try {
+				while (true) {
+					Int2 tile;
+					lock (tileQueue) {
+						if (tileQueue.Count == 0) {
+							return;
+						}
+
+						tile = tileQueue.Dequeue();
+					}
+
+					// Connect with tile at (x+1,z) and (x,z+1)
+					if (xDirection && tile.x < tileXCount - 1)
+						ConnectTiles(tiles[tile.x + tile.y * tileXCount], tiles[tile.x + 1 + tile.y * tileXCount]);
+					if (zDirection && tile.y < tileZCount - 1)
+						ConnectTiles(tiles[tile.x + tile.y * tileXCount], tiles[tile.x + (tile.y + 1) * tileXCount]);
+				}
+			} catch (System.Exception e) {
+				Debug.LogException(e);
+			} finally {
+				// See BuildTiles
+				if (doneEvent != null) doneEvent.Set();
+			}
+		}
+
+		/** Creates a list for every tile and adds every mesh that touches a tile to the corresponding list */
+		List<RasterizationMesh>[] PutMeshesIntoTileBuckets (List<RasterizationMesh> meshes) {
+			var result = new List<RasterizationMesh>[tiles.Length];
+			var borderExpansion = new Vector3(1, 0, 1)*TileBorderSizeInWorldUnits*2;
+
+			for (int i = 0; i < result.Length; i++) {
+				result[i] = ListPool<RasterizationMesh>.Claim();
+			}
+
+			for (int i = 0; i < meshes.Count; i++) {
+				var mesh = meshes[i];
+				var bounds = mesh.bounds;
+				// Expand borderSize voxels on each side
+				bounds.Expand(borderExpansion);
+
+				var rect = GetTouchingTiles(bounds);
+				for (int z = rect.ymin; z <= rect.ymax; z++) {
+					for (int x = rect.xmin; x <= rect.xmax; x++) {
+						result[x + z*tileXCount].Add(mesh);
+					}
+				}
+			}
+
+			return result;
+		}
+
+		protected IEnumerable<Progress> ScanAllTiles () {
+			transform = CalculateTransform();
+			InitializeTileInfo();
 
 			// If this is true, just fill the graph with empty tiles
 			if (scanEmptyGraph) {
-				for (int z = 0; z < tileZCount; z++) {
-					for (int x = 0; x < tileXCount; x++) {
-						tiles[z*tileXCount + x] = NewEmptyTile(x, z);
-					}
-				}
-				return;
+				FillWithEmptyTiles();
+				yield break;
 			}
-
-			AstarProfiler.StartProfile("Finding Meshes");
-			List<ExtraMesh> extraMeshes;
-
-#if !NETFX_CORE || UNITY_EDITOR
-			System.Console.WriteLine("Collecting Meshes");
-#endif
-			CollectMeshes(out extraMeshes, forcedBounds);
-
-			AstarProfiler.EndProfile("Finding Meshes");
 
 			// A walkableClimb higher than walkableHeight can cause issues when generating the navmesh since then it can in some cases
 			// Both be valid for a character to walk under an obstacle and climb up on top of it (and that cannot be handled with navmesh without links)
 			// The editor scripts also enforce this but we enforce it here too just to be sure
 			walkableClimb = Mathf.Min(walkableClimb, walkableHeight);
 
-			//Create the voxelizer and set all settings
-			var vox = new Voxelize(cellHeight, cellSize, walkableClimb, walkableHeight, maxSlope);
-			vox.inputExtraMeshes = extraMeshes;
+			yield return new Progress(0, "Finding Meshes");
+			var bounds = transform.Transform(new Bounds(forcedBoundsSize*0.5f, forcedBoundsSize));
+			var meshes = CollectMeshes(bounds);
+			var buckets = PutMeshesIntoTileBuckets(meshes);
+			ListPool<RasterizationMesh>.Release(meshes);
 
-			vox.maxEdgeLength = maxEdgeLength;
+			Queue<Int2> tileQueue = new Queue<Int2>();
 
-			int lastInfoCallback = -1;
-			var watch = System.Diagnostics.Stopwatch.StartNew();
-
-			//Generate all tiles
+			// Put all tiles in the queue
 			for (int z = 0; z < tileZCount; z++) {
 				for (int x = 0; x < tileXCount; x++) {
-					int tileNum = z*tileXCount + x;
-#if !NETFX_CORE || UNITY_EDITOR
-					System.Console.WriteLine("Generating Tile #"+(tileNum) + " of " + tileZCount*tileXCount);
+					tileQueue.Enqueue(new Int2(x, z));
+				}
+			}
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+			// WebGL does not support multithreading so we will do everything synchronously instead
+			BuildTiles(tileQueue, buckets, null, 0);
+#else
+			// Fire up a bunch of threads to scan the graph in parallel
+			int threadCount = Mathf.Min(tileQueue.Count, Mathf.Max(1, AstarPath.CalculateThreadCount(ThreadCount.AutomaticHighLoad)));
+			var waitEvents = new ManualResetEvent[threadCount];
+
+			for (int i = 0; i < waitEvents.Length; i++) {
+				waitEvents[i] = new ManualResetEvent(false);
+#if NETFX_CORE
+				// Need to make a copy here, otherwise it may refer to some other index when the task actually runs
+				var threadIndex = i;
+				System.Threading.Tasks.Task.Run(() => BuildTiles(tileQueue, buckets, waitEvents[threadIndex], threadIndex));
+#else
+				ThreadPool.QueueUserWorkItem(state => BuildTiles(tileQueue, buckets, waitEvents[(int)state], (int)state), i);
+#endif
+			}
+
+			// Prioritize responsiveness while playing
+			// but when not playing prioritize throughput
+			// (the Unity progress bar is also pretty slow to update)
+			int timeoutMillis = Application.isPlaying ? 1 : 200;
+
+			while (!WaitHandle.WaitAll(waitEvents, timeoutMillis)) {
+				int count;
+				lock (tileQueue) count = tileQueue.Count;
+
+				yield return new Progress(Mathf.Lerp(0.1f, 0.9f, (tiles.Length - count + 1) / (float)tiles.Length), "Generating Tile " + (tiles.Length - count + 1) + "/" + tiles.Length);
+			}
 #endif
 
-					//Call statusCallback only 10 times since it is very slow in the editor
-					if (statusCallback != null && (tileNum*10/tiles.Length > lastInfoCallback || watch.ElapsedMilliseconds > 2000)) {
-						lastInfoCallback = tileNum*10/tiles.Length;
-						watch.Reset();
-						watch.Start();
+			yield return new Progress(0.9f, "Assigning Graph Indices");
 
-						statusCallback(new Progress(Mathf.Lerp(0.1f, 0.9f, tileNum/(float)tiles.Length), "Building Tile " + tileNum + "/" + tiles.Length));
+			// Assign graph index to nodes
+			uint graphIndex = (uint)AstarPath.active.data.GetGraphIndex(this);
+
+			GetNodes(node => node.GraphIndex = graphIndex);
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+			// Put all tiles in the queue to be connected
+			for (int i = 0; i < tiles.Length; i++) tileQueue.Enqueue(new Int2(tiles[i].x, tiles[i].z));
+
+			// Calculate synchronously
+			ConnectTiles(tileQueue, null, true, true);
+#else
+			// First connect all tiles with an EVEN coordinate sum
+			// This would be the white squares on a chess board.
+			// Then connect all tiles with an ODD coordinate sum (which would be all black squares).
+			// This will prevent the different threads that do all
+			// this in parallel from conflicting with each other.
+			// The directions are also done separately
+			// first they are connected along the X direction and then along the Z direction.
+			// Looping over 0 and then 1
+			for (int coordinateSum = 0; coordinateSum <= 1; coordinateSum++) {
+				for (int direction = 0; direction <= 1; direction++) {
+					for (int i = 0; i < tiles.Length; i++) {
+						if ((tiles[i].x + tiles[i].z) % 2 == coordinateSum) {
+							tileQueue.Enqueue(new Int2(tiles[i].x, tiles[i].z));
+						}
 					}
 
-					BuildTileMesh(vox, x, z);
+					int numTilesInQueue = tileQueue.Count;
+					for (int i = 0; i < waitEvents.Length; i++) {
+						waitEvents[i].Reset();
+#if NETFX_CORE
+						var waitEvent = waitEvents[i];
+						System.Threading.Tasks.Task.Run(() => ConnectTiles(tileQueue, waitEvent, direction == 0, direction == 1));
+#else
+						ThreadPool.QueueUserWorkItem(state => ConnectTiles(tileQueue, state as ManualResetEvent, direction == 0, direction == 1), waitEvents[i]);
+#endif
+					}
+
+					while (!WaitHandle.WaitAll(waitEvents, timeoutMillis)) {
+						int count;
+						lock (tileQueue) {
+							count = tileQueue.Count;
+						}
+
+						yield return new Progress(0.95f, "Connecting Tile " + (numTilesInQueue - count) + "/" + numTilesInQueue + " (Phase " + (direction + 1 + 2*coordinateSum) + " of 4)");
+					}
 				}
 			}
-
-#if !NETFX_CORE
-			System.Console.WriteLine("Assigning Graph Indices");
 #endif
 
-			if (statusCallback != null) statusCallback(new Progress(0.9f, "Connecting tiles"));
-
-			//Assign graph index to nodes
-			uint graphIndex = (uint)AstarPath.active.astarData.GetGraphIndex(this);
-
-			GraphNodeDelegateCancelable del = delegate(GraphNode n) {
-				n.GraphIndex = graphIndex;
-				return true;
-			};
-			GetNodes(del);
-
-			for (int z = 0; z < tileZCount; z++) {
-				for (int x = 0; x < tileXCount; x++) {
-#if !NETFX_CORE
-					System.Console.WriteLine("Connecing Tile #"+(z*tileXCount + x) + " of " + tileZCount*tileXCount);
-#endif
-					if (x < tileXCount-1) ConnectTiles(tiles[x + z*tileXCount], tiles[x+1 + z*tileXCount]);
-					if (z < tileZCount-1) ConnectTiles(tiles[x + z*tileXCount], tiles[x + (z+1)*tileXCount]);
-				}
+			// This may be used by the TileHandlerHelper script to update the tiles
+			// while taking NavmeshCuts into account after the graph has been completely recalculated.
+			if (OnRecalculatedTiles != null) {
+				OnRecalculatedTiles(tiles.Clone() as NavmeshTile[]);
 			}
-
-			AstarProfiler.PrintResults();
 		}
 
-		protected void BuildTileMesh (Voxelize vox, int x, int z) {
-			AstarProfiler.StartProfile("Build Tile");
+		List<RasterizationMesh> CollectMeshes (Bounds bounds) {
+			var result = ListPool<RasterizationMesh>.Claim();
 
+			var meshGatherer = new RecastMeshGatherer(bounds, terrainSampleSize, mask, tagMask, colliderRasterizeDetail);
+
+			if (rasterizeMeshes) {
+				meshGatherer.CollectSceneMeshes(result);
+			}
+
+			meshGatherer.CollectRecastMeshObjs(result);
+
+			if (rasterizeTerrain) {
+				// Split terrains up into meshes approximately the size of a single chunk
+				var desiredTerrainChunkSize = cellSize*Math.Max(tileSizeX, tileSizeZ);
+				meshGatherer.CollectTerrainMeshes(rasterizeTrees, desiredTerrainChunkSize, result);
+			}
+
+			if (rasterizeColliders) {
+				meshGatherer.CollectColliderMeshes(result);
+			}
+
+			if (result.Count == 0) {
+				Debug.LogWarning("No MeshFilters were found contained in the layers specified by the 'mask' variables");
+			}
+
+			return result;
+		}
+
+		float CellHeight {
+			get {
+				// Voxel y coordinates will be stored as ushorts which have 65536 values
+				// Leave a margin to make sure things do not overflow
+				return Mathf.Max(forcedBoundsSize.y / 64000, 0.001f);
+			}
+		}
+
+		/** Convert character radius to a number of voxels */
+		int CharacterRadiusInVoxels {
+			get {
+				// Round it up most of the time, but round it down
+				// if it is very close to the result when rounded down
+				return Mathf.CeilToInt((characterRadius / cellSize) - 0.1f);
+			}
+		}
+
+		/** Number of extra voxels on each side of a tile to ensure accurate navmeshes near the tile border.
+		 * The width of a tile is expanded by 2 times this value (1x to the left and 1x to the right)
+		 */
+		int TileBorderSizeInVoxels {
+			get {
+				return CharacterRadiusInVoxels + 3;
+			}
+		}
+
+		float TileBorderSizeInWorldUnits {
+			get {
+				return TileBorderSizeInVoxels*cellSize;
+			}
+		}
+
+		Bounds CalculateTileBoundsWithBorder (int x, int z) {
+			var bounds = new Bounds();
+
+			bounds.SetMinMax(new Vector3(x*TileWorldSizeX, 0, z*TileWorldSizeZ),
+				new Vector3((x+1)*TileWorldSizeX, forcedBoundsSize.y, (z+1)*TileWorldSizeZ)
+				);
+
+			// Expand borderSize voxels on each side
+			bounds.Expand(new Vector3(1, 0, 1)*TileBorderSizeInWorldUnits*2);
+			return bounds;
+		}
+
+		protected NavmeshTile BuildTileMesh (Voxelize vox, int x, int z, int threadIndex = 0) {
+			AstarProfiler.StartProfile("Build Tile");
 			AstarProfiler.StartProfile("Init");
 
-			//World size of tile
-			float tcsx = tileSizeX*cellSize;
-			float tcsz = tileSizeZ*cellSize;
-
-			int voxelCharacterRadius = Mathf.CeilToInt(characterRadius/cellSize);
-
-			Vector3 forcedBoundsMin = forcedBounds.min;
-			Vector3 forcedBoundsMax = forcedBounds.max;
-
-			var bounds = new Bounds();
-			bounds.SetMinMax(new Vector3(x*tcsx, 0, z*tcsz) + forcedBoundsMin,
-				new Vector3((x+1)*tcsx + forcedBoundsMin.x, forcedBoundsMax.y, (z+1)*tcsz + forcedBoundsMin.z)
-				);
-			vox.borderSize = voxelCharacterRadius + 3;
-
-			//Expand borderSize voxels on each side
-			bounds.Expand(new Vector3(vox.borderSize, 0, vox.borderSize)*cellSize*2);
-
-			vox.forcedBounds = bounds;
+			vox.borderSize = TileBorderSizeInVoxels;
+			vox.forcedBounds = CalculateTileBoundsWithBorder(x, z);
 			vox.width = tileSizeX + vox.borderSize*2;
 			vox.depth = tileSizeZ + vox.borderSize*2;
 
@@ -1269,130 +816,60 @@ namespace Pathfinding {
 
 			vox.minRegionSize = Mathf.RoundToInt(minRegionSize / (cellSize*cellSize));
 
- #if ASTARDEBUG
-			Debug.Log("Building Tile " + x+","+z);
-			System.Console.WriteLine("Recast Graph -- Voxelizing");
-#endif
 			AstarProfiler.EndProfile("Init");
 
 
-			//Init voxelizer
+			// Init voxelizer
 			vox.Init();
-
-			vox.CollectMeshes();
-
-			vox.VoxelizeInput();
+			vox.VoxelizeInput(transform, CalculateTileBoundsWithBorder(x, z));
 
 			AstarProfiler.StartProfile("Filter Ledges");
 
 
-			vox.FilterLedges(vox.voxelWalkableHeight, vox.voxelWalkableClimb, vox.cellSize, vox.cellHeight, vox.forcedBounds.min);
+			vox.FilterLedges(vox.voxelWalkableHeight, vox.voxelWalkableClimb, vox.cellSize, vox.cellHeight);
 
 			AstarProfiler.EndProfile("Filter Ledges");
 
 			AstarProfiler.StartProfile("Filter Low Height Spans");
-			vox.FilterLowHeightSpans(vox.voxelWalkableHeight, vox.cellSize, vox.cellHeight, vox.forcedBounds.min);
+			vox.FilterLowHeightSpans(vox.voxelWalkableHeight, vox.cellSize, vox.cellHeight);
 			AstarProfiler.EndProfile("Filter Low Height Spans");
 
 			vox.BuildCompactField();
-
 			vox.BuildVoxelConnections();
-
-#if ASTARDEBUG
-			System.Console.WriteLine("Recast Graph -- Eroding");
-#endif
-
-			vox.ErodeWalkableArea(voxelCharacterRadius);
-
-#if ASTARDEBUG
-			System.Console.WriteLine("Recast Graph -- Building Distance Field");
-#endif
-
+			vox.ErodeWalkableArea(CharacterRadiusInVoxels);
 			vox.BuildDistanceField();
-
-#if ASTARDEBUG
-			System.Console.WriteLine("Recast Graph -- Building Regions");
-#endif
-
 			vox.BuildRegions();
 
-#if ASTARDEBUG
-			System.Console.WriteLine("Recast Graph -- Building Contours");
-#endif
-
 			var cset = new VoxelContourSet();
-
-			vox.BuildContours(contourMaxError, 1, cset, Voxelize.RC_CONTOUR_TESS_WALL_EDGES);
-
-#if ASTARDEBUG
-			System.Console.WriteLine("Recast Graph -- Building Poly Mesh");
-#endif
+			vox.BuildContours(contourMaxError, 1, cset, Voxelize.RC_CONTOUR_TESS_WALL_EDGES | Voxelize.RC_CONTOUR_TESS_TILE_EDGES);
 
 			VoxelMesh mesh;
-
 			vox.BuildPolyMesh(cset, 3, out mesh);
-
-#if ASTARDEBUG
-			System.Console.WriteLine("Recast Graph -- Building Nodes");
-#endif
-
-			//Vector3[] vertices = new Vector3[mesh.verts.Length];
 
 			AstarProfiler.StartProfile("Build Nodes");
 
-			// Debug code
-			//matrix = Matrix4x4.TRS (vox.voxelOffset,Quaternion.identity,Int3.Precision*vox.cellScale);
-
-			//Position the vertices correctly in the world
+			// Position the vertices correctly in graph space (all tiles are laid out on the xz plane with the (0,0) tile at the origin)
 			for (int i = 0; i < mesh.verts.Length; i++) {
-				//Note the multiplication is Scalar multiplication of vectors
-				mesh.verts[i] = ((mesh.verts[i]*Int3.Precision) * vox.cellScale) + (Int3)vox.voxelOffset;
-
-				// Debug code
-				//Debug.DrawRay (matrix.MultiplyPoint3x4(vertices[i]),Vector3.up,Color.red);
+				mesh.verts[i] *= Int3.Precision;
 			}
+			vox.transformVoxel2Graph.Transform(mesh.verts);
 
-
-#if ASTARDEBUG
-			System.Console.WriteLine("Recast Graph -- Generating Nodes");
-#endif
-
-			NavmeshTile tile = CreateTile(vox, mesh, x, z);
-			tiles[tile.x + tile.z*tileXCount] = tile;
+			NavmeshTile tile = CreateTile(vox, mesh, x, z, threadIndex);
 
 			AstarProfiler.EndProfile("Build Nodes");
 
-#if ASTARDEBUG
-			System.Console.WriteLine("Recast Graph -- Done");
-#endif
-
 			AstarProfiler.EndProfile("Build Tile");
+			return tile;
 		}
 
-		private Dictionary<Int2, int> cachedInt2_int_dict = new Dictionary<Int2, int>();
-		private Dictionary<Int3, int> cachedInt3_int_dict = new Dictionary<Int3, int>();
-
-		/** Create a tile at tile index \a x , \a z from the mesh.
-		 * \warning This implementation is not thread safe. It uses cached variables to improve performance
+		/** Create a tile at tile index \a x, \a z from the mesh.
+		 * \version Since version 3.7.6 the implementation is thread safe
 		 */
-		NavmeshTile CreateTile (Voxelize vox, VoxelMesh mesh, int x, int z) {
+		NavmeshTile CreateTile (Voxelize vox, VoxelMesh mesh, int x, int z, int threadIndex) {
 			if (mesh.tris == null) throw new System.ArgumentNullException("mesh.tris");
 			if (mesh.verts == null) throw new System.ArgumentNullException("mesh.verts");
-
-			//Create a new navmesh tile and assign its settings
-			var tile = new NavmeshTile();
-
-			tile.x = x;
-			tile.z = z;
-			tile.w = 1;
-			tile.d = 1;
-			tile.tris = mesh.tris;
-			tile.verts = mesh.verts;
-			tile.bbTree = new BBTree();
-
-			if (tile.tris.Length % 3 != 0) throw new System.ArgumentException("Indices array's length must be a multiple of 3 (mesh.tris)");
-
-			if (tile.verts.Length >= VertexIndexMask) {
+			if (mesh.tris.Length % 3 != 0) throw new System.ArgumentException("Indices array's length must be a multiple of 3 (mesh.tris)");
+			if (mesh.verts.Length >= VertexIndexMask) {
 				if (tileXCount*tileZCount == 1) {
 					throw new System.ArgumentException("Too many vertices per tile (more than " + VertexIndexMask + ")." +
 						"\n<b>Try enabling tiling in the recast graph settings.</b>\n");
@@ -1402,924 +879,50 @@ namespace Pathfinding {
 				}
 			}
 
-			//Dictionary<Int3, int> firstVerts = new Dictionary<Int3, int> ();
-			Dictionary<Int3, int> firstVerts = cachedInt3_int_dict;
-			firstVerts.Clear();
-
-			var compressedPointers = new int[tile.verts.Length];
-
-			int count = 0;
-			for (int i = 0; i < tile.verts.Length; i++) {
-				if (!firstVerts.ContainsKey(tile.verts[i])) {
-					firstVerts.Add(tile.verts[i], count);
-					compressedPointers[i] = count;
-					tile.verts[count] = tile.verts[i];
-					count++;
-				} else {
-					// There are some cases, rare but still there, that vertices are identical
-					compressedPointers[i] = firstVerts[tile.verts[i]];
-				}
-			}
-
-			for (int i = 0; i < tile.tris.Length; i++) {
-				tile.tris[i] = compressedPointers[tile.tris[i]];
-			}
-
-			var compressed = new Int3[count];
-			for (int i = 0; i < count; i++) compressed[i] = tile.verts[i];
-
-			tile.verts = compressed;
-
-			var nodes = new TriangleMeshNode[tile.tris.Length/3];
-			tile.nodes = nodes;
-
-			//Here we are faking a new graph
-			//The tile is not added to any graphs yet, but to get the position querys from the nodes
-			//to work correctly (not throw exceptions because the tile is not calculated) we fake a new graph
-			//and direct the position queries directly to the tile
-			int graphIndex = AstarPath.active.astarData.graphs.Length;
-
-			TriangleMeshNode.SetNavmeshHolder(graphIndex, tile);
-
-			//This index will be ORed to the triangle indices
-			int tileIndex = x + z*tileXCount;
-			tileIndex <<= TileIndexOffset;
-
-			//Create nodes and assign triangle indices
-			for (int i = 0; i < nodes.Length; i++) {
-				var node = new TriangleMeshNode(active);
-				nodes[i] = node;
-				node.GraphIndex = (uint)graphIndex;
-				node.v0 = tile.tris[i*3+0] | tileIndex;
-				node.v1 = tile.tris[i*3+1] | tileIndex;
-				node.v2 = tile.tris[i*3+2] | tileIndex;
-
-				//Degenerate triangles might occur, but they will not cause any large troubles anymore
-				//if (Polygon.IsColinear (node.GetVertex(0), node.GetVertex(1), node.GetVertex(2))) {
-				//	Debug.Log ("COLINEAR!!!!!!");
-				//}
-
-				//Make sure the triangle is clockwise
-				if (!VectorMath.IsClockwiseXZ(node.GetVertex(0), node.GetVertex(1), node.GetVertex(2))) {
-					int tmp = node.v0;
-					node.v0 = node.v2;
-					node.v2 = tmp;
-				}
-
-				node.Walkable = true;
-				node.Penalty = initialPenalty;
-				node.UpdatePositionFromVertices();
-			}
-
-			tile.bbTree.RebuildFrom(nodes);
-			CreateNodeConnections(tile.nodes);
-
-			//Remove the fake graph
-			TriangleMeshNode.SetNavmeshHolder(graphIndex, null);
-
-			return tile;
-		}
-
-		/** Create connections between all nodes.
-		 * \warning This implementation is not thread safe. It uses cached variables to improve performance
-		 */
-		void CreateNodeConnections (TriangleMeshNode[] nodes) {
-			List<MeshNode> connections = Pathfinding.Util.ListPool<MeshNode>.Claim();
-			List<uint> connectionCosts = Pathfinding.Util.ListPool<uint>.Claim();
-
-			Dictionary<Int2, int> nodeRefs = cachedInt2_int_dict;
-			nodeRefs.Clear();
-
-			// Build node neighbours
-			for (int i = 0; i < nodes.Length; i++) {
-				TriangleMeshNode node = nodes[i];
-
-				int av = node.GetVertexCount();
-
-				for (int a = 0; a < av; a++) {
-					// Recast can in some very special cases generate degenerate triangles which are simply lines
-					// In that case, duplicate keys might be added and thus an exception will be thrown
-					// It is safe to ignore the second edge though... I think (only found one case where this happens)
-					var key = new Int2(node.GetVertexIndex(a), node.GetVertexIndex((a+1) % av));
-					if (!nodeRefs.ContainsKey(key)) {
-						nodeRefs.Add(key, i);
-					}
-				}
-			}
-
-
-			for (int i = 0; i < nodes.Length; i++) {
-				TriangleMeshNode node = nodes[i];
-
-				connections.Clear();
-				connectionCosts.Clear();
-
-				int av = node.GetVertexCount();
-
-				for (int a = 0; a < av; a++) {
-					int first = node.GetVertexIndex(a);
-					int second = node.GetVertexIndex((a+1) % av);
-					int connNode;
-
-					if (nodeRefs.TryGetValue(new Int2(second, first), out connNode)) {
-						TriangleMeshNode other = nodes[connNode];
-
-						int bv = other.GetVertexCount();
-
-						for (int b = 0; b < bv; b++) {
-							/** \todo This will fail on edges which are only partially shared */
-							if (other.GetVertexIndex(b) == second && other.GetVertexIndex((b+1) % bv) == first) {
-								uint cost = (uint)(node.position - other.position).costMagnitude;
-								connections.Add(other);
-								connectionCosts.Add(cost);
-								break;
-							}
-						}
-					}
-				}
-
-				node.connections = connections.ToArray();
-				node.connectionCosts = connectionCosts.ToArray();
-			}
-
-			Pathfinding.Util.ListPool<MeshNode>.Release(connections);
-			Pathfinding.Util.ListPool<uint>.Release(connectionCosts);
-		}
-
-		/** Generate connections between the two tiles.
-		 * The tiles must be adjacent.
-		 */
-		void ConnectTiles (NavmeshTile tile1, NavmeshTile tile2) {
-			if (tile1 == null) return;//throw new System.ArgumentNullException ("tile1");
-			if (tile2 == null) return;//throw new System.ArgumentNullException ("tile2");
-
-			if (tile1.nodes == null) throw new System.ArgumentException("tile1 does not contain any nodes");
-			if (tile2.nodes == null) throw new System.ArgumentException("tile2 does not contain any nodes");
-
-			int t1x = Mathf.Clamp(tile2.x, tile1.x, tile1.x+tile1.w-1);
-			int t2x = Mathf.Clamp(tile1.x, tile2.x, tile2.x+tile2.w-1);
-			int t1z = Mathf.Clamp(tile2.z, tile1.z, tile1.z+tile1.d-1);
-			int t2z = Mathf.Clamp(tile1.z, tile2.z, tile2.z+tile2.d-1);
-
-			int coord, altcoord;
-			int t1coord, t2coord;
-
-			float tcs;
-
-			// Figure out which side that is shared between the two tiles
-			// and what coordinate index is fixed along that edge (x or z)
-			if (t1x == t2x) {
-				coord = 2;
-				altcoord = 0;
-				t1coord = t1z;
-				t2coord = t2z;
-				tcs = tileSizeZ*cellSize;
-			} else if (t1z == t2z) {
-				coord = 0;
-				altcoord = 2;
-				t1coord = t1x;
-				t2coord = t2x;
-				tcs = tileSizeX*cellSize;
-			} else {
-				throw new System.ArgumentException("Tiles are not adjacent (neither x or z coordinates match)");
-			}
-
-			if (Math.Abs(t1coord-t2coord) != 1) {
-				Debug.Log(tile1.x + " " + tile1.z + " " + tile1.w + " " + tile1.d + "\n"+
-					tile2.x + " " + tile2.z + " " + tile2.w + " " + tile2.d+"\n"+
-					t1x + " " + t1z + " " + t2x + " " + t2z);
-				throw new System.ArgumentException("Tiles are not adjacent (tile coordinates must differ by exactly 1. Got '" + t1coord + "' and '" + t2coord + "')");
-			}
-
-			//Midpoint between the two tiles
-			int midpoint = (int)Math.Round((Math.Max(t1coord, t2coord) * tcs + forcedBounds.min[coord]) * Int3.Precision);
-
-#if ASTARDEBUG
-			Vector3 v1 = new Vector3(-100, 0, -100);
-			Vector3 v2 = new Vector3(100, 0, 100);
-			v1[coord] = midpoint*Int3.PrecisionFactor;
-			v2[coord] = midpoint*Int3.PrecisionFactor;
-
-			Debug.DrawLine(v1, v2, Color.magenta);
-#endif
-
-			TriangleMeshNode[] nodes1 = tile1.nodes;
-			TriangleMeshNode[] nodes2 = tile2.nodes;
-
-			// Find adjacent nodes on the border between the tiles
-			for (int i = 0; i < nodes1.Length; i++) {
-				TriangleMeshNode nodeA = nodes1[i];
-				int aVertexCount = nodeA.GetVertexCount();
-
-				// Loop through all *sides* of the node
-				for (int a = 0; a < aVertexCount; a++) {
-					// Vertices that the segment consists of
-					Int3 aVertex1 = nodeA.GetVertex(a);
-					Int3 aVertex2 = nodeA.GetVertex((a+1) % aVertexCount);
-
-					// Check if it is really close to the tile border
-					if (Math.Abs(aVertex1[coord] - midpoint) < 2 && Math.Abs(aVertex2[coord] - midpoint) < 2) {
-						int minalt = Math.Min(aVertex1[altcoord], aVertex2[altcoord]);
-						int maxalt = Math.Max(aVertex1[altcoord], aVertex2[altcoord]);
-
-						// Degenerate edge
-						if (minalt == maxalt) continue;
-
-						for (int j = 0; j < nodes2.Length; j++) {
-							TriangleMeshNode nodeB = nodes2[j];
-							int bVertexCount = nodeB.GetVertexCount();
-							for (int b = 0; b < bVertexCount; b++) {
-								Int3 bVertex1 = nodeB.GetVertex(b);
-								Int3 bVertex2 = nodeB.GetVertex((b+1) % aVertexCount);
-								if (Math.Abs(bVertex1[coord] - midpoint) < 2 && Math.Abs(bVertex2[coord] - midpoint) < 2) {
-									int minalt2 = Math.Min(bVertex1[altcoord], bVertex2[altcoord]);
-									int maxalt2 = Math.Max(bVertex1[altcoord], bVertex2[altcoord]);
-
-									// Degenerate edge
-									if (minalt2 == maxalt2) continue;
-
-									if (maxalt > minalt2 && minalt < maxalt2) {
-										// The two nodes seem to be adjacent
-
-										// Test shortest distance between the segments (first test if they are equal since that is much faster)
-										if ((aVertex1 == bVertex1 && aVertex2 == bVertex2) || (aVertex1 == bVertex2 && aVertex2 == bVertex1) ||
-											VectorMath.SqrDistanceSegmentSegment((Vector3)aVertex1, (Vector3)aVertex2, (Vector3)bVertex1, (Vector3)bVertex2) < walkableClimb*walkableClimb) {
-											uint cost = (uint)(nodeA.position - nodeB.position).costMagnitude;
-
-											nodeA.AddConnection(nodeB, cost);
-											nodeB.AddConnection(nodeA, cost);
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		/** Start batch updating of tiles.
-		 * During batch updating, tiles will not be connected if they are updating with ReplaceTile.
-		 * When ending batching, all affected tiles will be connected.
-		 * This is faster than not using batching.
-		 */
-		public void StartBatchTileUpdate () {
-			if (batchTileUpdate) throw new System.InvalidOperationException("Calling StartBatchLoad when batching is already enabled");
-			batchTileUpdate = true;
-		}
-
-		/** End batch updating of tiles.
-		 * During batch updating, tiles will not be connected if they are updating with ReplaceTile.
-		 * When ending batching, all affected tiles will be connected.
-		 * This is faster than not using batching.
-		 */
-		public void EndBatchTileUpdate () {
-			if (!batchTileUpdate) throw new System.InvalidOperationException("Calling EndBatchLoad when batching not enabled");
-
-			batchTileUpdate = false;
-
-			int tw = tileXCount;
-			int td = tileZCount;
-
-			//Clear all flags
-			for (int z = 0; z < td; z++) {
-				for (int x = 0; x < tw; x++) {
-					tiles[x + z*tileXCount].flag = false;
-				}
-			}
-
-			for (int i = 0; i < batchUpdatedTiles.Count; i++) tiles[batchUpdatedTiles[i]].flag = true;
-
-			for (int z = 0; z < td; z++) {
-				for (int x = 0; x < tw; x++) {
-					if (x < tw-1
-						&& (tiles[x + z*tileXCount].flag || tiles[x+1 + z*tileXCount].flag)
-						&& tiles[x + z*tileXCount] != tiles[x+1 + z*tileXCount]) {
-						ConnectTiles(tiles[x + z*tileXCount], tiles[x+1 + z*tileXCount]);
-					}
-
-					if (z < td-1
-						&& (tiles[x + z*tileXCount].flag || tiles[x + (z+1)*tileXCount].flag)
-						&& tiles[x + z*tileXCount] != tiles[x + (z+1)*tileXCount]) {
-						ConnectTiles(tiles[x + z*tileXCount], tiles[x + (z+1)*tileXCount]);
-					}
-				}
-			}
-
-			batchUpdatedTiles.Clear();
-		}
-
-		/** Replace tile at index with nodes created from specified navmesh.
-		 * \see StartBatchTileUpdating
-		 */
-		public void ReplaceTile (int x, int z, Int3[] verts, int[] tris, bool worldSpace) {
-			ReplaceTile(x, z, 1, 1, verts, tris, worldSpace);
-		}
-
-		public void ReplaceTile (int x, int z, int w, int d, Int3[] verts, int[] tris, bool worldSpace) {
-			if (x + w > tileXCount || z+d > tileZCount || x < 0 || z < 0) {
-				throw new System.ArgumentException("Tile is placed at an out of bounds position or extends out of the graph bounds ("+x+", " + z + " [" + w + ", " + d+ "] " + tileXCount + " " + tileZCount + ")");
-			}
-
-			if (w < 1 || d < 1) throw new System.ArgumentException("width and depth must be greater or equal to 1. Was " + w + ", " + d);
-
-			//Remove previous tiles
-			for (int cz = z; cz < z+d; cz++) {
-				for (int cx = x; cx < x+w; cx++) {
-					NavmeshTile otile = tiles[cx + cz*tileXCount];
-					if (otile == null) continue;
-
-					//Remove old tile connections
-					RemoveConnectionsFromTile(otile);
-
-					for (int i = 0; i < otile.nodes.Length; i++) {
-						otile.nodes[i].Destroy();
-					}
-
-					for (int qz = otile.z; qz < otile.z+otile.d; qz++) {
-						for (int qx = otile.x; qx < otile.x+otile.w; qx++) {
-							NavmeshTile qtile = tiles[qx + qz*tileXCount];
-							if (qtile == null || qtile != otile) throw new System.Exception("This should not happen");
-
-							if (qz < z || qz >= z+d || qx < x || qx >= x+w) {
-								//if out of this tile's bounds, replace with empty tile
-								tiles[qx + qz*tileXCount] = NewEmptyTile(qx, qz);
-
-								if (batchTileUpdate) {
-									batchUpdatedTiles.Add(qx + qz*tileXCount);
-								}
-							} else {
-								//Will be replaced by the new tile
-								tiles[qx + qz*tileXCount] = null;
-							}
-						}
-					}
-				}
-			}
-
-			//Create a new navmesh tile and assign its settings
-			var tile = new NavmeshTile();
-
-			tile.x = x;
-			tile.z = z;
-			tile.w = w;
-			tile.d = d;
-			tile.tris = tris;
-			tile.verts = verts;
-			tile.bbTree = new BBTree();
-
-			if (tile.tris.Length % 3 != 0) throw new System.ArgumentException("Triangle array's length must be a multiple of 3 (tris)");
-
-			if (tile.verts.Length > 0xFFFF) throw new System.ArgumentException("Too many vertices per tile (more than 65535)");
-
-			if (!worldSpace) {
-				if (!Mathf.Approximately(x*tileSizeX*cellSize*Int3.FloatPrecision, (float)Math.Round(x*tileSizeX*cellSize*Int3.FloatPrecision))) Debug.LogWarning("Possible numerical imprecision. Consider adjusting tileSize and/or cellSize");
-				if (!Mathf.Approximately(z*tileSizeZ*cellSize*Int3.FloatPrecision, (float)Math.Round(z*tileSizeZ*cellSize*Int3.FloatPrecision))) Debug.LogWarning("Possible numerical imprecision. Consider adjusting tileSize and/or cellSize");
-
-				var offset = (Int3)(new Vector3((x * tileSizeX * cellSize), 0, (z * tileSizeZ * cellSize)) + forcedBounds.min);
-
-				for (int i = 0; i < verts.Length; i++) {
-					verts[i] += offset;
-				}
-			}
-
-			var nodes = new TriangleMeshNode[tile.tris.Length/3];
-			tile.nodes = nodes;
-
-			//Here we are faking a new graph
-			//The tile is not added to any graphs yet, but to get the position querys from the nodes
-			//to work correctly (not throw exceptions because the tile is not calculated) we fake a new graph
-			//and direct the position queries directly to the tile
-			int graphIndex = AstarPath.active.astarData.graphs.Length;
-
-			TriangleMeshNode.SetNavmeshHolder(graphIndex, tile);
-
-			//This index will be ORed to the triangle indices
-			int tileIndex = x + z*tileXCount;
-			tileIndex <<= TileIndexOffset;
-
-			if (tile.verts.Length > VertexIndexMask) {
-				Debug.LogError("Too many vertices in the tile (" + tile.verts.Length + " > " + VertexIndexMask +")\nYou can enable ASTAR_RECAST_LARGER_TILES under the 'Optimizations' tab in the A* Inspector to raise this limit.");
-				tiles[tileIndex] = NewEmptyTile(x, z);
-				return;
-			}
-
-			//Create nodes and assign triangle indices
-			for (int i = 0; i < nodes.Length; i++) {
-				var node = new TriangleMeshNode(active);
-				nodes[i] = node;
-				node.GraphIndex = (uint)graphIndex;
-				node.v0 = tile.tris[i*3+0] | tileIndex;
-				node.v1 = tile.tris[i*3+1] | tileIndex;
-				node.v2 = tile.tris[i*3+2] | tileIndex;
-
-				//Degenerate triangles might occur, but they will not cause any large troubles anymore
-				//if (Polygon.IsColinear (node.GetVertex(0), node.GetVertex(1), node.GetVertex(2))) {
-				//	Debug.Log ("COLINEAR!!!!!!");
-				//}
-
-				//Make sure the triangle is clockwise
-				if (!VectorMath.IsClockwiseXZ(node.GetVertex(0), node.GetVertex(1), node.GetVertex(2))) {
-					int tmp = node.v0;
-					node.v0 = node.v2;
-					node.v2 = tmp;
-				}
-
-				node.Walkable = true;
-				node.Penalty = initialPenalty;
-				node.UpdatePositionFromVertices();
-			}
-
-			tile.bbTree.RebuildFrom(nodes);
-
-			CreateNodeConnections(tile.nodes);
-
-			//Set tile
-			for (int cz = z; cz < z+d; cz++) {
-				for (int cx = x; cx < x+w; cx++) {
-					tiles[cx + cz*tileXCount] = tile;
-				}
-			}
-
-			if (batchTileUpdate) {
-				batchUpdatedTiles.Add(x + z*tileXCount);
-			} else {
-				ConnectTileWithNeighbours(tile);
-				/*if (x > 0) ConnectTiles (tiles[(x-1) + z*tileXCount], tile);
-				 * if (z > 0) ConnectTiles (tiles[x + (z-1)*tileXCount], tile);
-				 * if (x < tileXCount-1) ConnectTiles (tiles[(x+1) + z*tileXCount], tile);
-				 * if (z < tileZCount-1) ConnectTiles (tiles[x + (z+1)*tileXCount], tile);*/
-			}
-
-			//Remove the fake graph
-			TriangleMeshNode.SetNavmeshHolder(graphIndex, null);
-
-			//Real graph index
-			//TODO, could this step be changed for this function, is a fake index required?
-			graphIndex = AstarPath.active.astarData.GetGraphIndex(this);
-
-			for (int i = 0; i < nodes.Length; i++) nodes[i].GraphIndex = (uint)graphIndex;
-		}
-
-		void CollectTreeMeshes (Terrain terrain, List<ExtraMesh> extraMeshes) {
-			TerrainData data = terrain.terrainData;
-
-			for (int i = 0; i < data.treeInstances.Length; i++) {
-				TreeInstance instance = data.treeInstances[i];
-				TreePrototype prot = data.treePrototypes[instance.prototypeIndex];
-
-				// Make sure that the tree prefab exists
-				if (prot.prefab == null) {
-					continue;
-				}
-
-				var collider = prot.prefab.GetComponent<Collider>();
-
-				if (collider == null) {
-					var b = new Bounds(terrain.transform.position + Vector3.Scale(instance.position, data.size), new Vector3(instance.widthScale, instance.heightScale, instance.widthScale));
-
-					Matrix4x4 matrix = Matrix4x4.TRS(terrain.transform.position +  Vector3.Scale(instance.position, data.size), Quaternion.identity, new Vector3(instance.widthScale, instance.heightScale, instance.widthScale)*0.5f);
-
-
-					var m = new ExtraMesh(BoxColliderVerts, BoxColliderTris, b, matrix);
-
-#if ASTARDEBUG
-					Debug.DrawRay(instance.position, Vector3.up, Color.red, 1);
-#endif
-					extraMeshes.Add(m);
-				} else {
-					//The prefab has a collider, use that instead
-					Vector3 pos = terrain.transform.position + Vector3.Scale(instance.position, data.size);
-					var scale = new Vector3(instance.widthScale, instance.heightScale, instance.widthScale);
-
-					//Generate a mesh from the collider
-					ExtraMesh m = RasterizeCollider(collider, Matrix4x4.TRS(pos, Quaternion.identity, scale));
-
-					//Make sure a valid mesh was generated
-					if (m.vertices != null) {
-#if ASTARDEBUG
-						Debug.DrawRay(pos, Vector3.up, Color.yellow, 1);
-#endif
-						//The bounds are incorrectly based on collider.bounds
-						m.RecalculateBounds();
-						extraMeshes.Add(m);
-					}
-				}
-			}
-		}
-
-		void CollectTerrainMeshes (Bounds bounds, bool rasterizeTrees, List<ExtraMesh> extraMeshes) {
-			// Find all terrains in the scene
-			var terrains = MonoBehaviour.FindObjectsOfType(typeof(Terrain)) as Terrain[];
-
-			if (terrains.Length > 0) {
-				// Loop through all terrains in the scene
-				for (int j = 0; j < terrains.Length; j++) {
-					TerrainData terrainData = terrains[j].terrainData;
-
-					if (terrainData == null) continue;
-
-					Vector3 offset = terrains[j].GetPosition();
-					Vector3 center = offset + terrainData.size * 0.5F;
-
-					// Figure out the bounds of the terrain in world space
-					var b = new Bounds(center, terrainData.size);
-
-					// Only include terrains which intersects the graph
-					if (!b.Intersects(bounds)) continue;
-
-					// Sample the terrain heightmap
-					float[, ] heights = terrainData.GetHeights(0, 0, terrainData.heightmapWidth, terrainData.heightmapHeight);
-
-					// Clamp to at least 1 since that's the resolution of the heightmap
-					terrainSampleSize = Math.Max(terrainSampleSize, 1);
-
-					int rwidth = terrainData.heightmapWidth;
-					int rheight = terrainData.heightmapHeight;
-
-					int hWidth = (terrainData.heightmapWidth+terrainSampleSize-1) / terrainSampleSize + 1;
-					int hHeight = (terrainData.heightmapHeight+terrainSampleSize-1) / terrainSampleSize + 1;
-
-					// Create a mesh from the heightmap
-					var terrainVertices = new Vector3[hWidth*hHeight];
-
-					Vector3 hSampleSize = terrainData.heightmapScale;
-					float heightScale = terrainData.size.y;
-
-					// Create lots of vertices
-					for (int z = 0, nz = 0; nz < hHeight; z += terrainSampleSize, nz++) {
-						for (int x = 0, nx = 0; nx < hWidth; x += terrainSampleSize, nx++) {
-							int rx = Math.Min(x, rwidth-1);
-							int rz = Math.Min(z, rheight-1);
-
-							terrainVertices[nz*hWidth + nx] = new Vector3(rz * hSampleSize.x, heights[rx, rz]*heightScale, rx * hSampleSize.z) + offset;
-						}
-					}
-
-					// Create the mesh by creating triangles in a grid like pattern
-					var tris = new int[(hWidth-1)*(hHeight-1)*2*3];
-					int triangleIndex = 0;
-					for (int z = 0; z < hHeight-1; z++) {
-						for (int x = 0; x < hWidth-1; x++) {
-							tris[triangleIndex]   = z*hWidth + x;
-							tris[triangleIndex+1] = z*hWidth + x+1;
-							tris[triangleIndex+2] = (z+1)*hWidth + x+1;
-							triangleIndex += 3;
-							tris[triangleIndex]   = z*hWidth + x;
-							tris[triangleIndex+1] = (z+1)*hWidth + x+1;
-							tris[triangleIndex+2] = (z+1)*hWidth + x;
-							triangleIndex += 3;
-						}
-					}
-
-					#if ASTARDEBUG
-					for (int i = 0; i < tris.Length; i += 3) {
-						Debug.DrawLine(terrainVertices[tris[i]], terrainVertices[tris[i+1]], Color.red);
-						Debug.DrawLine(terrainVertices[tris[i+1]], terrainVertices[tris[i+2]], Color.red);
-						Debug.DrawLine(terrainVertices[tris[i+2]], terrainVertices[tris[i]], Color.red);
-					}
-					#endif
-
-
-					extraMeshes.Add(new ExtraMesh(terrainVertices, tris, b));
-
-					if (rasterizeTrees) {
-						// Rasterize all tree colliders on this terrain object
-						CollectTreeMeshes(terrains[j], extraMeshes);
-					}
-				}
-			}
-		}
-
-		void CollectColliderMeshes (Bounds bounds, List<ExtraMesh> extraMeshes) {
-			var colls = MonoBehaviour.FindObjectsOfType(typeof(Collider)) as Collider[];
-
-			if ((tagMask != null && tagMask.Count > 0) || mask != 0) {
-				for (int i = 0; i < colls.Length; i++) {
-					Collider col = colls[i];
-
-					if ((((1 << col.gameObject.layer) & mask) != 0 || tagMask.Contains(col.tag)) && col.enabled && !col.isTrigger && col.bounds.Intersects(bounds)) {
-						ExtraMesh emesh = RasterizeCollider(col);
-						//Make sure a valid ExtraMesh was returned
-						if (emesh.vertices != null)
-							extraMeshes.Add(emesh);
-					}
-				}
-			}
-
-			//Clear cache to avoid memory leak
-			capsuleCache.Clear();
-		}
-
-		bool CollectMeshes (out List<ExtraMesh> extraMeshes, Bounds bounds) {
-			extraMeshes = new List<ExtraMesh>();
-
-			if (rasterizeMeshes) {
-				GetSceneMeshes(bounds, tagMask, mask, extraMeshes);
-			}
-
-			GetRecastMeshObjs(bounds, extraMeshes);
-
-			if (rasterizeTerrain) {
-				CollectTerrainMeshes(bounds, rasterizeTrees, extraMeshes);
-			}
-
-			if (rasterizeColliders) {
-				CollectColliderMeshes(bounds, extraMeshes);
-			}
-
-			if (extraMeshes.Count == 0) {
-				Debug.LogWarning("No MeshFilters were found contained in the layers specified by the 'mask' variables");
-				return false;
-			}
-
-			return true;
-		}
-
-		/** Box Collider triangle indices can be reused for multiple instances.
-		 * \warning This array should never be changed
-		 */
-		private readonly int[] BoxColliderTris = {
-			0, 1, 2,
-			0, 2, 3,
-
-			6, 5, 4,
-			7, 6, 4,
-
-			0, 5, 1,
-			0, 4, 5,
-
-			1, 6, 2,
-			1, 5, 6,
-
-			2, 7, 3,
-			2, 6, 7,
-
-			3, 4, 0,
-			3, 7, 4
-		};
-
-		/** Box Collider vertices can be reused for multiple instances.
-		 * \warning This array should never be changed
-		 */
-		private readonly Vector3[] BoxColliderVerts = {
-			new Vector3(-1, -1, -1),
-			new Vector3(1, -1, -1),
-			new Vector3(1, -1, 1),
-			new Vector3(-1, -1, 1),
-
-			new Vector3(-1, 1, -1),
-			new Vector3(1, 1, -1),
-			new Vector3(1, 1, 1),
-			new Vector3(-1, 1, 1),
-		};
-
-		private List<CapsuleCache> capsuleCache = new List<CapsuleCache>();
-
-		class CapsuleCache {
-			public int rows;
-			public float height;
-			public Vector3[] verts;
-			public int[] tris;
-		}
-
-		/** Rasterizes a collider to a mesh.
-		 * This will pass the col.transform.localToWorldMatrix to the other overload of this function.
-		 */
-		ExtraMesh RasterizeCollider (Collider col) {
-			return RasterizeCollider(col, col.transform.localToWorldMatrix);
-		}
-
-		/** Rasterizes a collider to a mesh assuming it's vertices should be multiplied with the matrix.
-		 * Note that the bounds of the returned ExtraMesh is based on collider.bounds. So you might want to
-		 * call myExtraMesh.RecalculateBounds on the returned mesh to recalculate it if the collider.bounds would
-		 * not give the correct value.
-		 * */
-		ExtraMesh RasterizeCollider (Collider col, Matrix4x4 localToWorldMatrix) {
-			if (col is BoxCollider) {
-				var collider = col as BoxCollider;
-
-				Matrix4x4 matrix = Matrix4x4.TRS(collider.center, Quaternion.identity, collider.size*0.5f);
-				matrix = localToWorldMatrix * matrix;
-
-				Bounds b = collider.bounds;
-
-				var m = new ExtraMesh(BoxColliderVerts, BoxColliderTris, b, matrix);
-
-#if ASTARDEBUG
-				Vector3[] verts = BoxColliderVerts;
-				int[] tris = BoxColliderTris;
-
-				for (int i = 0; i < tris.Length; i += 3) {
-					Debug.DrawLine(matrix.MultiplyPoint3x4(verts[tris[i]]), matrix.MultiplyPoint3x4(verts[tris[i+1]]), Color.yellow);
-					Debug.DrawLine(matrix.MultiplyPoint3x4(verts[tris[i+2]]), matrix.MultiplyPoint3x4(verts[tris[i+1]]), Color.yellow);
-					Debug.DrawLine(matrix.MultiplyPoint3x4(verts[tris[i]]), matrix.MultiplyPoint3x4(verts[tris[i+2]]), Color.yellow);
-
-					//Normal debug
-					/*Vector3 va = matrix.MultiplyPoint3x4(verts[tris[i]]);
-					 * Vector3 vb = matrix.MultiplyPoint3x4(verts[tris[i+1]]);
-					 * Vector3 vc = matrix.MultiplyPoint3x4(verts[tris[i+2]]);
-					 *
-					 * Debug.DrawRay ((va+vb+vc)/3, Vector3.Cross(vb-va,vc-va).normalized,Color.blue);*/
-				}
-#endif
-				return m;
-			} else if (col is SphereCollider || col is CapsuleCollider) {
-				var scollider = col as SphereCollider;
-				var ccollider = col as CapsuleCollider;
-
-				float radius = (scollider != null ? scollider.radius : ccollider.radius);
-				float height = scollider != null ? 0 : (ccollider.height*0.5f/radius) - 1;
-
-				Matrix4x4 matrix = Matrix4x4.TRS(scollider != null ? scollider.center : ccollider.center, Quaternion.identity, Vector3.one*radius);
-				matrix = localToWorldMatrix * matrix;
-
-				//Calculate the number of rows to use
-				//grows as sqrt(x) to the radius of the sphere/capsule which I have found works quite good
-				int rows = Mathf.Max(4, Mathf.RoundToInt(colliderRasterizeDetail*Mathf.Sqrt(matrix.MultiplyVector(Vector3.one).magnitude)));
-
-				if (rows > 100) {
-					Debug.LogWarning("Very large detail for some collider meshes. Consider decreasing Collider Rasterize Detail (RecastGraph)");
-				}
-
-				int cols = rows;
-
-				Vector3[] verts;
-				int[] trisArr;
-
-
-				//Check if we have already calculated a similar capsule
-				CapsuleCache cached = null;
-				for (int i = 0; i < capsuleCache.Count; i++) {
-					CapsuleCache c = capsuleCache[i];
-					if (c.rows == rows && Mathf.Approximately(c.height, height)) {
-						cached = c;
-					}
-				}
-
-				if (cached == null) {
-					//Generate a sphere/capsule mesh
-
-					verts = new Vector3[(rows)*cols + 2];
-
-					var tris = new List<int>();
-					verts[verts.Length-1] = Vector3.up;
-
-					for (int r = 0; r < rows; r++) {
-						for (int c = 0; c < cols; c++) {
-							verts[c + r*cols] = new Vector3(Mathf.Cos(c*Mathf.PI*2/cols)*Mathf.Sin((r*Mathf.PI/(rows-1))), Mathf.Cos((r*Mathf.PI/(rows-1))) + (r < rows/2 ? height : -height), Mathf.Sin(c*Mathf.PI*2/cols)*Mathf.Sin((r*Mathf.PI/(rows-1))));
-						}
-					}
-
-					verts[verts.Length-2] = Vector3.down;
-
-					for (int i = 0, j = cols-1; i < cols; j = i++) {
-						tris.Add(verts.Length-1);
-						tris.Add(0*cols + j);
-						tris.Add(0*cols + i);
-					}
-
-					for (int r = 1; r < rows; r++) {
-						for (int i = 0, j = cols-1; i < cols; j = i++) {
-							tris.Add(r*cols + i);
-							tris.Add(r*cols + j);
-							tris.Add((r-1)*cols + i);
-
-							tris.Add((r-1)*cols + j);
-							tris.Add((r-1)*cols + i);
-							tris.Add(r*cols + j);
-						}
-					}
-
-					for (int i = 0, j = cols-1; i < cols; j = i++) {
-						tris.Add(verts.Length-2);
-						tris.Add((rows-1)*cols + j);
-						tris.Add((rows-1)*cols + i);
-					}
-
-					//Add calculated mesh to the cache
-					cached = new CapsuleCache();
-					cached.rows = rows;
-					cached.height = height;
-					cached.verts = verts;
-					cached.tris = tris.ToArray();
-					capsuleCache.Add(cached);
-				}
-
-				//Read from cache
-				verts = cached.verts;
-				trisArr = cached.tris;
-
-				Bounds b = col.bounds;
-
-				var m = new ExtraMesh(verts, trisArr, b, matrix);
-
-#if ASTARDEBUG
-				for (int i = 0; i < trisArr.Length; i += 3) {
-					Debug.DrawLine(matrix.MultiplyPoint3x4(verts[trisArr[i]]), matrix.MultiplyPoint3x4(verts[trisArr[i+1]]), Color.yellow);
-					Debug.DrawLine(matrix.MultiplyPoint3x4(verts[trisArr[i+2]]), matrix.MultiplyPoint3x4(verts[trisArr[i+1]]), Color.yellow);
-					Debug.DrawLine(matrix.MultiplyPoint3x4(verts[trisArr[i]]), matrix.MultiplyPoint3x4(verts[trisArr[i+2]]), Color.yellow);
-				}
-#endif
-				return m;
-			} else if (col is MeshCollider) {
-				var collider = col as MeshCollider;
-
-				if (collider.sharedMesh != null) {
-					var m = new ExtraMesh(collider.sharedMesh.vertices, collider.sharedMesh.triangles, collider.bounds, localToWorldMatrix);
-					return m;
-				}
-			}
-
-			return new ExtraMesh();
-		}
-
-
-		public bool Linecast (Vector3 origin, Vector3 end) {
-			return Linecast(origin, end, GetNearest(origin, NNConstraint.None).node);
-		}
-
-		public bool Linecast (Vector3 origin, Vector3 end, GraphNode hint, out GraphHitInfo hit) {
-			return NavMeshGraph.Linecast(this as INavmesh, origin, end, hint, out hit, null);
-		}
-
-		public bool Linecast (Vector3 origin, Vector3 end, GraphNode hint) {
-			GraphHitInfo hit;
-
-			return NavMeshGraph.Linecast(this as INavmesh, origin, end, hint, out hit, null);
-		}
-
-		/** Returns if there is an obstacle between \a origin and \a end on the graph.
-		 * \param [in] tmp_origin Point to start from
-		 * \param [in] tmp_end Point to linecast to
-		 * \param [out] hit Contains info on what was hit, see GraphHitInfo
-		 * \param [in] hint You need to pass the node closest to the start point, if null, a search for the closest node will be done
-		 * \param trace If a list is passed, then it will be filled with all nodes the linecast traverses
-		 * This is not the same as Physics.Linecast, this function traverses the \b graph and looks for collisions instead of checking for collider intersection.
-		 * \astarpro */
-		public bool Linecast (Vector3 tmp_origin, Vector3 tmp_end, GraphNode hint, out GraphHitInfo hit, List<GraphNode> trace) {
-			return NavMeshGraph.Linecast(this, tmp_origin, tmp_end, hint, out hit, trace);
-		}
-
-		public override void OnDrawGizmos (bool drawNodes) {
-			if (!drawNodes) {
-				return;
-			}
-
-			Gizmos.color = Color.white;
-			Gizmos.DrawWireCube(forcedBounds.center, forcedBounds.size);
-
-			PathHandler debugData = AstarPath.active.debugPathData;
-
-			GraphNodeDelegateCancelable del = delegate(GraphNode _node) {
-				var node = _node as TriangleMeshNode;
-
-				if (AstarPath.active.showSearchTree && debugData != null) {
-					bool v = InSearchTree(node, AstarPath.active.debugPath);
-					//debugData.GetPathNode(node).parent != null && debugData.GetPathNode(node).parent.node != null;
-					if (v && showNodeConnections) {
-						//Gizmos.color = new Color (0,1,0,0.7F);
-						var pnode = debugData.GetPathNode(node);
-						if (pnode.parent != null) {
-							Gizmos.color = NodeColor(node, debugData);
-							Gizmos.DrawLine((Vector3)node.position, (Vector3)debugData.GetPathNode(node).parent.node.position);
-						}
-					}
-
-					if (showMeshOutline) {
-						Gizmos.color = node.Walkable ? NodeColor(node, debugData) : AstarColor.UnwalkableNode;
-						if (!v) Gizmos.color = Gizmos.color * new Color(1, 1, 1, 0.1f);
-
-						Gizmos.DrawLine((Vector3)node.GetVertex(0), (Vector3)node.GetVertex(1));
-						Gizmos.DrawLine((Vector3)node.GetVertex(1), (Vector3)node.GetVertex(2));
-						Gizmos.DrawLine((Vector3)node.GetVertex(2), (Vector3)node.GetVertex(0));
-					}
-				} else {
-					if (showNodeConnections) {
-						Gizmos.color = NodeColor(node, null);
-
-						for (int q = 0; q < node.connections.Length; q++) {
-							//Gizmos.color = Color.Lerp (Color.green,Color.red,node.connectionCosts[q]/8000F);
-							Gizmos.DrawLine((Vector3)node.position, Vector3.Lerp((Vector3)node.connections[q].position, (Vector3)node.position, 0.4f));
-						}
-					}
-
-					if (showMeshOutline) {
-						Gizmos.color = node.Walkable ? NodeColor(node, debugData) : AstarColor.UnwalkableNode;
-
-
-						Gizmos.DrawLine((Vector3)node.GetVertex(0), (Vector3)node.GetVertex(1));
-						Gizmos.DrawLine((Vector3)node.GetVertex(1), (Vector3)node.GetVertex(2));
-						Gizmos.DrawLine((Vector3)node.GetVertex(2), (Vector3)node.GetVertex(0));
-					}
-				}
-
-				//Gizmos.color.a = 0.2F;
-
-				return true;
+			// Create a new navmesh tile and assign its settings
+			var tile = new NavmeshTile {
+				x = x,
+				z = z,
+				w = 1,
+				d = 1,
+				tris = mesh.tris,
+				bbTree = new BBTree()
 			};
 
-			GetNodes(del);
+			tile.vertsInGraphSpace = Utility.RemoveDuplicateVertices(mesh.verts, tile.tris);
+			tile.verts = (Int3[])tile.vertsInGraphSpace.Clone();
+			transform.Transform(tile.verts);
+
+			// Here we are faking a new graph
+			// The tile is not added to any graphs yet, but to get the position queries from the nodes
+			// to work correctly (not throw exceptions because the tile is not calculated) we fake a new graph
+			// and direct the position queries directly to the tile
+			// The thread index is added to make sure that if multiple threads are calculating tiles at the same time
+			// they will not use the same temporary graph index
+			uint temporaryGraphIndex = (uint)(active.data.graphs.Length + threadIndex);
+
+			if (temporaryGraphIndex > GraphNode.MaxGraphIndex) {
+				// Multithreaded tile calculations use fake graph indices, see above.
+				throw new System.Exception("Graph limit reached. Multithreaded recast calculations cannot be done because a few scratch graph indices are required.");
+			}
+
+			// This index will be ORed to the triangle indices
+			int tileIndex = x + z*tileXCount;
+			tileIndex <<= TileIndexOffset;
+
+			TriangleMeshNode.SetNavmeshHolder((int)temporaryGraphIndex, tile);
+			// We need to lock here because creating nodes is not thread safe
+			// and we may be doing this from multiple threads at the same time
+			lock (active) {
+				tile.nodes = CreateNodes(tile.tris, tileIndex, temporaryGraphIndex);
+			}
+
+			tile.bbTree.RebuildFrom(tile.nodes);
+			CreateNodeConnections(tile.nodes);
+			// Remove the fake graph
+			TriangleMeshNode.SetNavmeshHolder((int)temporaryGraphIndex, null);
+
+			return tile;
 		}
 
 		public override void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
@@ -2328,7 +931,7 @@ namespace Pathfinding {
 			characterRadius = ctx.reader.ReadSingle();
 			contourMaxError = ctx.reader.ReadSingle();
 			cellSize = ctx.reader.ReadSingle();
-			cellHeight = ctx.reader.ReadSingle();
+			ctx.reader.ReadSingle(); // Backwards compatibility, cellHeight was previously read here
 			walkableHeight = ctx.reader.ReadSingle();
 			maxSlope = ctx.reader.ReadSingle();
 			maxEdgeLength = ctx.reader.ReadSingle();
@@ -2366,146 +969,6 @@ namespace Pathfinding {
 			tileSizeZ = ctx.DeserializeInt(tileSizeX);
 
 			showMeshSurface = ctx.reader.ReadBoolean();
-		}
-
-		/** Serializes Node Info.
-		 * Should serialize:
-		 * - Base
-		 *    - Node Flags
-		 *    - Node Penalties
-		 *    - Node
-		 * - Node Positions (if applicable)
-		 * - Any other information necessary to load the graph in-game
-		 * All settings marked with json attributes (e.g JsonMember) have already been
-		 * saved as graph settings and do not need to be handled here.
-		 *
-		 * It is not necessary for this implementation to be forward or backwards compatible.
-		 *
-		 * \see
-		 */
-		public override void SerializeExtraInfo (GraphSerializationContext ctx) {
-			BinaryWriter writer = ctx.writer;
-
-			if (tiles == null) {
-				writer.Write(-1);
-				return;
-			}
-			writer.Write(tileXCount);
-			writer.Write(tileZCount);
-
-			for (int z = 0; z < tileZCount; z++) {
-				for (int x = 0; x < tileXCount; x++) {
-					NavmeshTile tile = tiles[x + z*tileXCount];
-
-					if (tile == null) {
-						throw new System.Exception("NULL Tile");
-						//writer.Write (-1);
-						//continue;
-					}
-
-					writer.Write(tile.x);
-					writer.Write(tile.z);
-
-					if (tile.x != x || tile.z != z) continue;
-
-					writer.Write(tile.w);
-					writer.Write(tile.d);
-
-					writer.Write(tile.tris.Length);
-
-					for (int i = 0; i < tile.tris.Length; i++) writer.Write(tile.tris[i]);
-
-					writer.Write(tile.verts.Length);
-					for (int i = 0; i < tile.verts.Length; i++) {
-						ctx.SerializeInt3(tile.verts[i]);
-					}
-
-					writer.Write(tile.nodes.Length);
-					for (int i = 0; i < tile.nodes.Length; i++) {
-						tile.nodes[i].SerializeNode(ctx);
-					}
-				}
-			}
-
-
-
-			//return NavMeshGraph.SerializeMeshNodes (this,nodes);
-		}
-
-		public override void DeserializeExtraInfo (GraphSerializationContext ctx) {
-			//NavMeshGraph.DeserializeMeshNodes (this,nodes,bytes);
-
-			BinaryReader reader = ctx.reader;
-
-			tileXCount = reader.ReadInt32();
-
-			if (tileXCount < 0) return;
-
-			tileZCount = reader.ReadInt32();
-
-			tiles = new NavmeshTile[tileXCount * tileZCount];
-
-			//Make sure mesh nodes can reference this graph
-			TriangleMeshNode.SetNavmeshHolder((int)ctx.graphIndex, this);
-
-			for (int z = 0; z < tileZCount; z++) {
-				for (int x = 0; x < tileXCount; x++) {
-					int tileIndex = x + z*tileXCount;
-					int tx = reader.ReadInt32();
-					if (tx < 0) throw new System.Exception("Invalid tile coordinates (x < 0)");
-
-					int tz = reader.ReadInt32();
-					if (tz < 0) throw new System.Exception("Invalid tile coordinates (z < 0)");
-
-					// This is not the origin of a large tile. Refer back to that tile.
-					if (tx != x || tz != z) {
-						tiles[tileIndex] = tiles[tz*tileXCount + tx];
-						continue;
-					}
-
-					var tile = new NavmeshTile();
-
-					tile.x = tx;
-					tile.z = tz;
-					tile.w = reader.ReadInt32();
-					tile.d = reader.ReadInt32();
-					tile.bbTree = new BBTree();
-
-					tiles[tileIndex] = tile;
-
-					int trisCount = reader.ReadInt32();
-
-					if (trisCount % 3 != 0) throw new System.Exception("Corrupt data. Triangle indices count must be divisable by 3. Got " + trisCount);
-
-					tile.tris = new int[trisCount];
-					for (int i = 0; i < tile.tris.Length; i++) tile.tris[i] = reader.ReadInt32();
-
-					tile.verts = new Int3[reader.ReadInt32()];
-					for (int i = 0; i < tile.verts.Length; i++) {
-						tile.verts[i] = ctx.DeserializeInt3();
-					}
-
-					int nodeCount = reader.ReadInt32();
-					tile.nodes = new TriangleMeshNode[nodeCount];
-
-					//Prepare for storing in vertex indices
-					tileIndex <<= TileIndexOffset;
-
-					for (int i = 0; i < tile.nodes.Length; i++) {
-						var node = new TriangleMeshNode(active);
-						tile.nodes[i] = node;
-
-						node.DeserializeNode(ctx);
-
-						node.v0 = tile.tris[i*3+0] | tileIndex;
-						node.v1 = tile.tris[i*3+1] | tileIndex;
-						node.v2 = tile.tris[i*3+2] | tileIndex;
-						node.UpdatePositionFromVertices();
-					}
-
-					tile.bbTree.RebuildFrom(tile.nodes);
-				}
-			}
 		}
 	}
 }

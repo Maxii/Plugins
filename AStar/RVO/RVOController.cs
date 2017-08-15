@@ -1,40 +1,55 @@
 using UnityEngine;
-using Pathfinding;
 using System.Collections.Generic;
 
 namespace Pathfinding.RVO {
+	using Pathfinding.Util;
+
 	/** RVO Character Controller.
-	 * Designed to be used as a drop-in replacement for the Unity Character Controller,
-	 * it supports almost all of the same functions and fields with the exception
-	 * that due to the nature of the RVO implementation, desired velocity is set in the Move function
-	 * and is assumed to stay the same until something else is requested (as opposed to reset every frame).
+	 * Similar to Unity's CharacterController. It handles movement calculations and takes other agents into account.
+	 * It does not handle movement itself, but allows the calling script to get the calculated velocity and
+	 * use that to move the object using a method it sees fit (for example using a CharacterController, using
+	 * transform.Translate or using a rigidbody).
+	 *
+	 * \code
+	 * public void Update () {
+	 *     // Just some point far away
+	 *     var targetPoint = transform.position + transform.forward * 100;
+	 *
+	 *     // Set the desired point to move towards using a desired speed of 10 and a max speed of 12
+	 *     controller.SetTarget(targetPoint, 10, 12);
+	 *
+	 *     // Calculate how much to move during this frame
+	 *     // This information is based on movement commands from earlier frames
+	 *     // as local avoidance is calculated globally at regular intervals by the RVOSimulator component
+	 *     var delta = controller.CalculateMovementDelta(transform.position, Time.deltaTime);
+	 *     transform.position = transform.position + delta;
+	 * }
+	 * \endcode
 	 *
 	 * For documentation of many of the variables of this class: refer to the Pathfinding.RVO.IAgent interface.
 	 *
-	 * \note Requires an RVOSimulator in the scene
+	 * \note Requires a single RVOSimulator component in the scene
 	 *
 	 * \see Pathfinding.RVO.IAgent
 	 * \see RVOSimulator
+	 * \see \ref local-avoidance
 	 *
 	 * \astarpro
 	 */
 	[AddComponentMenu("Pathfinding/Local Avoidance/RVO Controller")]
 	[HelpURL("http://arongranberg.com/astar/docs/class_pathfinding_1_1_r_v_o_1_1_r_v_o_controller.php")]
-	public class RVOController : MonoBehaviour {
-		/** Radius of the agent */
+	public class RVOController : VersionedMonoBehaviour {
+		/** Radius of the agent in world units */
 		[Tooltip("Radius of the agent")]
-		public float radius = 5;
+		public float radius = 0.5f;
 
-		/** Max speed of the agent. In units/second */
-		[Tooltip("Max speed of the agent. In world units/second")]
-		public float maxSpeed = 2;
-
-		/** Height of the agent. In world units */
+		/** Height of the agent in world units */
 		[Tooltip("Height of the agent. In world units")]
-		public float height = 1;
+		[HideInInspector]
+		public float height = 2;
 
-		/** A locked unit cannot move. Other units will still avoid it. But avoidance quailty is not the best. */
-		[Tooltip("A locked unit cannot move. Other units will still avoid it. But avoidance quailty is not the best")]
+		/** A locked unit cannot move. Other units will still avoid it but avoidance quality is not the best. */
+		[Tooltip("A locked unit cannot move. Other units will still avoid it. But avoidance quality is not the best")]
 		public bool locked;
 
 		/** Automatically set #locked to true when desired velocity is approximately zero.
@@ -43,33 +58,20 @@ namespace Pathfinding.RVO {
 		[Tooltip("Automatically set #locked to true when desired velocity is approximately zero")]
 		public bool lockWhenNotMoving = true;
 
-		/** How far in the time to look for collisions with other agents */
-		[Tooltip("How far in the time to look for collisions with other agents")]
+		/** How far into the future to look for collisions with other agents (in seconds) */
+		[Tooltip("How far into the future to look for collisions with other agents (in seconds)")]
 		public float agentTimeHorizon = 2;
 
-		[HideInInspector]
-		/** How far in the time to look for collisions with obstacles */
+		/** How far into the future to look for collisions with obstacles (in seconds) */
+		[Tooltip("How far into the future to look for collisions with obstacles (in seconds)")]
 		public float obstacleTimeHorizon = 2;
 
-		/** Maximum distance to other agents to take them into account for collisions.
-		 * Decreasing this value can lead to better performance, increasing it can lead to better quality of the simulation.
-		 */
-		[Tooltip("Maximum distance to other agents to take them into account for collisions.\n" +
-			 "Decreasing this value can lead to better performance, increasing it can lead to better quality of the simulation")]
-		public float neighbourDist = 10;
-
 		/** Max number of other agents to take into account.
-		 * A smaller value can reduce CPU load, a higher value can lead to better local avoidance quality.
+		 * Decreasing this value can lead to better performance, increasing it can lead to better quality of the simulation.
 		 */
 		[Tooltip("Max number of other agents to take into account.\n" +
 			 "A smaller value can reduce CPU load, a higher value can lead to better local avoidance quality.")]
 		public int maxNeighbours = 10;
-
-		/** Layer mask for the ground.
-		 * The RVOController will raycast down to check for the ground to figure out where to place the agent.
-		 */
-		[Tooltip("Layer mask for the ground. The RVOController will raycast down to check for the ground to figure out where to place the agent")]
-		public LayerMask mask = -1;
 
 		/** Specifies the avoidance layer for this agent.
 		 * The #collidesWith mask on other agents will determine if they will avoid this agent.
@@ -79,9 +81,8 @@ namespace Pathfinding.RVO {
 		/** Layer mask specifying which layers this agent will avoid.
 		 * You can set it as CollidesWith = RVOLayer.DefaultAgent | RVOLayer.Layer3 | RVOLayer.Layer6 ...
 		 *
-		 * This can be very useful in games which have multiple teams of some sort.
-		 * For example you usually want that the team agents avoid each other, but you do not want
-		 * them to avoid the enemies.
+		 * This can be very useful in games which have multiple teams of some sort. For example you usually
+		 * want the agents in one team to avoid each other, but you do not want them to avoid the enemies.
 		 *
 		 * \see http://en.wikipedia.org/wiki/Mask_(computing)
 		 */
@@ -90,8 +91,11 @@ namespace Pathfinding.RVO {
 
 		/** An extra force to avoid walls.
 		 * This can be good way to reduce "wall hugging" behaviour.
+		 *
+		 * \deprecated This feature is currently disabled as it didn't work that well and was tricky to support after some changes to the RVO system. It may be enabled again in a future version.
 		 */
 		[HideInInspector]
+		[System.Obsolete]
 		public float wallAvoidForce = 1;
 
 		/** How much the wallAvoidForce decreases with distance.
@@ -99,199 +103,280 @@ namespace Pathfinding.RVO {
 		 * \code str = 1/dist*wallAvoidFalloff \endcode
 		 *
 		 * \see wallAvoidForce
+		 *
+		 * \deprecated This feature is currently disabled as it didn't work that well and was tricky to support after some changes to the RVO system. It may be enabled again in a future version.
 		 */
 		[HideInInspector]
+		[System.Obsolete]
 		public float wallAvoidFalloff = 1;
+
+		/** \copydoc Pathfinding::RVO::IAgent::Priority */
+		[Tooltip("How strongly other agents will avoid this agent")]
+		[UnityEngine.Range(0, 1)]
+		public float priority = 0.5f;
 
 		/** Center of the agent relative to the pivot point of this game object */
 		[Tooltip("Center of the agent relative to the pivot point of this game object")]
-		public Vector3 center;
+		[HideInInspector]
+		public float center = 1f;
+
+		/** \details \deprecated */
+		[System.Obsolete("This field is obsolete in version 4.0 and will not affect anything. Use the LegacyRVOController if you need the old behaviour")]
+		public LayerMask mask { get { return 0; } set {} }
+
+		/** \details \deprecated */
+		[System.Obsolete("This field is obsolete in version 4.0 and will not affect anything. Use the LegacyRVOController if you need the old behaviour")]
+		public bool enableRotation { get { return false; } set {} }
+
+		/** \details \deprecated */
+		[System.Obsolete("This field is obsolete in version 4.0 and will not affect anything. Use the LegacyRVOController if you need the old behaviour")]
+		public float rotationSpeed { get { return 0; } set {} }
+
+		/** \details \deprecated */
+		[System.Obsolete("This field is obsolete in version 4.0 and will not affect anything. Use the LegacyRVOController if you need the old behaviour")]
+		public float maxSpeed { get { return 0; } set {} }
+
+		/** Determines if the XY (2D) or XZ (3D) plane is used for movement */
+		public MovementPlane movementPlane {
+			get {
+				if (simulator != null) return simulator.movementPlane;
+				else if (RVOSimulator.active) return RVOSimulator.active.movementPlane;
+				else return MovementPlane.XZ;
+			}
+		}
 
 		/** Reference to the internal agent */
-		private IAgent rvoAgent;
-
-		public bool enableRotation = true;
-		public float rotationSpeed = 30;
+		public IAgent rvoAgent { get; private set; }
 
 		/** Reference to the rvo simulator */
-		private Simulator simulator;
-
-		private float adjustedY;
+		public Simulator simulator { get; private set; }
 
 		/** Cached tranform component */
-		private Transform tr;
+		protected Transform tr;
 
-		/** Current desired velocity */
-		Vector3 desiredVelocity;
-
-	#if ASTARDEBUG
-		//Can cause unity serialization failures if the variable is not always included
+		/** Enables drawing debug information in the scene view */
 		public bool debug;
-	#else
-		//[HideInInspector]
-		public bool debug;
-	#endif
-
-		/** Position for the previous frame.
-		 * Used to check if the agent has moved manually
-		 */
-		private Vector3 lastPosition;
-
-		/** To avoid having to use FindObjectOfType every time */
-		static RVOSimulator cachedSimulator;
 
 		/** Current position of the agent */
 		public Vector3 position {
-			get { return rvoAgent.InterpolatedPosition; }
+			get {
+				return To3D(rvoAgent.Position, rvoAgent.ElevationCoordinate);
+			}
 		}
 
-		/** Current velocity of the agent */
+		/** Current calculated velocity of the agent.
+		 * This is not necessarily the velocity the agent is actually moving with
+		 * (that is up to the movement script to decide) but it is the velocity
+		 * that the RVO system has calculated is best for avoiding obstacles and
+		 * reaching the target.
+		 *
+		 * \see CalculateMovementDelta
+		 */
 		public Vector3 velocity {
-			get { return rvoAgent.Velocity; }
+			get {
+				if (Time.deltaTime > 0.00001f) {
+					return CalculateMovementDelta(Time.deltaTime) / Time.deltaTime;
+				} else {
+					return Vector3.zero;
+				}
+			}
 		}
 
-		public void OnDisable () {
+		/** Direction and distance to move in a single frame to avoid obstacles.
+		 * \param deltaTime How far to move [seconds].
+		 *      Usually set to Time.deltaTime.
+		 */
+		public Vector3 CalculateMovementDelta (float deltaTime) {
+			if (rvoAgent == null) return Vector3.zero;
+			return To3D(Vector2.ClampMagnitude(rvoAgent.CalculatedTargetPoint - To2D(tr.position), rvoAgent.CalculatedSpeed * deltaTime), 0);
+		}
+
+		/** Direction and distance to move in a single frame to avoid obstacles.
+		 * \param position Position of the agent.
+		 * \param deltaTime How far to move [seconds].
+		 *      Usually set to Time.deltaTime.
+		 */
+		public Vector3 CalculateMovementDelta (Vector3 position, float deltaTime) {
+			return To3D(Vector2.ClampMagnitude(rvoAgent.CalculatedTargetPoint - To2D(position), rvoAgent.CalculatedSpeed * deltaTime), 0);
+		}
+
+		/** \copydoc Pathfinding::RVO::IAgent::SetCollisionNormal */
+		public void SetCollisionNormal (Vector3 normal) {
+			rvoAgent.SetCollisionNormal(To2D(normal));
+		}
+
+		/** \copydoc Pathfinding::RVO::IAgent::ForceSetVelocity */
+		public void ForceSetVelocity (Vector3 velocity) {
+			rvoAgent.ForceSetVelocity(To2D(velocity));
+		}
+
+		/** Converts a 3D vector to a 2D vector in the movement plane.
+		 * If movementPlane is XZ it will be projected onto the XZ plane
+		 * otherwise it will be projected onto the XY plane.
+		 */
+		public Vector2 To2D (Vector3 p) {
+			float dummy;
+
+			return To2D(p, out dummy);
+		}
+
+		/** Converts a 3D vector to a 2D vector in the movement plane.
+		 * If movementPlane is XZ it will be projected onto the XZ plane
+		 * and the elevation coordinate will be the Y coordinate
+		 * otherwise it will be projected onto the XY plane and elevation
+		 * will be the Z coordinate.
+		 */
+		public Vector2 To2D (Vector3 p, out float elevation) {
+			if (movementPlane == MovementPlane.XY) {
+				elevation = p.z;
+				return new Vector2(p.x, p.y);
+			} else {
+				elevation = p.y;
+				return new Vector2(p.x, p.z);
+			}
+		}
+
+		/** Converts a 2D vector in the movement plane as well as an elevation to a 3D coordinate.
+		 * \see To2D
+		 * \see movementPlane
+		 */
+		public Vector3 To3D (Vector2 p, float elevationCoordinate) {
+			if (movementPlane == MovementPlane.XY) {
+				return new Vector3(p.x, p.y, elevationCoordinate);
+			} else {
+				return new Vector3(p.x, elevationCoordinate, p.y);
+			}
+		}
+
+		void OnDisable () {
 			if (simulator == null) return;
 
-			//Remove the agent from the simulation but keep the reference
-			//this component might get enabled and then we can simply
-			//add it to the simulation again
+			// Remove the agent from the simulation but keep the reference
+			// this component might get enabled and then we can simply
+			// add it to the simulation again
 			simulator.RemoveAgent(rvoAgent);
 		}
 
-		public void Awake () {
+		void OnEnable () {
 			tr = transform;
 
-			// Find the RVOSimulator in this scene
-			if (cachedSimulator == null) {
-				cachedSimulator = FindObjectOfType<RVOSimulator>();
-			}
-
-			if (cachedSimulator == null) {
+			if (RVOSimulator.active == null) {
 				Debug.LogError("No RVOSimulator component found in the scene. Please add one.");
 			} else {
-				simulator = cachedSimulator.GetSimulator();
+				simulator = RVOSimulator.active.GetSimulator();
+
+				// We might already have an rvoAgent instance which was disabled previously
+				// if so, we can simply add it to the simulation again
+				if (rvoAgent != null) {
+					simulator.AddAgent(rvoAgent);
+				} else {
+					float elevation;
+					var pos = To2D(transform.position, out elevation);
+					rvoAgent = simulator.AddAgent(pos, elevation);
+					rvoAgent.PreCalculationCallback = UpdateAgentProperties;
+				}
+
+				UpdateAgentProperties();
 			}
-		}
-
-		public void OnEnable () {
-			if (simulator == null) return;
-
-			//We might have an rvoAgent
-			//which was disabled previously
-			//if so, we can simply add it to the simulation again
-			if (rvoAgent != null) {
-				simulator.AddAgent(rvoAgent);
-			} else {
-				rvoAgent = simulator.AddAgent(transform.position);
-			}
-
-			UpdateAgentProperties();
-			rvoAgent.Teleport(transform.position);
-			adjustedY = rvoAgent.Position.y;
 		}
 
 		protected void UpdateAgentProperties () {
-			rvoAgent.Radius = radius;
-			rvoAgent.MaxSpeed = maxSpeed;
-			rvoAgent.Height = height;
+			rvoAgent.Radius = Mathf.Max(0.001f, radius);
 			rvoAgent.AgentTimeHorizon = agentTimeHorizon;
 			rvoAgent.ObstacleTimeHorizon = obstacleTimeHorizon;
 			rvoAgent.Locked = locked;
 			rvoAgent.MaxNeighbours = maxNeighbours;
 			rvoAgent.DebugDraw = debug;
-			rvoAgent.NeighbourDist = neighbourDist;
 			rvoAgent.Layer = layer;
 			rvoAgent.CollidesWith = collidesWith;
+			rvoAgent.Priority = priority;
+
+			float elevation;
+			rvoAgent.Position = To2D(transform.position, out elevation);
+
+			if (movementPlane == MovementPlane.XZ) {
+				rvoAgent.Height = height;
+				rvoAgent.ElevationCoordinate = elevation + center - 0.5f * height;
+			} else {
+				rvoAgent.Height = 1;
+				rvoAgent.ElevationCoordinate = 0;
+			}
+		}
+
+		/** Set the target point for the agent to move towards.
+		 * Similar to the #Move method but this is more flexible.
+		 * It is also better to use near the end of the path as when using the Move
+		 * method the agent does not know where to stop, so it may overshoot the target.
+		 * When using this method the agent will not overshoot the target.
+		 * The agent will assume that it will stop when it reaches the target so make sure that
+		 * you don't place the point too close to the agent if you actually just want to move in a
+		 * particular direction.
+		 *
+		 * The target point is assumed to stay the same until something else is requested (as opposed to being reset every frame).
+		 *
+		 * \param pos Point in world space to move towards.
+		 * \param speed Desired speed in world units per second.
+		 * \param maxSpeed Maximum speed in world units per second.
+		 *		The agent will use this speed if it is necessary to avoid collisions with other agents.
+		 *		Should be at least as high as speed, but it is recommended to use a slightly higher value than speed (for example speed*1.2).
+		 *
+		 * \see Also take a look at the documentation for IAgent.SetTarget which has a few more details.
+		 * \see Move
+		 */
+		public void SetTarget (Vector3 pos, float speed, float maxSpeed) {
+			if (simulator == null) return;
+
+			rvoAgent.SetTarget(To2D(pos), speed, maxSpeed);
+
+			if (lockWhenNotMoving) {
+				locked = speed < 0.001f;
+			}
 		}
 
 		/** Set the desired velocity for the agent.
 		 * Note that this is a velocity (units/second), not a movement delta (units/frame).
+		 *
+		 * This is assumed to stay the same until something else is requested (as opposed to being reset every frame).
+		 *
+		 * \note In most cases the SetTarget method is better to use.
+		 *  What this will actually do is call SetTarget with (position + velocity).
+		 *  See the note in the documentation for IAgent.SetTarget about the potential
+		 *  issues that this can cause (in particular that it might be hard to get the agent
+		 *  to stop at a precise point).
+		 *
+		 * \see SetTarget
 		 */
 		public void Move (Vector3 vel) {
-			desiredVelocity = vel;
+			if (simulator == null) return;
+
+			var velocity2D = To2D(vel);
+			var speed = velocity2D.magnitude;
+
+			rvoAgent.SetTarget(To2D(tr.position) + velocity2D, speed, speed);
+
+			if (lockWhenNotMoving) {
+				locked = speed < 0.001f;
+			}
 		}
 
 		/** Teleport the agent to a new position.
-		 * The agent will be moved instantly and not show ugly interpolation artifacts during a split second.
-		 * Manually changing the position of the transform will in most cases be picked up as a teleport automatically
-		 * by the script.
-		 *
-		 * During the simulation frame the agent was moved manually, local avoidance cannot fully be applied to the
-		 * agent, so try to avoid using it too much or local avoidance quality will degrade.
+		 * \deprecated Use transform.position instead, the RVOController can now handle that without any issues.
 		 */
+		[System.Obsolete("Use transform.position instead, the RVOController can now handle that without any issues.")]
 		public void Teleport (Vector3 pos) {
 			tr.position = pos;
-			lastPosition = pos;
-			rvoAgent.Teleport(pos);
-			adjustedY = pos.y;
-		}
-
-		public void Update () {
-			if (rvoAgent == null) return;
-
-			if (lastPosition != tr.position) {
-				Teleport(tr.position);
-			}
-
-			if (lockWhenNotMoving) {
-				locked = desiredVelocity == Vector3.zero;
-			}
-
-			UpdateAgentProperties();
-
-			RaycastHit hit;
-
-			//The non-interpolated position
-			Vector3 realPos = rvoAgent.InterpolatedPosition;
-			realPos.y = adjustedY;
-
-			if (mask != 0 && Physics.Raycast(realPos + Vector3.up*height*0.5f, Vector3.down, out hit, float.PositiveInfinity, mask)) {
-				adjustedY = hit.point.y;
-			} else {
-				adjustedY = 0;
-			}
-			realPos.y = adjustedY;
-
-			rvoAgent.SetYPosition(adjustedY);
-
-			Vector3 force = Vector3.zero;
-
-			if (wallAvoidFalloff > 0 && wallAvoidForce > 0) {
-				List<ObstacleVertex> obst = rvoAgent.NeighbourObstacles;
-
-				if (obst != null) for (int i = 0; i < obst.Count; i++) {
-						Vector3 a = obst[i].position;
-						Vector3 b = obst[i].next.position;
-
-						Vector3 closest = position - VectorMath.ClosestPointOnSegment(a, b, position);
-
-						if (closest == a || closest == b) continue;
-
-						float dist = closest.sqrMagnitude;
-						closest /= dist*wallAvoidFalloff;
-						force += closest;
-					}
-			}
-
-	#if ASTARDEBUG
-			Debug.DrawRay(position, desiredVelocity + force*wallAvoidForce);
-	#endif
-			rvoAgent.DesiredVelocity = desiredVelocity + force*wallAvoidForce;
-
-			tr.position = realPos + Vector3.up*height*0.5f - center;
-			lastPosition = tr.position;
-
-			if (enableRotation && velocity != Vector3.zero) transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.LookRotation(velocity), Time.deltaTime * rotationSpeed * Mathf.Min(velocity.magnitude, 0.2f));
 		}
 
 		private static readonly Color GizmoColor = new Color(240/255f, 213/255f, 30/255f);
 
-		public void OnDrawGizmos () {
-			Gizmos.color = GizmoColor;
-			Gizmos.DrawWireSphere(transform.position+center - Vector3.up*height*0.5f + Vector3.up*radius*0.5f, radius);
-			Gizmos.DrawLine(transform.position+center - Vector3.up*height*0.5f, transform.position+center + Vector3.up*height*0.5f);
-			Gizmos.DrawWireSphere(transform.position+center + Vector3.up*height*0.5f - Vector3.up*radius*0.5f, radius);
+		void OnDrawGizmos () {
+			var color = GizmoColor * (locked ? 0.5f : 1.0f);
+
+			if (movementPlane == MovementPlane.XY) {
+				Draw.Gizmos.Cylinder(transform.position, Vector3.forward, 0, radius, color);
+			} else {
+				Draw.Gizmos.Cylinder(transform.position + To3D(Vector2.zero, center - height * 0.5f), To3D(Vector2.zero, 1), height, radius, color);
+			}
 		}
 	}
 }

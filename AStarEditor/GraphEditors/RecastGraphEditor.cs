@@ -1,295 +1,19 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
-using Pathfinding.Util;
 
 namespace Pathfinding {
 	/**
 	 * Editor for the RecastGraph.
 	 * \astarpro
 	 */
-	[CustomGraphEditor(typeof(RecastGraph), "RecastGraph")]
+	[CustomGraphEditor(typeof(RecastGraph), "Recast Graph")]
 	public class RecastGraphEditor : GraphEditor {
 		public static bool tagMaskFoldout;
-
-#if !UNITY_5_1 && !UNITY_5_0
-		/** Material to use for the navmesh in the editor */
-		static Material navmeshMaterial;
-
-		/** Material to use for the navmeshe outline in the editor */
-		static Material navmeshOutlineMaterial;
-
-		/**
-		 * Meshes for visualizing the navmesh.
-		 * Used in OnDrawGizmos.
-		 */
-		List<GizmoTile> gizmoMeshes = new List<GizmoTile>();
-
-		/** Holds a surface and an outline visualization for a navmesh tile */
-		struct GizmoTile {
-			public RecastGraph.NavmeshTile tile;
-			public int hash;
-			public Mesh surfaceMesh;
-			public Mesh outlineMesh;
-		}
-#endif
 
 		public enum UseTiles {
 			UseTiles = 0,
 			DontUseTiles = 1
 		}
-
-#if !UNITY_5_1 && !UNITY_5_0
-		public override void OnEnable () {
-			navmeshMaterial = AssetDatabase.LoadAssetAtPath(AstarPathEditor.editorAssets + "/Materials/Navmesh.mat", typeof(Material)) as Material;
-			navmeshOutlineMaterial = AssetDatabase.LoadAssetAtPath(AstarPathEditor.editorAssets + "/Materials/NavmeshOutline.mat", typeof(Material)) as Material;
-		}
-
-		public override void UnloadGizmoMeshes () {
-			// Avoid memory leaks
-			for (int i = 0; i < gizmoMeshes.Count; i++) {
-				Mesh.DestroyImmediate(gizmoMeshes[i].surfaceMesh);
-				Mesh.DestroyImmediate(gizmoMeshes[i].outlineMesh);
-			}
-			gizmoMeshes.Clear();
-		}
-
-		/** Updates the meshes used in OnDrawGizmos to visualize the navmesh */
-		void UpdateDebugMeshes () {
-			var graph = target as RecastGraph;
-
-			var tiles = graph.GetTiles();
-
-			if (tiles == null || tiles.Length != gizmoMeshes.Count) {
-				// Destroy all previous meshes
-				UnloadGizmoMeshes();
-			}
-
-			if (tiles != null) {
-				// Update navmesh vizualizations for
-				// the tiles that have been changed
-				for (int i = 0; i < tiles.Length; i++) {
-					bool validTile = i < gizmoMeshes.Count && gizmoMeshes[i].tile == tiles[i];
-
-					// Calculate a hash of the tile
-					int hash = 0;
-					const int HashPrime = 31;
-					var nodes = tiles[i].nodes;
-					for (int j = 0; j < nodes.Length; j++) {
-						hash = hash*HashPrime;
-						var node = nodes[j];
-						hash ^= node.position.GetHashCode();
-						hash ^= 17 * (node.connections != null ? node.connections.Length : -1);
-						hash ^= 19 * (int)node.Penalty;
-						hash ^= 41 * (int)node.Tag;
-						hash ^= 57 * (int)node.Area;
-					}
-
-					hash ^= 67 * (int)AstarPath.active.debugMode;
-					hash ^= 73 * AstarPath.active.debugFloor.GetHashCode();
-					hash ^= 79 * AstarPath.active.debugRoof.GetHashCode();
-
-					validTile = validTile && hash == gizmoMeshes[i].hash;
-
-					if (!validTile) {
-						// Tile needs to be updated
-						var newTile = new GizmoTile {
-							tile = tiles[i],
-							hash = hash,
-							surfaceMesh = CreateNavmeshSurfaceVisualization(tiles[i]),
-							outlineMesh = CreateNavmeshOutlineVisualization(tiles[i])
-						};
-
-						if (i < gizmoMeshes.Count) {
-							// Destroy and replace existing mesh
-							Mesh.DestroyImmediate(gizmoMeshes[i].surfaceMesh);
-							Mesh.DestroyImmediate(gizmoMeshes[i].outlineMesh);
-							gizmoMeshes[i] = newTile;
-						} else {
-							gizmoMeshes.Add(newTile);
-						}
-					}
-				}
-			}
-		}
-
-		/** Creates a mesh of the surfaces of the navmesh for use in OnDrawGizmos in the editor */
-		Mesh CreateNavmeshSurfaceVisualization (RecastGraph.NavmeshTile tile) {
-			var mesh = new Mesh();
-
-			mesh.hideFlags = HideFlags.DontSave;
-
-			var vertices = ListPool<Vector3>.Claim(tile.verts.Length);
-			var colors = ListPool<Color32>.Claim(tile.verts.Length);
-
-			for (int j = 0; j < tile.verts.Length; j++) {
-				vertices.Add((Vector3)tile.verts[j]);
-				colors.Add(new Color32());
-			}
-
-			// TODO: Uses AstarPath.active
-			var debugPathData = AstarPath.active.debugPathData;
-
-			for (int j = 0; j < tile.nodes.Length; j++) {
-				var node = tile.nodes[j];
-				for (int v = 0; v < 3; v++) {
-					var color = target.NodeColor(node, debugPathData);
-					colors[node.GetVertexArrayIndex(v)] = (Color32)color;//(Color32)AstarColor.GetAreaColor(node.Area);
-				}
-			}
-
-			mesh.SetVertices(vertices);
-			mesh.SetTriangles(tile.tris, 0);
-			mesh.SetColors(colors);
-
-			// Upload all data and mark the mesh as unreadable
-			mesh.UploadMeshData(true);
-
-			// Return lists to the pool
-			ListPool<Vector3>.Release(vertices);
-			ListPool<Color32>.Release(colors);
-
-			return mesh;
-		}
-
-		/** Creates an outline of the navmesh for use in OnDrawGizmos in the editor */
-		static Mesh CreateNavmeshOutlineVisualization (RecastGraph.NavmeshTile tile) {
-			var sharedEdges = new bool[3];
-
-			var mesh = new Mesh();
-
-			mesh.hideFlags = HideFlags.DontSave;
-
-			var colorList = ListPool<Color32>.Claim();
-			var edgeList = ListPool<Int3>.Claim();
-
-			for (int j = 0; j < tile.nodes.Length; j++) {
-				sharedEdges[0] = sharedEdges[1] = sharedEdges[2] = false;
-
-				var node = tile.nodes[j];
-				for (int c = 0; c < node.connections.Length; c++) {
-					var other = node.connections[c] as TriangleMeshNode;
-
-					// Loop throgh neighbours to figure
-					// out which edges are shared
-					if (other != null && other.GraphIndex == node.GraphIndex) {
-						for (int v = 0; v < 3; v++) {
-							for (int v2 = 0; v2 < 3; v2++) {
-								if (node.GetVertexIndex(v) == other.GetVertexIndex((v2+1)%3) && node.GetVertexIndex((v+1)%3) == other.GetVertexIndex(v2)) {
-									// Found a shared edge with the other node
-									sharedEdges[v] = true;
-									v = 3;
-									break;
-								}
-							}
-						}
-					}
-				}
-
-				for (int v = 0; v < 3; v++) {
-					if (!sharedEdges[v]) {
-						edgeList.Add(node.GetVertex(v));
-						edgeList.Add(node.GetVertex((v+1)%3));
-						var color = (Color32)AstarColor.GetAreaColor(node.Area);
-						colorList.Add(color);
-						colorList.Add(color);
-					}
-				}
-			}
-
-			// Use pooled lists to avoid excessive allocations
-			var vertices = ListPool<Vector3>.Claim(edgeList.Count*2);
-			var colors = ListPool<Color32>.Claim(edgeList.Count*2);
-			var normals = ListPool<Vector3>.Claim(edgeList.Count*2);
-			var tris = ListPool<int>.Claim(edgeList.Count*3);
-
-			// Loop through each endpoint of the lines
-			// and add 2 vertices for each
-			for (int j = 0; j < edgeList.Count; j++) {
-				var vertex = (Vector3)edgeList[j];
-				vertices.Add(vertex);
-				vertices.Add(vertex);
-
-				// Encode the side of the line
-				// in the alpha component
-				var color = colorList[j];
-				colors.Add(new Color32(color.r, color.g, color.b, 0));
-				colors.Add(new Color32(color.r, color.g, color.b, 255));
-			}
-
-			// Loop through each line and add
-			// one normal for each vertex
-			for (int j = 0; j < edgeList.Count; j += 2) {
-				var lineDir = (Vector3)(edgeList[j+1] - edgeList[j]);
-				lineDir.Normalize();
-
-				// Store the line direction in the normals
-				// A line consists of 4 vertices
-				// The line direction will be used to
-				// offset the vertices to create a
-				// line with a fixed pixel thickness
-				normals.Add(lineDir);
-				normals.Add(lineDir);
-				normals.Add(lineDir);
-				normals.Add(lineDir);
-			}
-
-			// Setup triangle indices
-			// A triangle consists of 3 indices
-			// A line (4 vertices) consists of 2 triangles, so 6 triangle indices
-			for (int j = 0, v = 0; j < edgeList.Count*3; j += 6, v += 4) {
-				// First triangle
-				tris.Add(v+0);
-				tris.Add(v+1);
-				tris.Add(v+2);
-
-				// Second triangle
-				tris.Add(v+1);
-				tris.Add(v+3);
-				tris.Add(v+2);
-			}
-
-			// Set all data on the mesh
-			mesh.SetVertices(vertices);
-			mesh.SetTriangles(tris, 0);
-			mesh.SetColors(colors);
-			mesh.SetNormals(normals);
-
-			// Upload all data and mark the mesh as unreadable
-			mesh.UploadMeshData(true);
-
-			// Release the lists back to the pool
-			ListPool<Color32>.Release(colorList);
-			ListPool<Int3>.Release(edgeList);
-
-			ListPool<Vector3>.Release(vertices);
-			ListPool<Color32>.Release(colors);
-			ListPool<Vector3>.Release(normals);
-			ListPool<int>.Release(tris);
-
-			return mesh;
-		}
-
-		public override void OnDrawGizmos () {
-			var graph = target as RecastGraph;
-
-			if (graph.showMeshSurface) {
-				UpdateDebugMeshes();
-
-				for (int pass = 0; pass <= 2; pass++) {
-					navmeshMaterial.SetPass(pass);
-					for (int i = 0; i < gizmoMeshes.Count; i++) {
-						Graphics.DrawMeshNow(gizmoMeshes[i].surfaceMesh, Matrix4x4.identity);
-					}
-				}
-
-				navmeshOutlineMaterial.SetPass(0);
-				for (int i = 0; i < gizmoMeshes.Count; i++) {
-					Graphics.DrawMeshNow(gizmoMeshes[i].outlineMesh, Matrix4x4.identity);
-				}
-			}
-		}
-#endif
 
 		public override void OnInspectorGUI (NavGraph target) {
 			var graph = target as RecastGraph;
@@ -322,9 +46,6 @@ namespace Pathfinding {
 
 			graph.cellSize = EditorGUILayout.FloatField(new GUIContent("Cell Size", "Size of one voxel in world units"), graph.cellSize);
 			if (graph.cellSize < 0.001F) graph.cellSize = 0.001F;
-
-			graph.cellHeight = EditorGUILayout.FloatField(new GUIContent("Cell Height", "Height of one voxel in world units"), graph.cellHeight);
-			if (graph.cellHeight < 0.001F) graph.cellHeight = 0.001F;
 
 			graph.useTiles = (UseTiles)EditorGUILayout.EnumPopup("Use Tiles", graph.useTiles ? UseTiles.UseTiles : UseTiles.DontUseTiles) == UseTiles.UseTiles;
 
@@ -361,11 +82,11 @@ namespace Pathfinding {
 			graph.characterRadius = Mathf.Max(graph.characterRadius, 0);
 
 			if (graph.characterRadius < graph.cellSize * 2) {
-				EditorGUILayout.HelpBox("For best navmesh quality, it is recommended to keep the character radius to at least 2 times the cell size. Smaller cell sizes will give you higher quality navmeshes, but it will take more time to scan the graph.", MessageType.Warning);
+				EditorGUILayout.HelpBox("For best navmesh quality, it is recommended to keep the character radius at least 2 times as large as the cell size. Smaller cell sizes will give you higher quality navmeshes, but it will take more time to scan the graph.", MessageType.Warning);
 			}
 
 			graph.maxSlope = EditorGUILayout.Slider(new GUIContent("Max Slope", "Approximate maximum slope"), graph.maxSlope, 0F, 90F);
-			graph.maxEdgeLength = EditorGUILayout.FloatField(new GUIContent("Max Edge Length", "Maximum length of one edge in the completed navmesh before it is split. A lower value can often yield better quality graphs"), graph.maxEdgeLength);
+			graph.maxEdgeLength = EditorGUILayout.FloatField(new GUIContent("Max Border Edge Length", "Maximum length of one border edge in the completed navmesh before it is split. A lower value can often yield better quality graphs, but don't use so low values so that you get a lot of thin triangles."), graph.maxEdgeLength);
 			graph.maxEdgeLength = graph.maxEdgeLength < graph.cellSize ? graph.cellSize : graph.maxEdgeLength;
 
 			graph.contourMaxError = EditorGUILayout.FloatField(new GUIContent("Max Edge Error", "Amount of simplification to apply to edges.\nIn world units."), graph.contourMaxError);
@@ -410,6 +131,7 @@ namespace Pathfinding {
 
 			graph.forcedBoundsCenter = EditorGUILayout.Vector3Field("Center", graph.forcedBoundsCenter);
 			graph.forcedBoundsSize = EditorGUILayout.Vector3Field("Size", graph.forcedBoundsSize);
+			graph.rotation = EditorGUILayout.Vector3Field("Rotation", graph.rotation);
 
 			if (GUILayout.Button(new GUIContent("Snap bounds to scene", "Will snap the bounds of the graph to exactly contain all meshes that the bounds currently touches"))) {
 				graph.SnapForceBoundsToScene();
@@ -424,12 +146,12 @@ namespace Pathfinding {
 
 			Separator();
 
-			// The surface code is not compatible with Unity 5.0 or 5.1
-#if !UNITY_5_1 && !UNITY_5_0
-			graph.showMeshSurface = EditorGUILayout.Toggle(new GUIContent("Show mesh surface", "Toggles gizmos for drawing the surface of the mesh"), graph.showMeshSurface);
-#endif
-			graph.showMeshOutline = EditorGUILayout.Toggle(new GUIContent("Show mesh outline", "Toggles gizmos for drawing an outline of the mesh"), graph.showMeshOutline);
-			graph.showNodeConnections = EditorGUILayout.Toggle(new GUIContent("Show node connections", "Toggles gizmos for drawing node connections"), graph.showNodeConnections);
+			GUILayout.BeginHorizontal();
+			GUILayout.Space(18);
+			graph.showMeshSurface = GUILayout.Toggle(graph.showMeshSurface, new GUIContent("Show surface", "Toggles gizmos for drawing the surface of the mesh"), EditorStyles.miniButtonLeft);
+			graph.showMeshOutline = GUILayout.Toggle(graph.showMeshOutline, new GUIContent("Show outline", "Toggles gizmos for drawing an outline of the nodes"), EditorStyles.miniButtonMid);
+			graph.showNodeConnections = GUILayout.Toggle(graph.showNodeConnections, new GUIContent("Show connections", "Toggles gizmos for drawing node connections"), EditorStyles.miniButtonRight);
+			GUILayout.EndHorizontal();
 
 
 			Separator();
@@ -460,6 +182,10 @@ namespace Pathfinding {
 
 			graph.nearestSearchOnlyXZ = EditorGUILayout.Toggle(new GUIContent("Nearest node queries in XZ space",
 					"Recomended for single-layered environments.\nFaster but can be inacurate esp. in multilayered contexts."), graph.nearestSearchOnlyXZ);
+
+			if (graph.nearestSearchOnlyXZ && (Mathf.Abs(graph.rotation.x) > 1 || Mathf.Abs(graph.rotation.z) > 1)) {
+				EditorGUILayout.HelpBox("Nearest node queries in XZ space is not recommended for rotated graphs since XZ space no longer corresponds to the ground plane", MessageType.Warning);
+			}
 		}
 
 		/** Exports the INavmesh graph to a .obj file */
@@ -467,7 +193,7 @@ namespace Pathfinding {
 			//INavmesh graph = (INavmesh)target;
 			if (target == null) return;
 
-			RecastGraph.NavmeshTile[] tiles = target.GetTiles();
+			NavmeshTile[] tiles = target.GetTiles();
 
 			if (tiles == null) {
 				if (EditorUtility.DisplayDialog("Scan graph before exporting?", "The graph does not contain any mesh data. Do you want to scan it?", "Ok", "Cancel")) {
@@ -496,7 +222,7 @@ namespace Pathfinding {
 			sb.Append("vt 0 0\n");
 
 			for (int t = 0; t < tiles.Length; t++) {
-				RecastGraph.NavmeshTile tile = tiles[t];
+				NavmeshTile tile = tiles[t];
 
 				if (tile == null) continue;
 

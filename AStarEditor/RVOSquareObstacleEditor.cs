@@ -1,11 +1,12 @@
-using UnityEngine;
-using System.Collections;
 using UnityEditor;
 using Pathfinding.RVO;
 
-[CustomEditor(typeof(RVOSquareObstacle))]
-public class RVOSquareObstacleEditor : Editor {
-	public override void OnInspectorGUI () {
-		DrawDefaultInspector();
+namespace Pathfinding {
+	[CustomEditor(typeof(RVOSquareObstacle))]
+	[CanEditMultipleObjects]
+	public class RVOSquareObstacleEditor : Editor {
+		public override void OnInspectorGUI () {
+			DrawDefaultInspector();
+		}
 	}
 }

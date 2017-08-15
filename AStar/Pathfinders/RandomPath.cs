@@ -62,7 +62,7 @@ namespace Pathfinding {
 		/** Random number generator */
 		readonly System.Random rnd = new System.Random();
 
-		public override bool FloodingPath {
+		internal override bool FloodingPath {
 			get {
 				return true;
 			}
@@ -74,7 +74,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void Reset () {
+		protected override void Reset () {
 			base.Reset();
 
 			searchLength = 5000;
@@ -121,7 +121,7 @@ namespace Pathfinding {
 
 		/** Calls callback to return the calculated path.
 		 * \see #callback */
-		public override void ReturnPath () {
+		protected override void ReturnPath () {
 			if (path != null && path.Count > 0) {
 				endNode = path[path.Count-1];
 				endPoint = (Vector3)endNode.position;
@@ -134,11 +134,11 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void Prepare () {
+		protected override void Prepare () {
 			nnConstraint.tags = enabledTags;
-			NNInfo startNNInfo  = AstarPath.active.GetNearest(startPoint, nnConstraint, startHint);
+			var startNNInfo  = AstarPath.active.GetNearest(startPoint, nnConstraint);
 
-			startPoint = startNNInfo.clampedPosition;
+			startPoint = startNNInfo.position;
 			endPoint = startPoint;
 
 			startIntPoint = (Int3)startPoint;
@@ -167,7 +167,7 @@ namespace Pathfinding {
 			heuristicScale = aimStrength;
 		}
 
-		public override void Initialize () {
+		protected override void Initialize () {
 			//Adjust the costs for the end node
 			/*if (hasEndPoint && recalcStartEndCosts) {
 			 *  endNodeCosts = endNode.InitialOpen (open,hTarget,(Int3)endPoint,this,false);
@@ -200,16 +200,16 @@ namespace Pathfinding {
 			searchedNodes++;
 
 			//any nodes left to search?
-			if (pathHandler.HeapEmpty()) {
+			if (pathHandler.heap.isEmpty) {
 				LogError("No open points, the start node didn't open any nodes");
 				Error();
 				return;
 			}
 
-			currentR = pathHandler.PopNode();
+			currentR = pathHandler.heap.Remove();
 		}
 
-		public override void CalculateStep (long targetTick) {
+		protected override void CalculateStep (long targetTick) {
 			int counter = 0;
 
 			// Continue to search while there hasn't ocurred an error and the end hasn't been found
@@ -240,7 +240,7 @@ namespace Pathfinding {
 				currentR.node.Open(this, currentR, pathHandler);
 
 				// Any nodes left to search?
-				if (pathHandler.HeapEmpty()) {
+				if (pathHandler.heap.isEmpty) {
 					if (chosenNodeR != null) {
 						CompleteState = PathCompleteState.Complete;
 					} else if (maxGScoreNodeR != null) {
@@ -255,7 +255,7 @@ namespace Pathfinding {
 
 
 				// Select the node with the lowest F score and remove it from the open list
-				currentR = pathHandler.PopNode();
+				currentR = pathHandler.heap.Remove();
 
 				// Check for time every 500 nodes, roughly every 0.5 ms usually
 				if (counter > 500) {

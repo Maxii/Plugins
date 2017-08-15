@@ -54,7 +54,7 @@ namespace Pathfinding {
 		protected void Setup (Vector3 start, FloodPath flood, OnPathDelegate callback) {
 			this.flood = flood;
 
-			if (flood == null || flood.GetState() < PathState.Returned) {
+			if (flood == null || flood.PipelineState < PathState.Returned) {
 				throw new System.ArgumentException("You must supply a calculated FloodPath to the 'flood' argument");
 			}
 
@@ -62,7 +62,7 @@ namespace Pathfinding {
 			nnConstraint = new FloodPathConstraint(flood);
 		}
 
-		public override void Reset () {
+		protected override void Reset () {
 			base.Reset();
 			flood = null;
 		}
@@ -70,7 +70,7 @@ namespace Pathfinding {
 		/** Initializes the path.
 		 * Traces the path from the start node.
 		 */
-		public override void Initialize () {
+		protected override void Initialize () {
 			if (startNode != null && flood.HasPathTo(startNode)) {
 				Trace(startNode);
 				CompleteState = PathCompleteState.Complete;
@@ -80,7 +80,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void CalculateStep (long targetTick) {
+		protected override void CalculateStep (long targetTick) {
 			if (!IsDone()) {
 				Error();
 				LogError("Something went wrong. At this point the path should be completed");

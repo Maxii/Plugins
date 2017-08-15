@@ -48,7 +48,7 @@ namespace Pathfinding {
 	 * \see[AddComponentMenu("CONTEXT/Seeker/Something")] Modifier
 	 */
 	[System.Serializable]
-	public abstract class MonoModifier : MonoBehaviour, IPathModifier {
+	public abstract class MonoModifier : VersionedMonoBehaviour, IPathModifier {
 		public void OnEnable () {}
 		public void OnDisable () {}
 
@@ -61,7 +61,8 @@ namespace Pathfinding {
 		public abstract int Order { get; }
 
 		/** Alerts the Seeker that this modifier exists */
-		public void Awake () {
+		protected override void Awake () {
+			base.Awake();
 			seeker = GetComponent<Seeker>();
 
 			if (seeker != null) {

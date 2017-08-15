@@ -1,8 +1,10 @@
 using UnityEngine;
-using System;
 using System.Collections.Generic;
+using System;
 
 namespace Pathfinding {
+	using Pathfinding.Util;
+
 	/** Contains various spline functions.
 	 * \ingroup utils
 	 */
@@ -50,6 +52,20 @@ namespace Pathfinding {
 			t = Mathf.Clamp01(t);
 			float t2 = 1-t;
 			return t2*t2*t2 * p0 + 3 * t2*t2 * t * p1 + 3 * t2 * t*t * p2 + t*t*t * p3;
+		}
+
+		/** Returns the derivative for a point on a cubic bezier curve. \a t is clamped between 0 and 1 */
+		public static Vector3 CubicBezierDerivative (Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t) {
+			t = Mathf.Clamp01(t);
+			float t2 = 1-t;
+			return 3*t2*t2*(p1-p0) + 6*t2*t*(p2 - p1) + 3*t*t*(p3 - p2);
+		}
+
+		/** Returns the second derivative for a point on a cubic bezier curve. \a t is clamped between 0 and 1 */
+		public static Vector3 CubicBezierSecondDerivative (Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t) {
+			t = Mathf.Clamp01(t);
+			float t2 = 1-t;
+			return 6*t2*(p2 - 2*p1 + p0) + 6*t*(p3 - 2*p2 + p1);
 		}
 	}
 
@@ -381,6 +397,14 @@ namespace Pathfinding {
 		}
 
 		/** Returns if the points are colinear (lie on a straight line) */
+		public static bool IsColinear (Vector2 a, Vector2 b, Vector2 c) {
+			float v = (b.x-a.x)*(c.y-a.y)-(c.x-a.x)*(b.y-a.y);
+
+			// Epsilon not chosen with much thought, just that float.Epsilon was a bit too small.
+			return v <= 0.0000001f && v >= -0.0000001f;
+		}
+
+		/** Returns if the points are colinear (lie on a straight line) */
 		public static bool IsColinearXZ (Int3 a, Int3 b, Int3 c) {
 			return (long)(b.x - a.x) * (long)(c.z - a.z) - (long)(c.x - a.x) * (long)(b.z - a.z) == 0;
 		}
@@ -389,7 +413,7 @@ namespace Pathfinding {
 		public static bool IsColinearXZ (Vector3 a, Vector3 b, Vector3 c) {
 			float v = (b.x-a.x)*(c.z-a.z)-(c.x-a.x)*(b.z-a.z);
 
-			// Epsilon not chosen with much though, just that float.Epsilon was a bit too small.
+			// Epsilon not chosen with much thought, just that float.Epsilon was a bit too small.
 			return v <= 0.0000001f && v >= -0.0000001f;
 		}
 
@@ -739,6 +763,36 @@ namespace Pathfinding {
 			return true;
 		}
 
+		/** Intersection of a line and a circle.
+		 * Returns the greatest t such that segmentStart+t*(segmentEnd-segmentStart) lies on the circle.
+		 *
+		 * In case the line does not intersect with the circle, the closest point on the line
+		 * to the circle will be returned.
+		 *
+		 * \note Works for line and sphere in 3D space as well.
+		 *
+		 * \see http://mathworld.wolfram.com/Circle-LineIntersection.html
+		 * \see https://en.wikipedia.org/wiki/Intersection_(Euclidean_geometry)#A_line_and_a_circle
+		 */
+		public static float LineCircleIntersectionFactor (Vector3 circleCenter, Vector3 linePoint1, Vector3 linePoint2, float radius) {
+			float segmentLength;
+			var normalizedDirection = Normalize(linePoint2 - linePoint1, out segmentLength);
+			var dirToStart = linePoint1 - circleCenter;
+
+			var dot = Vector3.Dot(dirToStart, normalizedDirection);
+			var discriminant = dot * dot - (dirToStart.sqrMagnitude - radius*radius);
+
+			if (discriminant < 0) {
+				// No intersection, pick closest point on segment
+				discriminant = 0;
+			}
+
+			var t = -dot + Mathf.Sqrt(discriminant);
+			// Note: the default value of 1 is important for the PathInterpolator.MoveToCircleIntersection2D
+			// method to work properly. Maybe find some better abstraction where this default value is more obvious.
+			return segmentLength > 0.00001f ? t / segmentLength : 1f;
+		}
+
 		/** True if the matrix will reverse orientations of faces.
 		 *
 		 * Scaling by a negative value along an odd number of axes will reverse
@@ -794,6 +848,51 @@ namespace Pathfinding {
 			var cross = (dX.x*dZ.z - dZ.x*dX.z);
 
 			return cross < 0;
+		}
+
+		/** Normalize vector and also return the magnitude.
+		 * This is more efficient than calculating the magnitude and normalizing separately
+		 */
+		public static Vector3 Normalize (Vector3 v, out float magnitude) {
+			magnitude = v.magnitude;
+			// This is the same constant that Unity uses
+			if (magnitude > 1E-05f) {
+				return v / magnitude;
+			} else {
+				return Vector3.zero;
+			}
+		}
+
+		/** Normalize vector and also return the magnitude.
+		 * This is more efficient than calculating the magnitude and normalizing separately
+		 */
+		public static Vector2 Normalize (Vector2 v, out float magnitude) {
+			magnitude = v.magnitude;
+			// This is the same constant that Unity uses
+			if (magnitude > 1E-05f) {
+				return v / magnitude;
+			} else {
+				return Vector2.zero;
+			}
+		}
+
+		/* Clamp magnitude along the X and Z axes.
+		 * The y component will not be changed.
+		 */
+		public static Vector3 ClampMagnitudeXZ (Vector3 v, float maxMagnitude) {
+			float squaredMagnitudeXZ = v.x*v.x + v.z*v.z;
+
+			if (squaredMagnitudeXZ > maxMagnitude*maxMagnitude && maxMagnitude > 0) {
+				var factor = maxMagnitude / Mathf.Sqrt(squaredMagnitudeXZ);
+				v.x *= factor;
+				v.z *= factor;
+			}
+			return v;
+		}
+
+		/* Magnitude in the XZ plane */
+		public static float MagnitudeXZ (Vector3 v) {
+			return Mathf.Sqrt(v.x*v.x + v.z*v.z);
 		}
 	}
 
@@ -881,43 +980,30 @@ namespace Pathfinding {
 		}
 
 		/** Maps a value between startMin and startMax to be between 0 and 1 */
+		[System.Obsolete("Use Mathf.InverseLerp instead")]
 		public static float MapTo (float startMin, float startMax, float value) {
-			if (startMax != startMin) {
-				value -= startMin;
-				value /= (startMax - startMin);
-				value = Mathf.Clamp01(value);
-			} else {
-				value = 0;
-			}
-			return value;
+			return Mathf.InverseLerp(startMin, startMax, value);
 		}
 
 		/** Maps a value between startMin and startMax to be between targetMin and targetMax */
 		public static float MapTo (float startMin, float startMax, float targetMin, float targetMax, float value) {
-			value -= startMin;
-			value /= (startMax-startMin);
-			value = Mathf.Clamp01(value);
-			value *= (targetMax-targetMin);
-			value += targetMin;
-			return value;
+			return Mathf.Lerp(targetMin, targetMax, Mathf.InverseLerp(startMin, startMax, value));
 		}
 
 		/** Returns a nicely formatted string for the number of bytes (KiB, MiB, GiB etc). Uses decimal names (KB, Mb - 1000) but calculates using binary values (KiB, MiB - 1024) */
 		public static string FormatBytesBinary (int bytes) {
 			double sign = bytes >= 0 ? 1D : -1D;
 
-			bytes = bytes >= 0 ? bytes : -bytes;
+			bytes = Mathf.Abs(bytes);
 
 			if (bytes < 1024) {
 				return (bytes*sign)+" bytes";
+			} else if (bytes < 1024*1024) {
+				return ((bytes/1024D)*sign).ToString("0.0") + " KiB";
+			} else if (bytes < 1024*1024*1024) {
+				return ((bytes/(1024D*1024D))*sign).ToString("0.0") +" MiB";
 			}
-			if (bytes < 1024*1024) {
-				return ((bytes/1024D)*sign).ToString("0.0") + " kb";
-			}
-			if (bytes < 1024*1024*1024) {
-				return ((bytes/(1024D*1024D))*sign).ToString("0.0") +" mb";
-			}
-			return ((bytes/(1024D*1024D*1024D))*sign).ToString("0.0") +" gb";
+			return ((bytes/(1024D*1024D*1024D))*sign).ToString("0.0") +" GiB";
 		}
 
 		/** Returns bit number \a b from int \a a. The bit number is zero based. Relevant \a b values are from 0 to 31\n
@@ -925,18 +1011,60 @@ namespace Pathfinding {
 		 */
 		static int Bit (int a, int b) {
 			return (a >> b) & 1;
-			//return (a & (1 << b)) >> b; //Original code, one extra shift operation required
 		}
 
 		/** Returns a nice color from int \a i with alpha \a a. Got code from the open-source Recast project, works really well\n
 		 * Seems like there are only 64 possible colors from studying the code
 		 */
 		public static Color IntToColor (int i, float a) {
-			int r = Bit(i, 1) + Bit(i, 3) * 2 + 1;
-			int g = Bit(i, 2) + Bit(i, 4) * 2 + 1;
+			int r = Bit(i, 2) + Bit(i, 3) * 2 + 1;
+			int g = Bit(i, 1) + Bit(i, 4) * 2 + 1;
 			int b = Bit(i, 0) + Bit(i, 5) * 2 + 1;
 
 			return new Color(r*0.25F, g*0.25F, b*0.25F, a);
+		}
+
+		/**
+		 * Converts an HSV color to an RGB color.
+		 * According to the algorithm described at http://en.wikipedia.org/wiki/HSL_and_HSV
+		 *
+		 * @author Wikipedia
+		 * @return the RGB representation of the color.
+		 */
+		public static Color HSVToRGB (float h, float s, float v) {
+			float r = 0, g = 0, b = 0;
+
+			float Chroma = s * v;
+			float Hdash = h / 60.0f;
+			float X = Chroma * (1.0f - System.Math.Abs((Hdash % 2.0f) - 1.0f));
+
+			if (Hdash < 1.0f) {
+				r = Chroma;
+				g = X;
+			} else if (Hdash < 2.0f) {
+				r = X;
+				g = Chroma;
+			} else if (Hdash < 3.0f) {
+				g = Chroma;
+				b = X;
+			} else if (Hdash < 4.0f) {
+				g = X;
+				b = Chroma;
+			} else if (Hdash < 5.0f) {
+				r = X;
+				b = Chroma;
+			} else if (Hdash < 6.0f) {
+				r = Chroma;
+				b = X;
+			}
+
+			float Min = v - Chroma;
+
+			r += Min;
+			g += Min;
+			b += Min;
+
+			return new Color(r, g, b);
 		}
 
 		/** Squared distance between two points on the XZ plane */
@@ -1548,32 +1676,6 @@ namespace Pathfinding {
 			return VectorMath.SegmentIntersectsBounds(bounds, a, b);
 		}
 
-		/** Subdivides \a path and returns the new array with interpolated values.
-		 * The returned array is \a path subdivided \a subdivisions times, the resulting points are interpolated using Mathf.SmoothStep.\n
-		 * If \a subdivisions is less or equal to 0 (zero), the original array will be returned */
-		public static Vector3[] Subdivide (Vector3[] path, int subdivisions) {
-			subdivisions = subdivisions < 0 ? 0 : subdivisions;
-
-			if (subdivisions == 0) {
-				return path;
-			}
-
-			var path2 = new Vector3[(path.Length-1)*(int)Mathf.Pow(2, subdivisions)+1];
-
-			int c = 0;
-			for (int p = 0; p < path.Length-1; p++) {
-				float step = 1.0F/Mathf.Pow(2, subdivisions);
-
-				for (float i = 0; i < 1.0F; i += step) {
-					path2[c] = Vector3.Lerp(path[p], path[p+1], Mathf.SmoothStep(0, 1, i));
-					c++;
-				}
-			}
-
-			path2[c] = path[path.Length-1];
-			return path2;
-		}
-
 		/** Returns the closest point on the triangle. The \a triangle array must have a length of at least 3.
 		 * \see ClosesPointOnTriangle(Vector3,Vector3,Vector3,Vector3);
 		 *
@@ -1719,7 +1821,6 @@ namespace Pathfinding {
 			}
 		}
 
-
 		/** Get the 3D minimum distance between 2 segments
 		 * Input:  two 3D line segments S1 and S2
 		 * \returns the shortest squared distance between S1 and S2
@@ -1729,6 +1830,61 @@ namespace Pathfinding {
 		[System.Obsolete("Use VectorMath.SqrDistanceSegmentSegment instead")]
 		public static float DistanceSegmentSegment3D (Vector3 s1, Vector3 e1, Vector3 s2, Vector3 e2) {
 			return VectorMath.SqrDistanceSegmentSegment(s1, e1, s2, e2);
+		}
+
+		/** Cached dictionary to avoid excessive allocations */
+		static readonly Dictionary<Int3, int> cached_Int3_int_dict = new Dictionary<Int3, int>();
+
+		/** Compress the mesh by removing duplicate vertices.
+		 *
+		 * \param vertices Vertices of the input mesh
+		 * \param triangles Triangles of the input mesh
+		 * \param outVertices Vertices of the output mesh.
+		 * \param outTriangles Triangles of the output mesh.
+		 *
+		 * Vertices that differ by only 1 along the y coordinate will also be merged together.
+		 * \warning This function is not threadsafe. It uses some cached structures to reduce allocations.
+		 */
+		public static void CompressMesh (List<Int3> vertices, List<int> triangles, out Int3[] outVertices, out int[] outTriangles) {
+			Dictionary<Int3, int> firstVerts = cached_Int3_int_dict;
+			firstVerts.Clear();
+
+			// Use cached array to reduce memory allocations
+			int[] compressedPointers = ArrayPool<int>.Claim(vertices.Count);
+
+			// Map positions to the first index they were encountered at
+			int count = 0;
+			for (int i = 0; i < vertices.Count; i++) {
+				// Check if the vertex position has already been added
+				// Also check one position up and one down because rounding errors can cause vertices
+				// that should end up in the same position to be offset 1 unit from each other
+				// TODO: Check along X and Z axes as well?
+				int ind;
+				if (!firstVerts.TryGetValue(vertices[i], out ind) && !firstVerts.TryGetValue(vertices[i] + new Int3(0, 1, 0), out ind) && !firstVerts.TryGetValue(vertices[i] + new Int3(0, -1, 0), out ind)) {
+					firstVerts.Add(vertices[i], count);
+					compressedPointers[i] = count;
+					vertices[count] = vertices[i];
+					count++;
+				} else {
+					compressedPointers[i] = ind;
+				}
+			}
+
+			// Create the triangle array or reuse the existing buffer
+			outTriangles = new int[triangles.Count];
+
+			// Remap the triangles to the new compressed indices
+			for (int i = 0; i < outTriangles.Length; i++) {
+				outTriangles[i] = compressedPointers[triangles[i]];
+			}
+
+			// Create the vertex array or reuse the existing buffer
+			outVertices = new Int3[count];
+
+			for (int i = 0; i < count; i++)
+				outVertices[i] = vertices[i];
+
+			ArrayPool<int>.Release(ref compressedPointers);
 		}
 	}
 }

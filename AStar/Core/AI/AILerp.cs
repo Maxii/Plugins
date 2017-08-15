@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using Pathfinding;
+using Pathfinding.Util;
 
 /** Linearly interpolating movement script.
  * This movement script will follow the path exactly, it uses linear interpolation to move between the waypoints in the path.
@@ -21,9 +22,9 @@ using Pathfinding;
  * \ingroup movementscripts
  */
 [RequireComponent(typeof(Seeker))]
-[AddComponentMenu("Pathfinding/AI/AILerp (2D,3D generic)")]
+[AddComponentMenu("Pathfinding/AI/AISimpleLerp (2D,3D generic)")]
 [HelpURL("http://arongranberg.com/astar/docs/class_a_i_lerp.php")]
-public class AILerp : MonoBehaviour {
+public class AILerp : VersionedMonoBehaviour {
 	/** Determines how often it will search for new paths.
 	 * If you have fast moving targets or AIs, you might want to set it to a lower value.
 	 * The value is in seconds between path requests.
@@ -78,12 +79,6 @@ public class AILerp : MonoBehaviour {
 	/** Current path which is followed */
 	protected ABPath path;
 
-	/** Current index in the path which is current target */
-	protected int currentWaypointIndex = 0;
-
-	/** How far the AI has moved along the current segment */
-	protected float distanceAlongSegment = 0;
-
 	/** True if the end-of-path is reached.
 	 * \see TargetReached */
 	public bool targetReached { get; private set; }
@@ -99,6 +94,8 @@ public class AILerp : MonoBehaviour {
 	protected Vector3 previousMovementDirection;
 	protected float previousMovementStartTime = -9999;
 
+	protected PathInterpolator interpolator = new PathInterpolator();
+
 	/** Holds if the Start function has been run.
 	 * Used to test if coroutines should be started in OnEnable to prevent calculating paths
 	 * in the awake stage (or rather before start on frame 0).
@@ -108,62 +105,55 @@ public class AILerp : MonoBehaviour {
 	/** Initializes reference variables.
 	 * If you override this function you should in most cases call base.Awake () at the start of it.
 	 * */
-	protected virtual void Awake () {
+	protected override void Awake () {
+		base.Awake();
 		//This is a simple optimization, cache the transform component lookup
 		tr = transform;
 
 		seeker = GetComponent<Seeker>();
 
-		// Tell the StartEndModifier to ask for our exact position
-		// when post processing the path
-		// This is important if we are using prediction and
-		// requesting a path from some point slightly ahead of us
-		// since then the start point in the path request may be far
-		// from our position when the path has been calculated.
-		// This is also good because if a long path is requested, it may
-		// take a few frames for it to be calculated so we could have
-		// moved some distance during that time
-		seeker.startEndModifier.adjustStartPoint = () => {
-			return tr.position;
-		};
+		// Tell the StartEndModifier to ask for our exact position when post processing the path This
+		// is important if we are using prediction and requesting a path from some point slightly ahead
+		// of us since then the start point in the path request may be far from our position when the
+		// path has been calculated. This is also good because if a long path is requested, it may take
+		// a few frames for it to be calculated so we could have moved some distance during that time
+		seeker.startEndModifier.adjustStartPoint = () => tr.position;
 	}
 
 	/** Starts searching for paths.
 	 * If you override this function you should in most cases call base.Start () at the start of it.
-	 * \see OnEnable
-	 * \see RepeatTrySearchPath
+	 * \see #Init
+	 * \see #RepeatTrySearchPath
 	 */
 	protected virtual void Start () {
 		startHasRun = true;
-		OnEnable();
+		Init();
 	}
 
-	/** Run at start and when reenabled.
-	 * Starts RepeatTrySearchPath.
-	 *
-	 * \see Start
-	 */
+	/** Called when the component is enabled */
 	protected virtual void OnEnable () {
-		lastRepath = -9999;
-		canSearchAgain = true;
+		// Make sure we receive callbacks when paths complete
+		seeker.pathCallback += OnPathComplete;
+		Init();
+	}
 
+	void Init () {
 		if (startHasRun) {
-			// Make sure we receive callbacks when paths complete
-			seeker.pathCallback += OnPathComplete;
-
+			lastRepath = float.NegativeInfinity;
 			StartCoroutine(RepeatTrySearchPath());
 		}
 	}
 
 	public void OnDisable () {
-		// Abort calculation of path
-		if (seeker != null && !seeker.IsDone()) seeker.GetCurrentPath().Error();
+		// Abort any calculations in progress
+		if (seeker != null) seeker.CancelCurrentPathRequest();
+		canSearchAgain = true;
 
-		// Release current path
+		// Release the current path so that it can be pooled
 		if (path != null) path.Release(this);
 		path = null;
 
-		// Make sure we receive callbacks when paths complete
+		// Make sure we no longer receive callbacks when paths complete
 		seeker.pathCallback -= OnPathComplete;
 	}
 
@@ -188,8 +178,7 @@ public class AILerp : MonoBehaviour {
 			SearchPath();
 			return repathRate;
 		} else {
-			float v = repathRate - (Time.time-lastRepath);
-			return v < 0 ? 0 : v;
+			return Mathf.Max(0, repathRate - (Time.time-lastRepath));
 		}
 	}
 
@@ -213,15 +202,20 @@ public class AILerp : MonoBehaviour {
 		var targetPosition = target.position;
 		var currentPosition = GetFeetPosition();
 
-		// If we are following a path, start searching from the node we will reach next
-		// this can prevent odd turns right at the start of the path
-		if (path != null && path.vectorPath.Count > 1) {
-			currentPosition = path.vectorPath[currentWaypointIndex];
+		// If we are following a path, start searching from the node we will
+		// reach next this can prevent odd turns right at the start of the path
+		if (interpolator.valid) {
+			var prevDist = interpolator.distance;
+			// Move to the end of the current segment
+			interpolator.MoveToSegment(interpolator.segmentIndex, 1);
+			currentPosition = interpolator.position;
+			// Move back to the original position
+			interpolator.distance = prevDist;
 		}
 
 		canSearchAgain = false;
 
-		//Alternative way of requesting the path
+		// Alternative way of requesting the path
 		//ABPath p = ABPath.Construct (currentPosition,targetPoint,null);
 		//seeker.StartPath (p);
 
@@ -231,7 +225,7 @@ public class AILerp : MonoBehaviour {
 
 	/** The end of the path has been reached.
 	 * If you want custom logic for when the AI has reached it's destination
-	 * add it here
+	 * add it here.
 	 * You can also create a new script which inherits from this one
 	 * and override the function in that script.
 	 */
@@ -249,7 +243,7 @@ public class AILerp : MonoBehaviour {
 
 		canSearchAgain = true;
 
-		// Claim the new path
+		// Increase the reference count on the path.
 		// This is used for path pooling
 		p.Claim(this);
 
@@ -265,51 +259,31 @@ public class AILerp : MonoBehaviour {
 		}
 
 		// Release the previous path
-		// This is used for path pooling
+		// This is used for path pooling.
+		// Note that this will invalidate the interpolator
+		// since the vectorPath list will be pooled.
 		if (path != null) path.Release(this);
 
 		// Replace the old path
 		path = p;
+		targetReached = false;
 
-		// Just for the rest of the code to work, if there is only one waypoint in the path
-		// add another one
+		// Just for the rest of the code to work, if there
+		// is only one waypoint in the path add another one
 		if (path.vectorPath != null && path.vectorPath.Count == 1) {
 			path.vectorPath.Insert(0, GetFeetPosition());
 		}
-
-		targetReached = false;
 
 		// Reset some variables
 		ConfigureNewPath();
 	}
 
 	protected virtual void ConfigurePathSwitchInterpolation () {
-		bool previousPathWasValid = path != null && path.vectorPath != null && path.vectorPath.Count > 1;
+		bool reachedEndOfPreviousPath = interpolator.valid && interpolator.remainingDistance < 0.0001f;
 
-		bool reachedEndOfPreviousPath = false;
-
-		if (previousPathWasValid) {
-			reachedEndOfPreviousPath = currentWaypointIndex == path.vectorPath.Count-1 && distanceAlongSegment >= (path.vectorPath[path.vectorPath.Count-1] - path.vectorPath[path.vectorPath.Count-2]).magnitude;
-		}
-
-		if (previousPathWasValid && !reachedEndOfPreviousPath) {
-			List<Vector3> vPath = path.vectorPath;
-
-			// Make sure we stay inside valid ranges
-			currentWaypointIndex = Mathf.Clamp(currentWaypointIndex, 1, vPath.Count - 1);
-
-			// Current segment vector
-			Vector3 segment = vPath[currentWaypointIndex] - vPath[currentWaypointIndex - 1];
-			float segmentLength = segment.magnitude;
-
-			// Find the approximate length of the path that is left on the current path
-			float approximateLengthLeft = segmentLength * Mathf.Clamp01(1 - distanceAlongSegment);
-			for (int i = currentWaypointIndex; i < vPath.Count-1; i++) {
-				approximateLengthLeft += (vPath[i + 1] - vPath[i]).magnitude;
-			}
-
-			previousMovementOrigin = GetFeetPosition();
-			previousMovementDirection = segment.normalized * approximateLengthLeft;
+		if (interpolator.valid && !reachedEndOfPreviousPath) {
+			previousMovementOrigin = interpolator.position;
+			previousMovementDirection = interpolator.tangent.normalized * interpolator.remainingDistance;
 			previousMovementStartTime = Time.time;
 		} else {
 			previousMovementOrigin = Vector3.zero;
@@ -322,43 +296,17 @@ public class AILerp : MonoBehaviour {
 		return tr.position;
 	}
 
-	/** Finds the closest point on the current path.
-	 * Sets #currentWaypointIndex and #lerpTime to the appropriate values.
-	 */
+	/** Finds the closest point on the current path and configures the #interpolator */
 	protected virtual void ConfigureNewPath () {
-		var points = path.vectorPath;
+		var hadValidPath = interpolator.valid;
+		var prevTangent = hadValidPath ? interpolator.tangent : Vector3.zero;
 
-		var currentPosition = GetFeetPosition();
+		interpolator.SetPath(path.vectorPath);
+		interpolator.MoveToClosestPoint(GetFeetPosition());
 
-		// Find the closest point on the new path
-		// to our current position
-		// and initialize the path following variables
-		// to start following the path from that point
-		float bestDistanceAlongSegment = 0;
-		float bestDist = float.PositiveInfinity;
-		Vector3 bestDirection = Vector3.zero;
-		int bestIndex = 1;
-
-		for (int i = 0; i < points.Count-1; i++) {
-			float factor = VectorMath.ClosestPointOnLineFactor(points[i], points[i+1], currentPosition);
-			factor = Mathf.Clamp01(factor);
-			Vector3 point = Vector3.Lerp(points[i], points[i+1], factor);
-			float dist = (currentPosition - point).sqrMagnitude;
-
-			if (dist < bestDist) {
-				bestDist = dist;
-				bestDirection = points[i+1] - points[i];
-				bestDistanceAlongSegment = factor * bestDirection.magnitude;
-				bestIndex = i+1;
-			}
-		}
-
-		currentWaypointIndex = bestIndex;
-		distanceAlongSegment = bestDistanceAlongSegment;
-
-		if (interpolatePathSwitches && switchPathInterpolationSpeed > 0.01f) {
-			var correctionFactor = Mathf.Max(-Vector3.Dot(previousMovementDirection.normalized, bestDirection.normalized), 0);
-			distanceAlongSegment -= speed*correctionFactor*(1f/switchPathInterpolationSpeed);
+		if (interpolatePathSwitches && switchPathInterpolationSpeed > 0.01f && hadValidPath) {
+			var correctionFactor = Mathf.Max(-Vector3.Dot(prevTangent.normalized, interpolator.tangent.normalized), 0);
+			interpolator.distance -= speed*correctionFactor*(1f/switchPathInterpolationSpeed);
 		}
 	}
 
@@ -387,71 +335,32 @@ public class AILerp : MonoBehaviour {
 	}
 
 	/** Calculate the AI's next position (one frame in the future).
-	 * \param direction The direction of the segment the AI is currently traversing. Not normalized.
+	 * \param direction The tangent of the segment the AI is currently traversing. Not normalized.
 	 */
 	protected virtual Vector3 CalculateNextPosition (out Vector3 direction) {
-		if (path == null || path.vectorPath == null || path.vectorPath.Count == 0) {
+		if (!interpolator.valid) {
 			direction = Vector3.zero;
 			return tr.position;
 		}
 
-		List<Vector3> vPath = path.vectorPath;
-
-		// Make sure we stay inside valid ranges
-		currentWaypointIndex = Mathf.Clamp(currentWaypointIndex, 1, vPath.Count - 1);
-
-		// Current segment vector
-		Vector3 segment = vPath[currentWaypointIndex] - vPath[currentWaypointIndex - 1];
-		float segmentLength = segment.magnitude;
-
-		// Move forwards
-		distanceAlongSegment += Time.deltaTime * speed;
-
-		// Pick the next segment if we have traversed the current one completely
-		if (distanceAlongSegment >= segmentLength && currentWaypointIndex < vPath.Count-1) {
-			float overshootDistance = distanceAlongSegment-segmentLength;
-
-			while (true) {
-				currentWaypointIndex++;
-
-				// Next segment vector
-				Vector3 nextSegment = vPath[currentWaypointIndex] - vPath[currentWaypointIndex - 1];
-				float nextSegmentLength = nextSegment.magnitude;
-
-				if (overshootDistance <= nextSegmentLength || currentWaypointIndex == vPath.Count-1) {
-					segment = nextSegment;
-					segmentLength = nextSegmentLength;
-					distanceAlongSegment = overshootDistance;
-					break;
-				} else {
-					overshootDistance -= nextSegmentLength;
-				}
-			}
-		}
-
-		if (distanceAlongSegment >= segmentLength && currentWaypointIndex == vPath.Count - 1) {
-			if (!targetReached) {
-				OnTargetReached();
-			}
+		interpolator.distance += Time.deltaTime * speed;
+		if (interpolator.remainingDistance < 0.0001f && !targetReached) {
 			targetReached = true;
+			OnTargetReached();
 		}
 
-		// Find our position along the path using a simple linear interpolation
-		Vector3 positionAlongCurrentPath = segment * Mathf.Clamp01(segmentLength > 0 ? distanceAlongSegment/segmentLength : 1) + vPath[currentWaypointIndex - 1];
-
-		direction = segment;
-
-		if (interpolatePathSwitches) {
+		direction = interpolator.tangent;
+		float alpha = switchPathInterpolationSpeed * (Time.time - previousMovementStartTime);
+		if (interpolatePathSwitches && alpha < 1f) {
 			// Find the approximate position we would be at if we
 			// would have continued to follow the previous path
 			Vector3 positionAlongPreviousPath = previousMovementOrigin + Vector3.ClampMagnitude(previousMovementDirection, speed * (Time.time - previousMovementStartTime));
 
-			// Use this to debug
-			//Debug.DrawLine (previousMovementOrigin, positionAlongPreviousPath, Color.yellow);
-
-			return Vector3.Lerp(positionAlongPreviousPath, positionAlongCurrentPath, switchPathInterpolationSpeed * (Time.time - previousMovementStartTime));
+			// Interpolate between the position on the current path and the position
+			// we would have had if we would have continued along the previous path.
+			return Vector3.Lerp(positionAlongPreviousPath, interpolator.position, alpha);
 		} else {
-			return positionAlongCurrentPath;
+			return interpolator.position;
 		}
 	}
 }

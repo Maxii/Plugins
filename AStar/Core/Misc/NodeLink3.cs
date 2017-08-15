@@ -1,12 +1,9 @@
 using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
-using Pathfinding;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 namespace Pathfinding {
+	using Pathfinding.Util;
+
 	public class NodeLink3Node : PointNode {
 		public NodeLink3 link;
 		public Vector3 portalA;
@@ -19,22 +16,9 @@ namespace Pathfinding {
 
 			if (this.connections.Length != 2) throw new System.Exception("Invalid NodeLink3Node. Expected 2 connections, found " + this.connections.Length);
 
-			//if ( other != connections[0] || other != connections[1] ) return false;
-
 			if (left != null) {
-				//Debug.DrawLine ( portalA, portalB, Color.red);
 				left.Add(portalA);
 				right.Add(portalB);
-				/*
-				 * Vector3 normal = link.transform.forward;
-				 * Vector3 tangent = Vector3.Dot (normal, (Vector3)(other.Position - this.Position) ) > 0 ? link.transform.right*0.5f : -link.transform.right*0.5f;
-				 *
-				 * Debug.DrawLine ( link.transform.position -tangent * link.portalWidth, link.transform.position +tangent * link.portalWidth, Color.red);
-				 *
-				 * Debug.DrawRay ( link.transform.position -tangent * link.portalWidth, Vector3.up*5, Color.red);
-				 * Debug.Break ();
-				 * left.Add ( link.transform.position -tangent * link.portalWidth );
-				 * right.Add (link.transform.position +tangent * link.portalWidth );*/
 			}
 
 			return true;
@@ -44,12 +28,12 @@ namespace Pathfinding {
 			if (this.connections.Length < 2) return null;
 			if (this.connections.Length != 2) throw new System.Exception("Invalid NodeLink3Node. Expected 2 connections, found " + this.connections.Length);
 
-			return a == connections[0] ? (connections[1] as NodeLink3Node).GetOtherInternal(this) : (connections[0] as NodeLink3Node).GetOtherInternal(this);
+			return a == connections[0].node ? (connections[1].node as NodeLink3Node).GetOtherInternal(this) : (connections[0].node as NodeLink3Node).GetOtherInternal(this);
 		}
 
 		GraphNode GetOtherInternal (GraphNode a) {
 			if (this.connections.Length < 2) return null;
-			return a == connections[0] ? connections[1] : connections[0];
+			return a == connections[0].node ? connections[1].node : connections[0].node;
 		}
 	}
 
@@ -79,11 +63,6 @@ namespace Pathfinding {
 		/** Make a one-way connection */
 		public bool oneWay = false;
 
-		/* Delete existing connection instead of adding one */
-		//public bool deleteConnection = false;
-
-		//private bool createHiddenNodes = true;
-
 		public Transform StartTransform {
 			get { return transform; }
 		}
@@ -110,7 +89,7 @@ namespace Pathfinding {
 			if (AstarPath.active.isScanning) {
 				InternalOnPostScan();
 			} else {
-				AstarPath.active.AddWorkItem(new AstarPath.AstarWorkItem(delegate(bool force) {
+				AstarPath.active.AddWorkItem(new AstarWorkItem(force => {
 					InternalOnPostScan();
 					return true;
 				}));
@@ -119,14 +98,14 @@ namespace Pathfinding {
 
 		public void InternalOnPostScan () {
 #if !ASTAR_NO_POINT_GRAPH
-			if (AstarPath.active.astarData.pointGraph == null) {
-				AstarPath.active.astarData.AddGraph(new PointGraph());
+			if (AstarPath.active.data.pointGraph == null) {
+				AstarPath.active.data.AddGraph(typeof(PointGraph));
 			}
 
 			//Get nearest nodes from the first point graph, assuming both start and end transforms are nodes
-			startNode = AstarPath.active.astarData.pointGraph.AddNode(new NodeLink3Node(AstarPath.active), (Int3)StartTransform.position);   //AstarPath.active.astarData.pointGraph.GetNearest(StartTransform.position).node as PointNode;
+			startNode = AstarPath.active.data.pointGraph.AddNode(new NodeLink3Node(AstarPath.active), (Int3)StartTransform.position);
 			startNode.link = this;
-			endNode = AstarPath.active.astarData.pointGraph.AddNode(new NodeLink3Node(AstarPath.active), (Int3)EndTransform.position);    //AstarPath.active.astarData.pointGraph.GetNearest(EndTransform.position).node as PointNode;
+			endNode = AstarPath.active.data.pointGraph.AddNode(new NodeLink3Node(AstarPath.active), (Int3)EndTransform.position);
 			endNode.link = this;
 #else
 			throw new System.Exception("Point graphs are not included. Check your A* Optimization settings.");
@@ -168,7 +147,7 @@ namespace Pathfinding {
 			base.OnEnable();
 
 #if !ASTAR_NO_POINT_GRAPH
-			if (Application.isPlaying && AstarPath.active != null && AstarPath.active.astarData != null && AstarPath.active.astarData.pointGraph != null) {
+			if (Application.isPlaying && AstarPath.active != null && AstarPath.active.data != null && AstarPath.active.data.pointGraph != null) {
 				OnGraphsPostUpdate();
 			}
 #endif
@@ -224,19 +203,19 @@ namespace Pathfinding {
 
 			bool same = true;
 
-			if (true) {
-				NNInfo n1 = AstarPath.active.GetNearest(StartTransform.position, nn);
-				same &= n1.node == connectedNode1 && n1.node != null;
-				connectedNode1 = n1.node as MeshNode;
-				clamped1 = n1.clampedPosition;
+			{
+				var info = AstarPath.active.GetNearest(StartTransform.position, nn);
+				same &= info.node == connectedNode1 && info.node != null;
+				connectedNode1 = info.node as MeshNode;
+				clamped1 = info.position;
 				if (connectedNode1 != null) Debug.DrawRay((Vector3)connectedNode1.position, Vector3.up*5, Color.red);
 			}
 
-			if (true) {
-				NNInfo n2 = AstarPath.active.GetNearest(EndTransform.position, nn);
-				same &= n2.node == connectedNode2 && n2.node != null;
-				connectedNode2 = n2.node as MeshNode;
-				clamped2 = n2.clampedPosition;
+			{
+				var info = AstarPath.active.GetNearest(EndTransform.position, nn);
+				same &= info.node == connectedNode2 && info.node != null;
+				connectedNode2 = info.node as MeshNode;
+				clamped2 = info.position;
 				if (connectedNode2 != null) Debug.DrawRay((Vector3)connectedNode2.position, Vector3.up*5, Color.cyan);
 			}
 
@@ -268,11 +247,6 @@ namespace Pathfinding {
 
 					if (Int3.DotLong((vb2-vb1).Normal2D(), dir) < 0) continue;
 
-
-					//Debug.DrawLine ((Vector3)va1, (Vector3)va2, Color.magenta);
-					//Debug.DrawLine ((Vector3)vb1, (Vector3)vb2, Color.cyan);
-					//Debug.Break ();
-
 					if (Int3.Angle((vb2-vb1), (va2-va1)) > (170.0/360.0f)*Mathf.PI*2) {
 						float t1 = 0;
 						float t2 = 1;
@@ -281,7 +255,7 @@ namespace Pathfinding {
 						t1 = System.Math.Max(t1, VectorMath.ClosestPointOnLineFactor(va1, va2, vb2));
 
 						if (t2 < t1) {
-							Debug.LogError("Wait wut!? " + t1 + " " + t2 + " " + va1 + " " + va2 + " " + vb1 + " " + vb2+"\nTODO, fix this error");
+							Debug.LogError("Something went wrong! " + t1 + " " + t2 + " " + va1 + " " + va2 + " " + vb1 + " " + vb2+"\nTODO, how can this happen?");
 						} else {
 							Vector3 pa = (Vector3)(va2-va1)*t1 + (Vector3)va1;
 							Vector3 pb = (Vector3)(va2-va1)*t2 + (Vector3)va1;
@@ -306,43 +280,8 @@ namespace Pathfinding {
 			}
 		}
 
-		void DrawCircle (Vector3 o, float r, int detail, Color col) {
-			Vector3 prev = new Vector3(Mathf.Cos(0)*r, 0, Mathf.Sin(0)*r) + o;
-
-			Gizmos.color = col;
-			for (int i = 0; i <= detail; i++) {
-				float t = (i*Mathf.PI*2f)/detail;
-				Vector3 c = new Vector3(Mathf.Cos(t)*r, 0, Mathf.Sin(t)*r) + o;
-				Gizmos.DrawLine(prev, c);
-				prev = c;
-			}
-		}
-
 		private readonly static Color GizmosColor = new Color(206.0f/255.0f, 136.0f/255.0f, 48.0f/255.0f, 0.5f);
 		private readonly static Color GizmosColorSelected = new Color(235.0f/255.0f, 123.0f/255.0f, 32.0f/255.0f, 1.0f);
-
-		void DrawGizmoBezier (Vector3 p1, Vector3 p2) {
-			Vector3 dir = p2-p1;
-
-			if (dir == Vector3.zero) return;
-
-			Vector3 normal = Vector3.Cross(Vector3.up, dir);
-			Vector3 normalUp = Vector3.Cross(dir, normal);
-
-			normalUp = normalUp.normalized;
-			normalUp *= dir.magnitude*0.1f;
-
-			Vector3 p1c = p1+normalUp;
-			Vector3 p2c = p2+normalUp;
-
-			Vector3 prev = p1;
-			for (int i = 1; i <= 20; i++) {
-				float t = i/20.0f;
-				Vector3 p = AstarSplines.CubicBezier(p1, p1c, p2c, p2, t);
-				Gizmos.DrawLine(prev, p);
-				prev = p;
-			}
-		}
 
 		public virtual void OnDrawGizmosSelected () {
 			OnDrawGizmos(true);
@@ -356,21 +295,18 @@ namespace Pathfinding {
 			Color col = selected ? GizmosColorSelected : GizmosColor;
 
 			if (StartTransform != null) {
-				DrawCircle(StartTransform.position, 0.4f, 10, col);
+				Draw.Gizmos.CircleXZ(StartTransform.position, 0.4f, col, 0, 2*Mathf.PI, 10);
 			}
 			if (EndTransform != null) {
-				DrawCircle(EndTransform.position, 0.4f, 10, col);
+				Draw.Gizmos.CircleXZ(EndTransform.position, 0.4f, col, 0, 2*Mathf.PI, 10);
 			}
 
-			//Gizmos.DrawLine ( transform.position - transform.right*0.5f*portalWidth, transform.position + transform.right*0.5f*portalWidth );
-
 			if (StartTransform != null && EndTransform != null) {
-				Gizmos.color = col;
-				DrawGizmoBezier(StartTransform.position, EndTransform.position);
+				Draw.Gizmos.Bezier(StartTransform.position, EndTransform.position, col);
 				if (selected) {
 					Vector3 cross = Vector3.Cross(Vector3.up, (EndTransform.position-StartTransform.position)).normalized;
-					DrawGizmoBezier(StartTransform.position+cross*0.1f, EndTransform.position+cross*0.1f);
-					DrawGizmoBezier(StartTransform.position-cross*0.1f, EndTransform.position-cross*0.1f);
+					Draw.Gizmos.Bezier(StartTransform.position+cross*0.1f, EndTransform.position+cross*0.1f, col);
+					Draw.Gizmos.Bezier(StartTransform.position-cross*0.1f, EndTransform.position-cross*0.1f, col);
 				}
 			}
 		}

@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections.Generic;
-using Pathfinding;
 
 // Empty namespace declaration to avoid errors in the free version
 // Which does not have any classes in the RVO namespace
@@ -8,7 +7,6 @@ namespace Pathfinding.RVO {}
 
 namespace Pathfinding {
 	using Pathfinding.Util;
-	using Pathfinding.Serialization;
 
 #if UNITY_5_0
 	/** Used in Unity 5.0 since the HelpURLAttribute was first added in Unity 5.1 */
@@ -26,7 +24,6 @@ namespace Pathfinding {
 		public Color _ConnectionHighLerp;
 
 		public Color _MeshEdgeColor;
-		public Color _MeshColor;
 
 		/** Holds user set area colors.
 		 * Use GetAreaColor to get an area color */
@@ -40,7 +37,6 @@ namespace Pathfinding {
 		public static Color ConnectionHighLerp = new Color(1, 0, 0, 0.5F);
 
 		public static Color MeshEdgeColor = new Color(0, 0, 0, 0.5F);
-		public static Color MeshColor = new Color(0, 0, 0, 0.5F);
 
 		/** Holds user set area colors.
 		 * Use GetAreaColor to get an area color */
@@ -56,31 +52,28 @@ namespace Pathfinding {
 			return AreaColors[(int)area];
 		}
 
-		/** Pushes all local variables out to static ones */
+		/** Pushes all local variables out to static ones.
+		 * This is done because that makes it so much easier to access the colors during Gizmo rendering
+		 * and it has a positive performance impact as well (gizmo rendering is hot code).
+		 */
 		public void OnEnable () {
 			NodeConnection = _NodeConnection;
 			UnwalkableNode = _UnwalkableNode;
 			BoundsHandles = _BoundsHandles;
-
 			ConnectionLowLerp = _ConnectionLowLerp;
 			ConnectionHighLerp = _ConnectionHighLerp;
-
 			MeshEdgeColor = _MeshEdgeColor;
-			MeshColor = _MeshColor;
-
 			AreaColors = _AreaColors;
 		}
 
 		public AstarColor () {
+			// Set default colors
 			_NodeConnection = new Color(1, 1, 1, 0.9F);
 			_UnwalkableNode = new Color(1, 0, 0, 0.5F);
 			_BoundsHandles = new Color(0.29F, 0.454F, 0.741F, 0.9F);
-
 			_ConnectionLowLerp = new Color(0, 1, 0, 0.5F);
 			_ConnectionHighLerp = new Color(1, 0, 0, 0.5F);
-
 			_MeshEdgeColor = new Color(0, 0, 0, 0.5F);
-			_MeshColor = new Color(0.125F, 0.686F, 0, 0.19F);
 		}
 	}
 
@@ -189,13 +182,13 @@ namespace Pathfinding {
 		/** Returns a constraint which will not filter the results */
 		public static NNConstraint None {
 			get {
-				var n = new NNConstraint();
-				n.constrainWalkability = false;
-				n.constrainArea = false;
-				n.constrainTags = false;
-				n.constrainDistance = false;
-				n.graphMask = -1;
-				return n;
+				return new NNConstraint {
+						   constrainWalkability = false,
+						   constrainArea = false,
+						   constrainTags = false,
+						   constrainDistance = false,
+						   graphMask = -1,
+				};
 			}
 		}
 
@@ -211,9 +204,9 @@ namespace Pathfinding {
 	public class PathNNConstraint : NNConstraint {
 		public static new PathNNConstraint Default {
 			get {
-				var n = new PathNNConstraint();
-				n.constrainArea = true;
-				return n;
+				return new PathNNConstraint {
+						   constrainArea = true
+				};
 			}
 		}
 
@@ -227,7 +220,10 @@ namespace Pathfinding {
 		}
 	}
 
-	public struct NNInfo {
+	/** Internal result of a nearest node query.
+	 * \see NNInfo
+	 */
+	public struct NNInfoInternal {
 		/** Closest node found.
 		 * This node is not necessarily accepted by any NNConstraint passed.
 		 * \see constrainedNode
@@ -241,10 +237,11 @@ namespace Pathfinding {
 		/** The position clamped to the closest point on the #node.
 		 */
 		public Vector3 clampedPosition;
+
 		/** Clamped position for the optional constrainedNode */
 		public Vector3 constClampedPosition;
 
-		public NNInfo (GraphNode node) {
+		public NNInfoInternal (GraphNode node) {
 			this.node = node;
 			constrainedNode = null;
 			clampedPosition = Vector3.zero;
@@ -253,42 +250,62 @@ namespace Pathfinding {
 			UpdateInfo();
 		}
 
-		/** Sets the constrained node */
-		public void SetConstrained (GraphNode constrainedNode, Vector3 clampedPosition) {
-			this.constrainedNode = constrainedNode;
-			constClampedPosition = clampedPosition;
-		}
-
 		/** Updates #clampedPosition and #constClampedPosition from node positions */
 		public void UpdateInfo () {
 			clampedPosition = node != null ? (Vector3)node.position : Vector3.zero;
 			constClampedPosition = constrainedNode != null ? (Vector3)constrainedNode.position : Vector3.zero;
 		}
+	}
+
+	/** Result of a nearest node query */
+	public struct NNInfo {
+		/** Closest node */
+		public readonly GraphNode node;
+
+		/** Closest point on the navmesh.
+		 * This is the query position clamped to the closest point on the #node.
+		 */
+		public readonly Vector3 position;
+
+		/** Closest point on the navmesh.
+		 * \deprecated This field has been renamed to #position
+		 */
+		[System.Obsolete("This field has been renamed to 'position'")]
+		public Vector3 clampedPosition {
+			get {
+				return position;
+			}
+		}
+
+		public NNInfo (NNInfoInternal internalInfo) {
+			node = internalInfo.node;
+			position = internalInfo.clampedPosition;
+		}
 
 		public static explicit operator Vector3 (NNInfo ob) {
-			return ob.clampedPosition;
+			return ob.position;
 		}
 
 		public static explicit operator GraphNode (NNInfo ob) {
 			return ob.node;
 		}
-
-		public static explicit operator NNInfo (GraphNode ob) {
-			return new NNInfo(ob);
-		}
 	}
 
 	/** Progress info for e.g a progressbar.
 	 * Used by the scan functions in the project
-	 * \see AstarPath.ScanLoop
+	 * \see AstarPath.ScanAsync
 	 */
 	public struct Progress {
-		public float progress;
-		public string description;
+		public readonly float progress;
+		public readonly string description;
 
 		public Progress (float p, string d) {
 			progress = p;
 			description = d;
+		}
+
+		public override string ToString () {
+			return progress.ToString("0.0") + " " + description;
 		}
 	}
 
@@ -304,7 +321,16 @@ namespace Pathfinding {
 		 * -# Update eventual connectivity info if appropriate (GridGraphs updates connectivity, but most other graphs don't since then the connectivity cannot be recovered later).
 		 */
 		void UpdateArea (GraphUpdateObject o);
+
+		/** May be called on the Unity thread before starting the update.
+		 * \see CanUpdateAsync
+		 */
 		void UpdateAreaInit (GraphUpdateObject o);
+
+		/** May be called on the Unity thread after executing the update.
+		 * \see CanUpdateAsync
+		 */
+		void UpdateAreaPost (GraphUpdateObject o);
 
 		GraphUpdateThreading CanUpdateAsync (GraphUpdateObject o);
 	}
@@ -466,8 +492,8 @@ namespace Pathfinding {
 				backupData.Add(node.Penalty);
 				backupData.Add(node.Flags);
 #if !ASTAR_NO_GRID_GRAPH
-				var gg = node as GridNode;
-				if (gg != null) backupData.Add(gg.InternalGridFlags);
+				var gridNode = node as GridNode;
+				if (gridNode != null) backupData.Add(gridNode.InternalGridFlags);
 #endif
 			}
 		}
@@ -485,9 +511,9 @@ namespace Pathfinding {
 					changedNodes[i].Flags = backupData[counter];
 					counter++;
 #if !ASTAR_NO_GRID_GRAPH
-					var gg = changedNodes[i] as GridNode;
-					if (gg != null) {
-						gg.InternalGridFlags = (ushort)backupData[counter];
+					var gridNode = changedNodes[i] as GridNode;
+					if (gridNode != null) {
+						gridNode.InternalGridFlags = (ushort)backupData[counter];
 						counter++;
 					}
 #endif
@@ -525,6 +551,10 @@ namespace Pathfinding {
 		}
 	}
 
+	public interface ITransformedGraph {
+		GraphTransform transform { get; }
+	}
+
 	public interface IRaycastableGraph {
 		bool Linecast (Vector3 start, Vector3 end);
 		bool Linecast (Vector3 start, Vector3 end, GraphNode hint);
@@ -536,17 +566,14 @@ namespace Pathfinding {
 	 * Mainly used to send information about how the thread should execute when starting it
 	 */
 	public struct PathThreadInfo {
-		public int threadIndex;
-		public AstarPath astar;
-		public PathHandler runData;
-
-		public readonly System.Object lockObject;
+		public readonly int threadIndex;
+		public readonly AstarPath astar;
+		public readonly PathHandler runData;
 
 		public PathThreadInfo (int index, AstarPath astar, PathHandler runData) {
 			this.threadIndex = index;
 			this.astar = astar;
 			this.runData = runData;
-			lockObject = new object();
 		}
 	}
 
@@ -595,10 +622,10 @@ namespace Pathfinding {
 			return a.xmin != b.xmin || a.xmax != b.xmax || a.ymin != b.ymin || a.ymax != b.ymax;
 		}
 
-		public override bool Equals (System.Object _b) {
-			var b = (IntRect)_b;
+		public override bool Equals (System.Object obj) {
+			var rect = (IntRect)obj;
 
-			return xmin == b.xmin && xmax == b.xmax && ymin == b.ymin && ymax == b.ymax;
+			return xmin == rect.xmin && xmax == rect.xmax && ymin == rect.ymin && ymax == rect.ymax;
 		}
 
 		public override int GetHashCode () {
@@ -611,14 +638,12 @@ namespace Pathfinding {
 		 * \see IsValid
 		 */
 		public static IntRect Intersection (IntRect a, IntRect b) {
-			var r = new IntRect(
+			return new IntRect(
 				System.Math.Max(a.xmin, b.xmin),
 				System.Math.Max(a.ymin, b.ymin),
 				System.Math.Min(a.xmax, b.xmax),
 				System.Math.Min(a.ymax, b.ymax)
 				);
-
-			return r;
 		}
 
 		/** Returns if the two rectangles intersect each other
@@ -631,26 +656,22 @@ namespace Pathfinding {
 		 * This rectangle may contain areas outside both input rects as well in some cases.
 		 */
 		public static IntRect Union (IntRect a, IntRect b) {
-			var r = new IntRect(
+			return new IntRect(
 				System.Math.Min(a.xmin, b.xmin),
 				System.Math.Min(a.ymin, b.ymin),
 				System.Math.Max(a.xmax, b.xmax),
 				System.Math.Max(a.ymax, b.ymax)
 				);
-
-			return r;
 		}
 
 		/** Returns a new IntRect which is expanded to contain the point */
 		public IntRect ExpandToContain (int x, int y) {
-			var r = new IntRect(
+			return new IntRect(
 				System.Math.Min(xmin, x),
 				System.Math.Min(ymin, y),
 				System.Math.Max(xmax, x),
 				System.Math.Max(ymax, y)
 				);
-
-			return r;
 		}
 
 		/** Returns a new rect which is expanded by \a range in all directions.
@@ -727,16 +748,16 @@ namespace Pathfinding {
 		}
 
 		/** Draws some debug lines representing the rect */
-		public void DebugDraw (Matrix4x4 matrix, Color col) {
-			Vector3 p1 = matrix.MultiplyPoint3x4(new Vector3(xmin, 0, ymin));
-			Vector3 p2 = matrix.MultiplyPoint3x4(new Vector3(xmin, 0, ymax));
-			Vector3 p3 = matrix.MultiplyPoint3x4(new Vector3(xmax, 0, ymax));
-			Vector3 p4 = matrix.MultiplyPoint3x4(new Vector3(xmax, 0, ymin));
+		public void DebugDraw (GraphTransform transform, Color color) {
+			Vector3 p1 = transform.Transform(new Vector3(xmin, 0, ymin));
+			Vector3 p2 = transform.Transform(new Vector3(xmin, 0, ymax));
+			Vector3 p3 = transform.Transform(new Vector3(xmax, 0, ymax));
+			Vector3 p4 = transform.Transform(new Vector3(xmax, 0, ymin));
 
-			Debug.DrawLine(p1, p2, col);
-			Debug.DrawLine(p2, p3, col);
-			Debug.DrawLine(p3, p4, col);
-			Debug.DrawLine(p4, p1, col);
+			Debug.DrawLine(p1, p2, color);
+			Debug.DrawLine(p2, p3, color);
+			Debug.DrawLine(p3, p4, color);
+			Debug.DrawLine(p4, p1, color);
 		}
 	}
 
@@ -772,9 +793,22 @@ namespace Pathfinding {
 	#region Enums
 
 	public enum GraphUpdateThreading {
-		UnityThread,
-		SeparateThread,
-		SeparateAndUnityInit
+		/** Call UpdateArea in the unity thread.
+		 * This is the default value.
+		 * Not compatible with SeparateThread.
+		 */
+		UnityThread = 0,
+		/** Call UpdateArea in a separate thread. Not compatible with UnityThread. */
+		SeparateThread = 1 << 0,
+		/** Calls UpdateAreaInit in the Unity thread before everything else */
+		UnityInit = 1 << 1,
+		/** Calls UpdateAreaPost in the Unity thread after everything else.
+		 * This is used together with SeparateThread to apply the result of the multithreaded
+		 * calculations to the graph without modifying it at the same time as some other script
+		 * might be using it (e.g calling GetNearest).
+		 */
+		UnityPost = 1 << 2,
+		SeparateAndUnityInit = SeparateThread | UnityInit
 	}
 
 	/** How path results are logged by the system */

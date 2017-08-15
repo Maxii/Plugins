@@ -63,6 +63,7 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="AIBaseEditor.cs" />
     <Compile Include="AnimationLinkEditor.cs" />
     <Compile Include="AstarPathEditor.cs" />
     <Compile Include="AstarUpdateChecker.cs" />
@@ -83,6 +84,7 @@
     <Compile Include="OptimizationHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RecastMeshObjEditor.cs" />
+    <Compile Include="RVOControllerEditor.cs" />
     <Compile Include="RVONavmeshEditor.cs" />
     <Compile Include="RVOSimulatorEditor.cs" />
     <Compile Include="RVOSquareObstacleEditor.cs" />

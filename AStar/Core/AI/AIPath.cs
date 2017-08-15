@@ -3,39 +3,42 @@ using System.Collections;
 using System.Collections.Generic;
 using Pathfinding;
 using Pathfinding.RVO;
+using Pathfinding.Util;
 
 /** AI for following paths.
  * This AI is the default movement script which comes with the A* Pathfinding Project.
  * It is in no way required by the rest of the system, so feel free to write your own. But I hope this script will make it easier
- * to set up movement for the characters in your game. This script is not written for high performance, so I do not recommend using it for large groups of units.
+ * to set up movement for the characters in your game.
+ * This script works well for many types of units, but if you need the highest performance (for example if you are moving hundreds of characters) you
+ * may want to customize this script or write a custom movement script to be able to optimize it specifically for your game.
  * \n
  * \n
- * This script will try to follow a target transform, in regular intervals, the path to that target will be recalculated.
- * It will on FixedUpdate try to move towards the next point in the path.
- * However it will only move in the forward direction, but it will rotate around it's Y-axis
- * to make it reach the target.
+ * This script will try to follow a target transform. At regular intervals, the path to that target will be recalculated.
+ * It will in the #Update method try to move towards the next point in the path.
+ * However it will only move in roughly forward direction (Z+ axis) of the character, but it will rotate around it's Y-axis
+ * to make it possible to reach the target.
  *
  * \section variables Quick overview of the variables
  * In the inspector in Unity, you will see a bunch of variables. You can view detailed information further down, but here's a quick overview.\n
  * The #repathRate determines how often it will search for new paths, if you have fast moving targets, you might want to set it to a lower value.\n
  * The #target variable is where the AI will try to move, it can be a point on the ground where the player has clicked in an RTS for example.
  * Or it can be the player object in a zombie game.\n
- * The speed is self-explanatory, so is turningSpeed, however #slowdownDistance might require some explanation.
- * It is the approximate distance from the target where the AI will start to slow down. Note that this doesn't only affect the end point of the path
- * but also any intermediate points, so be sure to set #forwardLook and #pickNextWaypointDist to a higher value than this.\n
+ * The speed is self-explanatory, so is #rotationSpeed, however #slowdownDistance might require some explanation.
+ * It is the approximate distance from the target where the AI will start to slow down.\n
  * #pickNextWaypointDist is simply determines within what range it will switch to target the next waypoint in the path.\n
- * #forwardLook will try to calculate an interpolated target point on the current segment in the path so that it has a distance of #forwardLook from the AI\n
+ *
  * Below is an image illustrating several variables as well as some internal ones, but which are relevant for understanding how it works.
- * Note that the #forwardLook range will not match up exactly with the target point practically, even though that's the goal.
+ * \note The image is slightly outdated, replace forwardLook with pickNextWaypointDist in the image and ignore the circle for pickNextWaypointDist.
+ *
  * \shadowimage{aipath_variables.png}
  * This script has many movement fallbacks.
- * If it finds a NavmeshController, it will use that, otherwise it will look for a character controller, then for a rigidbody and if it hasn't been able to find any
- * it will use Transform.Translate which is guaranteed to always work.
+ * If it finds an RVOController attached to the same GameObject as this component, it will use that. If it fins a character controller it will also use that.
+ * Lastly if will fall back to simply modifying Transform.position which is guaranteed to always work and is also the most performant option.
  */
 [RequireComponent(typeof(Seeker))]
 [AddComponentMenu("Pathfinding/AI/AIPath (3D)")]
 [HelpURL("http://arongranberg.com/astar/docs/class_a_i_path.php")]
-public class AIPath : MonoBehaviour {
+public class AIPath : AIBase {
 	/** Determines how often it will search for new paths.
 	 * If you have fast moving targets or AIs, you might want to set it to a lower value.
 	 * The value is in seconds between path requests.
@@ -55,7 +58,8 @@ public class AIPath : MonoBehaviour {
 	public bool canSearch = true;
 
 	/** Enables or disables movement.
-	 * \see #canSearch */
+	 * \see #canSearch
+	 */
 	public bool canMove = true;
 
 	/** Maximum velocity.
@@ -64,44 +68,28 @@ public class AIPath : MonoBehaviour {
 	public float speed = 3;
 
 	/** Rotation speed.
-	 * Rotation is calculated using Quaternion.SLerp. This variable represents the damping, the higher, the faster it will be able to rotate.
+	 * Rotation is calculated using Quaternion.RotateTowards. This variable represents the rotation speed in degrees per second.
+	 * The higher it is, the faster the character will be able to rotate.
 	 */
-	public float turningSpeed = 5;
+	[UnityEngine.Serialization.FormerlySerializedAs("turningSpeed")]
+	public float rotationSpeed = 360;
 
 	/** Distance from the target point where the AI will start to slow down.
 	 * Note that this doesn't only affect the end point of the path
-	 * but also any intermediate points, so be sure to set #forwardLook and #pickNextWaypointDist to a higher value than this
+	 * but also any intermediate points, so be sure to set #pickNextWaypointDist to a higher value than this
 	 */
 	public float slowdownDistance = 0.6F;
 
 	/** Determines within what range it will switch to target the next waypoint in the path */
 	public float pickNextWaypointDist = 2;
 
-	/** Target point is Interpolated on the current segment in the path so that it has a distance of #forwardLook from the AI.
-	 * See the detailed description of AIPath for an illustrative image */
-	public float forwardLook = 1;
-
 	/** Distance to the end point to consider the end of path to be reached.
-	 * When this has been reached, the AI will not move anymore until the target changes and OnTargetReached will be called.
+	 * When the end is within this distance then #OnTargetReached will be called and #TargetReached will return true.
 	 */
 	public float endReachedDistance = 0.2F;
 
-	/** Do a closest point on path check when receiving path callback.
-	 * Usually the AI has moved a bit between requesting the path, and getting it back, and there is usually a small gap between the AI
-	 * and the closest node.
-	 * If this option is enabled, it will simulate, when the path callback is received, movement between the closest node and the current
-	 * AI position. This helps to reduce the moments when the AI just get a new path back, and thinks it ought to move backwards to the start of the new path
-	 * even though it really should just proceed forward.
-	 */
-	public bool closestOnPathCheck = true;
-
-	protected float minMoveScale = 0.05F;
-
-	/** Cached Seeker component */
-	protected Seeker seeker;
-
-	/** Cached Transform component */
-	protected Transform tr;
+	/** Draws detailed gizmos constantly in the scene view instead of only when the agent is selected and settings are being modified */
+	public bool alwaysDrawGizmos;
 
 	/** Time when the last path request was sent */
 	protected float lastRepath = -9999;
@@ -109,95 +97,62 @@ public class AIPath : MonoBehaviour {
 	/** Current path which is followed */
 	protected Path path;
 
-	/** Cached CharacterController component */
-	protected CharacterController controller;
-
-	protected RVOController rvoController;
-
-	/** Cached Rigidbody component */
-	protected Rigidbody rigid;
-
-	/** Current index in the path which is current target */
-	protected int currentWaypointIndex = 0;
-
-	/** Holds if the end-of-path is reached
-	 * \see TargetReached */
-	protected bool targetReached = false;
+	protected PathInterpolator interpolator = new PathInterpolator();
 
 	/** Only when the previous path has been returned should be search for a new path */
 	protected bool canSearchAgain = true;
 
-	protected Vector3 lastFoundWaypointPosition;
-	protected float lastFoundWaypointTime = -9999;
+	/** True if the end of the path has been reached */
+	public bool TargetReached { get; protected set; }
 
-	/** Returns if the end-of-path has been reached
-	 * \see targetReached */
-	public bool TargetReached {
-		get {
-			return targetReached;
-		}
-	}
-
-	/** Holds if the Start function has been run.
+	/** True if the Start function has been executed.
 	 * Used to test if coroutines should be started in OnEnable to prevent calculating paths
 	 * in the awake stage (or rather before start on frame 0).
 	 */
 	private bool startHasRun = false;
 
-	/** Initializes reference variables.
-	 * If you override this function you should in most cases call base.Awake () at the start of it.
-	 * */
-	protected virtual void Awake () {
-		seeker = GetComponent<Seeker>();
+	/** Point to where the AI is heading */
+	protected Vector3 targetPoint;
 
-		//This is a simple optimization, cache the transform component lookup
-		tr = transform;
+	protected Vector3 velocity;
 
-		//Cache some other components (not all are necessarily there)
-		controller = GetComponent<CharacterController>();
-		rvoController = GetComponent<RVOController>();
-		if (rvoController != null) rvoController.enableRotation = false;
-		rigid = GetComponent<Rigidbody>();
-	}
+	/** Rotation speed.
+	 * \deprecated This field has been renamed to #rotationSpeed and is now in degrees per second instead of a damping factor.
+	 */
+	[System.Obsolete("This field has been renamed to #rotationSpeed and is now in degrees per second instead of a damping factor")]
+	public float turningSpeed { get { return rotationSpeed/90; } set { rotationSpeed = value*90; } }
 
 	/** Starts searching for paths.
 	 * If you override this function you should in most cases call base.Start () at the start of it.
-	 * \see OnEnable
-	 * \see RepeatTrySearchPath
+	 * \see #Init
 	 */
 	protected virtual void Start () {
 		startHasRun = true;
-		OnEnable();
+		Init();
 	}
 
-	/** Run at start and when reenabled.
-	 * Starts RepeatTrySearchPath.
-	 *
-	 * \see Start
-	 */
+	/** Called when the component is enabled */
 	protected virtual void OnEnable () {
-		lastRepath = -9999;
-		canSearchAgain = true;
+		// Make sure we receive callbacks when paths are calculated
+		seeker.pathCallback += OnPathComplete;
+		Init();
+	}
 
-		lastFoundWaypointPosition = GetFeetPosition();
-
+	void Init () {
 		if (startHasRun) {
-			//Make sure we receive callbacks when paths complete
-			seeker.pathCallback += OnPathComplete;
-
+			lastRepath = float.NegativeInfinity;
 			StartCoroutine(RepeatTrySearchPath());
 		}
 	}
 
 	public void OnDisable () {
-		// Abort calculation of path
-		if (seeker != null && !seeker.IsDone()) seeker.GetCurrentPath().Error();
+		seeker.CancelCurrentPathRequest();
 
-		// Release current path
+		// Release current path so that it can be pooled
 		if (path != null) path.Release(this);
 		path = null;
 
-		//Make sure we receive callbacks when paths complete
+		// Make sure we no longer receive callbacks when paths complete
 		seeker.pathCallback -= OnPathComplete;
 	}
 
@@ -205,10 +160,7 @@ public class AIPath : MonoBehaviour {
 	 * \see TrySearchPath
 	 */
 	protected IEnumerator RepeatTrySearchPath () {
-		while (true) {
-			float v = TrySearchPath();
-			yield return new WaitForSeconds(v);
-		}
+		while (true) yield return new WaitForSeconds(TrySearchPath());
 	}
 
 	/** Tries to search for a path.
@@ -222,7 +174,6 @@ public class AIPath : MonoBehaviour {
 			SearchPath();
 			return repathRate;
 		} else {
-			//StartCoroutine (WaitForRepath ());
 			float v = repathRate - (Time.time-lastRepath);
 			return v < 0 ? 0 : v;
 		}
@@ -233,25 +184,25 @@ public class AIPath : MonoBehaviour {
 		if (target == null) throw new System.InvalidOperationException("Target is null");
 
 		lastRepath = Time.time;
-		//This is where we should search to
+		// This is where we should search to
 		Vector3 targetPosition = target.position;
 
 		canSearchAgain = false;
 
-		//Alternative way of requesting the path
-		//ABPath p = ABPath.Construct (GetFeetPosition(),targetPosition,null);
-		//seeker.StartPath (p);
+		// Alternative way of requesting the path
+		//ABPath p = ABPath.Construct(GetFeetPosition(), targetPosition, null);
+		//seeker.StartPath(p);
 
-		//We should search from the current position
+		// We should search from the current position
 		seeker.StartPath(GetFeetPosition(), targetPosition);
 	}
 
 	public virtual void OnTargetReached () {
-		//End of path has been reached
-		//If you want custom logic for when the AI has reached it's destination
-		//add it here
-		//You can also create a new script which inherits from this one
-		//and override the function in that script
+		// The end of the path has been reached.
+		// If you want custom logic for when the AI has reached it's destination
+		// add it here.
+		// You can also create a new script which inherits from this one
+		// and override the function in that script
 	}
 
 	/** Called when a requested path has finished calculation.
@@ -265,7 +216,7 @@ public class AIPath : MonoBehaviour {
 
 		canSearchAgain = true;
 
-		//Claim the new path
+		// Claim the new path
 		p.Claim(this);
 
 		// Path couldn't be calculated of some reason.
@@ -275,212 +226,155 @@ public class AIPath : MonoBehaviour {
 			return;
 		}
 
-		//Release the previous path
+		// Release the previous path
 		if (path != null) path.Release(this);
 
-		//Replace the old path
+		// Replace the old path
 		path = p;
 
-		//Reset some variables
-		currentWaypointIndex = 0;
-		targetReached = false;
+		// Make sure the path contains at least 2 points
+		if (path.vectorPath.Count == 1) path.vectorPath.Add(path.vectorPath[0]);
+		interpolator.SetPath(path.vectorPath);
 
-		//The next row can be used to find out if the path could be found or not
-		//If it couldn't (error == true), then a message has probably been logged to the console
-		//however it can also be got using p.errorLog
-		//if (p.error)
+		var graph = AstarData.GetGraph(path.path[0]) as ITransformedGraph;
+		movementPlane = graph != null ? graph.transform : GraphTransform.identityTransform;
 
-		if (closestOnPathCheck) {
-			// Simulate movement from the point where the path was requested
-			// to where we are right now. This reduces the risk that the agent
-			// gets confused because the first point in the path is far away
-			// from the current position (possibly behind it which could cause
-			// the agent to turn around, and that looks pretty bad).
-			Vector3 p1 = Time.time - lastFoundWaypointTime < 0.3f ? lastFoundWaypointPosition : p.originalStartPoint;
-			Vector3 p2 = GetFeetPosition();
-			Vector3 dir = p2-p1;
-			float magn = dir.magnitude;
-			dir /= magn;
-			int steps = (int)(magn/pickNextWaypointDist);
+		// Reset some variables
+		TargetReached = false;
 
-#if ASTARDEBUG
-			Debug.DrawLine(p1, p2, Color.red, 1);
-#endif
-
-			for (int i = 0; i <= steps; i++) {
-				CalculateVelocity(p1);
-				p1 += dir;
-			}
-		}
+		// Simulate movement from the point where the path was requested
+		// to where we are right now. This reduces the risk that the agent
+		// gets confused because the first point in the path is far away
+		// from the current position (possibly behind it which could cause
+		// the agent to turn around, and that looks pretty bad).
+		interpolator.MoveToLocallyClosestPoint((GetFeetPosition() + p.originalStartPoint) * 0.5f);
+		interpolator.MoveToLocallyClosestPoint(GetFeetPosition());
 	}
 
 	public virtual Vector3 GetFeetPosition () {
-		if (rvoController != null) {
-			return tr.position - Vector3.up*rvoController.height*0.5f;
-		} else
-		if (controller != null) {
-			return tr.position - Vector3.up*controller.height*0.5F;
+		if (rvoController != null && rvoController.enabled && rvoController.movementPlane == MovementPlane.XZ) {
+			return tr.position + tr.up*(rvoController.center - rvoController.height*0.5f);
+		}
+		if (controller != null && controller.enabled) {
+			return tr.TransformPoint(controller.center) - Vector3.up*controller.height*0.5F;
 		}
 
 		return tr.position;
 	}
 
-	public virtual void Update () {
-		if (!canMove) { return; }
+	/** Called during either Update or FixedUpdate depending on if rigidbodies are used for movement or not */
+	protected override void MovementUpdate (float deltaTime) {
+		if (!canMove) return;
 
-		Vector3 dir = CalculateVelocity(GetFeetPosition());
-
-		//Rotate towards targetDirection (filled in by CalculateVelocity)
-		RotateTowards(targetDirection);
-
-		if (rvoController != null) {
-			rvoController.Move(dir);
-		} else
-		if (controller != null) {
-			controller.SimpleMove(dir);
-		} else if (rigid != null) {
-			rigid.AddForce(dir);
+		if (!interpolator.valid) {
+			velocity2D = Vector3.zero;
 		} else {
-			tr.Translate(dir*Time.deltaTime, Space.World);
-		}
-	}
+			var currentPosition = tr.position;
 
-	/** Point to where the AI is heading.
-	 * Filled in by #CalculateVelocity */
-	protected Vector3 targetPoint;
-	/** Relative direction to where the AI is heading.
-	 * Filled in by #CalculateVelocity */
-	protected Vector3 targetDirection;
+			interpolator.MoveToLocallyClosestPoint(currentPosition, true, false);
+			interpolator.MoveToCircleIntersection2D(currentPosition, pickNextWaypointDist, movementPlane);
+			targetPoint = interpolator.position;
+			var dir = movementPlane.ToPlane(targetPoint-currentPosition);
 
-	protected float XZSqrMagnitude (Vector3 a, Vector3 b) {
-		float dx = b.x-a.x;
-		float dz = b.z-a.z;
+			var distanceToEnd = dir.magnitude + interpolator.remainingDistance;
+			// How fast to move depending on the distance to the target.
+			// Move slower as the character gets closer to the target.
+			float slowdown = slowdownDistance > 0 ? distanceToEnd / slowdownDistance : 1;
 
-		return dx*dx + dz*dz;
-	}
+			// a = v/t, should probably expose as a variable
+			float acceleration = speed / 0.4f;
+			velocity2D += MovementUtilities.CalculateAccelerationToReachPoint(dir, dir.normalized*speed, velocity2D, acceleration, speed) * deltaTime;
+			velocity2D = MovementUtilities.ClampVelocity(velocity2D, speed, slowdown, true, movementPlane.ToPlane(tr.forward));
 
-	/** Calculates desired velocity.
-	 * Finds the target path segment and returns the forward direction, scaled with speed.
-	 * A whole bunch of restrictions on the velocity is applied to make sure it doesn't overshoot, does not look too far ahead,
-	 * and slows down when close to the target.
-	 * /see speed
-	 * /see endReachedDistance
-	 * /see slowdownDistance
-	 * /see CalculateTargetPoint
-	 * /see targetPoint
-	 * /see targetDirection
-	 * /see currentWaypointIndex
-	 */
-	protected Vector3 CalculateVelocity (Vector3 currentPosition) {
-		if (path == null || path.vectorPath == null || path.vectorPath.Count == 0) return Vector3.zero;
+			ApplyGravity(deltaTime);
 
-		List<Vector3> vPath = path.vectorPath;
-
-		if (vPath.Count == 1) {
-			vPath.Insert(0, currentPosition);
-		}
-
-		if (currentWaypointIndex >= vPath.Count) { currentWaypointIndex = vPath.Count-1; }
-
-		if (currentWaypointIndex <= 1) currentWaypointIndex = 1;
-
-		while (true) {
-			if (currentWaypointIndex < vPath.Count-1) {
-				//There is a "next path segment"
-				float dist = XZSqrMagnitude(vPath[currentWaypointIndex], currentPosition);
-				//Mathfx.DistancePointSegmentStrict (vPath[currentWaypointIndex+1],vPath[currentWaypointIndex+2],currentPosition);
-				if (dist < pickNextWaypointDist*pickNextWaypointDist) {
-					lastFoundWaypointPosition = currentPosition;
-					lastFoundWaypointTime = Time.time;
-					currentWaypointIndex++;
-				} else {
-					break;
-				}
-			} else {
-				break;
+			if (distanceToEnd <= endReachedDistance && !TargetReached) {
+				TargetReached = true;
+				OnTargetReached();
 			}
+
+			// Rotate towards the direction we are moving in
+			var currentRotationSpeed = rotationSpeed * Mathf.Clamp01((Mathf.Sqrt(slowdown) - 0.3f) / 0.7f);
+			RotateTowards(velocity2D, currentRotationSpeed * deltaTime);
+
+			if (rvoController != null && rvoController.enabled) {
+				// Send a message to the RVOController that we want to move
+				// with this velocity. In the next simulation step, this
+				// velocity will be processed and it will be fed back to the
+				// rvo controller and finally it will be used by this script
+				// when calling the CalculateMovementDelta method below
+
+				// Make sure that we don't move further than to the end point
+				// of the path. If the RVO simulation FPS is low and we did
+				// not do this, the agent might overshoot the target a lot.
+				var rvoTarget = currentPosition + movementPlane.ToWorld(Vector2.ClampMagnitude(velocity2D, distanceToEnd), 0f);
+				rvoController.SetTarget(rvoTarget, velocity2D.magnitude, speed);
+			}
+			var delta2D = CalculateDeltaToMoveThisFrame(movementPlane.ToPlane(currentPosition), distanceToEnd, deltaTime);
+			Move(currentPosition, movementPlane.ToWorld(delta2D, verticalVelocity * deltaTime));
+
+			velocity = movementPlane.ToWorld(velocity2D, verticalVelocity);
 		}
+	}
 
-		Vector3 dir = vPath[currentWaypointIndex] - vPath[currentWaypointIndex-1];
-		Vector3 targetPosition = CalculateTargetPoint(currentPosition, vPath[currentWaypointIndex-1], vPath[currentWaypointIndex]);
-
-
-		dir = targetPosition-currentPosition;
-		dir.y = 0;
-		float targetDist = dir.magnitude;
-
-		float slowdown = Mathf.Clamp01(targetDist / slowdownDistance);
-
-		this.targetDirection = dir;
-		this.targetPoint = targetPosition;
-
-		if (currentWaypointIndex == vPath.Count-1 && targetDist <= endReachedDistance) {
-			if (!targetReached) { targetReached = true; OnTargetReached(); }
-
-			//Send a move request, this ensures gravity is applied
-			return Vector3.zero;
+	/** Direction that the agent wants to move in (excluding physics and local avoidance).
+	 * \deprecated Only exists for compatibility reasons.
+	 */
+	[System.Obsolete("Only exists for compatibility reasons.")]
+	public Vector3 targetDirection {
+		get {
+			return (targetPoint - tr.position).normalized;
 		}
+	}
 
-		Vector3 forward = tr.forward;
-		float dot = Vector3.Dot(dir.normalized, forward);
-		float sp = speed * Mathf.Max(dot, minMoveScale) * slowdown;
+	/** Current desired velocity of the agent (excluding physics and local avoidance but it includes gravity).
+	 * \deprecated This method no longer calculates the velocity. Use the #velocity property instead.
+	 */
+	[System.Obsolete("This method no longer calculates the velocity. Use the velocity property instead")]
+	public Vector3 CalculateVelocity (Vector3 position) {
+		return velocity;
+	}
 
-#if ASTARDEBUG
-		Debug.DrawLine(vPath[currentWaypointIndex-1], vPath[currentWaypointIndex], Color.black);
-		Debug.DrawLine(GetFeetPosition(), targetPosition, Color.red);
-		Debug.DrawRay(targetPosition, Vector3.up, Color.red);
-		Debug.DrawRay(GetFeetPosition(), dir, Color.yellow);
-		Debug.DrawRay(GetFeetPosition(), forward*sp, Color.cyan);
+#if UNITY_EDITOR
+	[System.NonSerialized]
+	int gizmoHash = 0;
+
+	[System.NonSerialized]
+	float lastChangedTime = float.NegativeInfinity;
+
+	protected static readonly Color GizmoColor = new Color(46.0f/255, 104.0f/255, 201.0f/255);
+
+	protected override void OnDrawGizmos () {
+		base.OnDrawGizmos();
+		if (alwaysDrawGizmos) OnDrawGizmosInternal();
+	}
+
+	void OnDrawGizmosSelected () {
+		if (!alwaysDrawGizmos) OnDrawGizmosInternal();
+	}
+
+	void OnDrawGizmosInternal () {
+		var newGizmoHash = pickNextWaypointDist.GetHashCode() ^ slowdownDistance.GetHashCode() ^ endReachedDistance.GetHashCode();
+
+		if (newGizmoHash != gizmoHash && gizmoHash != 0) lastChangedTime = Time.realtimeSinceStartup;
+		gizmoHash = newGizmoHash;
+		float alpha = alwaysDrawGizmos ? 1 : Mathf.SmoothStep(1, 0, (Time.realtimeSinceStartup - lastChangedTime - 5f)/0.5f) * (UnityEditor.Selection.gameObjects.Length == 1 ? 1 : 0);
+
+		if (alpha > 0) {
+			// Make sure the scene view is repainted while the gizmos are visible
+			if (!alwaysDrawGizmos) UnityEditor.SceneView.RepaintAll();
+			if (targetPoint != Vector3.zero) Draw.Gizmos.Line(transform.position, targetPoint, GizmoColor * new Color(1, 1, 1, alpha));
+			Gizmos.matrix = Matrix4x4.TRS(transform.position, transform.rotation, Vector3.one);
+			Draw.Gizmos.CircleXZ(Vector3.zero, pickNextWaypointDist, GizmoColor * new Color(1, 1, 1, alpha));
+			Draw.Gizmos.CircleXZ(Vector3.zero, slowdownDistance, Color.Lerp(GizmoColor, Color.red, 0.5f) * new Color(1, 1, 1, alpha));
+			Draw.Gizmos.CircleXZ(Vector3.zero, endReachedDistance, Color.Lerp(GizmoColor, Color.red, 0.8f) * new Color(1, 1, 1, alpha));
+		}
+	}
 #endif
 
-		if (Time.deltaTime > 0) {
-			sp = Mathf.Clamp(sp, 0, targetDist/(Time.deltaTime*2));
-		}
-		return forward*sp;
-	}
-
-	/** Rotates in the specified direction.
-	 * Rotates around the Y-axis.
-	 * \see turningSpeed
-	 */
-	protected virtual void RotateTowards (Vector3 dir) {
-		if (dir == Vector3.zero) return;
-
-		Quaternion rot = tr.rotation;
-		Quaternion toTarget = Quaternion.LookRotation(dir);
-
-		rot = Quaternion.Slerp(rot, toTarget, turningSpeed*Time.deltaTime);
-		Vector3 euler = rot.eulerAngles;
-		euler.z = 0;
-		euler.x = 0;
-		rot = Quaternion.Euler(euler);
-
-		tr.rotation = rot;
-	}
-
-	/** Calculates target point from the current line segment.
-	 * \param p Current position
-	 * \param a Line segment start
-	 * \param b Line segment end
-	 * The returned point will lie somewhere on the line segment.
-	 * \see #forwardLook
-	 * \todo This function uses .magnitude quite a lot, can it be optimized?
-	 */
-	protected Vector3 CalculateTargetPoint (Vector3 p, Vector3 a, Vector3 b) {
-		a.y = p.y;
-		b.y = p.y;
-
-		float magn = (a-b).magnitude;
-		if (magn == 0) return a;
-
-		float closest = Mathf.Clamp01(VectorMath.ClosestPointOnLineFactor(a, b, p));
-		Vector3 point = (b-a)*closest + a;
-		float distance = (point-p).magnitude;
-
-		float lookAhead = Mathf.Clamp(forwardLook - distance, 0.0F, forwardLook);
-
-		float offset = lookAhead / magn;
-		offset = Mathf.Clamp(offset+closest, 0.0F, 1.0F);
-		return (b-a)*offset + a;
+	protected override int OnUpgradeSerializedData (int version) {
+		// Approximately convert from a damping value to a degrees per second value.
+		if (version < 1) rotationSpeed *= 90;
+		return 1;
 	}
 }

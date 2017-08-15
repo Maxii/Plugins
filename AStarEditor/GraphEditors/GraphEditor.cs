@@ -5,6 +5,12 @@ namespace Pathfinding {
 	public class GraphEditor : GraphEditorBase {
 		public AstarPathEditor editor;
 
+		/** Stores if the graph is visible or not in the inspector */
+		public FadeArea fadeArea;
+
+		/** Stores if the graph info box is visible or not in the inspector */
+		public FadeArea infoFadeArea;
+
 		/** Called by editor scripts to rescan the graphs e.g when the user moved a graph.
 		 * Will only scan graphs if not playing and time to scan last graph was less than some constant (to avoid lag with large graphs) */
 		public bool AutoScan () {
@@ -16,9 +22,6 @@ namespace Pathfinding {
 		}
 
 		public virtual void OnEnable () {
-		}
-
-		public virtual void UnloadGizmoMeshes () {
 		}
 
 		public static Object ObjectField (string label, Object obj, System.Type objType, bool allowSceneObjects) {
@@ -101,10 +104,6 @@ namespace Pathfinding {
 		public virtual void OnSceneGUI (NavGraph target) {
 		}
 
-		/** Override to implement scene Gizmos drawing for the graph editor */
-		public virtual void OnDrawGizmos () {
-		}
-
 		/** Draws a thin separator line */
 		public static void Separator () {
 			GUIStyle separator = AstarPathEditor.astarSkin.FindStyle("PixelBox3Separator") ?? new GUIStyle();
@@ -145,40 +144,6 @@ namespace Pathfinding {
 
 			GUILayout.EndHorizontal();
 			return value;
-		}
-
-		/** Draws a wire cube using handles */
-		public static void DrawWireCube (Vector3 center, Vector3 size) {
-			size *= 0.5F;
-
-			var dx = new Vector3(size.x, 0, 0);
-			var dy = new Vector3(0, size.y, 0);
-			var dz = new Vector3(0, 0, size.z);
-
-			Vector3 p1 = center-dy-dz-dx;
-			Vector3 p2 = center-dy-dz+dx;
-			Vector3 p3 = center-dy+dz+dx;
-			Vector3 p4 = center-dy+dz-dx;
-
-			Vector3 p5 = center+dy-dz-dx;
-			Vector3 p6 = center+dy-dz+dx;
-			Vector3 p7 = center+dy+dz+dx;
-			Vector3 p8 = center+dy+dz-dx;
-
-			Handles.DrawLine(p1, p2);
-			Handles.DrawLine(p2, p3);
-			Handles.DrawLine(p3, p4);
-			Handles.DrawLine(p4, p1);
-
-			Handles.DrawLine(p5, p6);
-			Handles.DrawLine(p6, p7);
-			Handles.DrawLine(p7, p8);
-			Handles.DrawLine(p8, p5);
-
-			Handles.DrawLine(p1, p5);
-			Handles.DrawLine(p2, p6);
-			Handles.DrawLine(p3, p7);
-			Handles.DrawLine(p4, p8);
 		}
 	}
 }

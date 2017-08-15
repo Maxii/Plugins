@@ -1,11 +1,11 @@
-using UnityEngine;
-using System.Collections;
 using UnityEditor;
 using Pathfinding.RVO;
 
-[CustomEditor(typeof(RVONavmesh))]
-public class RVONavmeshEditor : Editor {
-	public override void OnInspectorGUI () {
-		DrawDefaultInspector();
+namespace Pathfinding {
+	[CustomEditor(typeof(RVONavmesh))]
+	public class RVONavmeshEditor : Editor {
+		public override void OnInspectorGUI () {
+			DrawDefaultInspector();
+		}
 	}
 }

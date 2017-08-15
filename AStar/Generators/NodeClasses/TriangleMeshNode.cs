@@ -4,6 +4,7 @@ using Pathfinding.Serialization;
 namespace Pathfinding {
 	public interface INavmeshHolder {
 		Int3 GetVertex (int i);
+		Int3 GetVertexInGraphSpace (int i);
 		int GetVertexArrayIndex (int index);
 		void GetTileCoordinates (int tileIndex, out int x, out int z);
 	}
@@ -21,7 +22,12 @@ namespace Pathfinding {
 		/** Internal vertex index for the third vertex */
 		public int v2;
 
+		/** Holds INavmeshHolder references for all graph indices to be able to access them in a performant manner */
 		protected static INavmeshHolder[] _navmeshHolders = new INavmeshHolder[0];
+
+		/** Used for synchronised access to the #_navmeshHolders array */
+		protected static readonly System.Object lockObject = new System.Object();
+
 		public static INavmeshHolder GetNavmeshHolder (uint graphIndex) {
 			return _navmeshHolders[(int)graphIndex];
 		}
@@ -31,18 +37,25 @@ namespace Pathfinding {
 		 */
 		public static void SetNavmeshHolder (int graphIndex, INavmeshHolder graph) {
 			if (_navmeshHolders.Length <= graphIndex) {
-				var gg = new INavmeshHolder[graphIndex+1];
-				for (int i = 0; i < _navmeshHolders.Length; i++) gg[i] = _navmeshHolders[i];
-				_navmeshHolders = gg;
+				// We need to lock and then check again to make sure
+				// that this the resize operation is thread safe
+				lock (lockObject) {
+					if (_navmeshHolders.Length <= graphIndex) {
+						var gg = new INavmeshHolder[graphIndex+1];
+						for (int i = 0; i < _navmeshHolders.Length; i++) gg[i] = _navmeshHolders[i];
+						_navmeshHolders = gg;
+					}
+				}
 			}
 			_navmeshHolders[graphIndex] = graph;
 		}
 
 		/** Set the position of this node to the average of its 3 vertices */
 		public void UpdatePositionFromVertices () {
-			INavmeshHolder g = GetNavmeshHolder(GraphIndex);
+			Int3 a, b, c;
 
-			position = (g.GetVertex(v0) + g.GetVertex(v1) + g.GetVertex(v2)) * 0.333333f;
+			GetVertices(out a, out b, out c);
+			position = (a + b + c) * 0.333333f;
 		}
 
 		/** Return a number identifying a vertex.
@@ -61,8 +74,23 @@ namespace Pathfinding {
 			return GetNavmeshHolder(GraphIndex).GetVertexArrayIndex(i == 0 ? v0 : (i == 1 ? v1 : v2));
 		}
 
+		/** Returns all 3 vertices of this node in world space */
+		public void GetVertices (out Int3 v0, out Int3 v1, out Int3 v2) {
+			// Get the object holding the vertex data for this node
+			// This is usually a graph or a recast graph tile
+			var holder = GetNavmeshHolder(GraphIndex);
+
+			v0 = holder.GetVertex(this.v0);
+			v1 = holder.GetVertex(this.v1);
+			v2 = holder.GetVertex(this.v2);
+		}
+
 		public override Int3 GetVertex (int i) {
 			return GetNavmeshHolder(GraphIndex).GetVertex(GetVertexIndex(i));
+		}
+
+		public Int3 GetVertexInGraphSpace (int i) {
+			return GetNavmeshHolder(GraphIndex).GetVertexInGraphSpace(GetVertexIndex(i));
 		}
 
 		public override int GetVertexCount () {
@@ -71,20 +99,17 @@ namespace Pathfinding {
 		}
 
 		public override Vector3 ClosestPointOnNode (Vector3 p) {
-			INavmeshHolder g = GetNavmeshHolder(GraphIndex);
+			Int3 a, b, c;
 
-			return Pathfinding.Polygon.ClosestPointOnTriangle((Vector3)g.GetVertex(v0), (Vector3)g.GetVertex(v1), (Vector3)g.GetVertex(v2), p);
+			GetVertices(out a, out b, out c);
+			return Pathfinding.Polygon.ClosestPointOnTriangle((Vector3)a, (Vector3)b, (Vector3)c, p);
 		}
 
 		public override Vector3 ClosestPointOnNodeXZ (Vector3 p) {
-			// Get the object holding the vertex data for this node
-			// This is usually a graph or a recast graph tile
-			INavmeshHolder g = GetNavmeshHolder(GraphIndex);
-
 			// Get all 3 vertices for this node
-			Int3 tp1 = g.GetVertex(v0);
-			Int3 tp2 = g.GetVertex(v1);
-			Int3 tp3 = g.GetVertex(v2);
+			Int3 tp1, tp2, tp3;
+
+			GetVertices(out tp1, out tp2, out tp3);
 
 			Vector2 closest = Polygon.ClosestPointOnTriangle(
 				new Vector2(tp1.x*Int3.PrecisionFactor, tp1.z*Int3.PrecisionFactor),
@@ -97,14 +122,10 @@ namespace Pathfinding {
 		}
 
 		public override bool ContainsPoint (Int3 p) {
-			// Get the object holding the vertex data for this node
-			// This is usually a graph or a recast graph tile
-			INavmeshHolder navmeshHolder = GetNavmeshHolder(GraphIndex);
-
 			// Get all 3 vertices for this node
-			Int3 a = navmeshHolder.GetVertex(v0);
-			Int3 b = navmeshHolder.GetVertex(v1);
-			Int3 c = navmeshHolder.GetVertex(v2);
+			Int3 a, b, c;
+
+			GetVertices(out a, out b, out c);
 
 			if ((long)(b.x - a.x) * (long)(p.z - a.z) - (long)(p.x - a.x) * (long)(b.z - a.z) > 0) return false;
 
@@ -122,12 +143,12 @@ namespace Pathfinding {
 		public override void UpdateRecursiveG (Path path, PathNode pathNode, PathHandler handler) {
 			UpdateG(path, pathNode);
 
-			handler.PushNode(pathNode);
+			handler.heap.Add(pathNode);
 
 			if (connections == null) return;
 
 			for (int i = 0; i < connections.Length; i++) {
-				GraphNode other = connections[i];
+				GraphNode other = connections[i].node;
 				PathNode otherPN = handler.GetPathNode(other);
 				if (otherPN.parent == pathNode && otherPN.pathID == handler.PathID) other.UpdateRecursiveG(path, otherPN, handler);
 			}
@@ -142,23 +163,24 @@ namespace Pathfinding {
 
 			// Loop through all connections
 			for (int i = connections.Length-1; i >= 0; i--) {
-				GraphNode other = connections[i];
+				var conn = connections[i];
+				var other = conn.node;
 
 				// Make sure we can traverse the neighbour
-				if (path.CanTraverse(other)) {
-					PathNode pathOther = handler.GetPathNode(other);
+				if (path.CanTraverse(conn.node)) {
+					PathNode pathOther = handler.GetPathNode(conn.node);
 
 					// Fast path out, worth it for triangle mesh nodes since they usually have degree 2 or 3
 					if (pathOther == pathNode.parent) {
 						continue;
 					}
 
-					uint cost = connectionCosts[i];
+					uint cost = conn.cost;
 
 					if (flag2 || pathOther.flag2) {
 						// Get special connection cost from the path
 						// This is used by the start and end nodes
-						cost = path.GetConnectionSpecialCost(this, other, cost);
+						cost = path.GetConnectionSpecialCost(this, conn.node, cost);
 					}
 
 					// Test if we have seen the other node before
@@ -168,7 +190,7 @@ namespace Pathfinding {
 						// must be the shortest one so far
 
 						// Might not be assigned
-						pathOther.node = other;
+						pathOther.node = conn.node;
 
 						pathOther.parent = pathNode;
 						pathOther.pathID = handler.PathID;
@@ -178,7 +200,7 @@ namespace Pathfinding {
 						pathOther.H = path.CalculateHScore(other);
 						other.UpdateG(path, pathOther);
 
-						handler.PushNode(pathOther);
+						handler.heap.Add(pathOther);
 					} else {
 						// If not we can test if the path from this node to the other one is a better one than the one already used
 						if (pathNode.G + cost + path.GetTraversalCost(other) < pathOther.G) {
@@ -203,7 +225,7 @@ namespace Pathfinding {
 		 * If no edge is shared, -1 is returned.
 		 * The edge is GetVertex(result) - GetVertex((result+1) % GetVertexCount()).
 		 * See GetPortal for the exact segment shared.
-		 * \note Might return that an edge is shared when the two nodes are in different tiles and adjacent on the XZ plane, but on the Y-axis.
+		 * \note Might return that an edge is shared when the two nodes are in different tiles and adjacent on the XZ plane, but do not line up perfectly on the Y-axis.
 		 * Therefore it is recommended that you only test for neighbours of this node or do additional checking afterwards.
 		 */
 		public int SharedEdge (GraphNode other) {
@@ -239,9 +261,9 @@ namespace Pathfinding {
 			//Only do this on recast graphs
 			if (tileIndex != tileIndex2 && (GetNavmeshHolder(GraphIndex) is RecastGraph)) {
 				for (int i = 0; i < connections.Length; i++) {
-					if (connections[i].GraphIndex != GraphIndex) {
+					if (connections[i].node.GraphIndex != GraphIndex) {
 #if !ASTAR_NO_POINT_GRAPH
-						var mid = connections[i] as NodeLink3Node;
+						var mid = connections[i].node as NodeLink3Node;
 						if (mid != null && mid.GetOther(this) == other) {
 							// We have found a node which is connected through a NodeLink3Node
 
@@ -351,9 +373,9 @@ namespace Pathfinding {
 					}
 				} else {
 					for (int i = 0; i < connections.Length; i++) {
-						if (connections[i].GraphIndex != GraphIndex) {
+						if (connections[i].node.GraphIndex != GraphIndex) {
 #if !ASTAR_NO_POINT_GRAPH
-							var mid = connections[i] as NodeLink3Node;
+							var mid = connections[i].node as NodeLink3Node;
 							if (mid != null && mid.GetOther(this) == other) {
 								// We have found a node which is connected through a NodeLink3Node
 
@@ -370,6 +392,30 @@ namespace Pathfinding {
 			}
 
 			return true;
+		}
+
+		public override float SurfaceArea () {
+			// TODO: This is the area in XZ space, use full 3D space for higher correctness maybe?
+			var holder = GetNavmeshHolder(GraphIndex);
+
+			return System.Math.Abs(VectorMath.SignedTriangleAreaTimes2XZ(holder.GetVertex(v0), holder.GetVertex(v1), holder.GetVertex(v2))) * 0.5f;
+		}
+
+		public override Vector3 RandomPointOnSurface () {
+			// Find a random point inside the triangle
+			// This generates uniformly distributed trilinear coordinates
+			// See http://mathworld.wolfram.com/TrianglePointPicking.html
+			float r1;
+			float r2;
+
+			do {
+				r1 = Random.value;
+				r2 = Random.value;
+			} while (r1+r2 > 1);
+
+			var holder = GetNavmeshHolder(GraphIndex);
+			// Pick the point corresponding to the trilinear coordinate
+			return ((Vector3)(holder.GetVertex(v1)-holder.GetVertex(v0)))*r1 + ((Vector3)(holder.GetVertex(v2)-holder.GetVertex(v0)))*r2 + (Vector3)holder.GetVertex(v0);
 		}
 
 		public override void SerializeNode (GraphSerializationContext ctx) {

@@ -34,24 +34,45 @@ namespace Pathfinding {
 			return p;
 		}
 
-		public override void Reset () {
+		protected override void Reset () {
 			base.Reset();
 			endingCondition = null;
 		}
+
+#if !ASTAR_NO_GRID_GRAPH
+		protected override bool EndPointGridGraphSpecialCase (GraphNode endNode) {
+			// Don't use the grid graph special case for this path type
+			return false;
+		}
+#endif
 
 		/** The start node need to be special cased and checked here if it is a valid target */
 		protected override void CompletePathIfStartIsValidTarget () {
 			var pNode = pathHandler.GetPathNode(startNode);
 
 			if (endingCondition.TargetFound(pNode)) {
-				endNode = pNode.node;
-				endPoint = (Vector3)endNode.position;
+				ChangeEndNode(startNode);
 				Trace(pNode);
 				CompleteState = PathCompleteState.Complete;
 			}
 		}
 
-		public override void CalculateStep (long targetTick) {
+		/** Changes the #endNode to \a target and resets some temporary flags on the previous node.
+		 * Also sets #endPoint to the position of \a target.
+		 */
+		void ChangeEndNode (GraphNode target) {
+			// Reset temporary flags on the previous end node, otherwise they might be
+			// left in the graph and cause other paths to calculate paths incorrectly
+			if (endNode != null && endNode != startNode) {
+				var pathNode = pathHandler.GetPathNode(endNode);
+				pathNode.flag1 = pathNode.flag2 = false;
+			}
+
+			endNode = target;
+			endPoint = (Vector3)target.position;
+		}
+
+		protected override void CalculateStep (long targetTick) {
 			int counter = 0;
 
 			// Continue to search while there hasn't ocurred an error and the end hasn't been found
@@ -68,14 +89,14 @@ namespace Pathfinding {
 				currentR.node.Open(this, currentR, pathHandler);
 
 				// Any nodes left to search?
-				if (pathHandler.HeapEmpty()) {
+				if (pathHandler.heap.isEmpty) {
 					Error();
 					LogError("Searched whole area but could not find target");
 					return;
 				}
 
 				// Select the node with the lowest F score and remove it from the open list
-				currentR = pathHandler.PopNode();
+				currentR = pathHandler.heap.Remove();
 
 				// Check for time every 500 nodes, roughly every 0.5 ms usually
 				if (counter > 500) {
@@ -95,8 +116,7 @@ namespace Pathfinding {
 			}
 
 			if (CompleteState == PathCompleteState.Complete) {
-				endNode = currentR.node;
-				endPoint = (Vector3)endNode.position;
+				ChangeEndNode(currentR.node);
 				Trace(currentR);
 			}
 		}
@@ -143,7 +163,7 @@ namespace Pathfinding {
 	 *
 	 * Where \a mySeeker is a Seeker component, and \a myXPath is an Pathfinding.XPath.\n
 	 *
-	 * \note The above was written without testing. I hope I haven't made any mistakes, if you try it out, and it doesn't seem to work. Please post a comment below.
+	 * \note The above was written without testing. I hope I haven't made any mistakes, if you try it out, and it doesn't seem to work. Please post a comment in the forums.
 	 *
 	 * \note Written for 3.0.8.3
 	 *

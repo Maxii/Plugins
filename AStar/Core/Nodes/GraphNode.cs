@@ -3,9 +3,20 @@ using System.Collections.Generic;
 using Pathfinding.Serialization;
 
 namespace Pathfinding {
-	public delegate void GraphNodeDelegate (GraphNode node);
-	public delegate bool GraphNodeDelegateCancelable (GraphNode node);
+	using Pathfinding.Util;
 
+	/** Represents a connection to another node */
+	public struct Connection {
+		/** Node which this connection goes to */
+		public GraphNode node;
+
+		/** Cost of moving along this connection.
+		 * A cost of 1000 corresponds approximately to the cost of moving one world unit.
+		 */
+		public uint cost;
+	}
+
+	/** Base class for all nodes */
 	public abstract class GraphNode {
 		/** Internal unique index */
 		private int nodeIndex;
@@ -48,8 +59,7 @@ namespace Pathfinding {
 		 *
 		 * \warning Should only be called by graph classes on their own nodes
 		 */
-		public void Destroy () {
-			//Already destroyed
+		internal void Destroy () {
 			if (Destroyed) return;
 
 			ClearConnections(true);
@@ -106,7 +116,6 @@ namespace Pathfinding {
 
 		#endregion
 
-
 		#region Properties
 
 		/** Holds various bitpacked variables.
@@ -149,6 +158,13 @@ namespace Pathfinding {
 			}
 		}
 
+		/** Connected component that contains the node.
+		 * This is visualized in the scene view as differently colored nodes (if the graph coloring mode is set to 'Areas').
+		 * Each area represents a set of nodes such that there is no valid path between nodes of different colors.
+		 *
+		 * \see https://en.wikipedia.org/wiki/Connected_component_(graph_theory)
+		 * \see #AstarPath.FloodFill
+		 */
 		public uint Area {
 			get {
 				return (flags & FlagsAreaMask) >> FlagsAreaOffset;
@@ -158,6 +174,9 @@ namespace Pathfinding {
 			}
 		}
 
+		/** Graph which contains this node.
+		 * \see #Pathfinding.AstarData.graphs
+		 */
 		public uint GraphIndex {
 			get {
 				return (flags & FlagsGraphMask) >> FlagsGraphOffset;
@@ -167,6 +186,9 @@ namespace Pathfinding {
 			}
 		}
 
+		/** Node tag.
+		 * \see \ref tags
+		 */
 		public uint Tag {
 			get {
 				return (flags & FlagsTagMask) >> FlagsTagOffset;
@@ -190,9 +212,9 @@ namespace Pathfinding {
 			//Simple but slow default implementation
 			UpdateG(path, pathNode);
 
-			handler.PushNode(pathNode);
+			handler.heap.Add(pathNode);
 
-			GetConnections(delegate(GraphNode other) {
+			GetConnections((GraphNode other) => {
 				PathNode otherPN = handler.GetPathNode(other);
 				if (otherPN.parent == pathNode && otherPN.pathID == handler.PathID) other.UpdateRecursiveG(path, otherPN, handler);
 			});
@@ -201,7 +223,7 @@ namespace Pathfinding {
 		public virtual void FloodFill (Stack<GraphNode> stack, uint region) {
 			//Simple but slow default implementation
 
-			GetConnections(delegate(GraphNode other) {
+			GetConnections((GraphNode other) => {
 				if (other.Area != region) {
 					other.Area = region;
 					stack.Push(other);
@@ -209,8 +231,20 @@ namespace Pathfinding {
 			});
 		}
 
-		/** Calls the delegate with all connections from this node */
-		public abstract void GetConnections (GraphNodeDelegate del);
+		/** Calls the delegate with all connections from this node.
+		 * \code
+		 * node.GetConnections(connectedTo => {
+		 *    Debug.DrawLine((Vector3)node.position, (Vector3)connectedTo.position, Color.red);
+		 * });
+		 * \endcode
+		 *
+		 * You can add all connected nodes to a list like this
+		 * \code
+		 * List<GraphNode> connections = new List<GraphNode>();
+		 * node.GetConnections(connections.Add);
+		 * \endcode
+		 */
+		public abstract void GetConnections (System.Action<GraphNode> action);
 
 		public abstract void AddConnection (GraphNode node, uint cost);
 		public abstract void RemoveConnection (GraphNode node);
@@ -266,7 +300,25 @@ namespace Pathfinding {
 		/** Open the node */
 		public abstract void Open (Path path, PathNode pathNode, PathHandler handler);
 
+		/** The surface area of the node in square world units */
+		public virtual float SurfaceArea () {
+			return 0;
+		}
 
+		/** A random point on the surface of the node.
+		 * For point nodes and other nodes which do not have a surface, this will always return the position of the node.
+		 */
+		public virtual Vector3 RandomPointOnSurface () {
+			return (Vector3)position;
+		}
+
+		/** Hash code used for checking if the gizmos need to be updated.
+		 * Will change when the gizmos for the node might change.
+		 */
+		public virtual int GetGizmoHashCode () {
+			// Some hashing, the constants are just some arbitrary prime numbers. #flags contains the info for #Area, #Tag and #Walkable
+			return position.GetHashCode() ^ (19 * (int)Penalty) ^ (41 * (int)flags);
+		}
 
 		public virtual void SerializeNode (GraphSerializationContext ctx) {
 			//Write basic node data.
@@ -311,8 +363,11 @@ namespace Pathfinding {
 		protected MeshNode (AstarPath astar) : base(astar) {
 		}
 
-		public GraphNode[] connections;
-		public uint[] connectionCosts;
+		/** All connections from this node.
+		 * \see AddConnection
+		 * \see RemoveConnection
+		 */
+		public Connection[] connections;
 
 		public abstract Int3 GetVertex (int i);
 		public abstract int GetVertexCount ();
@@ -323,17 +378,21 @@ namespace Pathfinding {
 			// Remove all connections to this node from our neighbours
 			if (alsoReverse && connections != null) {
 				for (int i = 0; i < connections.Length; i++) {
-					connections[i].RemoveConnection(this);
+					// Null check done here because NavmeshTile.Destroy
+					// requires it for some optimizations it does
+					// Normally connection elements are never null
+					if (connections[i].node != null) {
+						connections[i].node.RemoveConnection(this);
+					}
 				}
 			}
 
-			connections = null;
-			connectionCosts = null;
+			ArrayPool<Connection>.Release(ref connections, true);
 		}
 
-		public override void GetConnections (GraphNodeDelegate del) {
+		public override void GetConnections (System.Action<GraphNode> action) {
 			if (connections == null) return;
-			for (int i = 0; i < connections.Length; i++) del(connections[i]);
+			for (int i = 0; i < connections.Length; i++) action(connections[i].node);
 		}
 
 		public override void FloodFill (Stack<GraphNode> stack, uint region) {
@@ -343,7 +402,7 @@ namespace Pathfinding {
 			// Iterate through all connections, set the area and push the neighbour to the stack
 			// This is a simple DFS (https://en.wikipedia.org/wiki/Depth-first_search)
 			for (int i = 0; i < connections.Length; i++) {
-				GraphNode other = connections[i];
+				GraphNode other = connections[i].node;
 				if (other.Area != region) {
 					other.Area = region;
 					stack.Push(other);
@@ -352,17 +411,17 @@ namespace Pathfinding {
 		}
 
 		public override bool ContainsConnection (GraphNode node) {
-			for (int i = 0; i < connections.Length; i++) if (connections[i] == node) return true;
+			for (int i = 0; i < connections.Length; i++) if (connections[i].node == node) return true;
 			return false;
 		}
 
 		public override void UpdateRecursiveG (Path path, PathNode pathNode, PathHandler handler) {
 			UpdateG(path, pathNode);
 
-			handler.PushNode(pathNode);
+			handler.heap.Add(pathNode);
 
 			for (int i = 0; i < connections.Length; i++) {
-				GraphNode other = connections[i];
+				GraphNode other = connections[i].node;
 				PathNode otherPN = handler.GetPathNode(other);
 				if (otherPN.parent == pathNode && otherPN.pathID == handler.PathID) {
 					other.UpdateRecursiveG(path, otherPN, handler);
@@ -383,9 +442,9 @@ namespace Pathfinding {
 			// Check if we already have a connection to the node
 			if (connections != null) {
 				for (int i = 0; i < connections.Length; i++) {
-					if (connections[i] == node) {
+					if (connections[i].node == node) {
 						// Just update the cost for the existing connection
-						connectionCosts[i] = cost;
+						connections[i].cost = cost;
 						return;
 					}
 				}
@@ -394,18 +453,18 @@ namespace Pathfinding {
 			// Create new arrays which include the new connection
 			int connLength = connections != null ? connections.Length : 0;
 
-			var newconns = new GraphNode[connLength+1];
-			var newconncosts = new uint[connLength+1];
+			var newconns = ArrayPool<Connection>.ClaimWithExactLength(connLength+1);
 			for (int i = 0; i < connLength; i++) {
 				newconns[i] = connections[i];
-				newconncosts[i] = connectionCosts[i];
 			}
 
-			newconns[connLength] = node;
-			newconncosts[connLength] = cost;
+			newconns[connLength] = new Connection { node = node, cost = cost };
+
+			if (connections != null) {
+				ArrayPool<Connection>.Release(ref connections, true);
+			}
 
 			connections = newconns;
-			connectionCosts = newconncosts;
 		}
 
 		/** Removes any connection from this node to the specified node.
@@ -420,23 +479,23 @@ namespace Pathfinding {
 
 			// Iterate through all connections and check if there are any to the node
 			for (int i = 0; i < connections.Length; i++) {
-				if (connections[i] == node) {
+				if (connections[i].node == node) {
 					// Create new arrays which have the specified node removed
 					int connLength = connections.Length;
 
-					var newconns = new GraphNode[connLength-1];
-					var newconncosts = new uint[connLength-1];
+					var newconns = ArrayPool<Connection>.ClaimWithExactLength(connLength-1);
 					for (int j = 0; j < i; j++) {
 						newconns[j] = connections[j];
-						newconncosts[j] = connectionCosts[j];
 					}
 					for (int j = i+1; j < connLength; j++) {
 						newconns[j-1] = connections[j];
-						newconncosts[j-1] = connectionCosts[j];
+					}
+
+					if (connections != null) {
+						ArrayPool<Connection>.Release(ref connections, true);
 					}
 
 					connections = newconns;
-					connectionCosts = newconncosts;
 					return;
 				}
 			}
@@ -462,14 +521,25 @@ namespace Pathfinding {
 			return inside;
 		}
 
+		public override int GetGizmoHashCode () {
+			var hash = base.GetGizmoHashCode();
+
+			if (connections != null) {
+				for (int i = 0; i < connections.Length; i++) {
+					hash ^= 17 * connections[i].GetHashCode();
+				}
+			}
+			return hash;
+		}
+
 		public override void SerializeReferences (GraphSerializationContext ctx) {
 			if (connections == null) {
 				ctx.writer.Write(-1);
 			} else {
 				ctx.writer.Write(connections.Length);
 				for (int i = 0; i < connections.Length; i++) {
-					ctx.SerializeNodeReference(connections[i]);
-					ctx.writer.Write(connectionCosts[i]);
+					ctx.SerializeNodeReference(connections[i].node);
+					ctx.writer.Write(connections[i].cost);
 				}
 			}
 		}
@@ -479,14 +549,14 @@ namespace Pathfinding {
 
 			if (count == -1) {
 				connections = null;
-				connectionCosts = null;
 			} else {
-				connections = new GraphNode[count];
-				connectionCosts = new uint[count];
+				connections = ArrayPool<Connection>.ClaimWithExactLength(count);
 
 				for (int i = 0; i < count; i++) {
-					connections[i] = ctx.DeserializeNodeReference();
-					connectionCosts[i] = ctx.reader.ReadUInt32();
+					connections[i] = new Connection {
+						node = ctx.DeserializeNodeReference(),
+						cost = ctx.reader.ReadUInt32()
+					};
 				}
 			}
 		}

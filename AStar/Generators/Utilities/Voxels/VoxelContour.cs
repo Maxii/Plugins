@@ -1,8 +1,5 @@
 using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
-using Pathfinding;
-using Pathfinding.Voxels;
 
 namespace Pathfinding.Voxels {
 	public partial class Voxelize {
@@ -106,7 +103,7 @@ namespace Pathfinding.Voxels {
 						RemoveDegenerateSegments(simplified);
 
 						VoxelContour contour = new VoxelContour();
-						contour.verts = ClaimIntArr(simplified.Count, false);//simplified.ToArray ();
+						contour.verts = Pathfinding.Util.ArrayPool<int>.Claim(simplified.Count);//simplified.ToArray ();
 						for (int j = 0; j < simplified.Count; j++) contour.verts[j] = simplified[j];
 #if ASTAR_RECAST_INCLUDE_RAW_VERTEX_CONTOUR
 						//Not used at the moment, just debug stuff
@@ -301,31 +298,12 @@ namespace Pathfinding.Voxels {
 			}
 		}
 
-		static List<int[]> intArrCache = new List<int[]>();
-		static readonly int[] emptyArr = new int[0];
-
-		static void ReleaseIntArr (int[] arr) {
-			if (arr != null) intArrCache.Add(arr);
-		}
-
-		static int[] ClaimIntArr (int minCapacity, bool zero) {
-			for (int i = 0; i < intArrCache.Count; i++) {
-				if (intArrCache[i].Length >= minCapacity) {
-					int[] arr = intArrCache[i];
-					intArrCache.RemoveAt(i);
-					if (zero) Pathfinding.Util.Memory.MemSet<int>(arr, 0, sizeof(int));
-					return arr;
-				}
-			}
-			return new int[minCapacity];
-		}
-
 		/** Releases contents of a contour set to caches */
 		static void ReleaseContours (VoxelContourSet cset) {
 			for (int i = 0; i < cset.conts.Count; i++) {
 				VoxelContour cont = cset.conts[i];
-				ReleaseIntArr(cont.verts);
-				ReleaseIntArr(cont.rverts);
+				Pathfinding.Util.ArrayPool<int>.Release(ref cont.verts);
+				Pathfinding.Util.ArrayPool<int>.Release(ref cont.rverts);
 			}
 			cset.conts = null;
 		}
@@ -333,7 +311,7 @@ namespace Pathfinding.Voxels {
 		public static bool MergeContours (ref VoxelContour ca, ref VoxelContour cb, int ia, int ib) {
 			int maxVerts = ca.nverts + cb.nverts + 2;
 
-			int[] verts = ClaimIntArr(maxVerts*4, false);//new int[maxVerts*4];
+			int[] verts = Pathfinding.Util.ArrayPool<int>.Claim(maxVerts*4);
 
 			//if (!verts)
 			//	return false;
@@ -362,15 +340,13 @@ namespace Pathfinding.Voxels {
 				nv++;
 			}
 
-			//rcFree(ca.verts);
-			//rcFree(cb.verts);
-			ReleaseIntArr(ca.verts);
-			ReleaseIntArr(cb.verts);
+			Pathfinding.Util.ArrayPool<int>.Release(ref ca.verts);
+			Pathfinding.Util.ArrayPool<int>.Release(ref cb.verts);
 
 			ca.verts = verts;
 			ca.nverts = nv;
 
-			cb.verts = emptyArr;
+			cb.verts = Pathfinding.Util.ArrayPool<int>.Claim(0);
 			cb.nverts = 0;
 
 			return true;
@@ -481,6 +457,8 @@ namespace Pathfinding.Voxels {
 					cinc = pn-1;
 					ci = (bi+cinc) % pn;
 					endi = ai;
+					Utility.Swap(ref ax, ref bx);
+					Utility.Swap(ref az, ref bz);
 				}
 
 				// Tessellate only outer edges or edges between areas.
@@ -488,11 +466,6 @@ namespace Pathfinding.Voxels {
 					(verts[ci*4+3] & RC_AREA_BORDER) == RC_AREA_BORDER) {
 					while (ci != endi) {
 						float d2 = VectorMath.SqrDistancePointSegmentApproximate(verts[ci*4+0], verts[ci*4+2]/voxelArea.width, ax, az/voxelArea.width, bx, bz/voxelArea.width);
-						//float d2 = Mathfx.DistancePointSegment2 (verts[ci*4+0], verts[ci*4+2]/voxelArea.width, ax, az/voxelArea.width, bx, bz/voxelArea.width);
-
-						//if (Mathf.Abs (d2-d3) > 0.5F) {
-						//	Debug.Log (d2+" "+d3);
-						//}
 
 						if (d2 > maxd) {
 							maxd = d2;
@@ -536,7 +509,7 @@ namespace Pathfinding.Voxels {
 
 			float maxEdgeLen = maxEdgeLength / cellSize;
 
-			if (maxEdgeLen > 0 && (buildFlags & (RC_CONTOUR_TESS_WALL_EDGES|RC_CONTOUR_TESS_AREA_EDGES)) != 0) {
+			if (maxEdgeLen > 0 && (buildFlags & (RC_CONTOUR_TESS_WALL_EDGES|RC_CONTOUR_TESS_AREA_EDGES|RC_CONTOUR_TESS_TILE_EDGES)) != 0) {
 				for (int i = 0; i < simplified.Count/4; ) {
 					if (simplified.Count/4 > 200) {
 						break;
@@ -560,10 +533,15 @@ namespace Pathfinding.Voxels {
 					bool tess = false;
 
 					// Wall edges.
-					if ((buildFlags & RC_CONTOUR_TESS_WALL_EDGES) == 1 && (verts[ci*4+3] & ContourRegMask) == 0)
+					if ((buildFlags & RC_CONTOUR_TESS_WALL_EDGES) != 0 && (verts[ci*4+3] & ContourRegMask) == 0)
 						tess = true;
+
 					// Edges between areas.
-					if ((buildFlags & RC_CONTOUR_TESS_AREA_EDGES) == 1 && (verts[ci*4+3] & RC_AREA_BORDER) == 1)
+					if ((buildFlags & RC_CONTOUR_TESS_AREA_EDGES) != 0 && (verts[ci*4+3] & RC_AREA_BORDER) == RC_AREA_BORDER)
+						tess = true;
+
+					// Border of tile
+					if ((buildFlags & RC_CONTOUR_TESS_TILE_EDGES) != 0 && (verts[ci*4+3] & BorderReg) == BorderReg)
 						tess = true;
 
 					if (tess) {
@@ -573,12 +551,13 @@ namespace Pathfinding.Voxels {
 							// Round based on the segments in lexilogical order so that the
 							// max tesselation is consistent regardles in which direction
 							// segments are traversed.
-							if (bx > ax || (bx == ax && bz > az)) {
-								int n = bi < ai ? (bi+pn - ai) : (bi - ai);
-								maxi = (ai + n/2) % pn;
-							} else {
-								int n = bi < ai ? (bi+pn - ai) : (bi - ai);
-								maxi = (ai + (n+1)/2) % pn;
+							int n = bi < ai ? (bi+pn - ai) : (bi - ai);
+							if (n > 1) {
+								if (bx > ax || (bx == ax && bz > az)) {
+									maxi = (ai + n/2) % pn;
+								} else {
+									maxi = (ai + (n+1)/2) % pn;
+								}
 							}
 						}
 					}
@@ -869,15 +848,6 @@ namespace Pathfinding.Voxels {
 					simplified[i*4+2] == simplified[ni*4+2]) {
 					// Degenerate segment, remove.
 					simplified.RemoveRange(i, 4);
-
-					/*for (int j = i; j < simplified.Count/4-1; ++j)
-					 * {
-					 *  simplified[j*4+0] = simplified[(j+1)*4+0];
-					 *  simplified[j*4+1] = simplified[(j+1)*4+1];
-					 *  simplified[j*4+2] = simplified[(j+1)*4+2];
-					 *  simplified[j*4+3] = simplified[(j+1)*4+3];
-					 * }
-					 * simplified.resize(simplified.Count-4);*/
 				}
 			}
 		}

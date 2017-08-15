@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using UnityEngine;
-using Pathfinding;
 using Pathfinding.Util;
 using Pathfinding.WindowsStore;
 
@@ -13,7 +12,6 @@ using Pathfinding.Serialization.Zip;
 using ZipEntry = System.IO.Compression.ZipArchiveEntry;
 using ZipFile = System.IO.Compression.ZipArchive;
 #else
-using CompatFileStream = System.IO.FileStream;
 using Pathfinding.Ionic.Zip;
 #endif
 
@@ -358,7 +356,6 @@ namespace Pathfinding.Serialization {
 					if (node.NodeIndex == -1) {
 						Debug.LogError("Graph contains destroyed nodes. This is a bug.");
 					}
-					return true;
 				});
 			}
 			return maxIndex;
@@ -366,11 +363,11 @@ namespace Pathfinding.Serialization {
 
 		static byte[] SerializeNodeIndices (NavGraph[] graphs) {
 			var stream = new MemoryStream();
-			var wr = new BinaryWriter(stream);
+			var writer = new BinaryWriter(stream);
 
 			int maxNodeIndex = GetMaxNodeIndexInAllGraphs(graphs);
 
-			wr.Write(maxNodeIndex);
+			writer.Write(maxNodeIndex);
 
 			// While writing node indices, verify that the max node index is the same
 			// (user written graphs might have gotten it wrong)
@@ -379,8 +376,7 @@ namespace Pathfinding.Serialization {
 				if (graphs[i] == null) continue;
 				graphs[i].GetNodes(node => {
 					maxNodeIndex2 = Math.Max(node.NodeIndex, maxNodeIndex2);
-					wr.Write(node.NodeIndex);
-					return true;
+					writer.Write(node.NodeIndex);
 				});
 			}
 
@@ -388,7 +384,7 @@ namespace Pathfinding.Serialization {
 			if (maxNodeIndex2 != maxNodeIndex) throw new Exception("Some graphs are not consistent in their GetNodes calls, sequential calls give different results.");
 
 			byte[] bytes = stream.ToArray();
-			wr.Close();
+			writer.Close();
 
 			return bytes;
 		}
@@ -396,12 +392,12 @@ namespace Pathfinding.Serialization {
 		/** Serializes info returned by NavGraph.SerializeExtraInfo */
 		static byte[] SerializeGraphExtraInfo (NavGraph graph) {
 			var stream = new MemoryStream();
-			var wr = new BinaryWriter(stream);
-			var ctx = new GraphSerializationContext(wr);
+			var writer = new BinaryWriter(stream);
+			var ctx = new GraphSerializationContext(writer);
 
 			graph.SerializeExtraInfo(ctx);
 			byte[] bytes = stream.ToArray();
-			wr.Close();
+			writer.Close();
 
 			return bytes;
 		}
@@ -413,14 +409,11 @@ namespace Pathfinding.Serialization {
 		 */
 		static byte[] SerializeGraphNodeReferences (NavGraph graph) {
 			var stream = new MemoryStream();
-			var wr = new BinaryWriter(stream);
-			var ctx = new GraphSerializationContext(wr);
+			var writer = new BinaryWriter(stream);
+			var ctx = new GraphSerializationContext(writer);
 
-			graph.GetNodes(node => {
-				node.SerializeReferences(ctx);
-				return true;
-			});
-			wr.Close();
+			graph.GetNodes(node => node.SerializeReferences(ctx));
+			writer.Close();
 
 			var bytes = stream.ToArray();
 			return bytes;
@@ -453,8 +446,8 @@ namespace Pathfinding.Serialization {
 
 		byte[] SerializeNodeLinks () {
 			var stream = new MemoryStream();
-			var wr = new BinaryWriter(stream);
-			var ctx = new GraphSerializationContext(wr);
+			var writer = new BinaryWriter(stream);
+			var ctx = new GraphSerializationContext(writer);
 
 			NodeLink2.SerializeReferences(ctx);
 			return stream.ToArray();
@@ -528,7 +521,7 @@ namespace Pathfinding.Serialization {
 					"\nHowever node data (not settings) can get corrupted between versions (even though I try my best to keep compatibility), so it is recommended " +
 					"to recalculate any caches (those for faster startup) and resave any files. Even if it seems to load fine, it might cause subtle bugs.\n");
 			} else if (FullyDefinedVersion(meta.version) < FullyDefinedVersion(AstarPath.Version)) {
-				Debug.LogWarning("Trying to load data from an older version of the A* Pathfinding Project\nCurrent version: "+AstarPath.Version+" Data version: "+meta.version+
+				Debug.LogWarning("Upgrading serialized pathfinding data from version " + meta.version + " to " + AstarPath.Version +
 					"\nThis is usually fine, it just means you have upgraded to a new version." +
 					"\nHowever node data (not settings) can get corrupted between versions (even though I try my best to keep compatibility), so it is recommended " +
 					"to recalculate any caches (those for faster startup) and resave any files. Even if it seems to load fine, it might cause subtle bugs.\n");
@@ -553,13 +546,13 @@ namespace Pathfinding.Serialization {
 
 		NavGraph DeserializeGraph (int zipIndex, int graphIndex) {
 			// Get the graph type from the metadata we deserialized earlier
-			var tp = meta.GetGraphType(zipIndex);
+			var graphType = meta.GetGraphType(zipIndex);
 
 			// Graph was null when saving, ignore
-			if (System.Type.Equals(tp, null)) return null;
+			if (System.Type.Equals(graphType, null)) return null;
 
 			// Create a new graph of the right type
-			NavGraph graph = data.CreateGraph(tp);
+			NavGraph graph = data.CreateGraph(graphType);
 			graph.graphIndex = (uint)(graphIndex);
 
 			var jsonName = "graph" + zipIndex + jsonExt;
@@ -567,7 +560,7 @@ namespace Pathfinding.Serialization {
 
 			if (ContainsEntry(jsonName)) {
 				// Read the graph settings
-				TinyJsonDeserializer.Deserialize(GetString(GetEntry(jsonName)), tp, graph);
+				TinyJsonDeserializer.Deserialize(GetString(GetEntry(jsonName)), graphType, graph);
 			} else if (ContainsEntry(binName)) {
 				var reader = GetBinaryReader(GetEntry(binName));
 				var ctx = new GraphSerializationContext(reader, null, graph.graphIndex, meta);
@@ -628,7 +621,6 @@ namespace Pathfinding.Serialization {
 					if (node.Destroyed) {
 						result = true;
 					}
-					return true;
 				});
 			}
 			return result;
@@ -651,7 +643,6 @@ namespace Pathfinding.Serialization {
 					graphs[i].GetNodes(node => {
 						var index = reader.ReadInt32();
 						int2Node[index] = node;
-						return true;
 					});
 				}
 			} catch (Exception e) {
@@ -675,10 +666,7 @@ namespace Pathfinding.Serialization {
 			var reader = GetBinaryReader(entry);
 			var ctx = new GraphSerializationContext(reader, int2Node, graph.graphIndex, meta);
 
-			graph.GetNodes(node => {
-				node.DeserializeReferences(ctx);
-				return true;
-			});
+			graph.GetNodes(node => node.DeserializeReferences(ctx));
 		}
 
 		/** Deserializes extra graph info.
@@ -763,11 +751,11 @@ namespace Pathfinding.Serialization {
 #if NETFX_CORE
 			return new BinaryReader(entry.Open());
 #else
-			var mem = new System.IO.MemoryStream();
+			var stream = new System.IO.MemoryStream();
 
-			entry.Extract(mem);
-			mem.Position = 0;
-			return new System.IO.BinaryReader(mem);
+			entry.Extract(stream);
+			stream.Position = 0;
+			return new System.IO.BinaryReader(stream);
 #endif
 		}
 
@@ -913,9 +901,9 @@ namespace Pathfinding.Serialization {
 		/** Serialization settings for only saving graph settings */
 		public static SerializeSettings Settings {
 			get {
-				var s = new SerializeSettings();
-				s.nodes = false;
-				return s;
+				return new SerializeSettings {
+						   nodes = false
+				};
 			}
 		}
 	}

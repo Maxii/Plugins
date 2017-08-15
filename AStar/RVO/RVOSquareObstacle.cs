@@ -16,7 +16,7 @@ namespace Pathfinding.RVO {
 		public Vector2 size = Vector3.one;
 
 		/** Center of the square */
-		public Vector2 center = Vector3.one;
+		public Vector2 center = Vector3.zero;
 
 		protected override bool StaticObstacle { get { return false; } }
 		protected override bool ExecuteInEditor { get { return true; } }

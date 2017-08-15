@@ -1,6 +1,4 @@
-
 using UnityEngine;
-using System.Collections.Generic;
 
 namespace Pathfinding {
 	/** Adds new geometry to a recast graph.
@@ -27,52 +25,11 @@ namespace Pathfinding {
 	 * Then you can add links between the added geometry and the rest of the world, preferably using NodeLink3.
 	 */
 	[HelpURL("http://arongranberg.com/astar/docs/class_pathfinding_1_1_navmesh_add.php")]
-	public class NavmeshAdd : MonoBehaviour {
+	public class NavmeshAdd : NavmeshClipper {
 		public enum MeshType {
 			Rectangle,
 			CustomMesh
 		}
-
-		private static List<NavmeshAdd> allCuts = new List<NavmeshAdd>();
-
-		private static void Add (NavmeshAdd obj) {
-			allCuts.Add(obj);
-		}
-
-		private static void Remove (NavmeshAdd obj) {
-			allCuts.Remove(obj);
-		}
-
-		/** Get all active instances which intersect the bounds */
-		public static List<NavmeshAdd> GetAllInRange (Bounds b) {
-			List<NavmeshAdd> cuts = Pathfinding.Util.ListPool<NavmeshAdd>.Claim();
-			for (int i = 0; i < allCuts.Count; i++) {
-				if (allCuts[i].enabled && Intersects(b, allCuts[i].GetBounds())) {
-					cuts.Add(allCuts[i]);
-				}
-			}
-			return cuts;
-		}
-
-		/** True if \a b1 and \a b2 intersects.
-		 * \note This method ignores the Y axis
-		 */
-		private static bool Intersects (Bounds b1, Bounds b2) {
-			Vector3 min1 = b1.min;
-			Vector3 max1 = b1.max;
-			Vector3 min2 = b2.min;
-			Vector3 max2 = b2.max;
-
-			return min1.x <= max2.x && max1.x >= min2.x && min1.z <= max2.z && max1.z >= min2.z;
-		}
-
-		/** Returns a list with all NavmeshAdd components in the scene.
-		 * \warning Do not modify this array
-		 */
-		public static List<NavmeshAdd> GetAll () {
-			return allCuts;
-		}
-
 
 		public MeshType type;
 
@@ -96,31 +53,71 @@ namespace Pathfinding {
 
 		public Vector3 center;
 
-		Bounds bounds;
-
-		/** Includes rotation in calculations.
+		/** Includes rotation and scale in calculations.
 		 * This is slower since a lot more matrix multiplications are needed but gives more flexibility.
 		 */
-		public bool useRotation;
+		[UnityEngine.Serialization.FormerlySerializedAsAttribute("useRotation")]
+		public bool useRotationAndScale;
+
+		/** Distance between positions to require an update of the navmesh.
+		 * A smaller distance gives better accuracy, but requires more updates when moving the object over time,
+		 * so it is often slower.
+		 *
+		 * \note Dynamic updating requires a TileHandlerHelper somewhere in the scene.
+		 */
+		[Tooltip("Distance between positions to require an update of the navmesh\nA smaller distance gives better accuracy, but requires more updates when moving the object over time, so it is often slower.")]
+		public float updateDistance = 0.4f;
+
+		/** How many degrees rotation that is required for an update to the navmesh.
+		 * Should be between 0 and 180.
+		 *
+		 * \note Dynamic updating requires a Tile Handler Helper somewhere in the scene.
+		 */
+		[Tooltip("How many degrees rotation that is required for an update to the navmesh. Should be between 0 and 180.")]
+		public float updateRotationDistance = 10;
 
 		/** cached transform component */
 		protected Transform tr;
+		Vector3 lastPosition;
+		Quaternion lastRotation;
 
-		public void Awake () {
-			Add(this);
+		/** Returns true if this object has moved so much that it requires an update.
+		 * When an update to the navmesh has been done, call NotifyUpdated to be able to get
+		 * relavant output from this method again.
+		 */
+		public override bool RequiresUpdate () {
+			return (tr.position-lastPosition).sqrMagnitude > updateDistance*updateDistance || (useRotationAndScale && (Quaternion.Angle(lastRotation, tr.rotation) > updateRotationDistance));
 		}
 
-		public void OnEnable () {
+		/** Forces this navmesh add to update the navmesh.
+		 *
+		 * \note Dynamic updating requires a Tile Handler Helper somewhere in the scene.
+		 * This update is not instant, it is done the next time the TileHandlerHelper checks this instance for
+		 * if it needs updating.
+		 *
+		 * \see TileHandlerHelper.ForceUpdate()
+		 */
+		public override void ForceUpdate () {
+			lastPosition = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+		}
+
+		protected override void Awake () {
+			base.Awake();
 			tr = transform;
 		}
 
-		public void OnDestroy () {
-			Remove(this);
+		/** Internal method to notify the NavmeshAdd that it has just been used to update the navmesh */
+		internal override void NotifyUpdated () {
+			lastPosition = tr.position;
+
+			if (useRotationAndScale) {
+				lastRotation = tr.rotation;
+			}
 		}
 
 		public Vector3 Center {
 			get {
-				return tr.position + (useRotation ? tr.TransformPoint(center) : center);
+				return tr.position + (useRotationAndScale ? tr.TransformPoint(center) : center);
 			}
 		}
 
@@ -154,67 +151,70 @@ namespace Pathfinding {
 			}
 		}
 
-		public Bounds GetBounds () {
-			switch (type) {
-			case MeshType.Rectangle:
-				if (useRotation) {
-					Matrix4x4 m = Matrix4x4.TRS(tr.position, tr.rotation, Vector3.one);
-					bounds = new Bounds(m.MultiplyPoint3x4(center + new Vector3(-rectangleSize.x, 0, -rectangleSize.y)*0.5f), Vector3.zero);
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(rectangleSize.x, 0, -rectangleSize.y)*0.5f));
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(rectangleSize.x, 0, rectangleSize.y)*0.5f));
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(-rectangleSize.x, 0, rectangleSize.y)*0.5f));
+		/** Bounds in XZ space after transforming using the *inverse* transform of the \a inverseTransform parameter.
+		 * The transformation will typically transform the vertices to graph space and this is used to
+		 * figure out which tiles the add intersects.
+		 */
+		internal override Rect GetBounds (Pathfinding.Util.GraphTransform inverseTransform) {
+			if (this.verts == null) RebuildMesh();
+			var verts = Pathfinding.Util.ArrayPool<Int3>.Claim(this.verts != null ? this.verts.Length : 0);
+			int[] tris;
+			GetMesh(ref verts, out tris, inverseTransform);
+
+			Rect r = new Rect();
+			for (int i = 0; i < tris.Length; i++) {
+				var p = (Vector3)verts[tris[i]];
+				if (i == 0) {
+					r = new Rect(p.x, p.z, 0, 0);
 				} else {
-					bounds = new Bounds(tr.position+center, new Vector3(rectangleSize.x, 0, rectangleSize.y));
+					r.xMax = System.Math.Max(r.xMax, p.x);
+					r.yMax = System.Math.Max(r.yMax, p.z);
+					r.xMin = System.Math.Min(r.xMin, p.x);
+					r.yMin = System.Math.Min(r.yMin, p.z);
 				}
-				break;
-			case MeshType.CustomMesh:
-				if (mesh == null) break;
-
-				Bounds b = mesh.bounds;
-				if (useRotation) {
-					Matrix4x4 m = Matrix4x4.TRS(tr.position, tr.rotation, Vector3.one * meshScale);
-					//b.center *= meshScale;
-					//b.size *= meshScale;
-
-					bounds = new Bounds(m.MultiplyPoint3x4(center + b.center), Vector3.zero);
-
-					Vector3 mx = b.max;
-					Vector3 mn = b.min;
-
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mx.x, mn.y, mx.z)));
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mn.x, mn.y, mx.z)));
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mn.x, mx.y, mn.z)));
-					bounds.Encapsulate(m.MultiplyPoint3x4(center + new Vector3(mx.x, mx.y, mn.z)));
-				} else {
-					Vector3 size = b.size*meshScale;
-					bounds = new Bounds(transform.position+center+b.center*meshScale, size);
-				}
-				break;
 			}
-			return bounds;
+
+			Pathfinding.Util.ArrayPool<Int3>.Release(ref verts);
+			return r;
 		}
 
-		public void GetMesh (Int3 offset, ref Int3[] vbuffer, out int[] tbuffer) {
+		/** Copy the mesh to the vertex and triangle buffers after the vertices have been transformed using the inverse of the \a inverseTransform parameter.
+		 *
+		 * \param vbuffer Assumed to be either null or an array which has a length of zero or a power of two. If this mesh has more
+		 *  vertices than can fit in the buffer then the buffer will be pooled using Pathfinding.Util.ArrayPool.Release and
+		 *  a new sufficiently large buffer will be taken from the pool.
+		 * \param tbuffer This will be set to the internal triangle buffer. You must not modify this array.
+		 * \param inverseTransform All vertices will be transformed using the #Pathfinding.GraphTransform.InverseTransform method.
+		 *  This is typically used to transform from world space to graph space.
+		 */
+		public void GetMesh (ref Int3[] vbuffer, out int[] tbuffer, Pathfinding.Util.GraphTransform inverseTransform = null) {
 			if (verts == null) RebuildMesh();
 
 			if (verts == null) {
-				tbuffer = new int[0];
+				tbuffer = Util.ArrayPool<int>.Claim(0);
 				return;
 			}
 
-			if (vbuffer == null || vbuffer.Length < verts.Length) vbuffer = new Int3[verts.Length];
+			if (vbuffer == null || vbuffer.Length < verts.Length) {
+				if (vbuffer != null) Util.ArrayPool<Int3>.Release(ref vbuffer);
+				vbuffer = Util.ArrayPool<Int3>.Claim(verts.Length);
+			}
 			tbuffer = tris;
 
-			if (useRotation) {
+			if (useRotationAndScale) {
 				Matrix4x4 m = Matrix4x4.TRS(tr.position + center, tr.rotation, tr.localScale * meshScale);
 
 				for (int i = 0; i < verts.Length; i++) {
-					vbuffer[i] = offset + (Int3)m.MultiplyPoint3x4(verts[i]);
+					var v = m.MultiplyPoint3x4(verts[i]);
+					if (inverseTransform != null) v = inverseTransform.InverseTransform(v);
+					vbuffer[i] = (Int3)v;
 				}
 			} else {
 				Vector3 voffset = tr.position + center;
 				for (int i = 0; i < verts.Length; i++) {
-					vbuffer[i] = offset + (Int3)(voffset + verts[i]*meshScale);
+					var v = voffset + verts[i]*meshScale;
+					if (inverseTransform != null) v = inverseTransform.InverseTransform(v);
+					vbuffer[i] = (Int3)v;
 				}
 			}
 		}
@@ -229,7 +229,7 @@ namespace Pathfinding {
 
 
 			int[] tbuffer;
-			GetMesh(Int3.zero, ref gizmoBuffer, out tbuffer);
+			GetMesh(ref gizmoBuffer, out tbuffer);
 
 			Gizmos.color = GizmoColor;
 
@@ -242,14 +242,6 @@ namespace Pathfinding {
 				Gizmos.DrawLine(v2, v3);
 				Gizmos.DrawLine(v3, v1);
 			}
-		}
-
-		public void OnDrawGizmosSelected () {
-			Gizmos.color = Color.Lerp(GizmoColor, new Color(1, 1, 1, 0.2f), 0.9f);
-
-			Bounds b = GetBounds();
-			Gizmos.DrawCube(b.center, b.size);
-			Gizmos.DrawWireCube(b.center, b.size);
 		}
 	#endif
 	}

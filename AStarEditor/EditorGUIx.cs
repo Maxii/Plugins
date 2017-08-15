@@ -5,38 +5,142 @@ using UnityEditor;
 namespace Pathfinding {
 	/** Simple GUI utility functions */
 	public static class GUIUtilityx {
-		private static Color prevCol;
+		static Stack<Color> colors = new Stack<Color>();
 
-		public static void SetColor (Color col) {
-			prevCol = GUI.color;
-			GUI.color = col;
+		public static void PushTint (Color tint) {
+			colors.Push(GUI.color);
+			GUI.color *= tint;
 		}
 
-		public static void ResetColor () {
-			GUI.color = prevCol;
+		public static void PopTint () {
+			GUI.color = colors.Pop();
 		}
 	}
 
-	/** Handles fading effects and also some custom GUI functions such as LayerMaskField.
-	 * \warning The code is not pretty.
+	/** Editor helper for hiding and showing a group of GUI elements.
+	 * Call order in OnInspectorGUI should be:
+	 * - Begin
+	 * - Header/HeaderLabel (optional)
+	 * - BeginFade
+	 * - [your gui elements] (if BeginFade returns true)
+	 * - End
 	 */
-	public class EditorGUILayoutx {
-		Dictionary<string, FadeArea> fadeAreas;
+	public class FadeArea {
+		Rect lastRect;
+		float value;
+		float lastUpdate;
+		GUIStyle labelStyle;
+		GUIStyle areaStyle;
+		bool visible;
+		Editor editor;
 
-		/** Global info about which editor is currently active.
-		 * \todo Ugly, rewrite this class at some point...
+		/** Is this area open.
+		 * This is not the same as if any contents are visible, use #BeginFade for that.
 		 */
-		public static Editor editor;
+		public bool open;
 
-		public static GUIStyle defaultAreaStyle;
-		public static GUIStyle defaultLabelStyle;
+		public static bool fancyEffects;
+		const float animationSpeed = 100f;
 
-		const float speed = 8;
-		readonly bool fade = true;
-		public static bool fancyEffects = true;
+		public FadeArea (bool open, Editor editor, GUIStyle areaStyle, GUIStyle labelStyle = null) {
+			this.areaStyle = areaStyle;
+			this.labelStyle = labelStyle;
+			this.editor = editor;
+			visible = this.open = open;
+			value = open ? 1 : 0;
+		}
 
-		Stack<FadeArea> fadeAreaStack;
+		void Tick () {
+			if (Event.current.type == EventType.Repaint) {
+				float deltaTime = Time.realtimeSinceStartup-lastUpdate;
 
+				// Right at the start of a transition the deltaTime will
+				// not be reliable, so use a very small value instead
+				// until the next repaint
+				if (value == 0f || value == 1f) deltaTime = 0.001f;
+				deltaTime = Mathf.Clamp(deltaTime, 0.00001F, 0.1F);
+
+				// Larger regions fade slightly slower
+				deltaTime /= Mathf.Sqrt(Mathf.Max(lastRect.height, 100));
+
+				lastUpdate = Time.realtimeSinceStartup;
+
+
+				float targetValue = open ? 1F : 0F;
+				if (!Mathf.Approximately(targetValue, value)) {
+					value += deltaTime*animationSpeed*Mathf.Sign(targetValue-value);
+					value = Mathf.Clamp01(value);
+					editor.Repaint();
+
+					if (!fancyEffects) {
+						value = targetValue;
+					}
+				} else {
+					value = targetValue;
+				}
+			}
+		}
+
+		public void Begin () {
+			if (areaStyle != null) {
+				lastRect = EditorGUILayout.BeginVertical(areaStyle);
+			} else {
+				lastRect = EditorGUILayout.BeginVertical();
+			}
+		}
+
+		public void HeaderLabel (string label) {
+			GUILayout.Label(label, labelStyle);
+		}
+
+		public void Header (string label) {
+			Header(label, ref open);
+		}
+
+		public void Header (string label, ref bool open) {
+			if (GUILayout.Button(label, labelStyle)) {
+				open = !open;
+				editor.Repaint();
+			}
+			this.open = open;
+		}
+
+		/** Hermite spline interpolation */
+		static float Hermite (float start, float end, float value) {
+			return Mathf.Lerp(start, end, value * value * (3.0f - 2.0f * value));
+		}
+
+		public bool BeginFade () {
+			var hermite = Hermite(0, 1, value);
+
+			visible = EditorGUILayout.BeginFadeGroup(hermite);
+			GUIUtilityx.PushTint(new Color(1, 1, 1, hermite));
+			Tick();
+
+			// Another vertical group is necessary to work around
+			// a kink of the BeginFadeGroup implementation which
+			// causes the padding to change when value!=0 && value!=1
+			EditorGUILayout.BeginVertical();
+
+			return visible;
+		}
+
+		public void End () {
+			EditorGUILayout.EndVertical();
+
+			if (visible) {
+				// Some space that cannot be placed in the GUIStyle unfortunately
+				GUILayout.Space(4);
+
+				EditorGUILayout.EndFadeGroup();
+			}
+
+			EditorGUILayout.EndVertical();
+			GUIUtilityx.PopTint();
+		}
+	}
+	/** Handles fading effects and also some custom GUI functions such as LayerMaskField */
+	public static class EditorGUILayoutx {
 		static Dictionary<int, string[]> layerNames = new Dictionary<int, string[]>();
 		static long lastUpdateTick;
 
@@ -45,249 +149,10 @@ namespace Pathfinding {
 		 */
 		static string[] tagNamesAndEditTagsButton;
 
-		/** Last tiem tagNamesAndEditTagsButton was updated.
+		/** Last time tagNamesAndEditTagsButton was updated.
 		 * Uses EditorApplication.timeSinceStartup
 		 */
 		static double timeLastUpdatedTagNames;
-
-		public void RemoveID (string id) {
-			if (fadeAreas == null) {
-				return;
-			}
-
-			fadeAreas.Remove(id);
-		}
-
-		public bool DrawID (string id) {
-			return fadeAreas != null && fadeAreas[id].Show();
-		}
-
-		public class FadeArea {
-			public Rect currentRect;
-			public Rect lastRect;
-			public float value;
-			public float lastUpdate;
-
-			/** Is this area open.
-			 * This is not the same as if any contents are visible, use #Show for that.
-			 */
-			public bool open;
-
-			public Color preFadeColor;
-
-			/** Update the visibility in Layout to avoid complications with different events not drawing the same thing */
-			private bool visibleInLayout;
-
-			public void Switch () {
-				lastRect = currentRect;
-			}
-
-			public FadeArea (bool open) {
-				value = open ? 1 : 0;
-			}
-
-			/** Should anything inside this FadeArea be drawn.
-			 * Should be called every frame ( in all events ) for best results.
-			 */
-			public bool Show () {
-				if (Event.current.type == EventType.Layout) {
-					visibleInLayout = open || value > 0F;
-				}
-
-				return visibleInLayout;
-			}
-
-			public static implicit operator bool (FadeArea o) {
-				return o.open;
-			}
-		}
-
-		/** Make sure the stack is cleared at the start of a frame */
-		public void ClearFadeAreaStack () {
-			if (fadeAreaStack != null) fadeAreaStack.Clear();
-		}
-
-		public FadeArea BeginFadeArea (bool open, string label, string id) {
-			return BeginFadeArea(open, label, id, defaultAreaStyle);
-		}
-
-		public FadeArea BeginFadeArea (bool open, string label, string id, GUIStyle areaStyle) {
-			return BeginFadeArea(open, label, id, areaStyle, defaultLabelStyle);
-		}
-
-		public FadeArea BeginFadeArea (bool open, string label, string id, GUIStyle areaStyle, GUIStyle labelStyle) {
-			Color tmp1 = GUI.color;
-
-			FadeArea fadeArea = BeginFadeArea(open, id, 20, areaStyle);
-
-			Color tmp2 = GUI.color;
-
-			GUI.color = tmp1;
-
-			if (label != "") {
-				if (GUILayout.Button(label, labelStyle)) {
-					fadeArea.open = !fadeArea.open;
-					editor.Repaint();
-				}
-			}
-
-			GUI.color = tmp2;
-
-			return fadeArea;
-		}
-
-		public FadeArea BeginFadeArea (bool open, string id) {
-			return BeginFadeArea(open, id, 0);
-		}
-
-		public FadeArea BeginFadeArea (bool open, string id, float minHeight) {
-			return BeginFadeArea(open, id, minHeight, GUIStyle.none);
-		}
-
-		public FadeArea BeginFadeArea (bool open, string id, float minHeight, GUIStyle areaStyle) {
-			if (editor == null) {
-				Debug.LogError("You need to set the 'EditorGUIx.editor' variable before calling this function");
-				return null;
-			}
-
-			if (fadeAreaStack == null) {
-				fadeAreaStack = new Stack<FadeArea>();
-			}
-
-			if (fadeAreas == null) {
-				fadeAreas = new Dictionary<string, FadeArea>();
-			}
-
-			FadeArea fadeArea;
-			if (!fadeAreas.TryGetValue(id, out fadeArea)) {
-				fadeArea = new FadeArea(open);
-				fadeAreas.Add(id, fadeArea);
-			}
-
-			fadeAreaStack.Push(fadeArea);
-
-			fadeArea.open = open;
-
-			// Make sure the area fills the full width
-			areaStyle.stretchWidth = true;
-
-			Rect lastRect = fadeArea.lastRect;
-
-			if (!fancyEffects) {
-				fadeArea.value = open ? 1F : 0F;
-				lastRect.height -= minHeight;
-				lastRect.height = open ? lastRect.height : 0;
-				lastRect.height += minHeight;
-			} else {
-				lastRect.height = lastRect.height < minHeight ? minHeight : lastRect.height;
-				lastRect.height -= minHeight;
-				float faded = Hermite(0F, 1F, fadeArea.value);
-				lastRect.height *= faded;
-				lastRect.height += minHeight;
-				lastRect.height = Mathf.Round(lastRect.height);
-			}
-
-			Rect gotLastRect = GUILayoutUtility.GetRect(new GUIContent(), areaStyle, GUILayout.Height(lastRect.height));
-
-			//The clipping area, also drawing background
-			GUILayout.BeginArea(lastRect, areaStyle);
-
-			Rect newRect = EditorGUILayout.BeginVertical();
-
-			if (Event.current.type == EventType.Repaint || Event.current.type == EventType.ScrollWheel) {
-				newRect.x = gotLastRect.x;
-				newRect.y = gotLastRect.y;
-				newRect.width = gotLastRect.width;
-				newRect.height += areaStyle.padding.top+ areaStyle.padding.bottom;
-				fadeArea.currentRect = newRect;
-
-				if (fadeArea.lastRect != newRect) {
-					//@Fix - duplicate
-					//fadeArea.lastUpdate = Time.realtimeSinceStartup;
-					editor.Repaint();
-				}
-
-				fadeArea.Switch();
-			}
-
-			if (Event.current.type == EventType.Repaint) {
-				float value = fadeArea.value;
-				float targetValue = open ? 1F : 0F;
-
-				float newRectHeight = fadeArea.lastRect.height;
-				float deltaHeight = 400F / newRectHeight;
-
-				float deltaTime = Mathf.Clamp(Time.realtimeSinceStartup-fadeAreas[id].lastUpdate, 0.00001F, 0.05F);
-
-				deltaTime *= Mathf.Lerp(deltaHeight*deltaHeight*0.01F, 0.8F, 0.9F);
-
-				fadeAreas[id].lastUpdate = Time.realtimeSinceStartup;
-
-
-				if (Mathf.Abs(targetValue-value) > 0.001F) {
-					float time = Mathf.Clamp01(deltaTime*speed);
-					value += time*Mathf.Sign(targetValue-value);
-					editor.Repaint();
-				} else {
-					value = Mathf.Round(value);
-				}
-
-				fadeArea.value = Mathf.Clamp01(value);
-			}
-
-			if (fade) {
-				Color c = GUI.color;
-				fadeArea.preFadeColor = c;
-				c.a *= fadeArea.value;
-				GUI.color = c;
-			}
-
-			fadeArea.open = open;
-
-			return fadeArea;
-		}
-
-		public void EndFadeArea () {
-			if (fadeAreaStack.Count <= 0) {
-				Debug.LogError("You are popping more Fade Areas than you are pushing, make sure they are balanced");
-				return;
-			}
-
-			FadeArea fadeArea = fadeAreaStack.Pop();
-
-			EditorGUILayout.EndVertical();
-			GUILayout.EndArea();
-
-			if (fade) {
-				GUI.color = fadeArea.preFadeColor;
-			}
-		}
-
-		/** Returns width of current editor indent.
-		 * Unity seems to use 13+6*EditorGUI.indentLevel in U3
-		 * and 15*indent - (indent > 1 ? 2 : 0) or something like that in U4
-		 */
-		static int IndentWidth () {
-			//Works well for indent levels 0,1,2 at least
-			return 15*EditorGUI.indentLevel - (EditorGUI.indentLevel > 1 ? 2 : 0);
-		}
-
-		/** Begin horizontal indent for the next control.
-		 * Fake "real" indent when using EditorGUIUtility.LookLikeControls.\n
-		 * Forumula used is 13+6*EditorGUI.indentLevel
-		 */
-		public static void BeginIndent () {
-			GUILayout.BeginHorizontal();
-			GUILayout.Space(IndentWidth());
-		}
-
-		/** End indent.
-		 * Actually just a EndHorizontal call.
-		 * \see BeginIndent
-		 */
-		public static void EndIndent () {
-			GUILayout.EndHorizontal();
-		}
 
 		public static int TagField (string label, int value) {
 			// Make sure the tagNamesAndEditTagsButton is relatively up to date
@@ -368,28 +233,6 @@ namespace Pathfinding {
 			GUILayout.EndHorizontal();
 		}
 
-		public static int UpDownArrows (GUIContent label, int value, GUIStyle labelStyle, GUIStyle upArrow, GUIStyle downArrow) {
-			GUILayout.BeginHorizontal();
-			GUILayout.Space(EditorGUI.indentLevel*10);
-			GUILayout.Label(label, labelStyle, GUILayout.Width(170));
-
-			if (downArrow == null || upArrow == null) {
-				upArrow = GUI.skin.FindStyle("Button");
-				downArrow = upArrow;
-			}
-
-			if (GUILayout.Button("", upArrow, GUILayout.Width(16), GUILayout.Height(12))) {
-				value++;
-			}
-			if (GUILayout.Button("", downArrow, GUILayout.Width(16), GUILayout.Height(12))) {
-				value--;
-			}
-
-			GUILayout.Space(100);
-			GUILayout.EndHorizontal();
-			return value;
-		}
-
 		public static bool UnityTagMaskList (GUIContent label, bool foldout, List<string> tagMask) {
 			if (tagMask == null) throw new System.ArgumentNullException("tagMask");
 			if (EditorGUILayout.Foldout(foldout, label)) {
@@ -449,10 +292,6 @@ namespace Pathfinding {
 
 			selected.value = EditorGUILayout.MaskField(label, selected.value, currentLayerNames);
 			return selected;
-		}
-
-		public static float Hermite (float start, float end, float value) {
-			return Mathf.Lerp(start, end, value * value * (3.0f - 2.0f * value));
 		}
 	}
 }

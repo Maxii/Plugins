@@ -1,7 +1,6 @@
 #pragma warning disable 414
 using System.Collections.Generic;
 using UnityEngine;
-using Pathfinding;
 
 namespace Pathfinding {
 	public enum HeuristicOptimizationMode {
@@ -107,7 +106,7 @@ namespace Pathfinding {
 
 		void GetClosestWalkableNodesToChildrenRecursively (Transform tr, List<GraphNode> nodes) {
 			foreach (Transform ch in tr) {
-				NNInfo info = AstarPath.active.GetNearest(ch.position, NNConstraint.Default);
+				var info = AstarPath.active.GetNearest(ch.position, NNConstraint.Default);
 				if (info.node != null && info.node.Walkable) {
 					nodes.Add(info.node);
 				}
@@ -145,7 +144,6 @@ namespace Pathfinding {
 							}
 						}
 					}
-					return true;
 				});
 			}
 		}
@@ -157,11 +155,9 @@ namespace Pathfinding {
 			// Find any node in the graphs
 			for (int j = 0; j < graphs.Length; j++) {
 				graphs[j].GetNodes(node => {
-					if (node != null && node.Walkable) {
+					if (node != null && node.Walkable && first == null) {
 						first = node;
-						return false;
 					}
-					return true;
 				});
 			}
 
@@ -254,12 +250,12 @@ namespace Pathfinding {
 				}
 			};
 
-			startCostCalculation = (int k) => {
-				GraphNode pivot = pivots[k];
+			startCostCalculation = (int pivotIndex) => {
+				GraphNode pivot = pivots[pivotIndex];
 
-				FloodPath fp = null;
-				fp = FloodPath.Construct(pivot, onComplete);
-				fp.immediateCallback = (Path _p) =>  {
+				FloodPath floodPath = null;
+				floodPath = FloodPath.Construct(pivot, onComplete);
+				floodPath.immediateCallback = (Path _p) =>  {
 					// Handle path pooling
 					_p.Claim(this);
 
@@ -268,11 +264,11 @@ namespace Pathfinding {
 					// instead of the node centers
 					// so we have to remove the cost for the first and last connection
 					// in each path
-					var mn = pivot as MeshNode;
+					var meshNode = pivot as MeshNode;
 					uint costOffset = 0;
-					if (mn != null && mn.connectionCosts != null) {
-						for (int i = 0; i < mn.connectionCosts.Length; i++) {
-							costOffset = System.Math.Max(costOffset, mn.connectionCosts[i]);
+					if (meshNode != null && meshNode.connections != null) {
+						for (int i = 0; i < meshNode.connections.Length; i++) {
+							costOffset = System.Math.Max(costOffset, meshNode.connections[i].cost);
 						}
 					}
 
@@ -282,23 +278,22 @@ namespace Pathfinding {
 					// to avoid resizing the internal array too often
 					for (int j = graphs.Length-1; j >= 0; j--) {
 						graphs[j].GetNodes(node => {
-							int idx = node.NodeIndex*pivotCount + k;
+							int idx = node.NodeIndex*pivotCount + pivotIndex;
 							EnsureCapacity(idx);
-							PathNode pn = fp.pathHandler.GetPathNode(node);
+							PathNode pn = ((IPathInternals)floodPath).PathHandler.GetPathNode(node);
 							if (costOffset > 0) {
-								costs[idx] = pn.pathID == fp.pathID && pn.parent != null ? System.Math.Max(pn.parent.G-costOffset, 0) : 0;
+								costs[idx] = pn.pathID == floodPath.pathID && pn.parent != null ? System.Math.Max(pn.parent.G-costOffset, 0) : 0;
 							} else {
-								costs[idx] = pn.pathID == fp.pathID ? pn.G : 0;
+								costs[idx] = pn.pathID == floodPath.pathID ? pn.G : 0;
 							}
-							return true;
 						});
 					}
 
-					if (mode == HeuristicOptimizationMode.RandomSpreadOut && k < pivots.Length-1) {
+					if (mode == HeuristicOptimizationMode.RandomSpreadOut && pivotIndex < pivots.Length-1) {
 						// If the next pivot is null
 						// then find the node which is furthest away from the earlier
 						// pivot points
-						if (pivots[k+1] == null) {
+						if (pivots[pivotIndex+1] == null) {
 							int best = -1;
 							uint bestScore = 0;
 
@@ -309,11 +304,11 @@ namespace Pathfinding {
 							for (int j = 1; j < totCount; j++) {
 								// Find the minimum distance from the node to all existing pivot points
 								uint mx = 1 << 30;
-								for (int p = 0; p <= k; p++) mx = System.Math.Min(mx, costs[j*pivotCount + p]);
+								for (int p = 0; p <= pivotIndex; p++) mx = System.Math.Min(mx, costs[j*pivotCount + p]);
 
 								// Pick the node which has the largest minimum distance to the existing pivot points
 								// (i.e pick the one furthest away from the existing ones)
-								GraphNode node = fp.pathHandler.GetPathNode(j).node;
+								GraphNode node = ((IPathInternals)floodPath).PathHandler.GetPathNode(j).node;
 								if ((mx > bestScore || best == -1) && node != null && !node.Destroyed && node.Walkable) {
 									best = j;
 									bestScore = mx;
@@ -325,18 +320,18 @@ namespace Pathfinding {
 								return;
 							}
 
-							pivots[k+1] = fp.pathHandler.GetPathNode(best).node;
+							pivots[pivotIndex+1] = ((IPathInternals)floodPath).PathHandler.GetPathNode(best).node;
 						}
 
 						// Start next path
-						startCostCalculation(k+1);
+						startCostCalculation(pivotIndex+1);
 					}
 
 					// Handle path pooling
 					_p.Release(this);
 				};
 
-				AstarPath.StartPath(fp, true);
+				AstarPath.StartPath(floodPath, true);
 			};
 
 			if (mode != HeuristicOptimizationMode.RandomSpreadOut) {
@@ -403,7 +398,7 @@ namespace Pathfinding {
 											for (int piv = 0; piv < pivotCount; piv++) {
 												uint cost = costs[adjacentNode.NodeIndex*pivotCount + piv] + gg.neighbourCosts[d];
 												costs[pivotIndex + piv] = System.Math.Min(costs[pivotIndex + piv], cost);
-												Debug.DrawLine((Vector3)node.position, (Vector3)adjacentNode.position, Color.blue, 1);
+												//Debug.DrawLine((Vector3)node.position, (Vector3)adjacentNode.position, Color.blue, 1);
 											}
 										}
 									}

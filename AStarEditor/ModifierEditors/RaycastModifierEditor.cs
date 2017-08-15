@@ -1,6 +1,4 @@
-using UnityEngine;
 using UnityEditor;
-using Pathfinding;
 
 namespace Pathfinding {
 	[CustomEditor(typeof(RaycastModifier))]
@@ -20,6 +18,8 @@ namespace Pathfinding {
 		}
 
 		public override void OnInspectorGUI () {
+			serializedObject.Update();
+
 			EditorGUI.indentLevel = 0;
 
 			EditorGUILayout.PropertyField(iterations);

@@ -101,44 +101,10 @@ namespace Pathfinding {
 		 * Binary heap to keep track of nodes on the "Open list".
 		 * \see https://en.wikipedia.org/wiki/A*_search_algorithm
 		 */
-		private BinaryHeapM heap = new BinaryHeapM(128);
+		public readonly BinaryHeap heap = new BinaryHeap(128);
 
 		/** ID for the path currently being calculated or last path that was calculated */
 		public ushort PathID { get { return pathID; } }
-
-		/** Push a node to the heap */
-		public void PushNode (PathNode node) {
-			heap.Add(node);
-		}
-
-		/** Pop the node with the lowest F score from the heap */
-		public PathNode PopNode () {
-			return heap.Remove();
-		}
-
-		/** The internal heap.
-		 * \note Most things can be accomplished with other methods on this class instead.
-		 *
-		 * \see PushNode
-		 * \see PopNode
-		 * \see HeapEmpty
-		 */
-		public BinaryHeapM GetHeap () {
-			return heap;
-		}
-
-		/** Rebuild the heap to account for changed node values.
-		 * Some path types change the target for the H score in the middle of the path calculation,
-		 * that requires rebuilding the heap to keep it correctly sorted.
-		 */
-		public void RebuildHeap () {
-			heap.Rebuild();
-		}
-
-		/** True if the heap is empty */
-		public bool HeapEmpty () {
-			return heap.numberOfItems <= 0;
-		}
 
 		/** Log2 size of buckets.
 		 * So 10 yields a real bucket size of 1024.
@@ -201,9 +167,14 @@ namespace Pathfinding {
 		public void DestroyNode (GraphNode node) {
 			PathNode pn = GetPathNode(node);
 
-			//Clean up reference to help GC
+			// Clean up references to help the GC
 			pn.node = null;
 			pn.parent = null;
+			// This is not required for pathfinding, but not clearing it may confuse gizmo drawing for a fraction of a second.
+			// Especially when 'Show Search Tree' is enabled
+			pn.pathID = 0;
+			pn.G = 0;
+			pn.H = 0;
 		}
 
 		/** Internal method to initialize node data */

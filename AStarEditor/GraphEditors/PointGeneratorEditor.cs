@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEditor;
 
 namespace Pathfinding {
-	[CustomGraphEditor(typeof(PointGraph), "PointGraph")]
+	[CustomGraphEditor(typeof(PointGraph), "Point Graph")]
 	public class PointGraphEditor : GraphEditor {
 		public override void OnInspectorGUI (NavGraph target) {
 			var graph = target as PointGraph;
@@ -41,40 +41,6 @@ namespace Pathfinding {
 			}
 
 			graph.optimizeForSparseGraph = EditorGUILayout.Toggle(new GUIContent("Optimize For Sparse Graph", "Check online documentation for more information."), graph.optimizeForSparseGraph);
-
-			if (graph.optimizeForSparseGraph) {
-				EditorGUI.indentLevel++;
-
-				graph.optimizeFor2D = EditorGUILayout.Toggle(new GUIContent("Optimize For XZ Plane", "Check online documentation for more information."), graph.optimizeFor2D);
-
-				EditorGUI.indentLevel--;
-			}
-		}
-
-		public override void OnDrawGizmos () {
-			var graph = target as PointGraph;
-
-			if (graph == null || graph.active == null || !graph.active.showNavGraphs) {
-				return;
-			}
-
-			Gizmos.color = new Color(0.161F, 0.341F, 1F, 0.5F);
-
-			if (graph.root != null) {
-				DrawChildren(graph, graph.root);
-			} else if (!string.IsNullOrEmpty(graph.searchTag)) {
-				GameObject[] gos = GameObject.FindGameObjectsWithTag(graph.searchTag);
-				for (int i = 0; i < gos.Length; i++) {
-					Gizmos.DrawCube(gos[i].transform.position, Vector3.one*HandleUtility.GetHandleSize(gos[i].transform.position)*0.1F);
-				}
-			}
-		}
-
-		public void DrawChildren (PointGraph graph, Transform tr) {
-			foreach (Transform child in tr) {
-				Gizmos.DrawCube(child.position, Vector3.one*HandleUtility.GetHandleSize(child.position)*0.1F);
-				if (graph.recursive) DrawChildren(graph, child);
-			}
 		}
 	}
 }

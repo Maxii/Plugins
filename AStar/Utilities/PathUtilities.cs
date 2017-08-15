@@ -6,7 +6,7 @@ namespace Pathfinding {
 	/** Contains useful functions for working with paths and nodes.
 	 * This class works a lot with the Node class, a useful function to get nodes is AstarPath.GetNearest.
 	 * \see AstarPath.GetNearest
-	 * \see Pathfinding.Utils.GraphUpdateUtilities
+	 * \see Pathfinding.GraphUpdateUtilities
 	 * \since Added in version 3.2
 	 * \ingroup utils
 	 *
@@ -111,7 +111,7 @@ namespace Pathfinding {
 			/** \todo Pool */
 			var map = new HashSet<GraphNode>();
 
-			GraphNodeDelegate callback;
+			System.Action<GraphNode> callback;
 			if (tagMask == -1) {
 				callback = delegate(GraphNode node) {
 					if (node.Walkable && map.Add(node)) {
@@ -191,7 +191,7 @@ namespace Pathfinding {
 			List<GraphNode> result = ListPool<GraphNode>.Claim();
 
 			int currentDist = -1;
-			GraphNodeDelegate callback;
+			System.Action<GraphNode> callback;
 			if (tagMask == -1) {
 				callback = node => {
 					if (node.Walkable && !map.ContainsKey(node)) {
@@ -290,6 +290,14 @@ namespace Pathfinding {
 		/** Will calculate a number of points around \a p which are on the graph and are separated by \a clearance from each other.
 		 * This is like GetPointsAroundPoint except that \a previousPoints are treated as being in world space.
 		 * The average of the points will be found and then that will be treated as the group center.
+		 *
+		 * \param p The point to generate points around
+		 * \param g The graph to use for linecasting. If you are only using one graph, you can get this by AstarPath.active.graphs[0] as IRaycastableGraph.
+		 * Note that not all graphs are raycastable, recast, navmesh and grid graphs are raycastable. On recast and navmesh it works the best.
+		 * \param previousPoints The points to use for reference. Note that these are in world space.
+		 *      The new points will overwrite the existing points in the list. The result will be in world space.
+		 * \param radius The final points will be at most this distance from \a p.
+		 * \param clearanceRadius The points will if possible be at least this distance from each other.
 		 */
 		public static void GetPointsAroundPointWorld (Vector3 p, IRaycastableGraph g, List<Vector3> previousPoints, float radius, float clearanceRadius) {
 			if (previousPoints.Count == 0) return;
@@ -314,8 +322,11 @@ namespace Pathfinding {
 		 * \param g The graph to use for linecasting. If you are only using one graph, you can get this by AstarPath.active.graphs[0] as IRaycastableGraph.
 		 * Note that not all graphs are raycastable, recast, navmesh and grid graphs are raycastable. On recast and navmesh it works the best.
 		 * \param previousPoints The points to use for reference. Note that these should not be in world space. They are treated as relative to \a p.
+		 *      The new points will overwrite the existing points in the list. The result will be in world space, not relative to \a p.
 		 * \param radius The final points will be at most this distance from \a p.
 		 * \param clearanceRadius The points will if possible be at least this distance from each other.
+		 *
+		 * \todo Write unit tests
 		 */
 		public static void GetPointsAroundPoint (Vector3 p, IRaycastableGraph g, List<Vector3> previousPoints, float radius, float clearanceRadius) {
 			if (g == null) throw new System.ArgumentNullException("g");
@@ -324,7 +335,7 @@ namespace Pathfinding {
 
 			if (graph == null) throw new System.ArgumentException("g is not a NavGraph");
 
-			NNInfo nn = graph.GetNearestForce(p, NNConstraint.Default);
+			NNInfoInternal nn = graph.GetNearestForce(p, NNConstraint.Default);
 			p = nn.clampedPosition;
 
 			if (nn.node == null) {
@@ -346,20 +357,31 @@ namespace Pathfinding {
 				float newMagn = radius;//magn > radius ? radius : magn;
 				dir *= newMagn;
 
-				bool worked = false;
-
 				GraphHitInfo hit;
 
 				int tests = 0;
-				do {
+				while (true) {
 					Vector3 pt = p + dir;
 
 					if (g.Linecast(p, pt, nn.node, out hit)) {
-						pt = hit.point;
+						if (hit.point == Vector3.zero) {
+							// Oops, linecast actually failed completely
+							// try again unless we have tried lots of times
+							// then we just continue anyway
+							tests++;
+							if (tests > 8) {
+								previousPoints[i] = pt;
+								break;
+							}
+						} else {
+							pt = hit.point;
+						}
 					}
 
+					bool worked = false;
+
 					for (float q = 0.1f; q <= 1.0f; q += 0.05f) {
-						Vector3 qt = (pt - p)*q + p;
+						Vector3 qt = Vector3.Lerp(p, pt, q);
 						worked = true;
 						for (int j = 0; j < i; j++) {
 							if ((previousPoints[j] - qt).sqrMagnitude < clearanceRadius) {
@@ -368,25 +390,27 @@ namespace Pathfinding {
 							}
 						}
 
-						if (worked) {
+						// Abort after 8 tests or when we have found a valid point
+						if (worked || tests > 8) {
+							worked = true;
 							previousPoints[i] = qt;
 							break;
 						}
 					}
 
-					if (!worked) {
-						// Abort after 8 tries
-						if (tests > 8) {
-							worked = true;
-						} else {
-							clearanceRadius *= 0.9f;
-							// This will pick points in 2D closer to the edge of the circle with a higher probability
-							dir = Random.onUnitSphere * Mathf.Lerp(newMagn, radius, tests / 5);
-							dir.y = 0;
-							tests++;
-						}
+					// Break out of nested loop
+					if (worked) {
+						break;
 					}
-				} while (!worked);
+
+					// If we could not find a valid point, reduce the clearance radius slightly to improve
+					// the chances next time
+					clearanceRadius *= 0.9f;
+					// This will pick points in 2D closer to the edge of the circle with a higher probability
+					dir = Random.onUnitSphere * Mathf.Lerp(newMagn, radius, tests / 5);
+					dir.y = 0;
+					tests++;
+				}
 			}
 		}
 
@@ -395,19 +419,22 @@ namespace Pathfinding {
 		 * For other node types, only the positions of the nodes will be used.
 		 *
 		 * clearanceRadius will be reduced if no valid points can be found.
+		 *
+		 * \note This method assumes that the nodes in the list have the same type for some special cases.
+		 * More specifically if the first node is not a TriangleMeshNode or a GridNode, it will use a fast path
+		 * which assumes that all nodes in the list have the same area (which usually is an area of zero and the
+		 * nodes are all PointNodes).
 		 */
 		public static List<Vector3> GetPointsOnNodes (List<GraphNode> nodes, int count, float clearanceRadius = 0) {
 			if (nodes == null) throw new System.ArgumentNullException("nodes");
 			if (nodes.Count == 0) throw new System.ArgumentException("no nodes passed");
-
-			var rnd = new System.Random();
 
 			List<Vector3> pts = ListPool<Vector3>.Claim(count);
 
 			// Square
 			clearanceRadius *= clearanceRadius;
 
-			if (nodes[0] is TriangleMeshNode
+			if (clearanceRadius > 0 || nodes[0] is TriangleMeshNode
 #if !ASTAR_NO_GRID_GRAPH
 				|| nodes[0] is GridNode
 #endif
@@ -419,27 +446,12 @@ namespace Pathfinding {
 				float tot = 0;
 
 				for (int i = 0; i < nodes.Count; i++) {
-					var tnode = nodes[i] as TriangleMeshNode;
-					if (tnode != null) {
-						/** \bug Doesn't this need to be divided by 2? */
-						float a = System.Math.Abs(VectorMath.SignedTriangleAreaTimes2XZ(tnode.GetVertex(0), tnode.GetVertex(1), tnode.GetVertex(2)));
-						tot += a;
-						accs.Add(tot);
-					}
-#if !ASTAR_NO_GRID_GRAPH
-					else {
-						var gnode = nodes[i] as GridNode;
-
-						if (gnode != null) {
-							GridGraph gg = GridNode.GetGridGraph(gnode.GraphIndex);
-							float a = gg.nodeSize*gg.nodeSize;
-							tot += a;
-							accs.Add(tot);
-						} else {
-							accs.Add(tot);
-						}
-					}
-#endif
+					var surfaceArea = nodes[i].SurfaceArea();
+					// Ensures that even if the nodes have a surface area of 0, a random one will still be picked
+					// instead of e.g always picking the first or the last one.
+					surfaceArea += 0.001f;
+					tot += surfaceArea;
+					accs.Add(tot);
 				}
 
 				for (int i = 0; i < count; i++) {
@@ -451,59 +463,27 @@ namespace Pathfinding {
 					while (!worked) {
 						worked = true;
 
-						//If no valid points can be found, progressively lower the clearance radius until such a point is found
+						// If no valid points could be found, progressively lower the clearance radius until such a point is found
 						if (testCount >= testLimit) {
-							clearanceRadius *= 0.8f;
+							// Note that clearanceRadius is a squared radius
+							clearanceRadius *= 0.9f*0.9f;
 							testLimit += 10;
 							if (testLimit > 100) clearanceRadius = 0;
 						}
 
 						// Pick a random node among the ones in the list weighted by their area
-						float tg = (float)rnd.NextDouble()*tot;
+						float tg = Random.value*tot;
 						int v = accs.BinarySearch(tg);
 						if (v < 0) v = ~v;
 
 						if (v >= nodes.Count) {
-							// This shouldn't happen, due to NextDouble being smaller than 1... but I don't trust floating point arithmetic.
+							// Cover edge cases
 							worked = false;
 							continue;
 						}
 
-						var node = nodes[v] as TriangleMeshNode;
-
-						Vector3 p;
-
-						if (node != null) {
-							// Find a random point inside the triangle
-							// This generates uniformly distributed trilinear coordinates
-							// See http://mathworld.wolfram.com/TrianglePointPicking.html
-							float v1;
-							float v2;
-							do {
-								v1 = (float)rnd.NextDouble();
-								v2 = (float)rnd.NextDouble();
-							} while (v1+v2 > 1);
-
-							// Pick the point corresponding to the trilinear coordinate
-							p = ((Vector3)(node.GetVertex(1)-node.GetVertex(0)))*v1 + ((Vector3)(node.GetVertex(2)-node.GetVertex(0)))*v2 + (Vector3)node.GetVertex(0);
-						} else {
-#if !ASTAR_NO_GRID_GRAPH
-							var gnode = nodes[v] as GridNode;
-
-							if (gnode != null) {
-								GridGraph gg = GridNode.GetGridGraph(gnode.GraphIndex);
-
-								float v1 = (float)rnd.NextDouble();
-								float v2 = (float)rnd.NextDouble();
-								p = (Vector3)gnode.position + new Vector3(v1 - 0.5f, 0, v2 - 0.5f) * gg.nodeSize;
-							} else
-#endif
-							{
-								//Point nodes have no area, so we break directly instead
-								pts.Add((Vector3)nodes[v].position);
-								break;
-							}
-						}
+						var node = nodes[v];
+						var p = node.RandomPointOnSurface();
 
 						// Test if it is some distance away from the other points
 						if (clearanceRadius > 0) {
@@ -525,8 +505,9 @@ namespace Pathfinding {
 
 				ListPool<float>.Release(accs);
 			} else {
+				// Fast path, assumes all nodes have the same area (usually zero)
 				for (int i = 0; i < count; i++) {
-					pts.Add((Vector3)nodes[rnd.Next(nodes.Count)].position);
+					pts.Add((Vector3)nodes[Random.Range(0, nodes.Count)].RandomPointOnSurface());
 				}
 			}
 

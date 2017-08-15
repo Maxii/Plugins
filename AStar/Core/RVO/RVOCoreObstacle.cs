@@ -1,5 +1,4 @@
 using UnityEngine;
-using System.Collections;
 
 namespace Pathfinding.RVO {
 	/** One vertex in an obstacle.
@@ -19,15 +18,6 @@ namespace Pathfinding.RVO {
 		/** Collision layer for this obstacle */
 		public RVOLayer layer = RVOLayer.DefaultObstacle;
 
-		/** Specifies if this is a convex or concave vertex.
-		 * \note Not used at the moment
-		 */
-		public bool convex;
-
-		/** True if this vertex was created by the KDTree for internal reasons.
-		 * \note Not used at the moment
-		 */
-		public bool split = false;
 
 		/** Next vertex in the obstacle */
 		public ObstacleVertex next;

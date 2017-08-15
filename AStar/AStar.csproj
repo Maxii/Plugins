@@ -72,6 +72,7 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Core\AI\AIBase.cs" />
     <Compile Include="Core\AI\AILerp.cs" />
     <Compile Include="Core\AI\AIPath.cs" />
     <Compile Include="Core\AI\NavmeshController.cs" />
@@ -89,15 +90,19 @@
     <Compile Include="Core\Misc\AstarDebugger.cs" />
     <Compile Include="Core\Misc\AstarEnumFlagAttr.cs" />
     <Compile Include="Core\Misc\BinaryHeap.cs" />
+    <Compile Include="Core\Misc\Draw.cs" />
+    <Compile Include="Core\Misc\EditorResourceHelper.cs" />
     <Compile Include="Core\Misc\GraphEditorBase.cs" />
     <Compile Include="Core\Misc\GraphModifier.cs" />
     <Compile Include="Core\Misc\GraphUpdateProcessor.cs" />
     <Compile Include="Core\Misc\Int3.cs" />
     <Compile Include="Core\Misc\ListPool.cs" />
+    <Compile Include="Core\Misc\MovementUtilities.cs" />
     <Compile Include="Core\Misc\NodeLink.cs" />
     <Compile Include="Core\Misc\NodeLink2.cs" />
     <Compile Include="Core\Misc\NodeLink3.cs" />
     <Compile Include="Core\Misc\ObjectPool.cs" />
+    <Compile Include="Core\Misc\PathInterpolator.cs" />
     <Compile Include="Core\Misc\PathPool.cs" />
     <Compile Include="Core\Misc\PathProcessor.cs" />
     <Compile Include="Core\Misc\PathReturnQueue.cs" />
@@ -118,9 +123,11 @@
     <Compile Include="Core\Serialization\SimpleJsonReplacement.cs" />
     <Compile Include="Core\Serialization\SimpleZipReplacement.cs" />
     <Compile Include="Core\Serialization\TinyJson.cs" />
+    <Compile Include="Core\VersionedMonoBehaviour.cs" />
     <Compile Include="Generators\Base.cs" />
     <Compile Include="Generators\GridGenerator.cs" />
     <Compile Include="Generators\LayerGridGraphGenerator.cs" />
+    <Compile Include="Generators\NavmeshBase.cs" />
     <Compile Include="Generators\NavMeshGenerator.cs" />
     <Compile Include="Generators\NodeClasses\GridNode.cs" />
     <Compile Include="Generators\NodeClasses\GridNodeBase.cs" />
@@ -131,8 +138,12 @@
     <Compile Include="Generators\RecastGenerator.cs" />
     <Compile Include="Generators\Utilities\BBTree.cs" />
     <Compile Include="Generators\Utilities\EuclideanEmbedding.cs" />
+    <Compile Include="Generators\Utilities\GraphTransform.cs" />
+    <Compile Include="Generators\Utilities\GridLookup.cs" />
     <Compile Include="Generators\Utilities\NavMeshRenderer.cs" />
+    <Compile Include="Generators\Utilities\NavmeshTile.cs" />
     <Compile Include="Generators\Utilities\ObjImporter.cs" />
+    <Compile Include="Generators\Utilities\PointKDTree.cs" />
     <Compile Include="Generators\Utilities\RecastBBTree.cs" />
     <Compile Include="Generators\Utilities\RecastMeshGatherer.cs" />
     <Compile Include="Generators\Utilities\RecastMeshObj.cs" />
@@ -171,15 +182,19 @@
     <Compile Include="RVO\RVOObstacle.cs" />
     <Compile Include="RVO\RVOSimulator.cs" />
     <Compile Include="RVO\RVOSquareObstacle.cs" />
+    <Compile Include="TurnBased\BlockManager.cs" />
+    <Compile Include="TurnBased\SingleNodeBlocker.cs" />
     <Compile Include="Utilities\AstarChecksum.cs" />
     <Compile Include="Utilities\AstarMemory.cs" />
-    <Compile Include="Utilities\AstarParallel.cs" />
     <Compile Include="Utilities\AstarProfiler.cs" />
     <Compile Include="Utilities\DotNetReplacements.cs" />
+    <Compile Include="Utilities\Funnel.cs" />
+    <Compile Include="Utilities\GraphGizmoHelper.cs" />
     <Compile Include="Utilities\GraphUpdateUtilities.cs" />
     <Compile Include="Utilities\LockFreeStack.cs" />
     <Compile Include="Utilities\PathUtilities.cs" />
     <Compile Include="Utilities\ProfileHelper.cs" />
+    <Compile Include="Utilities\RetainedGizmos.cs" />
     <Compile Include="Utilities\UnityReferenceHelper.cs" />
   </ItemGroup>
   <ItemGroup />

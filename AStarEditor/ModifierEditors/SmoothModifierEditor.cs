@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEditor;
-using Pathfinding;
 
 namespace Pathfinding {
 	[CustomEditor(typeof(SimpleSmoothModifier))]
@@ -21,6 +20,8 @@ namespace Pathfinding {
 		}
 
 		public override void OnInspectorGUI () {
+			serializedObject.Update();
+
 			EditorGUILayout.PropertyField(smoothType);
 
 			if (!smoothType.hasMultipleDifferentValues) {

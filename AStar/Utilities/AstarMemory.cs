@@ -1,35 +1,8 @@
 using System;
 
 namespace Pathfinding.Util {
+	/** Various utilities for handling arrays and memory */
 	public static class Memory {
-		/** Sets all values in an array to a specific value faster than a loop.
-		 * Only faster for large arrays. Slower for small ones.
-		 * Tests indicate it becomes faster somewhere when the length of the array grows above around 100.
-		 * For large arrays this can be magnitudes faster. Up to 40 times faster has been measured.
-		 *
-		 * \see System.Buffer.BlockCopy
-		 */
-		public static void MemSet (byte[] array, byte value) {
-			if (array == null) {
-				throw new ArgumentNullException("array");
-			}
-
-			int block = 32, index = 0;
-			int length = Math.Min(block, array.Length);
-
-			//Fill the initial array
-			while (index < length) {
-				array[index++] = value;
-			}
-
-			length = array.Length;
-			while (index < length) {
-				Buffer.BlockCopy(array, 0, array, index, Math.Min(block, length-index));
-				index += block;
-				block *= 2;
-			}
-		}
-
 		/** Sets all values in an array to a specific value faster than a loop.
 		 * Only faster for large arrays. Slower for small ones.
 		 * Tests indicate it becomes faster somewhere when the length of the array grows above around 100.
@@ -112,6 +85,16 @@ namespace Pathfinding.Util {
 				index += block;
 				block *= 2;
 			}
+		}
+
+		/** Returns a new array with at most length \a newLength.
+		 * The array will contain a copy of all elements of \a arr up to but excluding the index newLength.
+		 */
+		public static T[] ShrinkArray<T>(T[] arr, int newLength) {
+			newLength = Math.Min(newLength, arr.Length);
+			var shrunkArr = new T[newLength];
+			Array.Copy(arr, shrunkArr, newLength);
+			return shrunkArr;
 		}
 	}
 }

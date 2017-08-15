@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace Pathfinding {
 	[AddComponentMenu("Pathfinding/Modifiers/Alternative Path")]
@@ -9,9 +10,7 @@ namespace Pathfinding {
 	 * It will only work when all penalty modifications are relative, i.e adding or subtracting penalties, but not when setting penalties
 	 * to specific values.
 	 *
-	 * When destroyed, it will correctly remove any added penalty. However it will only be done before the next
-	 * path request is calculated, so if this was the last path requesting unit to be destroyed, the penalty will stay
-	 * in the graph until the next path request is made.
+	 * When destroyed, it will correctly remove any added penalty.
 	 *
 	 * \ingroup modifiers
 	 */
@@ -33,70 +32,37 @@ namespace Pathfinding {
 		public int randomStep = 10;
 
 		/** The previous path */
-		GraphNode[] prevNodes;
-
-		/** Previous seed. Used to figure out which nodes to revert penalty on without storing them in an array */
-		int prevSeed;
+		List<GraphNode> prevNodes = new List<GraphNode>();
 
 		/** The previous penalty used. Stored just in case it changes during operation */
 		int prevPenalty;
 
-		bool waitingForApply;
-
-		readonly System.Object lockObject = new System.Object();
-
 		/** A random object */
-		System.Random rnd = new System.Random();
-
-		/** A random object generating random seeds for other random objects */
-		readonly System.Random seedGenerator = new System.Random();
+		readonly System.Random rnd = new System.Random();
 
 		bool destroyed;
 
-		/** The nodes waiting to have their penalty changed */
-		GraphNode[] toBeApplied;
 		public override void Apply (Path p) {
 			if (this == null) return;
 
-			lock (lockObject) {
-				toBeApplied = p.path.ToArray();
-
-				if (!waitingForApply) {
-					waitingForApply = true;
-					AstarPath.OnPathPreSearch += ApplyNow;
-				}
-			}
+			ApplyNow(p.path);
 		}
 
 		public override void OnDestroy () {
 			destroyed = true;
-			lock (lockObject) {
-				if (!waitingForApply) {
-					waitingForApply = true;
-					AstarPath.OnPathPreSearch += ClearOnDestroy;
-				}
-			}
+			ClearOnDestroy();
 			base.OnDestroy();
 		}
 
-		void ClearOnDestroy (Path p) {
-			lock (lockObject) {
-				AstarPath.OnPathPreSearch -= ClearOnDestroy;
-				waitingForApply = false;
-				InversePrevious();
-			}
+		void ClearOnDestroy () {
+			InversePrevious();
 		}
 
 		void InversePrevious () {
-			int seed = prevSeed;
-
-			rnd = new System.Random(seed);
-
-			//Add previous penalty
+			// Remove previous penalty
 			if (prevNodes != null) {
 				bool warnPenalties = false;
-				int rndStart = rnd.Next(randomStep);
-				for (int i = rndStart; i < prevNodes.Length; i += rnd.Next(1, randomStep)) {
+				for (int i = 0; i < prevNodes.Count; i++) {
 					if (prevNodes[i].Penalty < prevPenalty) {
 						warnPenalties = true;
 						prevNodes[i].Penalty = 0;
@@ -105,35 +71,26 @@ namespace Pathfinding {
 					}
 				}
 				if (warnPenalties) {
-					Debug.LogWarning("Penalty for some nodes has been reset while this modifier was active. Penalties might not be correctly set.", this);
+					Debug.LogWarning("Penalty for some nodes has been reset while the AlternativePath modifier was active (possibly because of a graph update). Some penalties might be incorrect (they may be lower than expected for the affected nodes)");
 				}
 			}
 		}
 
-		void ApplyNow (Path somePath) {
-			lock (lockObject) {
-				waitingForApply = false;
-				AstarPath.OnPathPreSearch -= ApplyNow;
+		void ApplyNow (List<GraphNode> nodes) {
+			InversePrevious();
+			prevNodes.Clear();
 
-				InversePrevious();
+			if (destroyed) return;
 
-				if (destroyed) return;
-
-				//Calculate a new seed
-				int seed = seedGenerator.Next();
-				rnd = new System.Random(seed);
-
-				if (toBeApplied != null) {
-					int rndStart = rnd.Next(randomStep);
-					for (int i = rndStart; i < toBeApplied.Length; i += rnd.Next(1, randomStep)) {
-						toBeApplied[i].Penalty = (uint)(toBeApplied[i].Penalty+penalty);
-					}
+			if (nodes != null) {
+				int rndStart = rnd.Next(randomStep);
+				for (int i = rndStart; i < nodes.Count; i += rnd.Next(1, randomStep)) {
+					nodes[i].Penalty = (uint)(nodes[i].Penalty+penalty);
+					prevNodes.Add(nodes[i]);
 				}
-
-				prevPenalty = penalty;
-				prevSeed = seed;
-				prevNodes = toBeApplied;
 			}
+
+			prevPenalty = penalty;
 		}
 	}
 }

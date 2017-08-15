@@ -10,7 +10,7 @@ namespace Pathfinding {
 	 */
 	[AddComponentMenu("Pathfinding/Navmesh/RelevantGraphSurface")]
 	[HelpURL("http://arongranberg.com/astar/docs/class_pathfinding_1_1_relevant_graph_surface.php")]
-	public class RelevantGraphSurface : MonoBehaviour {
+	public class RelevantGraphSurface : VersionedMonoBehaviour {
 		private static RelevantGraphSurface root;
 
 		public float maxRange = 1;
