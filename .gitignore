@@ -115,3 +115,8 @@ UpgradeLog*.XML
 # My additions
 *.orig
 [Ff]x[Cc]op[Oo]utput*/
+# My Sqlite3 additions showing up in VS 2017
+*.ide
+*.ide-shm
+*.ide-wal
+*.lock
