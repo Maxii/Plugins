@@ -1,4 +1,4 @@
-// Version 5.4
+// Version 5.5
 // ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -51,7 +51,9 @@ public class VectorObject3D : MonoBehaviour, IVectorObject {
 		m_material = mat;
 		m_useCustomMaterial = true;
 		GetComponent<MeshRenderer>().sharedMaterial = mat;
-		GetComponent<MeshRenderer>().sharedMaterial.mainTexture = m_vectorLine.texture;
+		if (mat != null) {
+			GetComponent<MeshRenderer>().sharedMaterial.mainTexture = m_vectorLine.texture;
+		}
 	}
 	
 	void SetupMesh () {

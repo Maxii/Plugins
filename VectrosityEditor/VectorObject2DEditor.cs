@@ -1,4 +1,4 @@
-// Version 5.4
+// Version 5.5
 // ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 #if UNITY_5_4 || UNITY_5_5
@@ -928,7 +928,9 @@ public class VectorObject2DEditor : Editor {
 		vline.Draw();
 		drawStart = vline.drawStart;
 		drawEnd = vline.drawEnd;
-		EditorUtility.SetDirty (vobject);
-		UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty (UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
+		if (!Application.isPlaying) {
+			EditorUtility.SetDirty (vobject);
+			UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty (UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
+		}
 	}
 }

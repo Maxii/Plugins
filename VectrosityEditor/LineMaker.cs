@@ -1,4 +1,4 @@
-// Version 5.4
+// Version 5.5
 // ©2017 Starscene Software. All rights reserved. Redistribution without permission not allowed.
 
 using UnityEngine;
@@ -191,7 +191,7 @@ public class LineMaker : ScriptableWizard {
 
 	private void OnGUI () {
 		GUILayout.BeginHorizontal();
-			GUILayout.Label("Object: \"" + objectTransform.name + "\"");
+			GUILayout.Label ("Object: \"" + objectTransform.name + "\"");
 			if (GUILayout.Button ("Load Line File")) {
 				LoadLineFile();
 			}
@@ -347,30 +347,28 @@ public class LineMaker : ScriptableWizard {
 	
 	private void ConnectAllPoints () {
 		if (!loadedFile) {
-			var meshTris = objectMesh.triangles;
 			var meshVertices = objectMesh.vertices;
 			var objectMatrix = objectTransform.localToWorldMatrix;
 			var pairs = new Dictionary<Vector3Pair, bool>();
 			
-			for (int i = 0; i < meshTris.Length; i += 3) {
-				var p1 = meshVertices[meshTris[i]];
-				var p2 = meshVertices[meshTris[i+1]];
-				CheckPoints (pairs, p1, p2, objectMatrix);
+			for (int i = 0; i < objectMesh.subMeshCount; i++) {
+				var meshIndices = objectMesh.GetIndices (i);
+				var polyCount = (objectMesh.GetTopology (i) == MeshTopology.Triangles)? 3 : 4;
 				
-				p1 = meshVertices[meshTris[i+1]];
-				p2 = meshVertices[meshTris[i+2]];
-				CheckPoints (pairs, p1, p2, objectMatrix);
-				
-				p1 = meshVertices[meshTris[i+2]];
-				p2 = meshVertices[meshTris[i]];
-				CheckPoints (pairs, p1, p2, objectMatrix);
+				for (int j = 0; j < meshIndices.Length; j += polyCount) {
+					for (int k = 0; k < polyCount; k++) {
+						var p1 = meshVertices[meshIndices[j + k]];
+						var p2 = meshVertices[meshIndices[j + (k+1)%polyCount]];
+						CheckPoints (pairs, p1, p2, objectMatrix);
+					}
+				}
 			}
 		}
 		else {
 			ConnectLoadedLines();
 		}
 	}
-
+	
 	private void CheckPoints (Dictionary<Vector3Pair, bool> pairs, Vector3 p1, Vector3 p2, Matrix4x4 objectMatrix) {
 		// Only add a line if the two points haven't been connected yet, so there are no duplicate lines
 		var pair1 = new Vector3Pair(p1, p2);
@@ -514,7 +512,7 @@ public class LineMaker : ScriptableWizard {
 		for (int i = 0; i < points.Count-1; i++) {
 			for (int j = i+1; j < points.Count; j++) {
 				if (points[i] == points[j]) {
-					points.RemoveAt(j--);
+					points.RemoveAt (j--);
 				}
 			}
 		}

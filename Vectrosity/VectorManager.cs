@@ -1,4 +1,4 @@
-// Version 5.4
+// Version 5.5
 // ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -40,6 +40,13 @@ public class VectorManager {
 		var vcs = go.GetComponent(typeof(VisibilityControlStatic)) as VisibilityControlStatic;
 		var vca = go.GetComponent(typeof(VisibilityControlAlways)) as VisibilityControlAlways;
 		var bc = go.GetComponent(typeof(BrightnessControl)) as BrightnessControl;
+		
+		if (go.GetComponent(typeof(MeshFilter)) as MeshFilter == null) {
+			go.AddComponent<MeshFilter>();
+		}
+		if (go.GetComponent(typeof(MeshRenderer)) as MeshRenderer == null) {
+			go.AddComponent<MeshRenderer>();
+		}
 		
 		if (visibility == Visibility.Dynamic) {
 			if (vcs) {

@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using GridFramework.Grids;
+using GFGrid = GridFramework.Grids.Grid;
 using GridFramework.Extensions.Align;
 using GridFramework.Extensions.Scale;
 
@@ -82,9 +83,9 @@ namespace GridFramework.Editor {
 		///     non-<c>null</c> at a time it doesn't matter.
 		///   </para>
 		/// </remarks>
-		private Grid AnyGrid {
+		private GFGrid AnyGrid {
 			get {
-				return (Grid)_rectGrid ?? (Grid)_hexGrid;
+				return (GFGrid)_rectGrid ?? (GFGrid)_hexGrid;
 			}
 		}
 
@@ -145,8 +146,8 @@ namespace GridFramework.Editor {
 #region  GUI items
 		private void GridField() {
 			const string label = "Grid:";
-			var currentGrid = (Grid)_rectGrid ?? (Grid)_hexGrid;
-			var grid = EditorGUILayout.ObjectField(label, currentGrid, typeof(Grid), true);
+			var currentGrid = (GFGrid)_rectGrid ?? (GFGrid)_hexGrid;
+			var grid = EditorGUILayout.ObjectField(label, currentGrid, typeof(GFGrid), true);
 			_rectGrid = grid as RectGrid;
 			_hexGrid  = grid as HexGrid;
 		}

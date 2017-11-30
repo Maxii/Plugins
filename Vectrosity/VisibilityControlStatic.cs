@@ -1,4 +1,4 @@
-// Version 5.4
+// Version 5.5
 // ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -44,6 +44,7 @@ public class VisibilityControlStatic : MonoBehaviour {
 		// However, the camera might not have been set up yet, so wait a frame and turn off if necessary
 		VectorManager.DrawArrayLine (m_objectNumber.i);
 		
+		yield return null;
 		yield return null;
 		if (!GetComponent<Renderer>().isVisible) {
 			m_vectorLine.active = false;

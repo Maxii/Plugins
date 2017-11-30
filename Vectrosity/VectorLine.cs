@@ -1,4 +1,4 @@
-// Version 5.4
+// Version 5.5
 // ©2017 Starscene Software. All rights reserved. Redistribution of source code without permission not allowed.
 
 using UnityEngine;
@@ -17,7 +17,7 @@ enum CanvasState {None, OnCanvas, OffCanvas}
 [System.Serializable]
 public partial class VectorLine {
 	public static string Version () {
-		return "Vectrosity version 5.4.2";
+		return "Vectrosity version 5.5";
 	}
 	
 	[SerializeField]
@@ -221,7 +221,7 @@ public partial class VectorLine {
 					drawStart = m_drawStart;
 					drawEnd = m_drawEnd;
 				}
-				if (value != LineType.Continuous && m_points2.Count > 16383) {
+				if (value != LineType.Continuous && ((m_points2 != null && m_points2.Count > 16383) || (m_points3 != null && m_points3.Count > 16383))) {
 					Resize (16383);
 				}
 				if (collider) {
@@ -950,7 +950,7 @@ public partial class VectorLine {
 		if (!SetVertexCount()) return;
 		
 		m_pointsCount = pointsCount;
-		int baseArrayLength = m_lineVertices.Length - ((m_capType != EndCap.None)? 8 : 0);
+		int baseArrayLength = m_lineVertices.Length - ((m_capType == EndCap.None)? 0 : 8);
 		if (baseArrayLength < m_vertexCount) {
 			if (baseArrayLength == 0) {
 				baseArrayLength = 4;
@@ -1032,16 +1032,20 @@ public partial class VectorLine {
 		if (m_lineType == LineType.Discrete && (pointsCount & 1) != 0) {
 			m_vertexCount += 4;
 		}
-		if (m_vertexCount > 65534) {
-			Debug.LogError ("VectorLine: exceeded maximum vertex count of 65534 for \"" + name + "\"...use fewer points (maximum is 16383 points for continuous lines and points, and 32767 points for discrete lines)");
+		int max = 65534;
+		if (m_capType != EndCap.None) {
+			max -= 8;
+		}
+		if (m_vertexCount > max) {
+			Debug.LogError ("VectorLine: exceeded maximum vertex count of 65534 for \"" + name + "\"...use fewer points (maximum is 16383 points for continuous lines and points, and 32767 points for discrete lines, minus two if end caps are used)");
 			return false;
 		}
 		return true;
 	}
 	
 	private int MaxPoints () {
-		if (m_lineType == LineType.Discrete) {
-			return 32767;
+		if (m_capType != EndCap.None) {
+			return 16381;
 		}
 		return 16383;
 	}
@@ -1815,6 +1819,9 @@ public partial class VectorLine {
 		end = m_pointsCount - 1;
 		if (m_drawStart > 0) {
 			start = m_drawStart;
+			if (m_lineType == LineType.Discrete && start == pointsCount - 1) {
+				start++;
+			}
 			if (clearVertices) {
 				ZeroVertices (0, start);
 			}
@@ -2465,6 +2472,9 @@ public partial class VectorLine {
 		if (connectFirstAndLast) {
 			SetIntersectionPoint3D (m_vertexCount-4, m_vertexCount-3, 0, 1);
 			SetIntersectionPoint3D (m_vertexCount-1, m_vertexCount-2, 3, 2);
+		}
+		if (m_drawStart > 0) {
+			start += 4;
 		}
 		for (int i = start; i < end; i+= 4) {
 			SetIntersectionPoint3D (i-4, i-3, i,   i+1);

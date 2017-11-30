@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 
 using GridFramework.Grids;
+using GFGrid = GridFramework.Grids.Grid;
 
 using File = System.IO.File;
 
@@ -90,7 +91,7 @@ namespace GridFramework.Editor {
 		///     it.
 		///   </para>
 		/// </remarks>
-		private static void CreateGrid<TGrid, TRend>(string name) where TGrid : Grid where TRend : GridRenderer {
+		private static void CreateGrid<TGrid, TRend>(string name) where TGrid : GFGrid where TRend : GridRenderer {
 			var go = new GameObject(name + " Grid");
 			go.AddComponent<TGrid>();
 			go.AddComponent<TRend>();

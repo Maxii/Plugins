@@ -812,15 +812,20 @@ public partial class VectorLine {
 			Debug.LogError ("VectorLine.MakeWireframe can't use a null mesh");
 			return;
 		}
-		var meshTris = mesh.triangles;
+		
 		var meshVertices = mesh.vertices;
 		var pairs = new Dictionary<Vector3Pair, bool>();
 		var linePoints = new List<Vector3>();
 		
-		for (int i = 0; i < meshTris.Length; i += 3) {
-			CheckPairPoints (pairs, meshVertices[meshTris[i]],   meshVertices[meshTris[i+1]], linePoints);
-			CheckPairPoints (pairs, meshVertices[meshTris[i+1]], meshVertices[meshTris[i+2]], linePoints);
-			CheckPairPoints (pairs, meshVertices[meshTris[i+2]], meshVertices[meshTris[i]],   linePoints);
+		for (int i = 0; i < mesh.subMeshCount; i++) {
+			var meshIndices = mesh.GetIndices (i);
+			var polyCount = (mesh.GetTopology (i) == MeshTopology.Triangles)? 3 : 4;
+			
+			for (int j = 0; j < meshIndices.Length; j += polyCount) {
+				for (int k = 0; k < polyCount; k++) {
+					CheckPairPoints (pairs, meshVertices[meshIndices[j + k]], meshVertices[meshIndices[j + (k+1)%polyCount]], linePoints);
+				}
+			}
 		}
 		
 		if (linePoints.Count != m_pointsCount) {
