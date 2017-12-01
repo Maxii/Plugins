@@ -445,7 +445,7 @@ namespace Pathfinding {
 			var distToEndOfPath = fn.DistanceToEndOfPath;
 			var slowdownFactor = slowdownTime > 0 ? distToEndOfPath / (maxSpeed * slowdownTime) : 1;
 
-			velocity2D = MovementUtilities.ClampVelocity(velocity2D, maxSpeed, slowdownFactor, slowWhenNotFacingTarget, movementPlane.ToPlane(tr.forward));
+			velocity2D = MovementUtilities.ClampVelocity(velocity2D, maxSpeed, slowdownFactor, slowWhenNotFacingTarget, movementPlane.ToPlane(rotationIn2D ? tr.up : tr.forward));
 
 			ApplyGravity(deltaTime);
 
@@ -535,7 +535,7 @@ namespace Pathfinding {
 
 			// Rotate character to face the correct direction
 			// Magic number, should expose as variable
-			while (Vector2.Angle(movementPlane.ToPlane(tr.forward), movementPlane.ToPlane(rs.first.forward)) > 5f) {
+			while (Vector2.Angle(movementPlane.ToPlane(rotationIn2D ? tr.up : tr.forward), movementPlane.ToPlane(rs.first.forward)) > 5f) {
 				RotateTowards(movementPlane.ToPlane(rs.first.forward), rotationSpeed * Time.deltaTime);
 				yield return null;
 			}

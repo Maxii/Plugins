@@ -1427,33 +1427,27 @@ namespace Pathfinding {
 		}
 
 		void DeserializeGraphs (byte[] bytes) {
-			AstarPath.active.AddWorkItem(new AstarWorkItem(force => {
-				try {
-					var sr = new Pathfinding.Serialization.AstarSerializer(script.data);
-					if (sr.OpenDeserialize(bytes)) {
-						script.data.DeserializeGraphsPart(sr);
+			try {
+				var sr = new Pathfinding.Serialization.AstarSerializer(script.data);
+				if (sr.OpenDeserialize(bytes)) {
+					script.data.DeserializeGraphsPart(sr);
 
-				        // Make sure every graph has a graph editor
-						CheckGraphEditors();
-						sr.DeserializeEditorSettings(graphEditors);
+					// Make sure every graph has a graph editor
+					CheckGraphEditors();
+					sr.DeserializeEditorSettings(graphEditors);
 
-						sr.CloseDeserialize();
-					} else {
-						Debug.LogWarning("Invalid data file (cannot read zip).\nThe data is either corrupt or it was saved using a 3.0.x or earlier version of the system");
-				        // Make sure every graph has a graph editor
-						CheckGraphEditors();
-					}
-				} catch (System.Exception e) {
-					Debug.LogError("Failed to deserialize graphs");
-					Debug.LogException(e);
-					script.data.data_backup = script.data.GetData();
-					script.data.SetData(null);
+					sr.CloseDeserialize();
+				} else {
+					Debug.LogWarning("Invalid data file (cannot read zip).\nThe data is either corrupt or it was saved using a 3.0.x or earlier version of the system");
+					// Make sure every graph has a graph editor
+					CheckGraphEditors();
 				}
-				return true;
-			}));
-
-			// Make sure the above work item is run directly
-			AstarPath.active.FlushWorkItems();
+			} catch (System.Exception e) {
+				Debug.LogError("Failed to deserialize graphs");
+				Debug.LogException(e);
+				script.data.data_backup = script.data.GetData();
+				script.data.SetData(null);
+			}
 		}
 
 		[MenuItem("Edit/Pathfinding/Scan All Graphs %&s")]

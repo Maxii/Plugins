@@ -79,6 +79,7 @@
     <Compile Include="Core\AI\RichAI.cs" />
     <Compile Include="Core\AI\RichPath.cs" />
     <Compile Include="Core\AI\Seeker.cs" />
+    <Compile Include="Core\AI\TurnBasedAI.cs" />
     <Compile Include="Core\astarclasses.cs" />
     <Compile Include="Core\AstarData.cs" />
     <Compile Include="Core\AstarMath.cs" />
@@ -186,6 +187,7 @@
     <Compile Include="TurnBased\SingleNodeBlocker.cs" />
     <Compile Include="Utilities\AstarChecksum.cs" />
     <Compile Include="Utilities\AstarMemory.cs" />
+    <Compile Include="Utilities\AstarParallel.cs" />
     <Compile Include="Utilities\AstarProfiler.cs" />
     <Compile Include="Utilities\DotNetReplacements.cs" />
     <Compile Include="Utilities\Funnel.cs" />

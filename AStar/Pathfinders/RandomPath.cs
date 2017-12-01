@@ -158,8 +158,8 @@ namespace Pathfinding {
 				return;
 			}
 
-			if (!startNode.Walkable) {
-				LogError("The node closest to the start point is not walkable");
+			if (!CanTraverse(startNode)) {
+				LogError("The node closest to the start point could not be traversed");
 				Error();
 				return;
 			}

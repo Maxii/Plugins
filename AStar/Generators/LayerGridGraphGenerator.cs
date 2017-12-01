@@ -20,10 +20,10 @@ namespace Pathfinding {
 	public class LayerGridGraph : GridGraph, IUpdatableGraph {
 		// This function will be called when this graph is destroyed
 		public override void OnDestroy () {
+			base.OnDestroy();
+
 			// Clean up a reference in a static variable which otherwise should point to this graph forever and stop the GC from collecting it
 			RemoveGridGraphFromStatic();
-
-			base.OnDestroy();
 		}
 
 		void RemoveGridGraphFromStatic () {
@@ -34,7 +34,7 @@ namespace Pathfinding {
 		 * \warning Do not modify this variable
 		 */
 		[JsonMember]
-		public int layerCount;
+		internal int layerCount;
 
 		/** If two layered nodes are too close, they will be merged */
 		[JsonMember]
@@ -55,7 +55,7 @@ namespace Pathfinding {
 			}
 		}
 
-		protected override int LayerCount {
+		public override int LayerCount {
 			get {
 				return layerCount;
 			}
@@ -80,11 +80,12 @@ namespace Pathfinding {
 		}
 
 		protected override List<GraphNode> GetNodesInRegion (Bounds b, GraphUpdateShape shape) {
-			if (nodes == null || nodes.Length != width*depth*layerCount) {
+			var rect = GetRectFromBounds(b);
+
+			if (nodes == null || !rect.IsValid() || nodes.Length != width*depth*layerCount) {
 				return Pathfinding.Util.ListPool<GraphNode>.Claim();
 			}
 
-			var rect = GetRectFromBounds(b);
 			// Get a buffer we can use
 			var inArea = Pathfinding.Util.ListPool<GraphNode>.Claim(rect.Width*rect.Height*layerCount);
 
@@ -113,13 +114,13 @@ namespace Pathfinding {
 			// Get a buffer we can use
 			var inArea = Pathfinding.Util.ListPool<GraphNode>.Claim();
 
-			if (nodes == null || nodes.Length != width*depth*layerCount) return inArea;
-
 			// Rect which covers the whole grid
 			var gridRect = new IntRect(0, 0, width-1, depth-1);
 
 			// Clamp the rect to the grid
 			rect = IntRect.Intersection(rect, gridRect);
+
+			if (nodes == null || !rect.IsValid() || nodes.Length != width*depth*layerCount) return inArea;
 
 			for (int l = 0; l < layerCount; l++) {
 				var lwd = l * Width * Depth;
@@ -143,26 +144,32 @@ namespace Pathfinding {
 		 * \returns The number of nodes written to the buffer.
 		 */
 		public override int GetNodesInRegion (IntRect rect, GridNodeBase[] buffer) {
-			if (nodes == null || nodes.Length != width*depth*layerCount) return 0;
-
 			// Clamp the rect to the grid
 			// Rect which covers the whole grid
 			var gridRect = new IntRect(0, 0, width-1, depth-1);
+
 			rect = IntRect.Intersection(rect, gridRect);
 
+			if (nodes == null || !rect.IsValid() || nodes.Length != width*depth*layerCount) return 0;
+
 			int counter = 0;
-			for (int l = 0; l < layerCount; l++) {
-				var lwd = l * Width * Depth;
-				for (int z = rect.ymin; z <= rect.ymax; z++) {
-					var offset = lwd + z*Width;
-					for (int x = rect.xmin; x <= rect.xmax; x++) {
-						var node = nodes[offset + x];
-						if (node != null) {
-							buffer[counter] = node;
-							counter++;
+			try {
+				for (int l = 0; l < layerCount; l++) {
+					var lwd = l * Width * Depth;
+					for (int z = rect.ymin; z <= rect.ymax; z++) {
+						var offset = lwd + z*Width;
+						for (int x = rect.xmin; x <= rect.xmax; x++) {
+							var node = nodes[offset + x];
+							if (node != null) {
+								buffer[counter] = node;
+								counter++;
+							}
 						}
 					}
 				}
+			} catch (System.IndexOutOfRangeException) {
+				// Catch the exception which 'buffer[counter] = node' would throw if the buffer was too small
+				throw new System.ArgumentException("Buffer is too small");
 			}
 
 			return counter;

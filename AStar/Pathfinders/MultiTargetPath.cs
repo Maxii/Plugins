@@ -82,7 +82,7 @@ namespace Pathfinding {
 		}
 
 		/** False if the path goes from one point to multiple targets. True if it goes from multiple start points to one target point */
-		public bool inverted = true;
+		public bool inverted { get; protected set; }
 
 		/** Default constructor.
 		 * Do not use this. Instead use the static Construct method which can handle path pooling.
@@ -107,7 +107,7 @@ namespace Pathfinding {
 			inverted = false;
 			this.callback = callback;
 			callbacks = callbackDelegates;
-
+			if (callbacks != null && callbacks.Length != targets.Length) throw new System.ArgumentException("The targets array must have the same length as the callbackDelegates array");
 			targetPoints = targets;
 
 			originalStartPoint = start;
@@ -129,6 +129,15 @@ namespace Pathfinding {
 			}
 		}
 
+		protected override void Reset () {
+			base.Reset();
+			pathsForAll = true;
+			chosenTarget = -1;
+			sequentialTarget = 0;
+			inverted = true;
+			heuristicMode = HeuristicMode.Sequential;
+		}
+
 		protected override void OnEnterPool () {
 			if (vectorPaths != null)
 				for (int i = 0; i < vectorPaths.Length; i++)
@@ -144,6 +153,10 @@ namespace Pathfinding {
 			nodePaths = null;
 			path = null;
 			callbacks = null;
+			targetNodes = null;
+			targetsFound = null;
+			targetPoints = null;
+			originalTargetPoints = null;
 
 			base.OnEnterPool();
 		}
@@ -293,9 +306,9 @@ namespace Pathfinding {
 				return;
 			}
 
-			if (!startNode.Walkable) {
-				LogError("Nearest node to the start point is not walkable");
+			if (!CanTraverse(startNode)) {
 				Error();
+				LogError("The node closest to the start point could not be traversed");
 				return;
 			}
 
@@ -328,7 +341,7 @@ namespace Pathfinding {
 
 				bool notReachable = false;
 
-				if (endNNInfo.node != null && endNNInfo.node.Walkable) {
+				if (endNNInfo.node != null && CanTraverse(endNNInfo.node)) {
 					anyWalkable = true;
 				} else {
 					notReachable = true;
@@ -364,8 +377,8 @@ namespace Pathfinding {
 			}
 
 			if (!anyWalkable) {
-				LogError("No target nodes were walkable");
 				Error();
+				LogError("No target nodes could be traversed");
 				return;
 			}
 

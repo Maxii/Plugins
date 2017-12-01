@@ -30,6 +30,16 @@ namespace Pathfinding {
 		 */
 		public float centerOffset = 1;
 
+		/** If true, the forward axis of the character will be along the Y axis instead of the Z axis.
+		 *
+		 * For 3D games you most likely want to leave this the default value which is false.
+		 * For 2D games you most likely want to change this to true as in 2D games you usually
+		 * want the Y axis to be the forwards direction of the character.
+		 *
+		 * \shadowimage{aibase_forward_axis.png}
+		 */
+		public bool rotationIn2D = false;
+
 		/** Current desired velocity of the agent.
 		 * Lies in the movement plane.
 		 */
@@ -127,6 +137,7 @@ namespace Pathfinding {
 		protected virtual void RotateTowards (Vector2 direction, float maxDegrees) {
 			if (direction != Vector2.zero) {
 				Quaternion targetRotation = Quaternion.LookRotation(movementPlane.ToWorld(direction, 0), movementPlane.ToWorld(Vector2.zero, 1));
+				if (rotationIn2D) targetRotation *= Quaternion.Euler(90, 0, 0);
 				tr.rotation = Quaternion.RotateTowards(tr.rotation, targetRotation, maxDegrees);
 			}
 		}

@@ -82,18 +82,19 @@ namespace Pathfinding {
 		, IRaycastableGraph {
 		/** This function will be called when this graph is destroyed */
 		public override void OnDestroy () {
+			base.OnDestroy();
+
 			// Clean up a reference in a static variable which otherwise should point to this graph forever and stop the GC from collecting it
 			RemoveGridGraphFromStatic();
-
-			base.OnDestroy();
 		}
 
 		internal override void DestroyAllNodesInternal () {
 			GetNodes(node => {
-				// If the grid data happens to be invalid (e.g we had to abort a graph update while it was running)
-				// this will prevent the Destroy method from potentially throwing IndexOutOfRange exceptions due to
-				// trying to access nodes outside the graph. It is safe to do this because we are destroying all nodes
-				// in the graph anyway.
+				// If the grid data happens to be invalid (e.g we had to abort a graph update while it was running) using 'false' as
+				// the parameter will prevent the Destroy method from potentially throwing IndexOutOfRange exceptions due to trying
+				// to access nodes outside the graph. It is safe to do this because we are destroying all nodes in the graph anyway.
+				// We do however need to clear custom connections in both directions
+				(node as GridNodeBase).ClearCustomConnections(true);
 				node.ClearConnections(false);
 				node.Destroy();
 			});
@@ -112,7 +113,11 @@ namespace Pathfinding {
 			}
 		}
 
-		protected virtual int LayerCount {
+		/** Number of layers in the graph.
+		 * For grid graphs this is always 1, for layered grid graphs it can be higher.
+		 * The nodes array has the size width*depth*layerCount.
+		 */
+		public virtual int LayerCount {
 			get {
 				return 1;
 			}
@@ -1827,11 +1832,12 @@ namespace Pathfinding {
 		 * \see GraphUpdateShape.GetBounds
 		 */
 		protected virtual List<GraphNode> GetNodesInRegion (Bounds bounds, GraphUpdateShape shape) {
-			if (nodes == null || nodes.Length != width*depth) {
+			var rect = GetRectFromBounds(bounds);
+
+			if (nodes == null || !rect.IsValid() || nodes.Length != width*depth) {
 				return ListPool<GraphNode>.Claim();
 			}
 
-			var rect = GetRectFromBounds(bounds);
 			// Get a buffer we can use
 			var inArea = ListPool<GraphNode>.Claim(rect.Width*rect.Height);
 
@@ -1863,10 +1869,11 @@ namespace Pathfinding {
 
 			rect = IntRect.Intersection(rect, gridRect);
 
+			if (nodes == null || !rect.IsValid() || nodes.Length != width*depth) return ListPool<GraphNode>.Claim(0);
+
 			// Get a buffer we can use
 			var inArea = ListPool<GraphNode>.Claim(rect.Width*rect.Height);
 
-			if (nodes == null || nodes.Length != width*depth) return inArea;
 
 			for (int z = rect.ymin; z <= rect.ymax; z++) {
 				var zw = z*Width;
@@ -1893,7 +1900,7 @@ namespace Pathfinding {
 
 			rect = IntRect.Intersection(rect, gridRect);
 
-			if (nodes == null || nodes.Length != width*depth) return 0;
+			if (nodes == null || !rect.IsValid() || nodes.Length != width*depth) return 0;
 
 			if (buffer.Length < rect.Width*rect.Height) throw new System.ArgumentException("Buffer is too small");
 

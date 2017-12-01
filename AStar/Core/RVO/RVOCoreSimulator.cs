@@ -128,7 +128,7 @@ namespace Pathfinding.RVO {
 		int MaxNeighbours { get; set; }
 
 		/** Number of neighbours that the agent took into account during the last simulation step */
-		int NeighbourCount { get;  }
+		int NeighbourCount { get; }
 
 		/** Specifies the avoidance layer for this agent.
 		 * The #CollidesWith mask on other agents will determine if they will avoid this agent.

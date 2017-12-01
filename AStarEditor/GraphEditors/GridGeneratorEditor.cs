@@ -575,7 +575,11 @@ namespace Pathfinding {
 
 			Handles.matrix = Matrix4x4.identity;
 			Handles.color = AstarColor.BoundsHandles;
+#if UNITY_5_5_OR_NEWER
+			Handles.CapFunction cap = Handles.CylinderHandleCap;
+#else
 			Handles.DrawCapFunction cap = Handles.CylinderCap;
+#endif
 
 			var center = currentTransform.Transform(new Vector3(0.5f, 0, 0.5f));
 			if (Tools.current == Tool.Scale) {

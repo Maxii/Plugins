@@ -69,6 +69,11 @@ namespace Pathfinding {
 		/** Perform nearest node searches in XZ space only.
 		 * Recomended for single-layered environments. Faster but can be inaccurate esp. in multilayered contexts.
 		 * You should not use this if the graph is rotated since then the XZ plane no longer corresponds to the ground plane.
+		 *
+		 * This can be important on sloped surfaces. See the image below:
+		 * \shadowimage{distanceXZ.png}
+		 *
+		 * You can also control this using a \link Pathfinding.NNConstraint.distanceXZ field on an NNConstraint object\endlink.
 		 */
 		[JsonMember]
 		public bool nearestSearchOnlyXZ;
@@ -190,6 +195,8 @@ namespace Pathfinding {
 		}
 
 		public override void OnDestroy () {
+			base.OnDestroy();
+
 			// Cleanup
 			TriangleMeshNode.SetNavmeshHolder(active.data.GetGraphIndex(this), null);
 
@@ -198,8 +205,6 @@ namespace Pathfinding {
 					Pathfinding.Util.ObjectPool<BBTree>.Release(ref tiles[i].bbTree);
 				}
 			}
-
-			base.OnDestroy();
 		}
 
 		public override void RelocateNodes (Matrix4x4 deltaMatrix) {
@@ -388,8 +393,11 @@ namespace Pathfinding {
 			}
 		}
 
+
+		static readonly NNConstraint NNConstraintDistanceXZ = new NNConstraint { distanceXZ = true };
+
 		public override NNInfoInternal GetNearest (Vector3 position, NNConstraint constraint, GraphNode hint) {
-			return GetNearestForce(position, null);
+			return GetNearestForce(position, constraint != null && constraint.distanceXZ ? NNConstraintDistanceXZ : null);
 		}
 
 		public override NNInfoInternal GetNearestForce (Vector3 position, NNConstraint constraint) {
@@ -1122,6 +1130,11 @@ namespace Pathfinding {
 				// Update navmesh vizualizations for
 				// the tiles that have been changed
 				for (int i = 0; i < tiles.Length; i++) {
+					// This may happen if an exception has been thrown when the graph was scanned.
+					// We don't want the gizmo code to start to throw exceptions as well then as
+					// that would obscure the actual source of the error.
+					if (tiles[i] == null) continue;
+
 					// Calculate a hash of the tile
 					var hasher = new RetainedGizmos.Hasher(active);
 					hasher.AddHash(showMeshOutline ? 1 : 0);

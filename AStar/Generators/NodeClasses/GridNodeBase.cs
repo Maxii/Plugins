@@ -172,6 +172,9 @@ namespace Pathfinding {
 			throw new System.NotImplementedException("GridNodes do not have support for adding manual connections with your current settings."+
 				"\nPlease disable ASTAR_GRID_NO_CUSTOM_CONNECTIONS in the Optimizations tab in the A* Inspector");
 		}
+
+		public void ClearCustomConnections (bool alsoReverse) {
+		}
 #else
 		public override void FloodFill (System.Collections.Generic.Stack<GraphNode> stack, uint region) {
 			if (connections != null) for (int i = 0; i < connections.Length; i++) {
@@ -183,11 +186,14 @@ namespace Pathfinding {
 				}
 		}
 
-		public override void ClearConnections (bool alsoReverse) {
-			if (alsoReverse) {
-				if (connections != null) for (int i = 0; i < connections.Length; i++) connections[i].node.RemoveConnection(this);
-			}
+		/** Same as #ClearConnections, but does not clear grid connections, only custom ones (e.g added by #AddConnection or a NodeLink component) */
+		public void ClearCustomConnections (bool alsoReverse) {
+			if (connections != null) for (int i = 0; i < connections.Length; i++) connections[i].node.RemoveConnection(this);
 			connections = null;
+		}
+
+		public override void ClearConnections (bool alsoReverse) {
+			ClearCustomConnections(alsoReverse);
 		}
 
 		public override void GetConnections (System.Action<GraphNode> action) {

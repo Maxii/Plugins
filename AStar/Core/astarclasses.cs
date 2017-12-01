@@ -10,7 +10,8 @@ namespace Pathfinding {
 
 #if UNITY_5_0
 	/** Used in Unity 5.0 since the HelpURLAttribute was first added in Unity 5.1 */
-	public class HelpURLAttribute : Attribute {}
+	public class HelpURLAttribute : Attribute {
+	}
 #endif
 
 	[System.Serializable]
@@ -133,7 +134,14 @@ namespace Pathfinding {
 		/** What must the walkable flag on a node be for it to be suitable. Does not affect anything if #constrainWalkability if false */
 		public bool walkable = true;
 
-		/** if available, do an XZ check instead of checking on all axes. The RecastGraph supports this */
+		/** if available, do an XZ check instead of checking on all axes.
+		 * The navmesh/recast graph supports this.
+		 *
+		 * This can be important on sloped surfaces. See the image below:
+		 * \shadowimage{distanceXZ2.png}
+		 *
+		 * The navmesh/recast graphs also contain a global option for this: \link Pathfinding.NavmeshBase.nearestSearchOnlyXZ nearestSearchOnlyXZ\endlink.
+		 */
 		public bool distanceXZ;
 
 		/** Sets if tags should be constrained */

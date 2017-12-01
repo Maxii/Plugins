@@ -66,23 +66,20 @@ namespace Pathfinding.Recast {
 						// Only include it if it intersects with the graph
 						if (rend.bounds.Intersects(bounds)) {
 							Mesh mesh = filter.sharedMesh;
-							var smesh = new RasterizationMesh();
-							smesh.matrix = rend.localToWorldMatrix;
-							smesh.original = filter;
+							RasterizationMesh smesh;
 
 							// Check the cache to avoid allocating
 							// a new array unless necessary
 							if (cachedVertices.ContainsKey(mesh)) {
-								smesh.vertices = cachedVertices[mesh];
-								smesh.triangles = cachedTris[mesh];
+								smesh = new RasterizationMesh(cachedVertices[mesh], cachedTris[mesh], rend.bounds);
 							} else {
-								smesh.vertices = mesh.vertices;
-								smesh.triangles = mesh.triangles;
+								smesh = new RasterizationMesh(mesh.vertices, mesh.triangles, rend.bounds);
 								cachedVertices[mesh] = smesh.vertices;
 								cachedTris[mesh] = smesh.triangles;
 							}
 
-							smesh.bounds = rend.bounds;
+							smesh.matrix = rend.localToWorldMatrix;
+							smesh.original = filter;
 							meshes.Add(smesh);
 						}
 					}
@@ -132,26 +129,21 @@ namespace Pathfinding.Recast {
 
 				if (filter != null && rend != null) {
 					Mesh mesh = filter.sharedMesh;
-
-					var smesh = new RasterizationMesh();
-					smesh.matrix = rend.localToWorldMatrix;
-					smesh.original = filter;
-					smesh.area = buffer2[i].area;
+					RasterizationMesh smesh;
 
 					// Don't read the vertices and triangles from the
 					// mesh if we have seen the same mesh previously
 					if (cachedVertices.ContainsKey(mesh)) {
-						smesh.vertices = cachedVertices[mesh];
-						smesh.triangles = cachedTris[mesh];
+						smesh = new RasterizationMesh(cachedVertices[mesh], cachedTris[mesh], rend.bounds);
 					} else {
-						smesh.vertices = mesh.vertices;
-						smesh.triangles = mesh.triangles;
+						smesh = new RasterizationMesh(mesh.vertices, mesh.triangles, rend.bounds);
 						cachedVertices[mesh] = smesh.vertices;
 						cachedTris[mesh] = smesh.triangles;
 					}
 
-					smesh.bounds = rend.bounds;
-
+					smesh.matrix = rend.localToWorldMatrix;
+					smesh.original = filter;
+					smesh.area = buffer2[i].area;
 					buffer.Add(smesh);
 				} else {
 					Collider coll = buffer2[i].GetCollider();
@@ -236,8 +228,16 @@ namespace Pathfinding.Recast {
 				for (int x = 0; x < heightmapWidth; x += chunkSizeAlongX) {
 					var width = Mathf.Min(chunkSizeAlongX, heightmapWidth - x);
 					var depth = Mathf.Min(chunkSizeAlongZ, heightmapDepth - z);
-					var chunk = GenerateHeightmapChunk(heights, sampleSize, offset, x, z, width, depth, terrainSampleSize);
-					result.Add(chunk);
+					var chunkMin = offset + new Vector3(z * sampleSize.x, 0, x * sampleSize.z);
+					var chunkMax = offset + new Vector3((z + depth) * sampleSize.x, sampleSize.y, (x + width) * sampleSize.z);
+					var chunkBounds = new Bounds();
+					chunkBounds.SetMinMax(chunkMin, chunkMax);
+
+					// Skip chunks that are not inside the desired bounds
+					if (chunkBounds.Intersects(bounds)) {
+						var chunk = GenerateHeightmapChunk(heights, sampleSize, offset, x, z, width, depth, terrainSampleSize);
+						result.Add(chunk);
+					}
 				}
 			}
 		}
@@ -259,7 +259,8 @@ namespace Pathfinding.Recast {
 			var heightmapDepth = heights.GetLength(1);
 
 			// Create a mesh from the heightmap
-			var terrainVertices = new Vector3[resultWidth * resultDepth];
+			var numVerts = resultWidth * resultDepth;
+			var terrainVertices = Util.ArrayPool<Vector3>.Claim(numVerts);
 
 			// Create lots of vertices
 			for (int z = 0; z < resultDepth; z++) {
@@ -272,7 +273,8 @@ namespace Pathfinding.Recast {
 			}
 
 			// Create the mesh by creating triangles in a grid like pattern
-			var tris = new int[(resultWidth-1)*(resultDepth-1)*2*3];
+			int numTris = (resultWidth-1)*(resultDepth-1)*2*3;
+			var tris = Util.ArrayPool<int>.Claim(numTris);
 			int triangleIndex = 0;
 			for (int z = 0; z < resultDepth-1; z++) {
 				for (int x = 0; x < resultWidth-1; x++) {
@@ -289,7 +291,7 @@ namespace Pathfinding.Recast {
 
 #if ASTARDEBUG
 			var color = AstarMath.IntToColor(x0 + 7 * z0, 0.7f);
-			for (int i = 0; i < tris.Length; i += 3) {
+			for (int i = 0; i < numTris; i += 3) {
 				Debug.DrawLine(terrainVertices[tris[i]], terrainVertices[tris[i+1]], color, 40);
 				Debug.DrawLine(terrainVertices[tris[i+1]], terrainVertices[tris[i+2]], color, 40);
 				Debug.DrawLine(terrainVertices[tris[i+2]], terrainVertices[tris[i]], color, 40);
@@ -297,6 +299,9 @@ namespace Pathfinding.Recast {
 #endif
 
 			var mesh = new RasterizationMesh(terrainVertices, tris, new Bounds());
+			mesh.numVertices = numVerts;
+			mesh.numTriangles = numTris;
+			mesh.pool = true;
 			// Could probably calculate these bounds in a faster way
 			mesh.RecalculateBounds();
 			return mesh;

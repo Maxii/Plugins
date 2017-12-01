@@ -22,7 +22,7 @@ using Pathfinding.Util;
  * \ingroup movementscripts
  */
 [RequireComponent(typeof(Seeker))]
-[AddComponentMenu("Pathfinding/AI/AISimpleLerp (2D,3D generic)")]
+[AddComponentMenu("Pathfinding/AI/AILerp (2D,3D)")]
 [HelpURL("http://arongranberg.com/astar/docs/class_a_i_lerp.php")]
 public class AILerp : VersionedMonoBehaviour {
 	/** Determines how often it will search for new paths.
@@ -53,7 +53,10 @@ public class AILerp : VersionedMonoBehaviour {
 	/** If true, the AI will rotate to face the movement direction */
 	public bool enableRotation = true;
 
-	/** If true, rotation will only be done along the Z axis */
+	/** If true, rotation will only be done along the Z axis so that the Y axis is the forward direction of the character.
+	 * This is useful for 2D games in which one often want to have the Y axis as the forward direction to get sprites and 2D colliders to work properly.
+	 * \shadowimage{aibase_forward_axis.png}
+	 */
 	public bool rotationIn2D = false;
 
 	/** How quickly to rotate */

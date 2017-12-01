@@ -222,7 +222,6 @@ namespace Pathfinding {
 		 */
 		public virtual void OnDestroy () {
 			DestroyAllNodesInternal();
-			active = null;
 		}
 
 		/** Destroys all nodes in the graph.

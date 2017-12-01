@@ -21,7 +21,7 @@ namespace Pathfinding.Util {
 			var currentMaxSpeed = maxSpeed * Mathf.Sqrt(Mathf.Min(1, slowdownFactor));
 
 			// Check if the agent should slow down in case it is not facing the direction it wants to move in
-			if (slowWhenNotFacingTarget) {
+			if (slowWhenNotFacingTarget && (forward.x != 0 || forward.y != 0)) {
 				float currentSpeed;
 				var normalizedVelocity = VectorMath.Normalize(velocity, out currentSpeed);
 				// 1 when velocity is in the same direction as forward

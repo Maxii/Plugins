@@ -94,7 +94,7 @@ namespace Pathfinding {
 
 	class WorkItemProcessor : IWorkItemContext {
 		/** Used to prevent waiting for work items to complete inside other work items as that will cause the program to hang */
-		bool workItemsInProgressRightNow = false;
+		public bool workItemsInProgressRightNow { get; private set; }
 
 		readonly AstarPath astar;
 		readonly IndexedQueue<AstarWorkItem> workItems = new IndexedQueue<AstarWorkItem>();
@@ -211,6 +211,7 @@ namespace Pathfinding {
 					"If you think this is not caused by any of your scripts, this might be a bug.");
 
 			workItemsInProgressRightNow = true;
+			astar.data.LockGraphStructure(true);
 			while (workItems.Count > 0) {
 				// Working on a new batch
 				if (!workItemsInProgress) {
@@ -247,6 +248,7 @@ namespace Pathfinding {
 				} catch {
 					workItems.Dequeue();
 					workItemsInProgressRightNow = false;
+					astar.data.UnlockGraphStructure();
 					throw;
 				}
 
@@ -257,6 +259,7 @@ namespace Pathfinding {
 
 					// Still work items to process
 					workItemsInProgressRightNow = false;
+					astar.data.UnlockGraphStructure();
 					return false;
 				} else {
 					workItems.Dequeue();
@@ -267,6 +270,7 @@ namespace Pathfinding {
 
 			workItemsInProgressRightNow = false;
 			workItemsInProgress = false;
+			astar.data.UnlockGraphStructure();
 			return true;
 		}
 	}

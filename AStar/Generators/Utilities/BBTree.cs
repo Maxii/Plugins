@@ -262,6 +262,8 @@ namespace Pathfinding {
 		 * Set to positive infinity if there was no previous solution.
 		 * \param previous This search will start from the \a previous NNInfo and improve it if possible.
 		 * Even if the search fails on this call, the solution will never be worse than \a previous.
+		 * Note that the \a distance parameter need to be configured with the distance for the previous result
+		 * otherwise it may get overwritten even though it was actually closer.
 		 */
 		public NNInfoInternal QueryClosestXZ (Vector3 p, NNConstraint constraint, ref float distance, NNInfoInternal previous) {
 			var sqrDistance = distance*distance;
@@ -286,12 +288,16 @@ namespace Pathfinding {
 					// Update the NNInfo
 					DrawDebugNode(node, 0.2f, Color.red);
 
-					Vector3 closest = node.ClosestPointOnNodeXZ(p);
 					if (constraint == null || constraint.Suitable(node)) {
+						Vector3 closest = node.ClosestPointOnNodeXZ(p);
 						// XZ squared distance
 						float dist = (closest.x-p.x)*(closest.x-p.x)+(closest.z-p.z)*(closest.z-p.z);
 
-						if (nnInfo.constrainedNode == null || dist < closestSqrDist) {
+						// There's a theoretical case when the closest point is on the edge of a node which may cause the
+						// closest point's xz coordinates to not line up perfectly with p's xz coordinates even though they should
+						// (because floating point errors are annoying). So use a tiny margin to cover most of those cases.
+						const float fuzziness = 0.000001f;
+						if (nnInfo.constrainedNode == null || dist < closestSqrDist - fuzziness || (dist <= closestSqrDist + fuzziness && Mathf.Abs(closest.y - p.y) < Mathf.Abs(nnInfo.constClampedPosition.y - p.y))) {
 							nnInfo.constrainedNode = node;
 							nnInfo.constClampedPosition = closest;
 							closestSqrDist = dist;
@@ -306,11 +312,11 @@ namespace Pathfinding {
 				GetOrderedChildren(ref first, ref second, out firstDist, out secondDist, p);
 
 				// Search children (closest box first to improve performance)
-				if (firstDist < closestSqrDist) {
+				if (firstDist <= closestSqrDist) {
 					SearchBoxClosestXZ(first, p, ref closestSqrDist, constraint, ref nnInfo);
 				}
 
-				if (secondDist < closestSqrDist) {
+				if (secondDist <= closestSqrDist) {
 					SearchBoxClosestXZ(second, p, ref closestSqrDist, constraint, ref nnInfo);
 				}
 			}

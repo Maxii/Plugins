@@ -201,7 +201,7 @@ namespace Pathfinding.Voxels {
 
 				Vector3[] vs = mesh.vertices;
 				int[] tris = mesh.triangles;
-				int trisLength = tris.Length;
+				int trisLength = mesh.numTriangles;
 
 				// Transform vertices first to world space and then to voxel space
 				for (int i = 0; i < vs.Length; i++) verts[i] = transform.InverseTransform(meshMatrix.MultiplyPoint3x4(vs[i]));

@@ -344,10 +344,25 @@ namespace Pathfinding.Voxels {
 		public Vector3[] vertices;
 		public int[] triangles;
 
+		/** Number of vertices in the #vertices array.
+		 * The vertices array is often pooled and then it sometimes makes sense to use a larger array than is actually necessary.
+		 */
+		public int numVertices;
+
+		/** Number of triangles in the #triangles array.
+		 * The triangles array is often pooled and then it sometimes makes sense to use a larger array than is actually necessary.
+		 */
+		public int numTriangles;
+
 		/** World bounds of the mesh. Assumed to already be multiplied with the matrix */
 		public Bounds bounds;
 
 		public Matrix4x4 matrix;
+
+		/** If true, the vertex and triangle arrays will be pooled after they have been used.
+		 * Should be used only if the vertex and triangle arrays were originally taken from a pool.
+		 */
+		public bool pool;
 
 		public RasterizationMesh () {
 		}
@@ -355,7 +370,9 @@ namespace Pathfinding.Voxels {
 		public RasterizationMesh (Vector3[] vertices, int[] triangles, Bounds bounds) {
 			matrix = Matrix4x4.identity;
 			this.vertices = vertices;
+			this.numVertices = vertices.Length;
 			this.triangles = triangles;
+			this.numTriangles = triangles.Length;
 			this.bounds = bounds;
 			original = null;
 			area = 0;
@@ -364,7 +381,9 @@ namespace Pathfinding.Voxels {
 		public RasterizationMesh (Vector3[] vertices, int[] triangles, Bounds bounds, Matrix4x4 matrix) {
 			this.matrix = matrix;
 			this.vertices = vertices;
+			this.numVertices = vertices.Length;
 			this.triangles = triangles;
+			this.numTriangles = triangles.Length;
 			this.bounds = bounds;
 			original = null;
 			area = 0;
@@ -374,11 +393,20 @@ namespace Pathfinding.Voxels {
 		public void RecalculateBounds () {
 			Bounds b = new Bounds(matrix.MultiplyPoint3x4(vertices[0]), Vector3.zero);
 
-			for (int i = 1; i < vertices.Length; i++) {
+			for (int i = 1; i < numVertices; i++) {
 				b.Encapsulate(matrix.MultiplyPoint3x4(vertices[i]));
 			}
-			//Assigned here to avoid changing bounds if vertices would happen to be null
+
+			// Assigned here to avoid changing bounds if vertices would happen to be null
 			bounds = b;
+		}
+
+		/** Pool the #vertex and #triangle arrays if the #pool field is true */
+		public void Pool () {
+			if (pool) {
+				Util.ArrayPool<int>.Release(ref triangles);
+				Util.ArrayPool<Vector3>.Release(ref vertices);
+			}
 		}
 	}
 

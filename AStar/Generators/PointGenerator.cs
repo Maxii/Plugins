@@ -110,7 +110,7 @@ namespace Pathfinding {
 		public PointNode[] nodes;
 
 		/** Number of nodes in this graph */
-		public int nodeCount { get; private set; }
+		public int nodeCount { get; protected set; }
 
 		public override int CountNodes () {
 			return nodeCount;

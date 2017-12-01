@@ -14,6 +14,16 @@ namespace Pathfinding {
 		 * A cost of 1000 corresponds approximately to the cost of moving one world unit.
 		 */
 		public uint cost;
+
+		public override int GetHashCode () {
+			return node.GetHashCode() ^ (int)cost;
+		}
+
+		public override bool Equals (object obj) {
+			if (obj == null) return false;
+			var conn = (Connection)obj;
+			return conn.node == node && conn.cost == cost;
+		}
 	}
 
 	/** Base class for all nodes */

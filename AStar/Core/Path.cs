@@ -407,6 +407,8 @@ namespace Pathfinding {
 			if (AstarPath.active.logPathResults != PathLog.None) {
 				_errorLog += msg;
 			}
+#else
+			_errorLog += msg;
 #endif
 
 			if (AstarPath.active.logPathResults != PathLog.None && AstarPath.active.logPathResults != PathLog.InGame) {
@@ -456,7 +458,7 @@ namespace Pathfinding {
 		 */
 		private void ErrorCheck () {
 			if (!hasBeenReset) throw new System.Exception("The path has never been reset. Use the static Construct call, do not use the normal constructors.");
-			if (((IPathInternals) this).Pooled) throw new System.Exception("The path is currently in a path pool. Are you sending the path for calculation twice?");
+			if (((IPathInternals)this).Pooled) throw new System.Exception("The path is currently in a path pool. Are you sending the path for calculation twice?");
 			if (pathHandler == null) throw new System.Exception("Field pathHandler is not set. Please report this bug.");
 			if (PipelineState > PathState.Processing) throw new System.Exception("This path has already been processed. Do not request a path with the same path object twice.");
 		}

@@ -148,8 +148,16 @@ namespace Pathfinding {
 		public bool scanEmptyGraph;
 
 		public enum RelevantGraphSurfaceMode {
+			/** No RelevantGraphSurface components are required anywhere */
 			DoNotRequire,
+			/** Any surfaces that are completely inside tiles need to have a \link Pathfinding.RelevantGraphSurface RelevantGraphSurface\endlink component
+			 * positioned on that surface, otherwise it will be stripped away.
+			 */
 			OnlyForCompletelyInsideTile,
+			/** All surfaces need to have one \link Pathfinding.RelevantGraphSurface RelevantGraphSurface\endlink component
+			 * positioned somewhere on the surface and in each tile that it touches, otherwise it will be stripped away.
+			 * Only tiles that have a RelevantGraphSurface component for that surface will keep it.
+			 */
 			RequireForAll
 		}
 
@@ -352,6 +360,7 @@ namespace Pathfinding {
 
 			for (int i = 1; i < meshes.Count; i++) {
 				bounds.Encapsulate(meshes[i].bounds);
+				meshes[i].Pool();
 			}
 
 			forcedBoundsCenter = bounds.center;
@@ -432,6 +441,7 @@ namespace Pathfinding {
 				for (int j = 0; j < nodes.Length; j++) nodes[j].GraphIndex = graphIndex;
 			}
 
+			for (int i = 0; i < vox.inputMeshes.Count; i++) vox.inputMeshes[i].Pool();
 			ListPool<RasterizationMesh>.Release(vox.inputMeshes);
 			vox.inputMeshes = null;
 			AstarProfiler.EndProfile("Build Tiles");
@@ -526,58 +536,6 @@ namespace Pathfinding {
 			tiles = new NavmeshTile[tileXCount*tileZCount];
 		}
 
-		void BuildTiles (Queue<Int2> tileQueue, List<RasterizationMesh>[] meshBuckets, ManualResetEvent doneEvent, int threadIndex) {
-			try {
-				// Create the voxelizer and set all settings
-				var vox = new Voxelize(CellHeight, cellSize, walkableClimb, walkableHeight, maxSlope, maxEdgeLength);
-
-				while (true) {
-					Int2 tile;
-					lock (tileQueue) {
-						if (tileQueue.Count == 0) {
-							return;
-						}
-
-						tile = tileQueue.Dequeue();
-					}
-
-					vox.inputMeshes = meshBuckets[tile.x + tile.y*tileXCount];
-					tiles[tile.x + tile.y*tileXCount] = BuildTileMesh(vox, tile.x, tile.y, threadIndex);
-				}
-			} catch (System.Exception e) {
-				Debug.LogException(e);
-			} finally {
-				if (doneEvent != null) doneEvent.Set();
-			}
-		}
-
-		/** Connects all tiles in the queue with the tiles to the right (x+1) side of them or above them (z+1) depending on xDirection and zDirection */
-		void ConnectTiles (Queue<Int2> tileQueue, ManualResetEvent doneEvent, bool xDirection, bool zDirection) {
-			try {
-				while (true) {
-					Int2 tile;
-					lock (tileQueue) {
-						if (tileQueue.Count == 0) {
-							return;
-						}
-
-						tile = tileQueue.Dequeue();
-					}
-
-					// Connect with tile at (x+1,z) and (x,z+1)
-					if (xDirection && tile.x < tileXCount - 1)
-						ConnectTiles(tiles[tile.x + tile.y * tileXCount], tiles[tile.x + 1 + tile.y * tileXCount]);
-					if (zDirection && tile.y < tileZCount - 1)
-						ConnectTiles(tiles[tile.x + tile.y * tileXCount], tiles[tile.x + (tile.y + 1) * tileXCount]);
-				}
-			} catch (System.Exception e) {
-				Debug.LogException(e);
-			} finally {
-				// See BuildTiles
-				if (doneEvent != null) doneEvent.Set();
-			}
-		}
-
 		/** Creates a list for every tile and adds every mesh that touches a tile to the corresponding list */
 		List<RasterizationMesh>[] PutMeshesIntoTileBuckets (List<RasterizationMesh> meshes) {
 			var result = new List<RasterizationMesh>[tiles.Length];
@@ -623,7 +581,6 @@ namespace Pathfinding {
 			var bounds = transform.Transform(new Bounds(forcedBoundsSize*0.5f, forcedBoundsSize));
 			var meshes = CollectMeshes(bounds);
 			var buckets = PutMeshesIntoTileBuckets(meshes);
-			ListPool<RasterizationMesh>.Release(meshes);
 
 			Queue<Int2> tileQueue = new Queue<Int2>();
 
@@ -634,37 +591,24 @@ namespace Pathfinding {
 				}
 			}
 
-#if UNITY_WEBGL && !UNITY_EDITOR
-			// WebGL does not support multithreading so we will do everything synchronously instead
-			BuildTiles(tileQueue, buckets, null, 0);
-#else
-			// Fire up a bunch of threads to scan the graph in parallel
-			int threadCount = Mathf.Min(tileQueue.Count, Mathf.Max(1, AstarPath.CalculateThreadCount(ThreadCount.AutomaticHighLoad)));
-			var waitEvents = new ManualResetEvent[threadCount];
-
-			for (int i = 0; i < waitEvents.Length; i++) {
-				waitEvents[i] = new ManualResetEvent(false);
-#if NETFX_CORE
-				// Need to make a copy here, otherwise it may refer to some other index when the task actually runs
-				var threadIndex = i;
-				System.Threading.Tasks.Task.Run(() => BuildTiles(tileQueue, buckets, waitEvents[threadIndex], threadIndex));
-#else
-				ThreadPool.QueueUserWorkItem(state => BuildTiles(tileQueue, buckets, waitEvents[(int)state], (int)state), i);
-#endif
-			}
+			var workQueue = new ParallelWorkQueue<Int2>(tileQueue);
+			// Create the voxelizers and set all settings (one for each thread)
+			var voxelizers = new Voxelize[workQueue.threadCount];
+			for (int i = 0; i < voxelizers.Length; i++) voxelizers[i] = new Voxelize(CellHeight, cellSize, walkableClimb, walkableHeight, maxSlope, maxEdgeLength);
+			workQueue.action = (tile, threadIndex) => {
+				voxelizers[threadIndex].inputMeshes = buckets[tile.x + tile.y*tileXCount];
+				tiles[tile.x + tile.y*tileXCount] = BuildTileMesh(voxelizers[threadIndex], tile.x, tile.y, threadIndex);
+			};
 
 			// Prioritize responsiveness while playing
 			// but when not playing prioritize throughput
 			// (the Unity progress bar is also pretty slow to update)
 			int timeoutMillis = Application.isPlaying ? 1 : 200;
 
-			while (!WaitHandle.WaitAll(waitEvents, timeoutMillis)) {
-				int count;
-				lock (tileQueue) count = tileQueue.Count;
-
-				yield return new Progress(Mathf.Lerp(0.1f, 0.9f, (tiles.Length - count + 1) / (float)tiles.Length), "Generating Tile " + (tiles.Length - count + 1) + "/" + tiles.Length);
+			// Scan all tiles in parallel
+			foreach (var done in workQueue.Run(timeoutMillis)) {
+				yield return new Progress(Mathf.Lerp(0.1f, 0.9f, done / (float)tiles.Length), "Calculated Tiles: " + done + "/" + tiles.Length);
 			}
-#endif
 
 			yield return new Progress(0.9f, "Assigning Graph Indices");
 
@@ -673,16 +617,9 @@ namespace Pathfinding {
 
 			GetNodes(node => node.GraphIndex = graphIndex);
 
-#if UNITY_WEBGL && !UNITY_EDITOR
-			// Put all tiles in the queue to be connected
-			for (int i = 0; i < tiles.Length; i++) tileQueue.Enqueue(new Int2(tiles[i].x, tiles[i].z));
-
-			// Calculate synchronously
-			ConnectTiles(tileQueue, null, true, true);
-#else
 			// First connect all tiles with an EVEN coordinate sum
 			// This would be the white squares on a chess board.
-			// Then connect all tiles with an ODD coordinate sum (which would be all black squares).
+			// Then connect all tiles with an ODD coordinate sum (which would be all black squares on a chess board).
 			// This will prevent the different threads that do all
 			// this in parallel from conflicting with each other.
 			// The directions are also done separately
@@ -696,28 +633,25 @@ namespace Pathfinding {
 						}
 					}
 
-					int numTilesInQueue = tileQueue.Count;
-					for (int i = 0; i < waitEvents.Length; i++) {
-						waitEvents[i].Reset();
-#if NETFX_CORE
-						var waitEvent = waitEvents[i];
-						System.Threading.Tasks.Task.Run(() => ConnectTiles(tileQueue, waitEvent, direction == 0, direction == 1));
-#else
-						ThreadPool.QueueUserWorkItem(state => ConnectTiles(tileQueue, state as ManualResetEvent, direction == 0, direction == 1), waitEvents[i]);
-#endif
-					}
+					workQueue = new ParallelWorkQueue<Int2>(tileQueue);
+					workQueue.action = (tile, threadIndex) => {
+						// Connect with tile at (x+1,z) and (x,z+1)
+						if (direction == 0 && tile.x < tileXCount - 1)
+							ConnectTiles(tiles[tile.x + tile.y * tileXCount], tiles[tile.x + 1 + tile.y * tileXCount]);
+						if (direction == 1 && tile.y < tileZCount - 1)
+							ConnectTiles(tiles[tile.x + tile.y * tileXCount], tiles[tile.x + (tile.y + 1) * tileXCount]);
+					};
 
-					while (!WaitHandle.WaitAll(waitEvents, timeoutMillis)) {
-						int count;
-						lock (tileQueue) {
-							count = tileQueue.Count;
-						}
-
-						yield return new Progress(0.95f, "Connecting Tile " + (numTilesInQueue - count) + "/" + numTilesInQueue + " (Phase " + (direction + 1 + 2*coordinateSum) + " of 4)");
+					var numTilesInQueue = tileQueue.Count;
+					// Connect all tiles in parallel
+					foreach (var done in workQueue.Run(timeoutMillis)) {
+						yield return new Progress(0.95f, "Connected Tiles " + (numTilesInQueue - done) + "/" + numTilesInQueue + " (Phase " + (direction + 1 + 2*coordinateSum) + " of 4)");
 					}
 				}
 			}
-#endif
+
+			for (int i = 0; i < meshes.Count; i++) meshes[i].Pool();
+			ListPool<RasterizationMesh>.Release(meshes);
 
 			// This may be used by the TileHandlerHelper script to update the tiles
 			// while taking NavmeshCuts into account after the graph has been completely recalculated.
@@ -727,30 +661,40 @@ namespace Pathfinding {
 		}
 
 		List<RasterizationMesh> CollectMeshes (Bounds bounds) {
+			Profiler.BeginSample("Find Meshes for rasterization");
 			var result = ListPool<RasterizationMesh>.Claim();
 
 			var meshGatherer = new RecastMeshGatherer(bounds, terrainSampleSize, mask, tagMask, colliderRasterizeDetail);
 
 			if (rasterizeMeshes) {
+				Profiler.BeginSample("Find meshes");
 				meshGatherer.CollectSceneMeshes(result);
+				Profiler.EndSample();
 			}
 
+			Profiler.BeginSample("Find RecastMeshObj components");
 			meshGatherer.CollectRecastMeshObjs(result);
+			Profiler.EndSample();
 
 			if (rasterizeTerrain) {
+				Profiler.BeginSample("Find terrains");
 				// Split terrains up into meshes approximately the size of a single chunk
 				var desiredTerrainChunkSize = cellSize*Math.Max(tileSizeX, tileSizeZ);
 				meshGatherer.CollectTerrainMeshes(rasterizeTrees, desiredTerrainChunkSize, result);
+				Profiler.EndSample();
 			}
 
 			if (rasterizeColliders) {
+				Profiler.BeginSample("Find colliders");
 				meshGatherer.CollectColliderMeshes(result);
+				Profiler.EndSample();
 			}
 
 			if (result.Count == 0) {
 				Debug.LogWarning("No MeshFilters were found contained in the layers specified by the 'mask' variables");
 			}
 
+			Profiler.EndSample();
 			return result;
 		}
 

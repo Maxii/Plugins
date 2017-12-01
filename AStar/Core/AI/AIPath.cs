@@ -36,7 +36,7 @@ using Pathfinding.Util;
  * Lastly if will fall back to simply modifying Transform.position which is guaranteed to always work and is also the most performant option.
  */
 [RequireComponent(typeof(Seeker))]
-[AddComponentMenu("Pathfinding/AI/AIPath (3D)")]
+[AddComponentMenu("Pathfinding/AI/AIPath (2D,3D)")]
 [HelpURL("http://arongranberg.com/astar/docs/class_a_i_path.php")]
 public class AIPath : AIBase {
 	/** Determines how often it will search for new paths.
@@ -284,7 +284,7 @@ public class AIPath : AIBase {
 			// a = v/t, should probably expose as a variable
 			float acceleration = speed / 0.4f;
 			velocity2D += MovementUtilities.CalculateAccelerationToReachPoint(dir, dir.normalized*speed, velocity2D, acceleration, speed) * deltaTime;
-			velocity2D = MovementUtilities.ClampVelocity(velocity2D, speed, slowdown, true, movementPlane.ToPlane(tr.forward));
+			velocity2D = MovementUtilities.ClampVelocity(velocity2D, speed, slowdown, true, movementPlane.ToPlane(rotationIn2D ? tr.up : tr.forward));
 
 			ApplyGravity(deltaTime);
 

@@ -133,6 +133,7 @@ namespace Pathfinding {
 			EditorGUI.BeginChangeCheck();
 			EditorGUILayout.PropertyField(points, true);
 			if (EditorGUI.EndChangeCheck()) {
+				serializedObject.ApplyModifiedProperties();
 				for (int i = 0; i < scripts.Length; i++) {
 					scripts[i].RecalcConvex();
 				}
@@ -155,6 +156,7 @@ namespace Pathfinding {
 			EditorGUI.BeginChangeCheck();
 			EditorGUILayout.PropertyField(convex, new GUIContent("Convex", "Sets if only the convex hull of the points should be used or the whole polygon"));
 			if (EditorGUI.EndChangeCheck()) {
+				serializedObject.ApplyModifiedProperties();
 				for (int i = 0; i < scripts.Length; i++) {
 					scripts[i].RecalcConvex();
 				}
@@ -199,6 +201,14 @@ namespace Pathfinding {
 			}
 		}
 
+		static void SphereCap (int controlID, Vector3 position, Quaternion rotation, float size) {
+#if UNITY_5_5_OR_NEWER
+			Handles.SphereHandleCap(controlID, position, rotation, size, Event.current.type);
+#else
+			Handles.SphereCap(controlID, position, rotation, size);
+#endif
+		}
+
 		public void OnSceneGUI () {
 			var script = target as GraphUpdateScene;
 
@@ -232,7 +242,8 @@ namespace Pathfinding {
 			for (int i = 0; i < points.Count; i++) {
 				if (i == selectedPoint && Tools.current == Tool.Move) {
 					Handles.color = PointSelectedColor;
-					Handles.SphereCap(-i-1, points[i], Quaternion.identity, HandleUtility.GetHandleSize(points[i])*pointGizmosRadius*2);
+					SphereCap(-i-1, points[i], Quaternion.identity, HandleUtility.GetHandleSize(points[i])*pointGizmosRadius*2);
+
 					Vector3 pre = points[i];
 					Vector3 post = Handles.PositionHandle(points[i], Quaternion.identity);
 					if (pre != post) {
@@ -241,7 +252,7 @@ namespace Pathfinding {
 					}
 				} else {
 					Handles.color = PointColor;
-					Handles.SphereCap(-i-1, points[i], Quaternion.identity, HandleUtility.GetHandleSize(points[i])*pointGizmosRadius);
+					SphereCap(-i-1, points[i], Quaternion.identity, HandleUtility.GetHandleSize(points[i])*pointGizmosRadius);
 				}
 			}
 
@@ -266,7 +277,7 @@ namespace Pathfinding {
 						var index = -(HandleUtility.nearestControl+1);
 						if (index >= 0 && index < points.Count) {
 							Handles.color = Color.red;
-							Handles.SphereCap(0, points[index], Quaternion.identity, HandleUtility.GetHandleSize(points[index])*2f*pointGizmosRadius);
+							SphereCap(0, points[index], Quaternion.identity, HandleUtility.GetHandleSize(points[index])*2f*pointGizmosRadius);
 						}
 					}
 				} else {
@@ -311,7 +322,7 @@ namespace Pathfinding {
 							Handles.color = Color.green;
 							Handles.DrawDottedLine(points[(insertionIndex-1 + points.Count) % points.Count], rayhit, 8);
 							Handles.DrawDottedLine(points[insertionIndex % points.Count], rayhit, 8);
-							Handles.SphereCap(0, rayhit, Quaternion.identity, HandleUtility.GetHandleSize(rayhit)*pointGizmosRadius);
+							SphereCap(0, rayhit, Quaternion.identity, HandleUtility.GetHandleSize(rayhit)*pointGizmosRadius);
 							// Project point down onto a plane
 							var zeroed = invMatrix.MultiplyPoint3x4(rayhit);
 							zeroed.y = 0;

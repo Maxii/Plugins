@@ -29,7 +29,6 @@ namespace Pathfinding.Voxels {
 			}
 			throw new System.NotImplementedException();
 			return null;
-
 #else
 			// Find cells revealed by the raised level.
 			stack.Clear();
@@ -749,8 +748,6 @@ namespace Pathfinding.Voxels {
 			for (int i = 0; i < voxelArea.compactSpanCount; i++) {
 				voxelArea.compactSpans[i].reg = srcReg[i];
 			}
-
-
 #else       /// ====== Use original recast code ====== //
 			//Start at maximum possible distance. & ~1 is rounding down to an even value
 			uint level = (uint)((voxelArea.maxDistance+1) & ~1);

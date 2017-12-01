@@ -143,6 +143,8 @@ namespace Pathfinding {
 
 		//End Serialization Settings
 
+		List<bool> graphStructureLocked = new List<bool>();
+
 		#endregion
 
 		public byte[] GetData () {
@@ -162,6 +164,48 @@ namespace Pathfinding {
 			} else {
 				DeserializeGraphs();
 			}
+		}
+
+		/** Prevent the graph structure from changing during the time this lock is held.
+		 * This prevents graphs from being added or removed and also prevents graphs from being serialized or deserialized.
+		 * This is used when e.g an async scan is happening to ensure that for example a graph that is being scanned is not destroyed.
+		 *
+		 * Each call to this method *must* be paired with exactly one call to #UnlockGraphStructure.
+		 * The calls may be nested.
+		 */
+		internal void LockGraphStructure (bool allowAddingGraphs = false) {
+			graphStructureLocked.Add(allowAddingGraphs);
+		}
+
+		/** Allows the graph structure to change again.
+		 * \see #LockGraphStructure
+		 */
+		internal void UnlockGraphStructure () {
+			if (graphStructureLocked.Count == 0) throw new System.InvalidOperationException();
+			graphStructureLocked.RemoveAt(graphStructureLocked.Count - 1);
+		}
+
+		PathProcessor.GraphUpdateLock AssertSafe (bool onlyAddingGraph = false) {
+			if (graphStructureLocked.Count > 0) {
+				bool allowAdding = true;
+				for (int i = 0; i < graphStructureLocked.Count; i++) allowAdding &= graphStructureLocked[i];
+				if (!(onlyAddingGraph && allowAdding)) throw new System.InvalidOperationException("Graphs cannot be added, removed or serialized while the graph structure is locked. This is the case when a graph is currently being scanned and when executing graph updates and work items.\nHowever as a special case, graphs can be added inside work items.");
+			}
+
+			// Pause the pathfinding threads
+			var graphLock = active.PausePathfinding();
+			if (!active.IsInsideWorkItem) {
+				// Make sure all graph updates and other callbacks are done
+				// Only do this if this code is not being called from a work item itself as that would cause a recursive wait that could never complete.
+				// There are some valid cases when this can happen. For example it may be necessary to add a new graph inside a work item.
+				active.FlushWorkItems();
+
+				// Paths that are already calculated and waiting to be returned to the Seeker component need to be
+				// processed immediately as their results usually depend on graphs that currently exist. If this was
+				// not done then after destroying a graph one could get a path result with destroyed nodes in it.
+				active.pathReturnQueue.ReturnPaths(false);
+			}
+			return graphLock;
 		}
 
 		/** Updates shortcuts to the first graph of different types.
@@ -185,7 +229,7 @@ namespace Pathfinding {
 
 		/** Load from data from #file_cachedStartup */
 		public void LoadFromCache () {
-			var graphLock = active.PausePathfinding();
+			var graphLock = AssertSafe();
 
 			if (file_cachedStartup != null) {
 				var bytes = file_cachedStartup.bytes;
@@ -221,7 +265,7 @@ namespace Pathfinding {
 		 * Serializes all graphs to a byte array
 		 * A similar function exists in the AstarPathEditor.cs script to save additional info */
 		public byte[] SerializeGraphs (Pathfinding.Serialization.SerializeSettings settings, out uint checksum) {
-			var graphLock = active.PausePathfinding();
+			var graphLock = AssertSafe();
 			var sr = new Pathfinding.Serialization.AstarSerializer(this, settings);
 
 			sr.OpenSerialize();
@@ -255,7 +299,10 @@ namespace Pathfinding {
 		void ClearGraphs () {
 			if (graphs == null) return;
 			for (int i = 0; i < graphs.Length; i++) {
-				if (graphs[i] != null) graphs[i].OnDestroy();
+				if (graphs[i] != null) {
+					graphs[i].OnDestroy();
+					graphs[i].active = null;
+				}
 			}
 			graphs = null;
 			UpdateShortcuts();
@@ -269,7 +316,7 @@ namespace Pathfinding {
 		 * An error will be logged if deserialization fails.
 		 */
 		public void DeserializeGraphs (byte[] bytes) {
-			var graphLock = active.PausePathfinding();
+			var graphLock = AssertSafe();
 
 			ClearGraphs();
 			DeserializeGraphsAdditive(bytes);
@@ -281,7 +328,7 @@ namespace Pathfinding {
 		 * This function will add loaded graphs to the current ones.
 		 */
 		public void DeserializeGraphsAdditive (byte[] bytes) {
-			var graphLock = active.PausePathfinding();
+			var graphLock = AssertSafe();
 
 			try {
 				if (bytes != null) {
@@ -314,8 +361,11 @@ namespace Pathfinding {
 		 * In most cases you should use the DeserializeGraphs or DeserializeGraphsAdditive method instead.
 		 */
 		public void DeserializeGraphsPart (Pathfinding.Serialization.AstarSerializer sr) {
+			var graphLock = AssertSafe();
+
 			ClearGraphs();
 			DeserializeGraphsPartAdditive(sr);
+			graphLock.Release();
 		}
 
 		/** Deserializes common info additively
@@ -490,10 +540,7 @@ namespace Pathfinding {
 		/** Adds the specified graph to the #graphs array */
 		void AddGraph (NavGraph graph) {
 			// Make sure to not interfere with pathfinding
-			var graphLock = active.PausePathfinding();
-
-			// Make sure all graph updates and other callbacks are done
-			active.FlushWorkItems();
+			var graphLock = AssertSafe(true);
 
 			// Try to fill in an empty position
 			bool foundEmpty = false;
@@ -538,12 +585,10 @@ namespace Pathfinding {
 			// Make sure the pathfinding threads are stopped
 			// If we don't wait until pathfinding that is potentially running on
 			// this graph right now we could end up with NullReferenceExceptions
-			var graphLock = active.PausePathfinding();
-
-			// Make sure all graph updates and other callbacks are done
-			active.FlushWorkItems();
+			var graphLock = AssertSafe();
 
 			graph.OnDestroy();
+			graph.active = null;
 
 			int i = System.Array.IndexOf(graphs, graph);
 			if (i != -1) graphs[i] = null;

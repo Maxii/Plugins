@@ -142,13 +142,9 @@ namespace Pathfinding {
 				return;
 			}
 
-			if (!startNode.Walkable) {
-#if ASTARDEBUG
-				Debug.DrawRay(startPoint, Vector3.up, Color.red);
-				Debug.DrawLine(startPoint, (Vector3)startNode.position, Color.red);
-#endif
+			if (!CanTraverse(startNode)) {
 				Error();
-				LogError("The node closest to the start point is not walkable");
+				LogError("The node closest to the start point could not be traversed");
 				return;
 			}
 		}

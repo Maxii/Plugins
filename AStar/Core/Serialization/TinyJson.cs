@@ -8,8 +8,10 @@ using WinRTLegacy;
 #endif
 
 namespace Pathfinding.Serialization {
-	public class JsonMemberAttribute : System.Attribute {}
-	public class JsonOptInAttribute : System.Attribute {}
+	public class JsonMemberAttribute : System.Attribute {
+	}
+	public class JsonOptInAttribute : System.Attribute {
+	}
 
 	/** A very tiny json serializer.
 	 * It is not supposed to have lots of features, it is only intended to be able to serialize graph settings
@@ -64,14 +66,14 @@ namespace Pathfinding.Serialization {
 				SerializeUnityObject(obj as UnityEngine.Object);
 			} else {
 #if NETFX_CORE
-				var optIn = tpInfo.CustomAttributes.Any(attr => attr.GetType() == typeof(JsonOptInAttribute));
+				var optIn = typeInfo.CustomAttributes.Any(attr => attr.GetType() == typeof(JsonOptInAttribute));
 #else
 				var optIn = typeInfo.GetCustomAttributes(typeof(JsonOptInAttribute), true).Length > 0;
 #endif
 				output.Append("{");
 
 #if NETFX_CORE
-				var fields = tpInfo.DeclaredFields.Where(f => !f.IsStatic).ToArray();
+				var fields = typeInfo.DeclaredFields.Where(f => !f.IsStatic).ToArray();
 #else
 				var fields = type.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
 #endif

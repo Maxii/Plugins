@@ -649,9 +649,13 @@ namespace Pathfinding.Serialization {
 				throw new Exception("Some graph(s) has thrown an exception during GetNodes, or some graph(s) have deserialized more or fewer nodes than were serialized", e);
 			}
 
+#if !NETFX_CORE
+			// For Windows Store apps the BaseStream.Position property is not supported
+			// so we have to disable this error check on that platform
 			if (reader.BaseStream.Position != reader.BaseStream.Length) {
 				throw new Exception((reader.BaseStream.Length / 4) + " nodes were serialized, but only data for " + (reader.BaseStream.Position / 4) + " nodes was found. The data looks corrupt.");
 			}
+#endif
 
 			reader.Close();
 			return int2Node;

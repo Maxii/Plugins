@@ -5,13 +5,14 @@ namespace Pathfinding {
 	[CustomEditor(typeof(AIBase), true)]
 	[CanEditMultipleObjects]
 	public class BaseAIEditor : Editor {
-		protected SerializedProperty gravity, groundMask, centerOffset;
+		protected SerializedProperty gravity, groundMask, centerOffset, rotationIn2D;
 		float lastSeenCustomGravity = float.NegativeInfinity;
 
 		void OnEnable () {
 			gravity = serializedObject.FindProperty("gravity");
 			groundMask = serializedObject.FindProperty("groundMask");
 			centerOffset = serializedObject.FindProperty("centerOffset");
+			rotationIn2D = serializedObject.FindProperty("rotationIn2D");
 		}
 
 		public override void OnInspectorGUI () {
@@ -21,10 +22,12 @@ namespace Pathfinding {
 			var p = serializedObject.GetIterator();
 			p.Next(true);
 			while (p.NextVisible(false)) {
-				if (!SerializedProperty.EqualContents(p, groundMask) && !SerializedProperty.EqualContents(p, centerOffset) && !SerializedProperty.EqualContents(p, gravity)) {
+				if (!SerializedProperty.EqualContents(p, groundMask) && !SerializedProperty.EqualContents(p, centerOffset) && !SerializedProperty.EqualContents(p, gravity) && !SerializedProperty.EqualContents(p, rotationIn2D)) {
 					EditorGUILayout.PropertyField(p, true);
 				}
 			}
+
+			EditorGUILayout.PropertyField(rotationIn2D);
 
 			var mono = target as MonoBehaviour;
 			var rigid = mono.GetComponent<Rigidbody>();

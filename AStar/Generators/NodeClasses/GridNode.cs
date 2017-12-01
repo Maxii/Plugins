@@ -891,7 +891,6 @@ namespace Pathfinding {
 			position = ctx.DeserializeInt3();
 			gridFlags = ctx.reader.ReadUInt16();
 		}
-
 #else
 		public override void AddConnection (GraphNode node, uint cost) {
 			throw new System.NotImplementedException();

@@ -105,13 +105,16 @@ public class BlockManager : VersionedMonoBehaviour {
 
 		for (int i = 0; i < blockersInNode.Count; i++) {
 			var inNode = blockersInNode[i];
+			bool found = false;
 			for (int j = 0; j < selector.Count; j++) {
 				// Need to use ReferenceEquals because this code may be called from a separate thread
 				// and the equality comparison that Unity provides is not thread safe
-				if (!System.Object.ReferenceEquals(inNode, selector[j])) {
-					return true;
+				if (System.Object.ReferenceEquals(inNode, selector[j])) {
+					found = true;
+					break;
 				}
 			}
+			if (!found) return true;
 		}
 		return false;
 	}

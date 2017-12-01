@@ -110,15 +110,7 @@ namespace Pathfinding {
 			Int3 tp1, tp2, tp3;
 
 			GetVertices(out tp1, out tp2, out tp3);
-
-			Vector2 closest = Polygon.ClosestPointOnTriangle(
-				new Vector2(tp1.x*Int3.PrecisionFactor, tp1.z*Int3.PrecisionFactor),
-				new Vector2(tp2.x*Int3.PrecisionFactor, tp2.z*Int3.PrecisionFactor),
-				new Vector2(tp3.x*Int3.PrecisionFactor, tp3.z*Int3.PrecisionFactor),
-				new Vector2(p.x, p.z)
-				);
-
-			return new Vector3(closest.x, p.y, closest.y);
+			return Polygon.ClosestPointOnTriangleXZ((Vector3)tp1, (Vector3)tp2, (Vector3)tp3, p);
 		}
 
 		public override bool ContainsPoint (Int3 p) {

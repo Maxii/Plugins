@@ -120,7 +120,7 @@ namespace Pathfinding {
 		public bool Contains (Vector3 point) {
 			// Transform to local space (shape in the XZ plane)
 			point -= origin;
-			var localSpacePoint = new Vector3(Vector3.Dot(point, right), 0, Vector3.Dot(point, forward));
+			var localSpacePoint = new Vector3(Vector3.Dot(point, right)/right.sqrMagnitude, 0, Vector3.Dot(point, forward)/forward.sqrMagnitude);
 
 			if (convex) {
 				if (_convexPoints == null) return false;
