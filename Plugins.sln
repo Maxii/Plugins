@@ -64,6 +64,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GridFramework", "GridFramew
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GridFrameworkEditor", "GridFrameworkEditor\GridFrameworkEditor.csproj", "{0ABBC7A1-F568-4A57-977C-77ABB459F1A6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TechTreeTool", "TechTreeTool\TechTreeTool.csproj", "{266A74F4-4912-419C-A830-3371AE29E40F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TechTreeToolEditor", "TechTreeToolEditor\TechTreeToolEditor.csproj", "{C3B23693-1C1D-4D94-9271-6978905A7EC3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -154,6 +158,14 @@ Global
 		{0ABBC7A1-F568-4A57-977C-77ABB459F1A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0ABBC7A1-F568-4A57-977C-77ABB459F1A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0ABBC7A1-F568-4A57-977C-77ABB459F1A6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{266A74F4-4912-419C-A830-3371AE29E40F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{266A74F4-4912-419C-A830-3371AE29E40F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{266A74F4-4912-419C-A830-3371AE29E40F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{266A74F4-4912-419C-A830-3371AE29E40F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3B23693-1C1D-4D94-9271-6978905A7EC3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3B23693-1C1D-4D94-9271-6978905A7EC3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3B23693-1C1D-4D94-9271-6978905A7EC3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3B23693-1C1D-4D94-9271-6978905A7EC3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
