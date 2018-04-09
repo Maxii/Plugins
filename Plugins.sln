@@ -68,6 +68,32 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TechTreeTool", "TechTreeToo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TechTreeToolEditor", "TechTreeToolEditor\TechTreeToolEditor.csproj", "{C3B23693-1C1D-4D94-9271-6978905A7EC3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GraphMaker", "GraphMaker\GraphMaker.csproj", "{8214A01F-B4D3-4ECE-9F61-BAE8DB9B8C76}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GraphMakerEditor", "GraphMakerEditor\GraphMakerEditor.csproj", "{820068D1-0574-48E7-B2A8-161A9D7CBBCB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "GraphMakerDOTween", "GraphMakerDOTween", "{D18AF44A-52B5-4597-9A9E-1EDB091EF793}"
+	ProjectSection(SolutionItems) = preProject
+		GraphMakerDOTween\DOTween.dll = GraphMakerDOTween\DOTween.dll
+		GraphMakerDOTween\DOTween.XML = GraphMakerDOTween\DOTween.XML
+		GraphMakerDOTween\DOTween43.dll = GraphMakerDOTween\DOTween43.dll
+		GraphMakerDOTween\DOTween43.xml = GraphMakerDOTween\DOTween43.xml
+		GraphMakerDOTween\DOTween46.dll = GraphMakerDOTween\DOTween46.dll
+		GraphMakerDOTween\DOTween46.xml = GraphMakerDOTween\DOTween46.xml
+		GraphMakerDOTween\DOTween50.dll = GraphMakerDOTween\DOTween50.dll
+		GraphMakerDOTween\DOTween50.xml = GraphMakerDOTween\DOTween50.xml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Editor", "Editor", "{5CA00105-12EC-405A-A369-DA31160B2B46}"
+	ProjectSection(SolutionItems) = preProject
+		GraphMakerDOTween\Editor\DOTweenEditor.dll = GraphMakerDOTween\Editor\DOTweenEditor.dll
+		GraphMakerDOTween\Editor\DOTweenEditor.XML = GraphMakerDOTween\Editor\DOTweenEditor.XML
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "GraphMakerSupport", "GraphMakerSupport", "{2F20FE2A-83D8-425E-BC6E-365428096460}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GraphMakerExamples", "GraphMakerExamples\GraphMakerExamples.csproj", "{B29247E1-9483-480D-8DFE-E3659EFEAE62}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -166,6 +192,18 @@ Global
 		{C3B23693-1C1D-4D94-9271-6978905A7EC3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C3B23693-1C1D-4D94-9271-6978905A7EC3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C3B23693-1C1D-4D94-9271-6978905A7EC3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8214A01F-B4D3-4ECE-9F61-BAE8DB9B8C76}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8214A01F-B4D3-4ECE-9F61-BAE8DB9B8C76}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8214A01F-B4D3-4ECE-9F61-BAE8DB9B8C76}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8214A01F-B4D3-4ECE-9F61-BAE8DB9B8C76}.Release|Any CPU.Build.0 = Release|Any CPU
+		{820068D1-0574-48E7-B2A8-161A9D7CBBCB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{820068D1-0574-48E7-B2A8-161A9D7CBBCB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{820068D1-0574-48E7-B2A8-161A9D7CBBCB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{820068D1-0574-48E7-B2A8-161A9D7CBBCB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B29247E1-9483-480D-8DFE-E3659EFEAE62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B29247E1-9483-480D-8DFE-E3659EFEAE62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B29247E1-9483-480D-8DFE-E3659EFEAE62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B29247E1-9483-480D-8DFE-E3659EFEAE62}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -174,5 +212,7 @@ Global
 		{6AE1FB36-A813-4126-99BE-9DB7C87D48AE} = {250733FE-01D4-469A-89B9-20F929CCF094}
 		{8B11661A-1201-4AEE-A98D-932582000BF5} = {250733FE-01D4-469A-89B9-20F929CCF094}
 		{A1736422-DCCB-466A-8B1A-CF5984F76FD1} = {250733FE-01D4-469A-89B9-20F929CCF094}
+		{D18AF44A-52B5-4597-9A9E-1EDB091EF793} = {2F20FE2A-83D8-425E-BC6E-365428096460}
+		{5CA00105-12EC-405A-A369-DA31160B2B46} = {D18AF44A-52B5-4597-9A9E-1EDB091EF793}
 	EndGlobalSection
 EndGlobal

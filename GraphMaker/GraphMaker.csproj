@@ -1,0 +1,112 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{8214A01F-B4D3-4ECE-9F61-BAE8DB9B8C76}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>GraphMaker</RootNamespace>
+    <AssemblyName>GraphMaker</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="DOTween">
+      <HintPath>..\GraphMakerSupport\GraphMakerDOTween\DOTween.dll</HintPath>
+    </Reference>
+    <Reference Include="DOTween43">
+      <HintPath>..\GraphMakerSupport\GraphMakerDOTween\DOTween43.dll</HintPath>
+    </Reference>
+    <Reference Include="DOTween46">
+      <HintPath>..\GraphMakerSupport\GraphMakerDOTween\DOTween46.dll</HintPath>
+    </Reference>
+    <Reference Include="DOTween50">
+      <HintPath>..\GraphMakerSupport\GraphMakerDOTween\DOTween50.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="UnityEngine">
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\Managed\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>..\..\..\..\..\Program Files\Unity\Editor\Data\UnityExtensions\Unity\GUISystem\UnityEngine.UI.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\AssemblyVersionInfo.cs">
+      <Link>Properties\AssemblyVersionInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
+      <Link>Properties\SharedAssemblyInfo.cs</Link>
+    </Compile>
+    <Compile Include="GUIDependent\WMG_Anim.cs" />
+    <Compile Include="GUIDependent\WMG_Events.cs" />
+    <Compile Include="GUIDependent\WMG_Graph_Tooltip.cs" />
+    <Compile Include="GUIDependent\WMG_GUI_Functions.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utils\WMG_Change_Obj.cs" />
+    <Compile Include="Utils\WMG_EnumFlagAttribute.cs" />
+    <Compile Include="Utils\WMG_Enums.cs" />
+    <Compile Include="Utils\WMG_List.cs" />
+    <Compile Include="Utils\WMG_Reflection.cs" />
+    <Compile Include="Utils\WMG_Util.cs" />
+    <Compile Include="WMG_Axis_Graph.cs" />
+    <Compile Include="WMG_Caching_Functions.cs" />
+    <Compile Include="WMG_Compute_Shader.cs" />
+    <Compile Include="WMG_Data_Generators.cs" />
+    <Compile Include="WMG_Data_Source.cs" />
+    <Compile Include="WMG_Graph_Auto_Anim.cs" />
+    <Compile Include="WMG_Graph_Manager.cs" />
+    <Compile Include="WMG_Grid.cs" />
+    <Compile Include="WMG_Hierarchical_Tree.cs" />
+    <Compile Include="WMG_Legend.cs" />
+    <Compile Include="WMG_Legend_Entry.cs" />
+    <Compile Include="WMG_Link.cs" />
+    <Compile Include="WMG_Node.cs" />
+    <Compile Include="WMG_Path_Finding.cs" />
+    <Compile Include="WMG_Pie_Graph.cs" />
+    <Compile Include="WMG_Pie_Graph_Slice.cs" />
+    <Compile Include="WMG_Radar_Graph.cs" />
+    <Compile Include="WMG_Random_Graph.cs" />
+    <Compile Include="WMG_Ring.cs" />
+    <Compile Include="WMG_Ring_Graph.cs" />
+    <Compile Include="WMG_Series.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ngui\Ngui.csproj">
+      <Project>{ac0f8b23-dd41-4bab-a967-aa2c33bb1d0b}</Project>
+      <Name>Ngui</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

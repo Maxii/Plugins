@@ -6,11 +6,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{8FF21DBB-048A-4258-A8E0-AEAE868D1460}</ProjectGuid>
+    <ProjectGuid>{B29247E1-9483-480D-8DFE-E3659EFEAE62}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ScriptableObjectFactory</RootNamespace>
-    <AssemblyName>ScriptableObjectFactory</AssemblyName>
+    <RootNamespace>GraphMakerExamples</RootNamespace>
+    <AssemblyName>GraphMakerExamples</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -51,8 +51,20 @@
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ScriptableObjectFactory.cs" />
-    <Compile Include="ScriptableObjectWindow.cs" />
+    <Compile Include="WMG_Editor.cs" />
+    <Compile Include="WMG_Node_World_Map.cs" />
+    <Compile Include="WMG_Skill_Tree.cs" />
+    <Compile Include="WMG_World_Map.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GraphMaker\GraphMaker.csproj">
+      <Project>{8214a01f-b4d3-4ece-9f61-bae8db9b8c76}</Project>
+      <Name>GraphMaker</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Ngui\Ngui.csproj">
+      <Project>{ac0f8b23-dd41-4bab-a967-aa2c33bb1d0b}</Project>
+      <Name>Ngui</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
