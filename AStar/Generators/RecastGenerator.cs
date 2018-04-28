@@ -14,7 +14,15 @@ namespace Pathfinding {
 
 	/** Automatically generates navmesh graphs based on world geometry.
 	 * The recast graph is based on Recast (http://code.google.com/p/recastnavigation/).\n
-	 * I have translated a good portion of it to C# to run it natively in Unity. The Recast process is described as follows:
+	 * I have translated a good portion of it to C# to run it natively in Unity.
+	 *
+	 * \section howitworks How a recast graph works
+	 * When generating a recast graph what happens is that the world is voxelized.
+	 * You can think of this as constructing an approximation of the world out of lots of boxes.
+	 * If you have played Minecraft it looks very similar (but with smaller boxes).
+	 * \shadowimage{recast/voxelized_truck.jpg}
+	 *
+	 * The Recast process is described as follows:
 	 * - The voxel mold is build from the input triangle mesh by rasterizing the triangles into a multi-layer heightfield.
 	 * Some simple filters are then applied to the mold to prune out locations where the character would not be able to move.
 	 * - The walkable areas described by the mold are divided into simple overlayed 2D regions.
@@ -44,7 +52,6 @@ namespace Pathfinding {
 	 * \shadowimage{recastgraph_graph.png}
 	 * \shadowimage{recastgraph_inspector.png}
 	 *
-	 *
 	 * \ingroup graphs
 	 *
 	 * \astarpro
@@ -59,12 +66,26 @@ namespace Pathfinding {
 		public float characterRadius = 1.5F;
 
 		/** Max distance from simplified edge to real edge.
+		 * This value is measured in voxels. So with the default value of 2 it means that the final navmesh contour may be at most
+		 * 2 voxels (i.e 2 times #cellSize) away from the border that was calculated when voxelizing the world.
+		 * A higher value will yield a more simplified and cleaner navmesh while a lower value may capture more details.
+		 * However a too low value will cause the individual voxels to be visible (see image below).
+		 *
 		 * \shadowimage{recast/max_edge_error.gif}
+		 *
+		 * \see #cellSize
 		 */
 		[JsonMember]
 		public float contourMaxError = 2F;
 
 		/** Voxel sample size (x,z).
+		 * When generating a recast graph what happens is that the world is voxelized.
+		 * You can think of this as constructing an approximation of the world out of lots of boxes.
+		 * If you have played Minecraft it looks very similar (but with smaller boxes).
+		 * \shadowimage{recast/voxelized_truck.jpg}
+		 * The cell size is the width and depth of those boxes. The height of the boxes is usually much smaller
+		 * and automatically calculated however. See #CellHeight.
+		 *
 		 * Lower values will yield higher quality navmeshes, however the graph will be slower to scan.
 		 *
 		 * \shadowimage{recast/cell_size.gif}
@@ -91,8 +112,12 @@ namespace Pathfinding {
 		public float maxSlope = 30;
 
 		/** Longer edges will be subdivided.
-		 * Reducing this value can improve path quality since similarly sized polygons
-		 * yield better paths than really large and really small next to each other
+		 * Reducing this value can sometimes improve path quality since similarly sized triangles
+		 * yield better paths than really large and really triangles small next to each other.
+		 * However it will also add a lot more nodes which will make pathfinding slower.
+		 * For more information about this take a look at \ref navmeshnotes.
+		 *
+		 * \shadowimage{recast/max_edge_length.gif}
 		 */
 		[JsonMember]
 		public float maxEdgeLength = 20;
@@ -116,31 +141,53 @@ namespace Pathfinding {
 		/** Size in voxels of a single tile.
 		 * This is the width of the tile.
 		 *
+		 * \shadowimage{recast/tile.png}
+		 *
 		 * A large tile size can be faster to initially scan (but beware of out of memory issues if you try with a too large tile size in a large world)
 		 * smaller tile sizes are (much) faster to update.
 		 *
 		 * Different tile sizes can affect the quality of paths. It is often good to split up huge open areas into several tiles for
-		 * better quality paths, but too small tiles can lead to effects looking like invisible obstacles.
+		 * better quality paths, but too small tiles can also lead to effects looking like invisible obstacles.
+		 * For more information about this take a look at \ref navmeshnotes.
+		 * Usually it is best to experiment and see what works best for your game.
+		 *
+		 * When scanning a recast graphs individual tiles can be calculated in parallel which can make it much faster to scan large worlds.
+		 * When you want to recalculate a part of a recast graph, this can only be done on a tile-by-tile basis which means that if you often try to update a region
+		 * of the recast graph much smaller than the tile size, then you will be doing a lot of unnecessary calculations. However if you on the other hand
+		 * update regions of the recast graph that are much larger than the tile size then it may be slower than necessary as there is some overhead in having lots of tiles
+		 * instead of a few larger ones (not that much though).
+		 *
+		 * Recommended values are between 64 and 256, but these are very soft limits. It is possible to use both larger and smaller values.
 		 */
 		[JsonMember]
 		public int editorTileSize = 128;
 
 		/** Size of a tile along the X axis in voxels.
+		 * \copydetails editorTileSize
+		 *
 		 * \warning Do not modify, it is set from #editorTileSize at Scan
+		 *
+		 * \see #tileSizeZ
 		 */
 		[JsonMember]
 		public int tileSizeX = 128;
 
 		/** Size of a tile along the Z axis in voxels.
+		 * \copydetails editorTileSize
+		 *
 		 * \warning Do not modify, it is set from #editorTileSize at Scan
+		 *
+		 * \see #tileSizeX
 		 */
 		[JsonMember]
 		public int tileSizeZ = 128;
 
 
-		/** If true, divide the graph into tiles, otherwise use a single tile covering the whole graph */
+		/** If true, divide the graph into tiles, otherwise use a single tile covering the whole graph.
+		 * \since Since 4.1 the default value is \a true.
+		 */
 		[JsonMember]
-		public bool useTiles;
+		public bool useTiles = true;
 
 		/** If true, scanning the graph will yield a completely empty graph.
 		 * Useful if you want to replace the graph with a custom navmesh for example
@@ -228,6 +275,12 @@ namespace Pathfinding {
 		 * try to adjust it to the tree's scale, it might not do a very good job though so
 		 * an attached collider is preferable.
 		 *
+		 * \note It seems that Unity will only generate tree colliders at runtime when the game is started.
+		 * For this reason, this graph will not pick up tree colliders when scanned outside of play mode
+		 * but it will pick them up if the graph is scanned when the game has started. If it still does not pick them up
+		 * make sure that the trees actually have colliders attached to them and that the tree prefabs are
+		 * in the correct layer (the layer should be included in the layer mask).
+		 *
 		 * \see rasterizeTerrain
 		 * \see colliderRasterizeDetail
 		 */
@@ -288,6 +341,8 @@ namespace Pathfinding {
 		 * that will be done in UpdateAreaPost which runs in the Unity thread.
 		 */
 		List<NavmeshTile> stagingTiles = new List<NavmeshTile>();
+
+		protected override bool RecalculateNormals { get { return true; } }
 
 		public override float TileWorldSizeX {
 			get {
@@ -382,11 +437,11 @@ namespace Pathfinding {
 
 			RelevantGraphSurface.UpdateAllPositions();
 
-			//Calculate world bounds of all affected tiles
+			// Calculate world bounds of all affected tiles
 			IntRect touchingTiles = GetTouchingTiles(o.bounds);
 			Bounds tileBounds = GetTileBounds(touchingTiles);
 
-			// Expand TileBorderSizeInWorldUnits voxels on each side
+			// Expand TileBorderSizeInWorldUnits voxels in all directions
 			tileBounds.Expand(new Vector3(1, 0, 1)*TileBorderSizeInWorldUnits*2);
 
 			var meshes = CollectMeshes(tileBounds);
@@ -442,8 +497,7 @@ namespace Pathfinding {
 			}
 
 			for (int i = 0; i < vox.inputMeshes.Count; i++) vox.inputMeshes[i].Pool();
-			ListPool<RasterizationMesh>.Release(vox.inputMeshes);
-			vox.inputMeshes = null;
+			ListPool<RasterizationMesh>.Release(ref vox.inputMeshes);
 			AstarProfiler.EndProfile("Build Tiles");
 		}
 
@@ -487,7 +541,7 @@ namespace Pathfinding {
 			Profiler.EndSample();
 		}
 
-		public override IEnumerable<Progress> ScanInternal () {
+		protected override IEnumerable<Progress> ScanInternal () {
 			TriangleMeshNode.SetNavmeshHolder(AstarPath.active.data.GetGraphIndex(this), this);
 
 			if (!Application.isPlaying) {
@@ -651,7 +705,7 @@ namespace Pathfinding {
 			}
 
 			for (int i = 0; i < meshes.Count; i++) meshes[i].Pool();
-			ListPool<RasterizationMesh>.Release(meshes);
+			ListPool<RasterizationMesh>.Release(ref meshes);
 
 			// This may be used by the TileHandlerHelper script to update the tiles
 			// while taking NavmeshCuts into account after the graph has been completely recalculated.
@@ -830,7 +884,8 @@ namespace Pathfinding {
 				w = 1,
 				d = 1,
 				tris = mesh.tris,
-				bbTree = new BBTree()
+				bbTree = new BBTree(),
+				graph = this,
 			};
 
 			tile.vertsInGraphSpace = Utility.RemoveDuplicateVertices(mesh.verts, tile.tris);
@@ -850,15 +905,12 @@ namespace Pathfinding {
 				throw new System.Exception("Graph limit reached. Multithreaded recast calculations cannot be done because a few scratch graph indices are required.");
 			}
 
-			// This index will be ORed to the triangle indices
-			int tileIndex = x + z*tileXCount;
-			tileIndex <<= TileIndexOffset;
-
 			TriangleMeshNode.SetNavmeshHolder((int)temporaryGraphIndex, tile);
 			// We need to lock here because creating nodes is not thread safe
 			// and we may be doing this from multiple threads at the same time
+			tile.nodes = new TriangleMeshNode[tile.tris.Length/3];
 			lock (active) {
-				tile.nodes = CreateNodes(tile.tris, tileIndex, temporaryGraphIndex);
+				CreateNodes(tile.nodes, tile.tris, x + z*tileXCount, temporaryGraphIndex);
 			}
 
 			tile.bbTree.RebuildFrom(tile.nodes);
@@ -869,7 +921,7 @@ namespace Pathfinding {
 			return tile;
 		}
 
-		public override void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
+		protected override void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
 			base.DeserializeSettingsCompatibility(ctx);
 
 			characterRadius = ctx.reader.ReadSingle();

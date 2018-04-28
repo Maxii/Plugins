@@ -213,7 +213,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public static implicit operator string (Int3 obj) {
+		public static implicit operator string(Int3 obj) {
 			return obj.ToString();
 		}
 

@@ -45,7 +45,6 @@ namespace Pathfinding.RVO {
 
 		/** Height of the agent in world units */
 		[Tooltip("Height of the agent. In world units")]
-		[HideInInspector]
 		public float height = 2;
 
 		/** A locked unit cannot move. Other units will still avoid it but avoidance quality is not the best. */
@@ -54,9 +53,12 @@ namespace Pathfinding.RVO {
 
 		/** Automatically set #locked to true when desired velocity is approximately zero.
 		 * This prevents other units from pushing them away when they are supposed to e.g block a choke point.
+		 *
+		 * When this is true every call to #SetTarget or #Move will set the #locked field to true if the desired velocity
+		 * was non-zero or false if it was zero.
 		 */
 		[Tooltip("Automatically set #locked to true when desired velocity is approximately zero")]
-		public bool lockWhenNotMoving = true;
+		public bool lockWhenNotMoving = false;
 
 		/** How far into the future to look for collisions with other agents (in seconds) */
 		[Tooltip("How far into the future to look for collisions with other agents (in seconds)")]
@@ -84,9 +86,12 @@ namespace Pathfinding.RVO {
 		 * This can be very useful in games which have multiple teams of some sort. For example you usually
 		 * want the agents in one team to avoid each other, but you do not want them to avoid the enemies.
 		 *
+		 * This field only affects which other agents that this agent will avoid, it does not affect how other agents
+		 * react to this agent.
+		 *
 		 * \see http://en.wikipedia.org/wiki/Mask_(computing)
 		 */
-		[Pathfinding.AstarEnumFlag]
+		[Pathfinding.EnumFlag]
 		public RVOLayer collidesWith = (RVOLayer)(-1);
 
 		/** An extra force to avoid walls.
@@ -117,7 +122,6 @@ namespace Pathfinding.RVO {
 
 		/** Center of the agent relative to the pivot point of this game object */
 		[Tooltip("Center of the agent relative to the pivot point of this game object")]
-		[HideInInspector]
 		public float center = 1f;
 
 		/** \details \deprecated */
@@ -154,10 +158,15 @@ namespace Pathfinding.RVO {
 		/** Cached tranform component */
 		protected Transform tr;
 
+		/** Cached reference to a movement script (if one is used) */
+		protected IAstarAI ai;
+
 		/** Enables drawing debug information in the scene view */
 		public bool debug;
 
-		/** Current position of the agent */
+		/** Current position of the agent.
+		 * Note that this is only updated every local avoidance simulation step, not every frame.
+		 */
 		public Vector3 position {
 			get {
 				return To3D(rvoAgent.Position, rvoAgent.ElevationCoordinate);
@@ -171,6 +180,19 @@ namespace Pathfinding.RVO {
 		 * reaching the target.
 		 *
 		 * \see CalculateMovementDelta
+		 *
+		 * You can also set the velocity of the agent. This will override the local avoidance input completely.
+		 * It is useful if you have a player controlled character and want other agents to avoid it.
+		 *
+		 * Setting the velocity using this property will mark the agent as being externally controlled for 1 simulation step.
+		 * Local avoidance calculations will be skipped for the next simulation step but will be resumed
+		 * after that unless this property is set again.
+		 *
+		 * Note that if you set the velocity the value that can be read from this property will not change until
+		 * the next simulation step.
+		 *
+		 * \see \link Pathfinding::RVO::IAgent::ForceSetVelocity IAgent.ForceSetVelocity\endlink
+		 * \see \ref ManualRVOAgent.cs
 		 */
 		public Vector3 velocity {
 			get {
@@ -180,6 +202,9 @@ namespace Pathfinding.RVO {
 					return Vector3.zero;
 				}
 			}
+			set {
+				rvoAgent.ForceSetVelocity(To2D(value));
+			}
 		}
 
 		/** Direction and distance to move in a single frame to avoid obstacles.
@@ -188,7 +213,7 @@ namespace Pathfinding.RVO {
 		 */
 		public Vector3 CalculateMovementDelta (float deltaTime) {
 			if (rvoAgent == null) return Vector3.zero;
-			return To3D(Vector2.ClampMagnitude(rvoAgent.CalculatedTargetPoint - To2D(tr.position), rvoAgent.CalculatedSpeed * deltaTime), 0);
+			return To3D(Vector2.ClampMagnitude(rvoAgent.CalculatedTargetPoint - To2D(ai != null ? ai.position : tr.position), rvoAgent.CalculatedSpeed * deltaTime), 0);
 		}
 
 		/** Direction and distance to move in a single frame to avoid obstacles.
@@ -205,9 +230,12 @@ namespace Pathfinding.RVO {
 			rvoAgent.SetCollisionNormal(To2D(normal));
 		}
 
-		/** \copydoc Pathfinding::RVO::IAgent::ForceSetVelocity */
+		/** \copydoc Pathfinding::RVO::IAgent::ForceSetVelocity.
+		 * \deprecated Set the #velocity property instead
+		  */
+		[System.Obsolete("Set the 'velocity' property instead")]
 		public void ForceSetVelocity (Vector3 velocity) {
-			rvoAgent.ForceSetVelocity(To2D(velocity));
+			this.velocity = velocity;
 		}
 
 		/** Converts a 3D vector to a 2D vector in the movement plane.
@@ -228,7 +256,7 @@ namespace Pathfinding.RVO {
 		 */
 		public Vector2 To2D (Vector3 p, out float elevation) {
 			if (movementPlane == MovementPlane.XY) {
-				elevation = p.z;
+				elevation = -p.z;
 				return new Vector2(p.x, p.y);
 			} else {
 				elevation = p.y;
@@ -242,7 +270,7 @@ namespace Pathfinding.RVO {
 		 */
 		public Vector3 To3D (Vector2 p, float elevationCoordinate) {
 			if (movementPlane == MovementPlane.XY) {
-				return new Vector3(p.x, p.y, elevationCoordinate);
+				return new Vector3(p.x, p.y, -elevationCoordinate);
 			} else {
 				return new Vector3(p.x, elevationCoordinate, p.y);
 			}
@@ -259,9 +287,11 @@ namespace Pathfinding.RVO {
 
 		void OnEnable () {
 			tr = transform;
+			ai = GetComponent<IAstarAI>();
 
 			if (RVOSimulator.active == null) {
 				Debug.LogError("No RVOSimulator component found in the scene. Please add one.");
+				enabled = false;
 			} else {
 				simulator = RVOSimulator.active.GetSimulator();
 
@@ -270,13 +300,9 @@ namespace Pathfinding.RVO {
 				if (rvoAgent != null) {
 					simulator.AddAgent(rvoAgent);
 				} else {
-					float elevation;
-					var pos = To2D(transform.position, out elevation);
-					rvoAgent = simulator.AddAgent(pos, elevation);
+					rvoAgent = simulator.AddAgent(Vector2.zero, 0);
 					rvoAgent.PreCalculationCallback = UpdateAgentProperties;
 				}
-
-				UpdateAgentProperties();
 			}
 		}
 
@@ -292,7 +318,10 @@ namespace Pathfinding.RVO {
 			rvoAgent.Priority = priority;
 
 			float elevation;
-			rvoAgent.Position = To2D(transform.position, out elevation);
+			// Use the position from the movement script if one is attached
+			// as the movement script's position may not be the same as the transform's position
+			// (in particular if IAstarAI.updatePosition is false).
+			rvoAgent.Position = To2D(ai != null ? ai.position : tr.position, out elevation);
 
 			if (movementPlane == MovementPlane.XZ) {
 				rvoAgent.Height = height;
@@ -320,8 +349,8 @@ namespace Pathfinding.RVO {
 		 *		The agent will use this speed if it is necessary to avoid collisions with other agents.
 		 *		Should be at least as high as speed, but it is recommended to use a slightly higher value than speed (for example speed*1.2).
 		 *
-		 * \see Also take a look at the documentation for IAgent.SetTarget which has a few more details.
-		 * \see Move
+		 * \see Also take a look at the documentation for #IAgent.SetTarget which has a few more details.
+		 * \see #Move
 		 */
 		public void SetTarget (Vector3 pos, float speed, float maxSpeed) {
 			if (simulator == null) return;
@@ -344,7 +373,7 @@ namespace Pathfinding.RVO {
 		 *  issues that this can cause (in particular that it might be hard to get the agent
 		 *  to stop at a precise point).
 		 *
-		 * \see SetTarget
+		 * \see #SetTarget
 		 */
 		public void Move (Vector3 vel) {
 			if (simulator == null) return;
@@ -352,7 +381,7 @@ namespace Pathfinding.RVO {
 			var velocity2D = To2D(vel);
 			var speed = velocity2D.magnitude;
 
-			rvoAgent.SetTarget(To2D(tr.position) + velocity2D, speed, speed);
+			rvoAgent.SetTarget(To2D(ai != null ? ai.position : tr.position) + velocity2D, speed, speed);
 
 			if (lockWhenNotMoving) {
 				locked = speed < 0.001f;
@@ -372,10 +401,12 @@ namespace Pathfinding.RVO {
 		void OnDrawGizmos () {
 			var color = GizmoColor * (locked ? 0.5f : 1.0f);
 
+			var pos = ai != null ? ai.position : transform.position;
+
 			if (movementPlane == MovementPlane.XY) {
-				Draw.Gizmos.Cylinder(transform.position, Vector3.forward, 0, radius, color);
+				Draw.Gizmos.Cylinder(pos, Vector3.forward, 0, radius, color);
 			} else {
-				Draw.Gizmos.Cylinder(transform.position + To3D(Vector2.zero, center - height * 0.5f), To3D(Vector2.zero, 1), height, radius, color);
+				Draw.Gizmos.Cylinder(pos + To3D(Vector2.zero, center - height * 0.5f), To3D(Vector2.zero, 1), height, radius, color);
 			}
 		}
 	}

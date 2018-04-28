@@ -153,14 +153,12 @@ namespace Pathfinding {
 #endif
 
 			if (startNode == null || endNode == null) {
-				LogError("Couldn't find close nodes to the start point");
-				Error();
+				FailWithError("Couldn't find close nodes to the start point");
 				return;
 			}
 
 			if (!CanTraverse(startNode)) {
-				LogError("The node closest to the start point could not be traversed");
-				Error();
+				FailWithError("The node closest to the start point could not be traversed");
 				return;
 			}
 
@@ -201,8 +199,7 @@ namespace Pathfinding {
 
 			//any nodes left to search?
 			if (pathHandler.heap.isEmpty) {
-				LogError("No open points, the start node didn't open any nodes");
-				Error();
+				FailWithError("No open points, the start node didn't open any nodes");
 				return;
 			}
 
@@ -212,7 +209,7 @@ namespace Pathfinding {
 		protected override void CalculateStep (long targetTick) {
 			int counter = 0;
 
-			// Continue to search while there hasn't ocurred an error and the end hasn't been found
+			// Continue to search as long as we haven't encountered an error and we haven't found the target
 			while (CompleteState == PathCompleteState.NotCalculated) {
 				searchedNodes++;
 
@@ -247,8 +244,7 @@ namespace Pathfinding {
 						chosenNodeR = maxGScoreNodeR;
 						CompleteState = PathCompleteState.Complete;
 					} else {
-						LogError("Not a single node found to search");
-						Error();
+						FailWithError("Not a single node found to search");
 					}
 					break;
 				}

@@ -207,11 +207,11 @@ namespace Pathfinding.Util {
 					mesh.UploadMeshData(true);
 
 					// Release the lists back to the pool
-					ListPool<Vector3>.Release(vertices);
-					ListPool<Color32>.Release(colors);
-					ListPool<Vector3>.Release(normals);
-					ListPool<Vector2>.Release(uv);
-					ListPool<int>.Release(tris);
+					ListPool<Vector3>.Release(ref vertices);
+					ListPool<Color32>.Release(ref colors);
+					ListPool<Vector3>.Release(ref normals);
+					ListPool<Vector2>.Release(ref uv);
+					ListPool<int>.Release(ref tris);
 
 					gizmos.meshes.Add(new MeshWithHash { hash = hash, mesh = mesh, lines = true });
 					gizmos.existingHashes.Add(hash);
@@ -298,6 +298,12 @@ namespace Pathfinding.Util {
 		/** Call after all #Draw commands for the frame have been done to draw everything */
 		public void FinalizeDraw () {
 			RemoveUnusedMeshes(meshes);
+
+#if UNITY_EDITOR
+			// Make sure the material references are correct
+			if (surfaceMaterial == null) surfaceMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath(EditorResourceHelper.editorAssets + "/Materials/Navmesh.mat", typeof(Material)) as Material;
+			if (lineMaterial == null) lineMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath(EditorResourceHelper.editorAssets + "/Materials/NavmeshOutline.mat", typeof(Material)) as Material;
+#endif
 
 			var cam = Camera.current;
 			var planes = GeometryUtility.CalculateFrustumPlanes(cam);

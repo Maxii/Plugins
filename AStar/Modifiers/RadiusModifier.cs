@@ -136,7 +136,7 @@ namespace Pathfinding {
 			List<Vector3> res = Apply(vs);
 
 			if (res != vs) {
-				Pathfinding.Util.ListPool<Vector3>.Release(p.vectorPath);
+				Pathfinding.Util.ListPool<Vector3>.Release(ref p.vectorPath);
 				p.vectorPath = res;
 			}
 		}

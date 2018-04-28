@@ -1,6 +1,10 @@
 namespace Pathfinding {
 	using UnityEngine;
 
+	/** An item of work that can be executed when graphs are safe to update.
+	 * \see #AstarPath.UpdateGraphs
+	 * \see #AstarPath.AddWorkItem
+	 */
 	public struct AstarWorkItem {
 		/** Init function.
 		 * May be null if no initialization is needed.
@@ -117,44 +121,39 @@ namespace Pathfinding {
 		class IndexedQueue<T> {
 			T[] buffer = new T[4];
 			int start;
-			int length;
 
 			public T this[int index] {
 				get {
-					if (index < 0 || index >= length) throw new System.IndexOutOfRangeException();
+					if (index < 0 || index >= Count) throw new System.IndexOutOfRangeException();
 					return buffer[(start + index) % buffer.Length];
 				}
 				set {
-					if (index < 0 || index >= length) throw new System.IndexOutOfRangeException();
+					if (index < 0 || index >= Count) throw new System.IndexOutOfRangeException();
 					buffer[(start + index) % buffer.Length] = value;
 				}
 			}
 
-			public int Count {
-				get {
-					return length;
-				}
-			}
+			public int Count { get; private set; }
 
 			public void Enqueue (T item) {
-				if (length == buffer.Length) {
+				if (Count == buffer.Length) {
 					var newBuffer = new T[buffer.Length*2];
-					for (int i = 0; i < length; i++) {
+					for (int i = 0; i < Count; i++) {
 						newBuffer[i] = this[i];
 					}
 					buffer = newBuffer;
 					start = 0;
 				}
 
-				buffer[(start + length) % buffer.Length] = item;
-				length++;
+				buffer[(start + Count) % buffer.Length] = item;
+				Count++;
 			}
 
 			public T Dequeue () {
-				if (length == 0) throw new System.InvalidOperationException();
+				if (Count == 0) throw new System.InvalidOperationException();
 				var item = buffer[start];
 				start = (start + 1) % buffer.Length;
-				length--;
+				Count--;
 				return item;
 			}
 		}
@@ -191,8 +190,8 @@ namespace Pathfinding {
 		 *
 		 * \see ProcessWorkItems
 		 */
-		public void AddWorkItem (AstarWorkItem itm) {
-			workItems.Enqueue(itm);
+		public void AddWorkItem (AstarWorkItem item) {
+			workItems.Enqueue(item);
 		}
 
 		/** Process graph updating work items.

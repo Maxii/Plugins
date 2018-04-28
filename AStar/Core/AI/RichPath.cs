@@ -20,15 +20,20 @@ namespace Pathfinding {
 		 */
 		public ITransform transform;
 
+		public RichPath () {
+			Clear();
+		}
+
 		public void Clear () {
 			parts.Clear();
 			currentPart = 0;
+			Endpoint = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
 		}
 
 		/** Use this for initialization.
 		 *
-		 * \param s Optionally provide in order to take tag penalties into account. May be null if you do not use a Seeker\
-		 * \param p Path to follow
+		 * \param seeker Optionally provide in order to take tag penalties into account. May be null if you do not use a Seeker\
+		 * \param path Path to follow
 		 * \param mergePartEndpoints If true, then adjacent parts that the path is split up in will
 		 * try to use the same start/end points. For example when using a link on a navmesh graph
 		 * Instead of first following the path to the center of the node where the link is and then
@@ -36,13 +41,13 @@ namespace Pathfinding {
 		 * which usually makes more sense.
 		 * \param simplificationMode The path can optionally be simplified. This can be a bit expensive for long paths.
 		 */
-		public void Initialize (Seeker s, Path p, bool mergePartEndpoints, bool simplificationMode) {
-			if (p.error) throw new System.ArgumentException("Path has an error");
+		public void Initialize (Seeker seeker, Path path, bool mergePartEndpoints, bool simplificationMode) {
+			if (path.error) throw new System.ArgumentException("Path has an error");
 
-			List<GraphNode> nodes = p.path;
+			List<GraphNode> nodes = path.path;
 			if (nodes.Count == 0) throw new System.ArgumentException("Path traverses no nodes");
 
-			seeker = s;
+			this.seeker = seeker;
 			// Release objects back to object pool
 			// Yeah, I know, it's casting... but this won't be called much
 			for (int i = 0; i < parts.Count; i++) {
@@ -52,15 +57,17 @@ namespace Pathfinding {
 				else if (specialPart != null) ObjectPool<RichSpecial>.Release(ref specialPart);
 			}
 
-			parts.Clear();
-			currentPart = 0;
+			Clear();
 
 			// Initialize new
+			Endpoint = path.vectorPath[path.vectorPath.Count-1];
 
 			//Break path into parts
 			for (int i = 0; i < nodes.Count; i++) {
 				if (nodes[i] is TriangleMeshNode) {
-					var graph = AstarData.GetGraph(nodes[i]);
+					var graph = AstarData.GetGraph(nodes[i]) as NavmeshBase;
+					if (graph == null) throw new System.Exception("Found a TriangleMeshNode that was not in a NavmeshBase graph");
+
 					RichFunnel f = ObjectPool<RichFunnel>.Claim().Initialize(this, graph);
 
 					f.funnelSimplification = simplificationMode;
@@ -77,13 +84,13 @@ namespace Pathfinding {
 					i--;
 
 					if (sIndex == 0) {
-						f.exactStart = p.vectorPath[0];
+						f.exactStart = path.vectorPath[0];
 					} else {
 						f.exactStart = (Vector3)nodes[mergePartEndpoints ? sIndex-1 : sIndex].position;
 					}
 
 					if (i == nodes.Count-1) {
-						f.exactEnd = p.vectorPath[p.vectorPath.Count-1];
+						f.exactEnd = path.vectorPath[path.vectorPath.Count-1];
 					} else {
 						f.exactEnd = (Vector3)nodes[mergePartEndpoints ? i+1 : i].position;
 					}
@@ -116,6 +123,8 @@ namespace Pathfinding {
 				}
 			}
 		}
+
+		public Vector3 Endpoint { get; private set; }
 
 		/** True if we have completed (called NextPart for) the last part in the path */
 		public bool CompletedAllParts {
@@ -151,7 +160,7 @@ namespace Pathfinding {
 		List<TriangleMeshNode> nodes;
 		public Vector3 exactStart;
 		public Vector3 exactEnd;
-		NavGraph graph;
+		NavmeshBase graph;
 		int currentNode;
 		Vector3 currentPosition;
 		int checkForDestroyedNodesCounter;
@@ -169,7 +178,7 @@ namespace Pathfinding {
 		}
 
 		/** Works like a constructor, but can be used even for pooled objects. Returns \a this for easy chaining */
-		public RichFunnel Initialize (RichPath path, NavGraph graph) {
+		public RichFunnel Initialize (RichPath path, NavmeshBase graph) {
 			if (graph == null) throw new System.ArgumentNullException("graph");
 			if (this.graph != null) throw new System.InvalidOperationException("Trying to initialize an already initialized object. " + graph);
 
@@ -214,14 +223,12 @@ namespace Pathfinding {
 			left.Add(exactStart);
 			right.Add(exactStart);
 
-
 			this.nodes.Clear();
 
-			var raycastableGraph = graph as IRaycastableGraph;
-			if (raycastableGraph != null && funnelSimplification) {
+			if (funnelSimplification) {
 				List<GraphNode> tmp = Pathfinding.Util.ListPool<GraphNode>.Claim(end-start);
 
-				SimplifyPath(raycastableGraph, nodes, start, end, tmp, exactStart, exactEnd);
+				SimplifyPath(graph, nodes, start, end, tmp, exactStart, exactEnd);
 
 				if (this.nodes.Capacity < tmp.Count) this.nodes.Capacity = tmp.Count;
 
@@ -231,7 +238,7 @@ namespace Pathfinding {
 					if (node != null) this.nodes.Add(node);
 				}
 
-				Pathfinding.Util.ListPool<GraphNode>.Release(tmp);
+				Pathfinding.Util.ListPool<GraphNode>.Release(ref tmp);
 			} else {
 				if (this.nodes.Capacity < end-start) this.nodes.Capacity = (end-start);
 				for (int i = start; i <= end; i++) {
@@ -466,10 +473,10 @@ namespace Pathfinding {
 				return true;
 			}
 
-			var i3Pos = (Int3)position;
+			var graphSpacePos = (Int3)graph.transform.InverseTransform(position);
 
 			// Check if we are in the same node as we were in during the last frame and otherwise do a more extensive search
-			if (nodes[currentNode].ContainsPoint(i3Pos)) {
+			if (nodes[currentNode].ContainsPointInGraphSpace(graphSpacePos)) {
 				return false;
 			}
 
@@ -487,7 +494,7 @@ namespace Pathfinding {
 				}
 
 				// We found a node which contains our current position in XZ space
-				if (nodes[i].ContainsPoint(i3Pos)) {
+				if (nodes[i].ContainsPointInGraphSpace(graphSpacePos)) {
 					currentNode = i;
 					return false;
 				}
@@ -499,7 +506,7 @@ namespace Pathfinding {
 					return true;
 				}
 
-				if (nodes[i].ContainsPoint(i3Pos)) {
+				if (nodes[i].ContainsPointInGraphSpace(graphSpacePos)) {
 					currentNode = i;
 					return false;
 				}

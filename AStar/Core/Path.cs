@@ -13,6 +13,17 @@ namespace Pathfinding {
 		uint GetTraversalCost (Path path, GraphNode node);
 	}
 
+	/** Convenience class to access the default implementation of the ITraversalProvider */
+	public static class DefaultITraversalProvider {
+		public static bool CanTraverse (Path path, GraphNode node) {
+			return node.Walkable && (path.enabledTags >> (int)node.Tag & 0x1) != 0;
+		}
+
+		public static uint GetTraversalCost (Path path, GraphNode node) {
+			return path.GetTagPenalty((int)node.Tag) + node.Penalty;
+		}
+	}
+
 	/** Base class for all path types */
 	public abstract class Path : IPathInternals {
 #if ASTAR_POOL_DEBUG
@@ -50,7 +61,7 @@ namespace Pathfinding {
 
 		/** Returns the state of the path in the pathfinding pipeline */
 		internal PathState PipelineState { get; private set; }
-		System.Object stateLock = new object();
+		System.Object stateLock = new object ();
 
 		/** Provides additional traversal information to a path request.
 		 * \see \ref turnbased
@@ -58,23 +69,33 @@ namespace Pathfinding {
 		public ITraversalProvider traversalProvider;
 
 
+		/** Backing field for #CompleteState */
+		protected PathCompleteState completeState;
+
 		/** Current state of the path */
-		public PathCompleteState CompleteState { get; protected set; }
+		public PathCompleteState CompleteState {
+			get { return completeState; }
+			protected set {
+				// Locking is used to avoid multithreading race conditions
+				// in which the error state is set on the main thread to cancel the path and then a pathfinding thread marks the path as
+				// completed which would replace the error state (if a lock and check would not have been used).
+				lock (stateLock) {
+					// Once the path is put in the error state, it cannot be set to any other state
+					if (completeState != PathCompleteState.Error) completeState = value;
+				}
+			}
+		}
 
 		/** If the path failed, this is true.
 		 * \see #errorLog
+		 * \see This is equivalent to checking path.CompleteState == PathCompleteState.Error
 		 */
 		public bool error { get { return CompleteState == PathCompleteState.Error; } }
 
-		/** Additional info on what went wrong.
-		 * \see #error
+		/** Additional info on why a path failed.
+		 * \see #AstarPath.logPathResults
 		 */
-		private string _errorLog = "";
-
-		/** Log messages with info about any errors. */
-		public string errorLog {
-			get { return _errorLog; }
-		}
+		public string errorLog { get; private set; }
 
 		/** Holds the path as a Node array. All nodes the path traverses.
 		 * This may not be the same nodes as the post processed path traverses.
@@ -91,7 +112,7 @@ namespace Pathfinding {
 		internal float duration;
 
 		/** Number of nodes this path has searched */
-		protected int searchedNodes;
+		internal int searchedNodes;
 
 		/** True if the path is currently pooled.
 		 * Do not set this value. Only read. It is used internally.
@@ -219,9 +240,9 @@ namespace Pathfinding {
 		 * Allows for very easy scripting.
 		 * \code
 		 * IEnumerator Start () {
-		 *  var path = seeker.StartPath (transform.position, transform.position+transform.forward*10, OnPathComplete);
-		 *  yield return StartCoroutine (path.WaitForPath());
-		 *  // The path is calculated no
+		 *  var path = seeker.StartPath(transform.position, transform.position + transform.forward*10, null);
+		 *  yield return StartCoroutine(path.WaitForPath());
+		 *  // The path is calculated now
 		 * }
 		 * \endcode
 		 *
@@ -230,7 +251,8 @@ namespace Pathfinding {
 		 *
 		 * \throws System.InvalidOperationException if the path is not started. Send the path to Seeker.StartPath or AstarPath.StartPath before calling this function.
 		 *
-		 * \see BlockUntilCalculated
+		 * \see #BlockUntilCalculated
+		 * \see https://docs.unity3d.com/Manual/Coroutines.html
 		 */
 		public IEnumerator WaitForPath () {
 			if (PipelineState == PathState.Created) throw new System.InvalidOperationException("This path has not been started yet");
@@ -360,13 +382,13 @@ namespace Pathfinding {
 		}
 
 		/** Returns if this path is done calculating.
-		 * \returns If CompleteState is not PathCompleteState.NotCalculated.
+		 * \returns If #CompleteState is not \link Pathfinding.PathCompleteState.NotCalculated NotCalculated\endlink.
 		 *
 		 * \note The callback for the path might not have been called yet.
 		 *
 		 * \since Added in 3.0.8
 		 *
-		 * \see Seeker.IsDone
+		 * \see #Seeker.IsDone which also takes into account if the %path %callback has been called and had modifiers applied.
 		 */
 		public bool IsDone () {
 			return CompleteState != PathCompleteState.NotCalculated;
@@ -387,80 +409,52 @@ namespace Pathfinding {
 			return PipelineState;
 		}
 
-		/** Appends \a msg to #errorLog and logs \a msg to the console.
-		 * Debug.Log call is only made if AstarPath.logPathResults is not equal to None and not equal to InGame.
-		 * Consider calling Error() along with this call.
-		 */
-// Ugly Code Inc. wrote the below code :D
-// What it does is that it disables the LogError function if ASTAR_NO_LOGGING is enabled
-// since the DISABLED define will never be enabled
-// Ugly way of writing Conditional("!ASTAR_NO_LOGGING")
-#if ASTAR_NO_LOGGING
-		[System.Diagnostics.Conditional("DISABLED")]
-#endif
-		internal void LogError (string msg) {
-#if !UNITY_EDITOR
-			// Optimize for release builds
-			// If no path logging is enabled
-			// don't append to the error log string
-			// to reduce allocations
-			if (AstarPath.active.logPathResults != PathLog.None) {
-				_errorLog += msg;
-			}
-#else
-			_errorLog += msg;
-#endif
-
-			if (AstarPath.active.logPathResults != PathLog.None && AstarPath.active.logPathResults != PathLog.InGame) {
-				Debug.LogWarning(msg);
-			}
+		/** Causes the path to fail and sets #errorLog to \a msg */
+		internal void FailWithError (string msg) {
+			Error();
+			if (errorLog != "") errorLog += "\n" + msg;
+			else errorLog = msg;
 		}
 
-		/** Logs an error and calls Error().
-		 * This is called only if something is very wrong or the user is doing something he/she really should not be doing.
+		/** Logs an error.
+		 * \deprecated Use #FailWithError instead
 		 */
-		internal void ForceLogError (string msg) {
-			Error();
-			_errorLog += msg;
-			Debug.LogError(msg);
+		[System.Obsolete("Use FailWithError instead")]
+		internal void LogError (string msg) {
+			Log(msg);
 		}
 
 		/** Appends a message to the #errorLog.
 		 * Nothing is logged to the console.
 		 *
 		 * \note If AstarPath.logPathResults is PathLog.None and this is a standalone player, nothing will be logged as an optimization.
+		 *
+		 * \deprecated Use #FailWithError instead
 		 */
+		[System.Obsolete("Use FailWithError instead")]
 		internal void Log (string msg) {
-#if !UNITY_EDITOR
-			// Optimize for release builds
-			// If no path logging is enabled
-			// don't append to the error log string
-			// to reduce allocations
-			if (AstarPath.active.logPathResults != PathLog.None) {
-				_errorLog += msg;
-			}
-#endif
+			errorLog += msg;
 		}
 
 		/** Aborts the path because of an error.
 		 * Sets #error to true.
-		 * This function is called when an error has ocurred (e.g a valid path could not be found).
-		 * \see LogError
+		 * This function is called when an error has occurred (e.g a valid path could not be found).
+		 * \see #FailWithError
 		 */
 		public void Error () {
 			CompleteState = PathCompleteState.Error;
 		}
 
-		/** Does some error checking.
-		 * Makes sure the user isn't using old code paths and that no major errors have been done.
+		/** Performs some error checking.
+		 * Makes sure the user isn't using old code paths and that no major errors have been made.
 		 *
-		 * \throws An exception if any errors are found
+		 * Causes the path to fail if any errors are found.
 		 */
 		private void ErrorCheck () {
-			if (!hasBeenReset) throw new System.Exception("The path has never been reset. Use the static Construct call, do not use the normal constructors.");
-			if (((IPathInternals)this).Pooled) throw new System.Exception("The path is currently in a path pool. Are you sending the path for calculation twice?");
-			if (pathHandler == null) throw new System.Exception("Field pathHandler is not set. Please report this bug.");
-			if (PipelineState > PathState.Processing) throw new System.Exception("This path has already been processed. Do not request a path with the same path object twice.");
+			if (!hasBeenReset) FailWithError("Please use the static Construct function for creating paths, do not use the normal constructors.");
+			if (((IPathInternals)this).Pooled) FailWithError("The path is currently in a path pool. Are you sending the path for calculation twice?");
+			if (pathHandler == null) FailWithError("Field pathHandler is not set. Please report this bug.");
+			if (PipelineState > PathState.Processing) FailWithError("This path has already been processed. Do not request a path with the same path object twice.");
 		}
 
 		/** Called when the path enters the pool.
@@ -470,10 +464,8 @@ namespace Pathfinding {
 		 * \warning Do not call this function manually.
 		 */
 		protected virtual void OnEnterPool () {
-			if (vectorPath != null) Pathfinding.Util.ListPool<Vector3>.Release(vectorPath);
-			if (path != null) Pathfinding.Util.ListPool<GraphNode>.Release(path);
-			vectorPath = null;
-			path = null;
+			if (vectorPath != null) Pathfinding.Util.ListPool<Vector3>.Release(ref vectorPath);
+			if (path != null) Pathfinding.Util.ListPool<GraphNode>.Release(ref path);
 			// Clear the callback to remove a potential memory leak
 			// while the path is in the pool (which it could be for a long time).
 			callback = null;
@@ -506,8 +498,8 @@ namespace Pathfinding {
 			pathHandler = null;
 			callback = null;
 			immediateCallback = null;
-			_errorLog = "";
-			CompleteState = PathCompleteState.NotCalculated;
+			errorLog = "";
+			completeState = PathCompleteState.NotCalculated;
 
 			path = Pathfinding.Util.ListPool<GraphNode>.Claim();
 			vectorPath = Pathfinding.Util.ListPool<Vector3>.Claim();
@@ -588,7 +580,7 @@ namespace Pathfinding {
 		/** Releases a path claim (pooling).
 		 * Removes the claim of the path by the specified object.
 		 * When the claim count reaches zero, the path will be pooled, all variables will be cleared and the path will be put in a pool to be used again.
-		 * This is great for memory since less allocations are made.
+		 * This is great for performance since fewer allocations are made.
 		 *
 		 * If the silent parameter is true, this method will remove the claim by the specified object
 		 * but the path will not be pooled if the claim count reches zero unless a Release call (not silent) has been made earlier.
@@ -760,7 +752,7 @@ namespace Pathfinding {
 			try {
 				ErrorCheck();
 			} catch (System.Exception e) {
-				ForceLogError("Exception in path "+pathID+"\n"+e);
+				FailWithError(e.Message);
 			}
 		}
 

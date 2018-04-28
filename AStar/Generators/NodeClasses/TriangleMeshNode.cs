@@ -2,10 +2,19 @@ using UnityEngine;
 using Pathfinding.Serialization;
 
 namespace Pathfinding {
-	public interface INavmeshHolder {
+	/** Interface for something that holds a triangle based navmesh */
+	public interface INavmeshHolder : ITransformedGraph, INavmesh {
+		/** Position of vertex number i in the world */
 		Int3 GetVertex (int i);
+
+		/** Position of vertex number i in coordinates local to the graph.
+		 * The up direction is always the +Y axis for these coordinates.
+		 */
 		Int3 GetVertexInGraphSpace (int i);
+
 		int GetVertexArrayIndex (int index);
+
+		/** Transforms coordinates from graph space to world space */
 		void GetTileCoordinates (int tileIndex, out int x, out int z);
 	}
 
@@ -36,18 +45,16 @@ namespace Pathfinding {
 		 * \warning Internal method
 		 */
 		public static void SetNavmeshHolder (int graphIndex, INavmeshHolder graph) {
-			if (_navmeshHolders.Length <= graphIndex) {
-				// We need to lock and then check again to make sure
-				// that this the resize operation is thread safe
-				lock (lockObject) {
-					if (_navmeshHolders.Length <= graphIndex) {
-						var gg = new INavmeshHolder[graphIndex+1];
-						for (int i = 0; i < _navmeshHolders.Length; i++) gg[i] = _navmeshHolders[i];
-						_navmeshHolders = gg;
-					}
+			// We need to lock to make sure that
+			// the resize operation is thread safe
+			lock (lockObject) {
+				if (graphIndex >= _navmeshHolders.Length) {
+					var gg = new INavmeshHolder[graphIndex+1];
+					_navmeshHolders.CopyTo(gg, 0);
+					_navmeshHolders = gg;
 				}
+				_navmeshHolders[graphIndex] = graph;
 			}
-			_navmeshHolders[graphIndex] = graph;
 		}
 
 		/** Set the position of this node to the average of its 3 vertices */
@@ -85,6 +92,17 @@ namespace Pathfinding {
 			v2 = holder.GetVertex(this.v2);
 		}
 
+		/** Returns all 3 vertices of this node in graph space */
+		public void GetVerticesInGraphSpace (out Int3 v0, out Int3 v1, out Int3 v2) {
+			// Get the object holding the vertex data for this node
+			// This is usually a graph or a recast graph tile
+			var holder = GetNavmeshHolder(GraphIndex);
+
+			v0 = holder.GetVertexInGraphSpace(this.v0);
+			v1 = holder.GetVertexInGraphSpace(this.v1);
+			v2 = holder.GetVertexInGraphSpace(this.v2);
+		}
+
 		public override Int3 GetVertex (int i) {
 			return GetNavmeshHolder(GraphIndex).GetVertex(GetVertexIndex(i));
 		}
@@ -105,6 +123,62 @@ namespace Pathfinding {
 			return Pathfinding.Polygon.ClosestPointOnTriangle((Vector3)a, (Vector3)b, (Vector3)c, p);
 		}
 
+		/** Closest point on the node when seen from above.
+		 * This method is mostly for internal use as the #Pathfinding.NavmeshBase.Linecast methods use it.
+		 *
+		 * - The returned point is the closest one on the node to \a p when seen from above (relative to the graph).
+		 *   This is important mostly for sloped surfaces.
+		 * - The returned point is an Int3 point in graph space.
+		 * - It is guaranteed to be inside the node, so if you call #ContainsPointInGraphSpace with the return value from this method the result is guaranteed to be true.
+		 *
+		 * This method is slower than e.g #ClosestPointOnNode or #ClosestPointOnNodeXZ.
+		 * However they do not have the same guarantees as this method has.
+		 */
+		internal Int3 ClosestPointOnNodeXZInGraphSpace (Vector3 p) {
+			// Get the vertices that make up the triangle
+			Int3 a, b, c;
+
+			GetVerticesInGraphSpace(out a, out b, out c);
+
+			// Convert p to graph space
+			p = GetNavmeshHolder(GraphIndex).transform.InverseTransform(p);
+
+			// Find the closest point on the triangle to p when looking at the triangle from above (relative to the graph)
+			var closest = Pathfinding.Polygon.ClosestPointOnTriangleXZ((Vector3)a, (Vector3)b, (Vector3)c, p);
+
+			// Make sure the point is actually inside the node
+			var i3closest = (Int3)closest;
+			if (ContainsPointInGraphSpace(i3closest)) {
+				// Common case
+				return i3closest;
+			} else {
+				// Annoying...
+				// The closest point when converted from floating point coordinates to integer coordinates
+				// is not actually inside the node. It needs to be inside the node for some methods
+				// (like for example Linecast) to work properly.
+
+				// Try the 8 integer coordinates around the closest point
+				// and check if any one of them are completely inside the node.
+				// This will most likely succeed as it should be very close.
+				for (int dx = -1; dx <= 1; dx++) {
+					for (int dz = -1; dz <= 1; dz++) {
+						if ((dx != 0 || dz != 0)) {
+							var candidate = new Int3(i3closest.x + dx, i3closest.y, i3closest.z + dz);
+							if (ContainsPointInGraphSpace(candidate)) return candidate;
+						}
+					}
+				}
+
+				// Happens veery rarely.
+				// Pick the closest vertex of the triangle.
+				// The vertex is guaranteed to be inside the triangle.
+				var da = (a - i3closest).sqrMagnitudeLong;
+				var db = (b - i3closest).sqrMagnitudeLong;
+				var dc = (c - i3closest).sqrMagnitudeLong;
+				return da < db ? (da < dc ? a : c) : (db < dc ? b : c);
+			}
+		}
+
 		public override Vector3 ClosestPointOnNodeXZ (Vector3 p) {
 			// Get all 3 vertices for this node
 			Int3 tp1, tp2, tp3;
@@ -113,11 +187,15 @@ namespace Pathfinding {
 			return Polygon.ClosestPointOnTriangleXZ((Vector3)tp1, (Vector3)tp2, (Vector3)tp3, p);
 		}
 
-		public override bool ContainsPoint (Int3 p) {
+		public override bool ContainsPoint (Vector3 p) {
+			return ContainsPointInGraphSpace((Int3)GetNavmeshHolder(GraphIndex).transform.InverseTransform(p));
+		}
+
+		public override bool ContainsPointInGraphSpace (Int3 p) {
 			// Get all 3 vertices for this node
 			Int3 a, b, c;
 
-			GetVertices(out a, out b, out c);
+			GetVerticesInGraphSpace(out a, out b, out c);
 
 			if ((long)(b.x - a.x) * (long)(p.z - a.z) - (long)(p.x - a.x) * (long)(b.z - a.z) > 0) return false;
 
@@ -133,7 +211,7 @@ namespace Pathfinding {
 		}
 
 		public override void UpdateRecursiveG (Path path, PathNode pathNode, PathHandler handler) {
-			UpdateG(path, pathNode);
+			pathNode.UpdateG(path);
 
 			handler.heap.Add(pathNode);
 
@@ -190,7 +268,7 @@ namespace Pathfinding {
 						pathOther.cost = cost;
 
 						pathOther.H = path.CalculateHScore(other);
-						other.UpdateG(path, pathOther);
+						pathOther.UpdateG(path);
 
 						handler.heap.Add(pathOther);
 					} else {
@@ -200,13 +278,6 @@ namespace Pathfinding {
 							pathOther.parent = pathNode;
 
 							other.UpdateRecursiveG(path, pathOther, handler);
-						} else if (pathOther.G+cost+path.GetTraversalCost(this) < pathNode.G && other.ContainsConnection(this)) {
-							// Or if the path from the other node to this one is better
-
-							pathNode.parent = pathOther;
-							pathNode.cost = cost;
-
-							UpdateRecursiveG(path, pathNode, handler);
 						}
 					}
 				}
@@ -215,179 +286,131 @@ namespace Pathfinding {
 
 		/** Returns the edge which is shared with \a other.
 		 * If no edge is shared, -1 is returned.
-		 * The edge is GetVertex(result) - GetVertex((result+1) % GetVertexCount()).
-		 * See GetPortal for the exact segment shared.
-		 * \note Might return that an edge is shared when the two nodes are in different tiles and adjacent on the XZ plane, but do not line up perfectly on the Y-axis.
-		 * Therefore it is recommended that you only test for neighbours of this node or do additional checking afterwards.
+		 * If there is a connection with the other node, but the connection is not marked as using a particular edge of the shape of the node
+		 * then 0xFF will be returned.
+		 *
+		 * The vertices in the edge can be retrieved using
+		 * \code
+		 * var edge = node.SharedEdge(other);
+		 * var a = node.GetVertex(edge);
+		 * var b = node.GetVertex((edge+1) % node.GetVertexCount());
+		 * \endcode
+		 *
+		 * \see #GetPortal which also handles edges that are shared over tile borders and some types of node links
 		 */
 		public int SharedEdge (GraphNode other) {
-			int a, b;
+			var edge = -1;
 
-			GetPortal(other, null, null, false, out a, out b);
-			return a;
+			for (int i = 0; i < connections.Length; i++) {
+				if (connections[i].node == other) edge = connections[i].shapeEdge;
+			}
+			return edge;
 		}
 
-		public override bool GetPortal (GraphNode _other, System.Collections.Generic.List<Vector3> left, System.Collections.Generic.List<Vector3> right, bool backwards) {
+		public override bool GetPortal (GraphNode toNode, System.Collections.Generic.List<Vector3> left, System.Collections.Generic.List<Vector3> right, bool backwards) {
 			int aIndex, bIndex;
 
-			return GetPortal(_other, left, right, backwards, out aIndex, out bIndex);
+			return GetPortal(toNode, left, right, backwards, out aIndex, out bIndex);
 		}
 
-		public bool GetPortal (GraphNode _other, System.Collections.Generic.List<Vector3> left, System.Collections.Generic.List<Vector3> right, bool backwards, out int aIndex, out int bIndex) {
+		public bool GetPortal (GraphNode toNode, System.Collections.Generic.List<Vector3> left, System.Collections.Generic.List<Vector3> right, bool backwards, out int aIndex, out int bIndex) {
 			aIndex = -1;
 			bIndex = -1;
 
 			//If the nodes are in different graphs, this function has no idea on how to find a shared edge.
-			if (_other.GraphIndex != GraphIndex) return false;
+			if (backwards || toNode.GraphIndex != GraphIndex) return false;
 
 			// Since the nodes are in the same graph, they are both TriangleMeshNodes
 			// So we don't need to care about other types of nodes
-			var other = _other as TriangleMeshNode;
+			var toTriNode = toNode as TriangleMeshNode;
+			var edge = SharedEdge(toTriNode);
 
-			//Get tile indices
-			int tileIndex = (GetVertexIndex(0) >> RecastGraph.TileIndexOffset) & RecastGraph.TileIndexMask;
-			int tileIndex2 = (other.GetVertexIndex(0) >> RecastGraph.TileIndexOffset) & RecastGraph.TileIndexMask;
+			// A connection was found, but it specifically didn't use an edge
+			if (edge == 0xFF) return false;
 
-			//When the nodes are in different tiles, the edges might not be completely identical
-			//so another technique is needed
-			//Only do this on recast graphs
-			if (tileIndex != tileIndex2 && (GetNavmeshHolder(GraphIndex) is RecastGraph)) {
+			// No connection was found between the nodes
+			// Check if there is a node link that connects them
+			if (edge == -1) {
+				#if !ASTAR_NO_POINT_GRAPH
 				for (int i = 0; i < connections.Length; i++) {
 					if (connections[i].node.GraphIndex != GraphIndex) {
-#if !ASTAR_NO_POINT_GRAPH
 						var mid = connections[i].node as NodeLink3Node;
-						if (mid != null && mid.GetOther(this) == other) {
+						if (mid != null && mid.GetOther(this) == toTriNode) {
 							// We have found a node which is connected through a NodeLink3Node
-
-							if (left != null) {
-								mid.GetPortal(other, left, right, false);
-								return true;
-							}
+							mid.GetPortal(toTriNode, left, right, false);
+							return true;
 						}
-#endif
 					}
 				}
+				#endif
 
-				//Get the tile coordinates, from them we can figure out which edge is going to be shared
-				int x1, x2, z1, z2;
-				int coord;
+				return false;
+			}
+
+			aIndex = edge;
+			bIndex = (edge + 1) % GetVertexCount();
+
+			// Get the vertices of the shared edge for the first node
+			Int3 v1a = GetVertex(edge);
+			Int3 v1b = GetVertex((edge+1) % GetVertexCount());
+
+			// Get tile indices
+			int tileIndex1 = (GetVertexIndex(0) >> NavmeshBase.TileIndexOffset) & NavmeshBase.TileIndexMask;
+			int tileIndex2 = (toTriNode.GetVertexIndex(0) >> NavmeshBase.TileIndexOffset) & NavmeshBase.TileIndexMask;
+
+			if (tileIndex1 != tileIndex2) {
+				// When the nodes are in different tiles, the edges might not be completely identical
+				// so another technique is needed.
+
+				// Get the tile coordinates, from them we can figure out which edge is going to be shared
+				int x1, x2, z1, z2, coord;
 				INavmeshHolder nm = GetNavmeshHolder(GraphIndex);
-				nm.GetTileCoordinates(tileIndex, out x1, out z1);
+				nm.GetTileCoordinates(tileIndex1, out x1, out z1);
 				nm.GetTileCoordinates(tileIndex2, out x2, out z2);
 
-				if (System.Math.Abs(x1-x2) == 1) coord = 0;
-				else if (System.Math.Abs(z1-z2) == 1) coord = 2;
-				else throw new System.Exception("Tiles not adjacent (" + x1+", " + z1 +") (" + x2 + ", " + z2+")");
+				if (System.Math.Abs(x1-x2) == 1) coord = 2;
+				else if (System.Math.Abs(z1-z2) == 1) coord = 0;
+				else return false; // Tiles are not adjacent. This is likely a custom connection between two nodes.
 
-				int av = GetVertexCount();
-				int bv = other.GetVertexCount();
+				var otherEdge = toTriNode.SharedEdge(this);
 
-				//Try the X and Z coordinate. For one of them the coordinates should be equal for one of the two nodes' edges
-				//The midpoint between the tiles is the only place where they will be equal
+				// A connection was found, but it specifically didn't use an edge. This is odd since the connection in the other direction did use an edge
+				if (otherEdge == 0xFF) throw new System.Exception("Connection used edge in one direction, but not in the other direction. Has the wrong overload of AddConnection been used?");
 
-				int first = -1, second = -1;
+				// If it is -1 then it must be a one-way connection. Fall back to using the whole edge
+				if (otherEdge != -1) {
+					// When the nodes are in different tiles, they might not share exactly the same edge
+					// so we clamp the portal to the segment of the edges which they both have.
+					int mincoord = System.Math.Min(v1a[coord], v1b[coord]);
+					int maxcoord = System.Math.Max(v1a[coord], v1b[coord]);
 
-				//Find the shared edge
-				for (int a = 0; a < av; a++) {
-					int va = GetVertex(a)[coord];
-					for (int b = 0; b < bv; b++) {
-						if (va == other.GetVertex((b+1)%bv)[coord] && GetVertex((a+1) % av)[coord] == other.GetVertex(b)[coord]) {
-							first = a;
-							second = b;
-							a = av;
-							break;
-						}
-					}
-				}
+					// Get the vertices of the shared edge for the second node
+					Int3 v2a = toTriNode.GetVertex(otherEdge);
+					Int3 v2b = toTriNode.GetVertex((otherEdge+1) % toTriNode.GetVertexCount());
 
-				aIndex = first;
-				bIndex = second;
+					mincoord = System.Math.Max(mincoord, System.Math.Min(v2a[coord], v2b[coord]));
+					maxcoord = System.Math.Min(maxcoord, System.Math.Max(v2a[coord], v2b[coord]));
 
-				if (first != -1) {
-					Int3 a = GetVertex(first);
-					Int3 b = GetVertex((first+1)%av);
-
-					//The coordinate which is not the same for the vertices
-					int ocoord = coord == 2 ? 0 : 2;
-
-					//When the nodes are in different tiles, they might not share exactly the same edge
-					//so we clamp the portal to the segment of the edges which they both have.
-					int mincoord = System.Math.Min(a[ocoord], b[ocoord]);
-					int maxcoord = System.Math.Max(a[ocoord], b[ocoord]);
-
-					mincoord = System.Math.Max(mincoord, System.Math.Min(other.GetVertex(second)[ocoord], other.GetVertex((second+1)%bv)[ocoord]));
-					maxcoord = System.Math.Min(maxcoord, System.Math.Max(other.GetVertex(second)[ocoord], other.GetVertex((second+1)%bv)[ocoord]));
-
-					if (a[ocoord] < b[ocoord]) {
-						a[ocoord] = mincoord;
-						b[ocoord] = maxcoord;
+					if (v1a[coord] < v1b[coord]) {
+						v1a[coord] = mincoord;
+						v1b[coord] = maxcoord;
 					} else {
-						a[ocoord] = maxcoord;
-						b[ocoord] = mincoord;
+						v1a[coord] = maxcoord;
+						v1b[coord] = mincoord;
 					}
-
-					if (left != null) {
-						//All triangles should be clockwise so second is the rightmost vertex (seen from this node)
-						left.Add((Vector3)a);
-						right.Add((Vector3)b);
-					}
-					return true;
-				}
-			} else
-			if (!backwards) {
-				int first = -1;
-				int second = -1;
-
-				int av = GetVertexCount();
-				int bv = other.GetVertexCount();
-
-				/** \todo Maybe optimize with pa=av-1 instead of modulus... */
-				for (int a = 0; a < av; a++) {
-					int va = GetVertexIndex(a);
-					for (int b = 0; b < bv; b++) {
-						if (va == other.GetVertexIndex((b+1)%bv) && GetVertexIndex((a+1) % av) == other.GetVertexIndex(b)) {
-							first = a;
-							second = b;
-							a = av;
-							break;
-						}
-					}
-				}
-
-				aIndex = first;
-				bIndex = second;
-
-				if (first != -1) {
-					if (left != null) {
-						//All triangles should be clockwise so second is the rightmost vertex (seen from this node)
-						left.Add((Vector3)GetVertex(first));
-						right.Add((Vector3)GetVertex((first+1)%av));
-					}
-				} else {
-					for (int i = 0; i < connections.Length; i++) {
-						if (connections[i].node.GraphIndex != GraphIndex) {
-#if !ASTAR_NO_POINT_GRAPH
-							var mid = connections[i].node as NodeLink3Node;
-							if (mid != null && mid.GetOther(this) == other) {
-								// We have found a node which is connected through a NodeLink3Node
-
-								if (left != null) {
-									mid.GetPortal(other, left, right, false);
-									return true;
-								}
-							}
-#endif
-						}
-					}
-					return false;
 				}
 			}
 
+			if (left != null) {
+				// All triangles should be laid out in clockwise order so v1b is the rightmost vertex (seen from this node)
+				left.Add((Vector3)v1a);
+				right.Add((Vector3)v1b);
+			}
 			return true;
 		}
 
+		/** \todo This is the area in XZ space, use full 3D space for higher correctness maybe? */
 		public override float SurfaceArea () {
-			// TODO: This is the area in XZ space, use full 3D space for higher correctness maybe?
 			var holder = GetNavmeshHolder(GraphIndex);
 
 			return System.Math.Abs(VectorMath.SignedTriangleAreaTimes2XZ(holder.GetVertex(v0), holder.GetVertex(v1), holder.GetVertex(v2))) * 0.5f;

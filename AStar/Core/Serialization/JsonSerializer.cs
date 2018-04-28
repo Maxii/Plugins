@@ -56,7 +56,7 @@ namespace Pathfinding.Serialization {
 		public GraphNode DeserializeNodeReference () {
 			var id = reader.ReadInt32();
 
-			if (id2NodeMapping == null) throw new Exception("Calling DeserializeNodeReference when serializing");
+			if (id2NodeMapping == null) throw new Exception("Calling DeserializeNodeReference when not deserializing node references");
 
 			if (id == -1) return null;
 			GraphNode node = id2NodeMapping[id];
@@ -203,6 +203,15 @@ namespace Pathfinding.Serialization {
 		 * thus only be called from a single thread and should not be called while using an earlier got string builder.
 		 */
 		static System.Text.StringBuilder GetStringBuilder () { _stringBuilder.Length = 0; return _stringBuilder; }
+
+		/** Cached version object for 3.8.3 */
+		public static readonly System.Version V3_8_3 = new System.Version(3, 8, 3);
+
+		/** Cached version object for 3.9.0 */
+		public static readonly System.Version V3_9_0 = new System.Version(3, 9, 0);
+
+		/** Cached version object for 4.1.0 */
+		public static readonly System.Version V4_1_0 = new System.Version(4, 1, 0);
 
 		public AstarSerializer (AstarData data) {
 			this.data = data;
@@ -395,7 +404,7 @@ namespace Pathfinding.Serialization {
 			var writer = new BinaryWriter(stream);
 			var ctx = new GraphSerializationContext(writer);
 
-			graph.SerializeExtraInfo(ctx);
+			((IGraphInternals)graph).SerializeExtraInfo(ctx);
 			byte[] bytes = stream.ToArray();
 			writer.Close();
 
@@ -451,25 +460,6 @@ namespace Pathfinding.Serialization {
 
 			NodeLink2.SerializeReferences(ctx);
 			return stream.ToArray();
-		}
-
-		public void SerializeEditorSettings (GraphEditorBase[] editors) {
-			if (editors == null || !settings.editorSettings) return;
-
-			for (int i = 0; i < editors.Length; i++) {
-				if (editors[i] == null) return;
-
-				var output = GetStringBuilder();
-				TinyJsonSerializer.Serialize(editors[i], output);
-				var bytes = encoding.GetBytes(output.ToString());
-
-				//Less or equal to 2 bytes means that nothing was saved (file is "{}")
-				if (bytes.Length <= 2)
-					continue;
-
-				AddChecksum(bytes);
-				AddEntry("graph"+i+"_editor"+jsonExt, bytes);
-			}
 		}
 
 		#endregion
@@ -564,7 +554,7 @@ namespace Pathfinding.Serialization {
 			} else if (ContainsEntry(binName)) {
 				var reader = GetBinaryReader(GetEntry(binName));
 				var ctx = new GraphSerializationContext(reader, null, graph.graphIndex, meta);
-				graph.DeserializeSettingsCompatibility(ctx);
+				((IGraphInternals)graph).DeserializeSettingsCompatibility(ctx);
 			} else {
 				throw new FileNotFoundException("Could not find data for graph " + zipIndex + " in zip. Entry 'graph" + zipIndex + jsonExt + "' does not exist");
 			}
@@ -609,7 +599,7 @@ namespace Pathfinding.Serialization {
 			var ctx = new GraphSerializationContext(reader, null, graph.graphIndex, meta);
 
 			// Call the graph to process the data
-			graph.DeserializeExtraInfo(ctx);
+			((IGraphInternals)graph).DeserializeExtraInfo(ctx);
 			return true;
 		}
 
@@ -722,7 +712,8 @@ namespace Pathfinding.Serialization {
 		/** Calls PostDeserialization on all loaded graphs */
 		public void PostDeserialization () {
 			for (int i = 0; i < graphs.Length; i++) {
-				graphs[i].PostDeserialization();
+				var ctx = new GraphSerializationContext(null, null, 0, meta);
+				((IGraphInternals)graphs[i]).PostDeserialization(ctx);
 			}
 		}
 
@@ -731,22 +722,16 @@ namespace Pathfinding.Serialization {
 		 * It searches for a matching graph (matching if graphEditor.target == graph) for every graph editor.
 		 * Multiple graph editors should not refer to the same graph.\n
 		 * \note Stored in files named "graph#_editor.json" where # is the graph number.
+		 *
+		 * \note This method is only used for compatibility, newer versions store everything in the graph.serializedEditorSettings field which is already serialized.
 		 */
-		public void DeserializeEditorSettings (GraphEditorBase[] graphEditors) {
-			if (graphEditors == null) return;
+		public void DeserializeEditorSettingsCompatibility () {
+			for (int i = 0; i < graphs.Length; i++) {
+				var zipIndex = graphIndexInZip[graphs[i]];
+				ZipEntry entry = GetEntry("graph"+zipIndex+"_editor"+jsonExt);
+				if (entry == null) continue;
 
-			for (int i = 0; i < graphEditors.Length; i++) {
-				if (graphEditors[i] == null) continue;
-				for (int j = 0; j < graphs.Length; j++) {
-					if (graphEditors[i].target != graphs[j]) continue;
-
-					var zipIndex = graphIndexInZip[graphs[j]];
-					ZipEntry entry = GetEntry("graph"+zipIndex+"_editor"+jsonExt);
-					if (entry == null) continue;
-
-					TinyJsonDeserializer.Deserialize(GetString(entry), graphEditors[i].GetType(), graphEditors[i]);
-					break;
-				}
+				(graphs[i] as IGraphInternals).SerializedEditorSettings = GetString(entry);
 			}
 		}
 
@@ -861,26 +846,26 @@ namespace Pathfinding.Serialization {
 		/** Type names for all graphs */
 		public List<string> typeNames;
 
-		/** Returns the Type of graph number \a i */
-		public Type GetGraphType (int i) {
+		/** Returns the Type of graph number \a index */
+		public Type GetGraphType (int index) {
 			// The graph was null when saving. Ignore it
-			if (String.IsNullOrEmpty(typeNames[i])) return null;
+			if (String.IsNullOrEmpty(typeNames[index])) return null;
 
 #if ASTAR_FAST_NO_EXCEPTIONS || UNITY_WEBGL
 			System.Type[] types = AstarData.DefaultGraphTypes;
 
 			Type type = null;
 			for (int j = 0; j < types.Length; j++) {
-				if (types[j].FullName == typeNames[i]) type = types[j];
+				if (types[j].FullName == typeNames[index]) type = types[j];
 			}
 #else
 			// Note calling through assembly is more stable on e.g WebGL
-			Type type = WindowsStoreCompatibility.GetTypeInfo(typeof(AstarPath)).Assembly.GetType(typeNames[i]);
+			Type type = WindowsStoreCompatibility.GetTypeInfo(typeof(AstarPath)).Assembly.GetType(typeNames[index]);
 #endif
 			if (!System.Type.Equals(type, null))
 				return type;
 
-			throw new Exception("No graph of type '" + typeNames[i] + "' could be created, type does not exist");
+			throw new Exception("No graph of type '" + typeNames[index] + "' could be created, type does not exist");
 		}
 	}
 

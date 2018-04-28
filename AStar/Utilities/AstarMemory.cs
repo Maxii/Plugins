@@ -96,5 +96,13 @@ namespace Pathfinding.Util {
 			Array.Copy(arr, shrunkArr, newLength);
 			return shrunkArr;
 		}
+
+		/** Swaps the variables a and b */
+		public static void Swap<T>(ref T a, ref T b) {
+			T tmp = a;
+
+			a = b;
+			b = tmp;
+		}
 	}
 }

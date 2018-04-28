@@ -19,7 +19,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR; UNITY_5_5_OR_NEWER</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;UNITY_EDITOR; UNITY_5_5_OR_NEWER; UNITY_2017_3_OR_NEWER</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
@@ -64,12 +64,12 @@
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="AIBaseEditor.cs" />
+    <Compile Include="AILerpEditor.cs" />
     <Compile Include="AnimationLinkEditor.cs" />
     <Compile Include="AstarPathEditor.cs" />
     <Compile Include="AstarUpdateChecker.cs" />
     <Compile Include="AstarUpdateWindow.cs" />
     <Compile Include="CustomGraphEditorAttribute.cs" />
-    <Compile Include="EditorGUIx.cs" />
     <Compile Include="GraphEditors\GraphEditor.cs" />
     <Compile Include="GraphEditors\GridGeneratorEditor.cs" />
     <Compile Include="GraphEditors\LayerGridGraphEditor.cs" />
@@ -77,11 +77,17 @@
     <Compile Include="GraphEditors\PointGeneratorEditor.cs" />
     <Compile Include="GraphEditors\RecastGraphEditor.cs" />
     <Compile Include="GraphUpdateSceneEditor.cs" />
-    <Compile Include="Misc\AstarEnumFlagDrawer.cs" />
+    <Compile Include="Legacy\LegacyAIPathEditor.cs" />
+    <Compile Include="Legacy\LegacyEditorHelper.cs" />
+    <Compile Include="Legacy\LegacyRichAIEditor.cs" />
+    <Compile Include="Legacy\LegacyRVOControllerEditor.cs" />
     <Compile Include="ModifierEditors\RaycastModifierEditor.cs" />
     <Compile Include="ModifierEditors\SmoothModifierEditor.cs" />
     <Compile Include="NavmeshCutEditor.cs" />
-    <Compile Include="OptimizationHandler.cs" />
+    <Compile Include="PackageTools\EditorBase.cs" />
+    <Compile Include="PackageTools\EditorGUIx.cs" />
+    <Compile Include="PackageTools\EnumFlagDrawer.cs" />
+    <Compile Include="PackageTools\OptimizationHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RecastMeshObjEditor.cs" />
     <Compile Include="RVOControllerEditor.cs" />
@@ -96,7 +102,9 @@
       <Name>AStar</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Misc\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

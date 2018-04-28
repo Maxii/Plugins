@@ -39,6 +39,31 @@ namespace Pathfinding {
 		[JsonMember]
 		public float scale = 1;
 
+		/** Determines how normals are calculated.
+		 * Disable for spherical graphs or other complicated surfaces that allow the agents to e.g walk on walls or ceilings.
+		 *
+		 * By default the normals of the mesh will be flipped so that they point as much as possible in the upwards direction.
+		 * The normals are important when connecting adjacent nodes. Two adjacent nodes will only be connected if they are oriented the same way.
+		 * This is particularly important if you have a navmesh on the walls or even on the ceiling of a room. Or if you are trying to make a spherical navmesh.
+		 * If you do one of those things then you should set disable this setting and make sure the normals in your source mesh are properly set.
+		 *
+		 * If you for example take a look at the image below. In the upper case then the nodes on the bottom half of the
+		 * mesh haven't been connected with the nodes on the upper half because the normals on the lower half will have been
+		 * modified to point inwards (as that is the direction that makes them face upwards the most) while the normals on
+		 * the upper half point outwards. This causes the nodes to not connect properly along the seam. When this option
+		 * is set to false instead the nodes are connected properly as in the original mesh all normals point outwards.
+		 * \shadowimage{navmesh_normals.jpg}
+		 *
+		 * The default value of this field is true to reduce the risk for errors in the common case. If a mesh is supplied that
+		 * has all normals pointing downwards and this option is false, then some methods like #PointOnNavmesh will not work correctly
+		 * as they assume that the normals point upwards. For a more complicated surface like a spherical graph those methods make no sense anyway
+		 * as there is no clear definition of what it means to be "inside" a triangle when there is no clear up direction.
+		 */
+		[JsonMember]
+		public bool recalculateNormals = true;
+
+		protected override bool RecalculateNormals { get { return recalculateNormals; } }
+
 		public override float TileWorldSizeX {
 			get {
 				return forcedBoundsSize.x;
@@ -62,29 +87,26 @@ namespace Pathfinding {
 			return new GraphTransform(Matrix4x4.TRS(offset, Quaternion.Euler(rotation), Vector3.one) * Matrix4x4.TRS(sourceMesh != null ? sourceMesh.bounds.min * scale : Vector3.zero, Quaternion.identity, Vector3.one));
 		}
 
-		public GraphUpdateThreading CanUpdateAsync (GraphUpdateObject o) {
+		GraphUpdateThreading IUpdatableGraph.CanUpdateAsync (GraphUpdateObject o) {
 			return GraphUpdateThreading.UnityThread;
 		}
 
-		public void UpdateAreaInit (GraphUpdateObject o) {}
-		public void UpdateAreaPost (GraphUpdateObject o) {}
+		void IUpdatableGraph.UpdateAreaInit (GraphUpdateObject o) {}
+		void IUpdatableGraph.UpdateAreaPost (GraphUpdateObject o) {}
 
-		public void UpdateArea (GraphUpdateObject o) {
+		void IUpdatableGraph.UpdateArea (GraphUpdateObject o) {
 			UpdateArea(o, this);
 		}
 
-		public static void UpdateArea (GraphUpdateObject o, INavmesh graph) {
-			Bounds bounds = o.bounds;
-
-			// Bounding rectangle with floating point coordinates
-			Rect rect = Rect.MinMaxRect(bounds.min.x, bounds.min.z, bounds.max.x, bounds.max.z);
+		public static void UpdateArea (GraphUpdateObject o, INavmeshHolder graph) {
+			Bounds bounds = graph.transform.InverseTransform(o.bounds);
 
 			// Bounding rectangle with integer coordinates
 			var irect = new IntRect(
 				Mathf.FloorToInt(bounds.min.x*Int3.Precision),
 				Mathf.FloorToInt(bounds.min.z*Int3.Precision),
-				Mathf.FloorToInt(bounds.max.x*Int3.Precision),
-				Mathf.FloorToInt(bounds.max.z*Int3.Precision)
+				Mathf.CeilToInt(bounds.max.x*Int3.Precision),
+				Mathf.CeilToInt(bounds.max.z*Int3.Precision)
 				);
 
 			// Corners of the bounding rectangle
@@ -109,32 +131,29 @@ namespace Pathfinding {
 
 				// Check bounding box rect in XZ plane
 				for (int v = 0; v < 3; v++) {
-					Int3 p = node.GetVertex(v);
-					var vert = (Vector3)p;
+					Int3 p = node.GetVertexInGraphSpace(v);
 
 					if (irect.Contains(p.x, p.z)) {
 						inside = true;
 						break;
 					}
 
-					if (vert.x < rect.xMin) allLeft++;
-					if (vert.x > rect.xMax) allRight++;
-					if (vert.z < rect.yMin) allTop++;
-					if (vert.z > rect.yMax) allBottom++;
+					if (p.x < irect.xmin) allLeft++;
+					if (p.x > irect.xmax) allRight++;
+					if (p.z < irect.ymin) allTop++;
+					if (p.z > irect.ymax) allBottom++;
 				}
 
-				if (!inside) {
-					if (allLeft == 3 || allRight == 3 || allTop == 3 || allBottom == 3) {
-						return;
-					}
+				if (!inside && (allLeft == 3 || allRight == 3 || allTop == 3 || allBottom == 3)) {
+					return;
 				}
 
 				// Check if the polygon edges intersect the bounding rect
 				for (int v = 0; v < 3; v++) {
 					int v2 = v > 1 ? 0 : v+1;
 
-					Int3 vert1 = node.GetVertex(v);
-					Int3 vert2 = node.GetVertex(v2);
+					Int3 vert1 = node.GetVertexInGraphSpace(v);
+					Int3 vert2 = node.GetVertexInGraphSpace(v2);
 
 					if (VectorMath.SegmentsIntersectXZ(a, b, vert1, vert2)) { inside = true; break; }
 					if (VectorMath.SegmentsIntersectXZ(a, c, vert1, vert2)) { inside = true; break; }
@@ -143,7 +162,7 @@ namespace Pathfinding {
 				}
 
 				// Check if the node contains any corner of the bounding rect
-				if (inside || node.ContainsPoint(a) || node.ContainsPoint(b) || node.ContainsPoint(c) || node.ContainsPoint(d)) {
+				if (inside || node.ContainsPointInGraphSpace(a) || node.ContainsPointInGraphSpace(b) || node.ContainsPointInGraphSpace(c) || node.ContainsPointInGraphSpace(d)) {
 					inside = true;
 				}
 
@@ -156,7 +175,7 @@ namespace Pathfinding {
 
 				// Check y coordinate
 				for (int v = 0; v < 3; v++) {
-					Int3 p = node.GetVertex(v);
+					Int3 p = node.GetVertexInGraphSpace(v);
 					if (p.y < ymin) allBelow++;
 					if (p.y > ymax) allAbove++;
 				}
@@ -187,7 +206,7 @@ namespace Pathfinding {
 			while (scan.MoveNext()) {}
 		}
 
-		public override IEnumerable<Progress> ScanInternal () {
+		protected override IEnumerable<Progress> ScanInternal () {
 			transform = CalculateTransform();
 			tileZCount = tileXCount = 1;
 			tiles = new NavmeshTile[tileZCount*tileXCount];
@@ -217,7 +236,7 @@ namespace Pathfinding {
 			Int3[] compressedVertices = null;
 			int[] compressedTriangles = null;
 			Polygon.CompressMesh(intVertices, new List<int>(sourceMesh.triangles), out compressedVertices, out compressedTriangles);
-			ListPool<Int3>.Release(intVertices);
+			ListPool<Int3>.Release(ref intVertices);
 
 			yield return new Progress(0.2f, "Building Nodes");
 
@@ -230,7 +249,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
+		protected override void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
 			base.DeserializeSettingsCompatibility(ctx);
 
 			sourceMesh = ctx.DeserializeUnityObject() as Mesh;

@@ -39,9 +39,9 @@ namespace Pathfinding {
 			}
 
 			GUI.enabled = false;
-			EditorGUILayout.LabelField("Width (voxels)", estWidth.ToString());
+			EditorGUILayout.LabelField(new GUIContent("Width (voxels)", "Based on the cell size and the bounding box"), new GUIContent(estWidth.ToString()));
 
-			EditorGUILayout.LabelField("Depth (voxels)", estDepth.ToString());
+			EditorGUILayout.LabelField(new GUIContent("Depth (voxels)", "Based on the cell size and the bounding box"), new GUIContent(estDepth.ToString()));
 			GUI.enabled = preEnabled;
 
 			graph.cellSize = EditorGUILayout.FloatField(new GUIContent("Cell Size", "Size of one voxel in world units"), graph.cellSize);
@@ -131,6 +131,8 @@ namespace Pathfinding {
 
 			graph.forcedBoundsCenter = EditorGUILayout.Vector3Field("Center", graph.forcedBoundsCenter);
 			graph.forcedBoundsSize = EditorGUILayout.Vector3Field("Size", graph.forcedBoundsSize);
+			// Make sure the bounding box is not infinitely thin along any axis
+			graph.forcedBoundsSize = Vector3.Max(graph.forcedBoundsSize, Vector3.one * 0.001f);
 			graph.rotation = EditorGUILayout.Vector3Field("Rotation", graph.rotation);
 
 			if (GUILayout.Button(new GUIContent("Snap bounds to scene", "Will snap the bounds of the graph to exactly contain all meshes that the bounds currently touches"))) {

@@ -19,7 +19,12 @@ namespace Pathfinding.Util {
 			else UnityEngine.Debug.DrawLine(matrix.MultiplyPoint3x4(a), matrix.MultiplyPoint3x4(b), color);
 		}
 
-		public void CircleXZ (Vector3 center, float radius, Color color, float startAngle = 0f, float endAngle = 2*Mathf.PI, int steps = 40) {
+		public void CircleXZ (Vector3 center, float radius, Color color, float startAngle = 0f, float endAngle = 2*Mathf.PI) {
+			int steps = 40;
+
+#if UNITY_EDITOR
+			if (gizmos) steps = (int)Mathf.Clamp(Mathf.Sqrt(radius / UnityEditor.HandleUtility.GetHandleSize((UnityEngine.Gizmos.matrix * matrix).MultiplyPoint3x4(center))) * 25, 4, 40);
+#endif
 			while (startAngle > endAngle) startAngle -= 2*Mathf.PI;
 
 			Vector3 prev = new Vector3(Mathf.Cos(startAngle)*radius, 0, Mathf.Sin(startAngle)*radius);

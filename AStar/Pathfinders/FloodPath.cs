@@ -137,14 +137,12 @@ namespace Pathfinding {
 #endif
 
 			if (startNode == null) {
-				Error();
-				LogError("Couldn't find a close node to the start point");
+				FailWithError("Couldn't find a close node to the start point");
 				return;
 			}
 
 			if (!CanTraverse(startNode)) {
-				Error();
-				LogError("The node closest to the start point could not be traversed");
+				FailWithError("The node closest to the start point could not be traversed");
 				return;
 			}
 		}
@@ -176,7 +174,7 @@ namespace Pathfinding {
 		protected override void CalculateStep (long targetTick) {
 			int counter = 0;
 
-			//Continue to search while there hasn't ocurred an error and the end hasn't been found
+			//Continue to search as long as we haven't encountered an error and we haven't found the target
 			while (CompleteState == PathCompleteState.NotCalculated) {
 				searchedNodes++;
 

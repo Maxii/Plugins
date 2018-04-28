@@ -33,7 +33,7 @@ namespace Pathfinding {
 #endif
 		};
 
-		static string GetAstarPath () {
+		static string GetPackageRootDirectory () {
 			var paths = Directory.GetDirectories(Application.dataPath, "AstarPathfindingProject", SearchOption.AllDirectories);
 
 			if (paths.Length > 0) {
@@ -103,7 +103,7 @@ namespace Pathfinding {
 		}
 
 		public static List<DefineDefinition> FindDefines () {
-			var path = GetAstarPath()+"/defines.csv";
+			var path = GetPackageRootDirectory()+"/defines.csv";
 
 			if (File.Exists(path)) {
 				// Read a file consisting of lines with the format

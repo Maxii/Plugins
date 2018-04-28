@@ -48,14 +48,6 @@ namespace Pathfinding.Voxels {
 			a[i+2] = v.z;
 		}
 
-		/** Swaps the variables a and b */
-		public static void Swap (ref int a, ref int b) {
-			int tmp = a;
-
-			a = b;
-			b = tmp;
-		}
-
 		/** Removes duplicate vertices from the array and updates the triangle array.
 		 * \returns The new array of vertices
 		 */

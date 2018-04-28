@@ -4,37 +4,41 @@ using UnityEditor;
 namespace Pathfinding.RVO {
 	[CustomEditor(typeof(RVOController))]
 	[CanEditMultipleObjects]
-	public class RVOControllerEditor : Editor {
-		SerializedProperty center, height;
-
-		void OnEnable () {
-			center = serializedObject.FindProperty("center");
-			height = serializedObject.FindProperty("height");
-		}
-
-		public override void OnInspectorGUI () {
-			serializedObject.Update();
-			DrawDefaultInspector();
+	public class RVOControllerEditor : EditorBase {
+		protected override void Inspector () {
+			EditorGUILayout.Separator();
+			EditorGUILayout.LabelField("Shape", EditorStyles.boldLabel);
+			PropertyField("radius");
+			Clamp("radius", 0.01f);
 
 			if ((target as RVOController).movementPlane == MovementPlane.XZ) {
-				EditorGUILayout.PropertyField(height);
-				EditorGUILayout.PropertyField(center);
+				PropertyField("height");
+				Clamp("height", 0.01f);
+				PropertyField("center");
 			}
+
+			EditorGUILayout.Separator();
+			EditorGUILayout.LabelField("Avoidance", EditorStyles.boldLabel);
+			PropertyField("agentTimeHorizon");
+			PropertyField("obstacleTimeHorizon");
+			PropertyField("maxNeighbours");
+			PropertyField("layer");
+			PropertyField("collidesWith");
+			PropertyField("priority");
+			EditorGUILayout.Separator();
+			EditorGUI.BeginDisabledGroup(PropertyField("lockWhenNotMoving"));
+			PropertyField("locked");
+			EditorGUI.EndDisabledGroup();
+			EditorGUILayout.Separator();
+			PropertyField("debug");
 
 			bool maxNeighboursLimit = false;
 			bool debugAndMultithreading = false;
 
 			for (int i = 0; i < targets.Length; i++) {
 				var controller = targets[i] as RVOController;
-				if (controller.rvoAgent != null) {
-					if (controller.rvoAgent.NeighbourCount >= controller.rvoAgent.MaxNeighbours) {
-						maxNeighboursLimit = true;
-					}
-				}
-
-				if (controller.simulator != null && controller.simulator.Multithreading && controller.debug) {
-					debugAndMultithreading = true;
-				}
+				maxNeighboursLimit |= controller.rvoAgent != null && controller.rvoAgent.NeighbourCount >= controller.rvoAgent.MaxNeighbours;
+				debugAndMultithreading |= controller.simulator != null && controller.simulator.Multithreading && controller.debug;
 			}
 
 			if (maxNeighboursLimit) {
@@ -49,8 +53,6 @@ namespace Pathfinding.RVO {
 			if (RVOSimulator.active == null && !EditorUtility.IsPersistent(target)) {
 				EditorGUILayout.HelpBox("There is no enabled RVOSimulator component in the scene. A single RVOSimulator component is required for local avoidance.", MessageType.Warning);
 			}
-
-			serializedObject.ApplyModifiedProperties();
 		}
 	}
 }

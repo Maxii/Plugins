@@ -87,10 +87,7 @@ namespace Pathfinding {
 		 * can use areas to create splits on the navmesh for easier updating using normal graph updates (updatePhysics=False).
 		 * See the below video for more information.
 		 *
-		 * \htmlonly
-		 * <iframe width="600" height="400" src="http://www.youtube.com/embed/CS6UypuEMwM" frameborder="0" allowfullscreen></iframe>
-		 * \endhtmlonly
-		 *
+		 * \youtube{CS6UypuEMwM}
 		 *
 		 */
 		public int area = 0;

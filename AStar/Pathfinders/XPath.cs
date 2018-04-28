@@ -75,7 +75,7 @@ namespace Pathfinding {
 		protected override void CalculateStep (long targetTick) {
 			int counter = 0;
 
-			// Continue to search while there hasn't ocurred an error and the end hasn't been found
+			// Continue to search as long as we haven't encountered an error and we haven't found the target
 			while (CompleteState == PathCompleteState.NotCalculated) {
 				searchedNodes++;
 
@@ -90,8 +90,7 @@ namespace Pathfinding {
 
 				// Any nodes left to search?
 				if (pathHandler.heap.isEmpty) {
-					Error();
-					LogError("Searched whole area but could not find target");
+					FailWithError("Searched whole area but could not find target");
 					return;
 				}
 
@@ -123,25 +122,25 @@ namespace Pathfinding {
 	}
 
 	/** Customized ending condition for a path.
-	 * This class can be used to implement a custom ending condition for e.g an Pathfinding.XPath.\n
-	 * Inherit from this class and override the #TargetFound function to implement you own ending condition logic.\n
-	 * \n
-	 * For example, you might want to create an Ending Condition which stops when a node is close enough to a given point.\n
+	 * This class can be used to implement a custom ending condition for e.g an Pathfinding.XPath.
+	 * Inherit from this class and override the #TargetFound function to implement you own ending condition logic.
+	 *
+	 * For example, you might want to create an Ending Condition which stops when a node is close enough to a given point.
 	 * Then what you do is that you create your own class, let's call it MyEndingCondition and override the function TargetFound to specify our own logic.
 	 * We want to inherit from ABPathEndingCondition because only ABPaths have end points defined.
 	 *
 	 * \code
 	 * public class MyEndingCondition : ABPathEndingCondition {
 	 *
-	 * // Maximum world distance to the target node before terminating the path
-	 * public float maxDistance = 10;
+	 *     // Maximum world distance to the target node before terminating the path
+	 *     public float maxDistance = 10;
 	 *
-	 * // Reuse the constructor in the superclass
-	 * public EndingConditionProximity (ABPath p) : base (p) {}
+	 *     // Reuse the constructor in the superclass
+	 *     public MyEndingCondition (ABPath p) : base (p) {}
 	 *
-	 * public override bool TargetFound (PathNode node) {
-	 *  return ((Vector3)node.node.position - abPath.originalEndPoint).sqrMagnitude <= maxDistance*maxDistance;
-	 * }
+	 *     public override bool TargetFound (PathNode node) {
+	 *         return ((Vector3)node.node.position - abPath.originalEndPoint).sqrMagnitude <= maxDistance*maxDistance;
+	 *     }
 	 * }
 	 * \endcode
 	 *
@@ -153,19 +152,18 @@ namespace Pathfinding {
 	 * Then you simply assign it to the \a endingCondition variable on, for example an XPath which uses the EndingCondition.
 	 *
 	 * \code
-	 * EndingConditionProximity ec = new MyEndingCondition ();
-	 * ec.maxDistance = 100; //Or some other value
+	 * XPath myXPath = XPath.Construct(startPoint, endPoint);
+	 * MyEndingCondition ec = new MyEndingCondition();
+	 * ec.maxDistance = 100; // Or some other value
 	 * myXPath.endingCondition = ec;
 	 *
-	 * //Call the path!
-	 * mySeeker.StartPath (ec);
+	 * // Calculate the path!
+	 * seeker.StartPath (ec);
 	 * \endcode
 	 *
-	 * Where \a mySeeker is a Seeker component, and \a myXPath is an Pathfinding.XPath.\n
+	 * Where \a seeker is a #Seeker component, and \a myXPath is an Pathfinding.XPath.\n
 	 *
 	 * \note The above was written without testing. I hope I haven't made any mistakes, if you try it out, and it doesn't seem to work. Please post a comment in the forums.
-	 *
-	 * \note Written for 3.0.8.3
 	 *
 	 * \version Method structure changed in 3.2
 	 * \version Updated in version 3.6.8

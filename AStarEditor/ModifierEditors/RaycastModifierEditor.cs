@@ -3,50 +3,30 @@ using UnityEditor;
 namespace Pathfinding {
 	[CustomEditor(typeof(RaycastModifier))]
 	[CanEditMultipleObjects]
-	public class RaycastModifierEditor : Editor {
-		SerializedProperty iterations, useRaycasting, thickRaycast, thickRaycastRadius, raycastOffset, useGraphRaycasting, subdivideEveryIter, mask;
+	public class RaycastModifierEditor : EditorBase {
+		protected override void Inspector () {
+			PropertyField("quality");
 
-		void OnEnable () {
-			iterations = serializedObject.FindProperty("iterations");
-			useRaycasting = serializedObject.FindProperty("useRaycasting");
-			thickRaycast = serializedObject.FindProperty("thickRaycast");
-			thickRaycastRadius = serializedObject.FindProperty("thickRaycastRadius");
-			raycastOffset = serializedObject.FindProperty("raycastOffset");
-			useGraphRaycasting = serializedObject.FindProperty("useGraphRaycasting");
-			subdivideEveryIter = serializedObject.FindProperty("subdivideEveryIter");
-			mask = serializedObject.FindProperty("mask");
-		}
-
-		public override void OnInspectorGUI () {
-			serializedObject.Update();
-
-			EditorGUI.indentLevel = 0;
-
-			EditorGUILayout.PropertyField(iterations);
-			if (iterations.intValue < 0 && !iterations.hasMultipleDifferentValues) iterations.intValue = 0;
-
-			EditorGUILayout.PropertyField(useRaycasting);
-
-			if (useRaycasting.boolValue) {
+			if (PropertyField("useRaycasting", "Use Physics Raycasting")) {
 				EditorGUI.indentLevel++;
-				EditorGUILayout.PropertyField(thickRaycast);
 
-				if (thickRaycast.boolValue) {
+				PropertyField("use2DPhysics");
+				if (PropertyField("thickRaycast")) {
 					EditorGUI.indentLevel++;
-					EditorGUILayout.PropertyField(thickRaycastRadius);
-					if (thickRaycastRadius.floatValue < 0 && !thickRaycastRadius.hasMultipleDifferentValues) thickRaycastRadius.floatValue = 0;
+					PropertyField("thickRaycastRadius");
+					Clamp("thickRaycastRadius", 0f);
 					EditorGUI.indentLevel--;
 				}
 
-				EditorGUILayout.PropertyField(raycastOffset);
-				EditorGUILayout.PropertyField(mask);
+				PropertyField("raycastOffset");
+				PropertyField("mask", "Layer Mask");
 				EditorGUI.indentLevel--;
 			}
 
-			EditorGUILayout.PropertyField(useGraphRaycasting);
-			EditorGUILayout.PropertyField(subdivideEveryIter);
-
-			serializedObject.ApplyModifiedProperties();
+			PropertyField("useGraphRaycasting");
+			if (!FindProperty("useGraphRaycasting").boolValue && !FindProperty("useRaycasting").boolValue) {
+				EditorGUILayout.HelpBox("You should use either raycasting, graph raycasting or both, otherwise this modifier will not do anything", MessageType.Warning);
+			}
 		}
 	}
 }

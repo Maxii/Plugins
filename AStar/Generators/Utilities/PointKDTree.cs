@@ -1,22 +1,34 @@
 using System.Collections.Generic;
 
 namespace Pathfinding {
-	/** Represents a collection of GraphNodes. It allows for fast lookups of the closest node to a point */
+	using Pathfinding.Util;
+
+	/** Represents a collection of GraphNodes.
+	 * It allows for fast lookups of the closest node to a point.
+	 *
+	 * \see https://en.wikipedia.org/wiki/K-d_tree
+	 */
 	public class PointKDTree {
 		// TODO: Make constant
-		public static int LeafSize = 10;
+		public const int LeafSize = 10;
+		public const int LeafArraySize = LeafSize*2 + 1;
 
 		Node[] tree = new Node[16];
 
 		int numNodes = 0;
 
 		readonly List<GraphNode> largeList = new List<GraphNode>();
-		readonly Stack<List<GraphNode> > listCache = new Stack<List<GraphNode> >();
+		readonly Stack<GraphNode[]> arrayCache = new Stack<GraphNode[]>();
 		static readonly IComparer<GraphNode>[] comparers = new IComparer<GraphNode>[] { new CompareX(), new CompareY(), new CompareZ() };
 
 		struct Node {
-			public List<GraphNode> data;
+			/** Nodes in this leaf node (null if not a leaf node) */
+			public GraphNode[] data;
+			/** Split point along the #splitAxis if not a leaf node */
 			public int split;
+			/** Number of non-null entries in #data */
+			public ushort count;
+			/** Axis to split along if not a leaf node (x=0, y=1, z=2) */
 			public byte splitAxis;
 		}
 
@@ -49,9 +61,10 @@ namespace Pathfinding {
 				throw new System.ArgumentException();
 
 			for (int i = 0; i < tree.Length; i++) {
-				if (tree[i].data != null) {
-					tree[i].data.Clear();
-					listCache.Push(tree[i].data);
+				var data = tree[i].data;
+				if (data != null) {
+					for (int j = 0; j < LeafArraySize; j++) data[j] = null;
+					arrayCache.Push(data);
 					tree[i].data = null;
 				}
 			}
@@ -60,23 +73,26 @@ namespace Pathfinding {
 			Build(1, new List<GraphNode>(nodes), start, end);
 		}
 
-		List<GraphNode> GetOrCreateList () {
+		GraphNode[] GetOrCreateList () {
 			// Note, the lists will never become larger than this initial capacity, so possibly they should be replaced by arrays
-			return listCache.Count > 0 ? listCache.Pop() : new List<GraphNode>(LeafSize*2 + 1);
+			return arrayCache.Count > 0 ? arrayCache.Pop() : new GraphNode[LeafArraySize];
 		}
 
 		int Size (int index) {
-			return tree[index].data != null ? tree[index].data.Count : Size(2 * index) + Size(2 * index + 1);
+			return tree[index].data != null ? tree[index].count : Size(2 * index) + Size(2 * index + 1);
 		}
 
 		void CollectAndClear (int index, List<GraphNode> buffer) {
 			var nodes = tree[index].data;
+			var count = tree[index].count;
 
 			if (nodes != null) {
 				tree[index] = new Node();
-				for (int i = 0; i < nodes.Count; i++) buffer.Add(nodes[i]);
-				nodes.Clear();
-				listCache.Push(nodes);
+				for (int i = 0; i < count; i++) {
+					buffer.Add(nodes[i]);
+					nodes[i] = null;
+				}
+				arrayCache.Push(nodes);
 			} else {
 				CollectAndClear(index*2, buffer);
 				CollectAndClear(index*2 + 1, buffer);
@@ -87,14 +103,14 @@ namespace Pathfinding {
 			// Allow a node to be 2.5 times as full as it should ideally be
 			// but do not allow it to contain more than 3/4ths of the total number of nodes
 			// (important to make sure nodes near the top of the tree also get rebalanced).
-			// A node should ideally contain numNodes/2^depth nodes below it (^ is exponentiation, not xor)
+			// A node should ideally contain numNodes/(2^depth) nodes below it (^ is exponentiation, not xor)
 			return System.Math.Min(((5 * numNodes) / 2) >> depth, (3 * numNodes) / 4);
 		}
 
 		void Rebalance (int index) {
 			CollectAndClear(index, largeList);
 			Build(index, largeList, 0, largeList.Count);
-			largeList.Clear();
+			largeList.ClearFast();
 		}
 
 		void EnsureSize (int index) {
@@ -108,9 +124,10 @@ namespace Pathfinding {
 		void Build (int index, List<GraphNode> nodes, int start, int end) {
 			EnsureSize(index);
 			if (end - start <= LeafSize) {
-				tree[index].data = GetOrCreateList();
+				var leafData = tree[index].data = GetOrCreateList();
+				tree[index].count = (ushort)(end - start);
 				for (int i = start; i < end; i++)
-					tree[index].data.Add(nodes[i]);
+					leafData[i - start] = nodes[i];
 			} else {
 				Int3 mn, mx;
 				mn = mx = nodes[start].position;
@@ -139,10 +156,10 @@ namespace Pathfinding {
 			}
 
 			// Add the point to the leaf node
-			tree[index].data.Add(point);
+			tree[index].data[tree[index].count++] = point;
 
 			// Check if the leaf node is large enough that we need to do some rebalancing
-			if (tree[index].data.Count > LeafSize*2) {
+			if (tree[index].count >= LeafArraySize) {
 				int levelsUp = 0;
 
 				// Search upwards for nodes that are too large and should be rebalanced
@@ -169,7 +186,7 @@ namespace Pathfinding {
 			var data = tree[index].data;
 
 			if (data != null) {
-				for (int i = data.Count-1; i >= 0; i--) {
+				for (int i = tree[index].count - 1; i >= 0; i--) {
 					var dist = (data[i].position - point).sqrMagnitudeLong;
 					if (dist < bestSqrDist && (constraint == null || constraint.Suitable(data[i]))) {
 						bestSqrDist = dist;
@@ -189,7 +206,12 @@ namespace Pathfinding {
 			}
 		}
 
-		/** Add all nodes within a squared distance of the point to the buffer */
+		/** Add all nodes within a squared distance of the point to the buffer.
+		 * \param point Nodes around this point will be added to the \a buffer.
+		 * \param sqrRadius squared maximum distance in Int3 space. If you are converting from world space you will need to multiply by Int3.Precision:
+		 * \code var sqrRadius = (worldSpaceRadius * Int3.Precision) * (worldSpaceRadius * Int3.Precision); \endcode
+		 * \param buffer All nodes will be added to this list.
+		 */
 		public void GetInRange (Int3 point, long sqrRadius, List<GraphNode> buffer) {
 			GetInRangeInternal(1, point, sqrRadius, buffer);
 		}
@@ -198,7 +220,7 @@ namespace Pathfinding {
 			var data = tree[index].data;
 
 			if (data != null) {
-				for (int i = data.Count-1; i >= 0; i--) {
+				for (int i = tree[index].count - 1; i >= 0; i--) {
 					var dist = (data[i].position - point).sqrMagnitudeLong;
 					if (dist < sqrRadius) {
 						buffer.Add(data[i]);
@@ -206,6 +228,7 @@ namespace Pathfinding {
 				}
 			} else {
 				var dist = (long)(point[tree[index].splitAxis] - tree[index].split);
+				// Pick the first child to enter based on which side of the splitting line the point is
 				var childIndex = 2 * index + (dist < 0 ? 0 : 1);
 				GetInRangeInternal(childIndex, point, sqrRadius, buffer);
 

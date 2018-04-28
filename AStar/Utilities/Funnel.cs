@@ -22,7 +22,10 @@ namespace Pathfinding {
 		* \see NodeLink2
 		*/
 		public struct PathPart {
-			public int startIndex, endIndex;
+			/** Index of the first node in this part */
+			public int startIndex;
+			/** Index of the last node in this part */
+			public int endIndex;
 			public Vector3 startPoint, endPoint;
 			public bool isLink;
 		}
@@ -104,22 +107,22 @@ namespace Pathfinding {
 		}
 
 		public static FunnelPortals ConstructFunnelPortals (List<GraphNode> nodes, PathPart part) {
-			// Claim temporary lists and try to find lists with a high capacity
-			var left = ListPool<Vector3>.Claim(nodes.Count+1);
-			var right = ListPool<Vector3>.Claim(nodes.Count+1);
-
 			if (nodes == null || nodes.Count == 0) {
-				return new FunnelPortals { left = left, right = right };
+				return new FunnelPortals { left = ListPool<Vector3>.Claim(0), right = ListPool<Vector3>.Claim(0) };
 			}
 
 			if (part.endIndex < part.startIndex || part.startIndex < 0 || part.endIndex > nodes.Count) throw new System.ArgumentOutOfRangeException();
+
+			// Claim temporary lists and try to find lists with a high capacity
+			var left = ListPool<Vector3>.Claim(nodes.Count+1);
+			var right = ListPool<Vector3>.Claim(nodes.Count+1);
 
 			// Add start point
 			left.Add(part.startPoint);
 			right.Add(part.startPoint);
 
 			// Loop through all nodes in the path (except the last one)
-			for (int i = part.startIndex; i < part.endIndex - 1; i++) {
+			for (int i = part.startIndex; i < part.endIndex; i++) {
 				// Get the portal between path[i] and path[i+1] and add it to the left and right lists
 				bool portalWasAdded = nodes[i].GetPortal(nodes[i+1], left, right, false);
 
@@ -178,17 +181,25 @@ namespace Pathfinding {
 		}
 
 		/** Unwraps the funnel portals from 3D space to 2D space.
-		 * The result is stored in the \a left and \a right arrays which must have lengths equal to the funnel.left and funnel.right lists.
+		 * The result is stored in the \a left and \a right arrays which must be at least as large as the funnel.left and funnel.right lists.
 		 *
 		 * The input is a funnel like in the image below. It may be rotated and twisted.
 		 * \shadowimage{funnel_unwrap_input.png}
 		 * The output will be a funnel in 2D space like in the image below. All twists and bends will have been straightened out.
 		 * \shadowimage{funnel_unwrap_output.png}
 		 *
-		 * \see Calculate(FunnelPortals,bool,bool)
+		 * \see #Calculate(FunnelPortals,bool,bool)
 		 */
 		public static void Unwrap (FunnelPortals funnel, Vector2[] left, Vector2[] right) {
+			int startingIndex = 1;
 			var normal = Vector3.Cross(funnel.right[1] - funnel.left[0], funnel.left[1] - funnel.left[0]);
+
+			// This handles the case when the starting point is colinear with the first portal.
+			// Note that left.Length is only guaranteed to be at least as large as funnel.left.Count, it may be larger.
+			while (normal.sqrMagnitude <= 0.00000001f && startingIndex + 1 < funnel.left.Count) {
+				startingIndex++;
+				normal = Vector3.Cross(funnel.right[startingIndex] - funnel.left[0], funnel.left[startingIndex] - funnel.left[0]);
+			}
 
 			left[0] = right[0] = Vector2.zero;
 
@@ -222,56 +233,27 @@ namespace Pathfinding {
 		/** Try to fix degenerate or invalid funnels.
 		 * \returns The number of vertices at the start of both arrays that should be ignored or -1 if the algorithm failed.
 		 */
-		static int FixFunnel (ref Vector2[] left, ref Vector2[] right) {
-			if (left.Length != right.Length) throw new System.ArgumentException("left and right lists must have equal length");
+		static int FixFunnel (Vector2[] left, Vector2[] right, int numPortals) {
+			if (numPortals > left.Length || numPortals > right.Length) throw new System.ArgumentException("Arrays do not have as many elements as specified");
 
-			if (left.Length < 3) {
+			if (numPortals < 3) {
 				return -1;
 			}
 
-			int removed = 0;
-			// Remove identical vertices
-			while (left[1] == left[2] && right[1] == right[2]) {
+			// Remove duplicate vertices
+			int startIndex = 0;
+			while (left[startIndex + 1] == left[startIndex + 2] && right[startIndex + 1] == right[startIndex + 2]) {
 				// Equivalent to RemoveAt(1) if they would have been lists
-				left[1] = left[0];
-				right[1] = right[0];
-				removed++;
+				left[startIndex + 1] = left[startIndex + 0];
+				right[startIndex + 1] = right[startIndex + 0];
+				startIndex++;
 
-				if (left.Length - removed < 3) {
+				if (numPortals - startIndex < 3) {
 					return -1;
 				}
 			}
 
-			Vector2 swPoint = left[removed + 2];
-			if (swPoint == left[removed + 1]) {
-				swPoint = right[removed + 2];
-			}
-
-			//Test
-			while (VectorMath.IsColinear(left[removed + 0], left[removed + 1], right[removed + 1]) || VectorMath.RightOrColinear(left[removed + 1], right[removed + 1], swPoint) == VectorMath.RightOrColinear(left[removed + 1], right[removed + 1], left[removed + 0])) {
-				// Equivalent to RemoveAt(1) if they would have been lists
-				left[removed + 1] = left[removed + 0];
-				right[removed + 1] = right[removed + 0];
-				removed++;
-
-				if (left.Length - removed < 3) {
-					return -1;
-				}
-
-				swPoint = left[removed + 2];
-				if (swPoint == left[removed + 1]) {
-					swPoint = right[removed + 2];
-				}
-			}
-
-			// Switch left and right to really be on the "left" and "right" sides
-			if (!VectorMath.RightOrColinear(left[removed + 0], left[removed + 1], right[removed + 1]) && !VectorMath.IsColinear(left[removed + 0], left[removed + 1], right[removed + 1])) {
-				var tmp = left;
-				left = right;
-				right = tmp;
-			}
-
-			return removed;
+			return startIndex;
 		}
 
 		protected static Vector2 ToXZ (Vector3 p) {
@@ -310,38 +292,31 @@ namespace Pathfinding {
 		 * \see Unwrap
 		 */
 		public static List<Vector3> Calculate (FunnelPortals funnel, bool unwrap, bool splitAtEveryPortal) {
-			var leftArr = new Vector2[funnel.left.Count];
-			var rightArr = new Vector2[funnel.left.Count];
+			if (funnel.left.Count != funnel.right.Count) throw new System.ArgumentException("funnel.left.Count != funnel.right.Count");
+
+			// Get arrays at least as large as the number of portals
+			var leftArr = ArrayPool<Vector2>.Claim(funnel.left.Count);
+			var rightArr = ArrayPool<Vector2>.Claim(funnel.left.Count);
 
 			if (unwrap) {
 				Unwrap(funnel, leftArr, rightArr);
 			} else {
 				// Copy to arrays
-				for (int i = 0; i < leftArr.Length; i++) {
+				for (int i = 0; i < funnel.left.Count; i++) {
 					leftArr[i] = ToXZ(funnel.left[i]);
 					rightArr[i] = ToXZ(funnel.right[i]);
 				}
 			}
 
-			var origLeft = leftArr;
-			int startIndex = FixFunnel(ref leftArr, ref rightArr);
-
-			var left3D = funnel.left;
-			var right3D = funnel.right;
-			if (origLeft != leftArr) {
-				// Flipped order
-				left3D = funnel.right;
-				right3D = funnel.left;
-			}
-
+			int startIndex = FixFunnel(leftArr, rightArr, funnel.left.Count);
 			var intermediateResult = ListPool<int>.Claim();
 			if (startIndex == -1) {
-				// If funnel algorithm failed, degrade to simple line
+				// If funnel algorithm failed, fall back to a simple line
 				intermediateResult.Add(0);
 				intermediateResult.Add(funnel.left.Count - 1);
 			} else {
 				bool lastCorner;
-				Calculate(leftArr, rightArr, startIndex, intermediateResult, int.MaxValue, out lastCorner);
+				Calculate(leftArr, rightArr, funnel.left.Count, startIndex, intermediateResult, int.MaxValue, out lastCorner);
 			}
 
 			// Get list for the final result
@@ -357,7 +332,7 @@ namespace Pathfinding {
 					var next2D = idx >= 0 ? leftArr[idx] : rightArr[-idx];
 					for (int j = prevIdx + 1; j < System.Math.Abs(idx); j++) {
 						var factor = VectorMath.LineIntersectionFactorXZ(FromXZ(leftArr[j]), FromXZ(rightArr[j]), FromXZ(prev2D), FromXZ(next2D));
-						result.Add(Vector3.Lerp(left3D[j], right3D[j], factor));
+						result.Add(Vector3.Lerp(funnel.left[j], funnel.right[j], factor));
 					}
 
 					prevIdx = Mathf.Abs(idx);
@@ -365,16 +340,16 @@ namespace Pathfinding {
 				}
 
 				if (idx >= 0) {
-					result.Add(left3D[idx]);
+					result.Add(funnel.left[idx]);
 				} else {
-					result.Add(right3D[-idx]);
+					result.Add(funnel.right[-idx]);
 				}
 			}
 
 			// Release lists back to the pool
-			ListPool<Vector3>.Release(funnel.left);
-			ListPool<Vector3>.Release(funnel.right);
-			ListPool<int>.Release(intermediateResult);
+			ListPool<int>.Release(ref intermediateResult);
+			ArrayPool<Vector2>.Release(ref leftArr);
+			ArrayPool<Vector2>.Release(ref rightArr);
 			return result;
 		}
 
@@ -386,7 +361,7 @@ namespace Pathfinding {
 		*
 		* \see http://digestingduck.blogspot.se/2010/03/simple-stupid-funnel-algorithm.html
 		*/
-		static void Calculate (Vector2[] left, Vector2[] right, int startIndex, List<int> funnelPath, int maxCorners, out bool lastCorner) {
+		static void Calculate (Vector2[] left, Vector2[] right, int numPortals, int startIndex, List<int> funnelPath, int maxCorners, out bool lastCorner) {
 			if (left.Length != right.Length) throw new System.ArgumentException();
 
 			lastCorner = false;
@@ -401,7 +376,7 @@ namespace Pathfinding {
 
 			funnelPath.Add(apexIndex);
 
-			for (int i = startIndex + 2; i < left.Length; i++) {
+			for (int i = startIndex + 2; i < numPortals; i++) {
 				if (funnelPath.Count >= maxCorners) {
 					return;
 				}
@@ -445,7 +420,7 @@ namespace Pathfinding {
 			}
 
 			lastCorner = true;
-			funnelPath.Add(left.Length-1);
+			funnelPath.Add(numPortals-1);
 		}
 	}
 }

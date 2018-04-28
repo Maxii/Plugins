@@ -1,13 +1,18 @@
 using UnityEngine;
+#if UNITY_5_5_OR_NEWER
+using UnityEngine.Profiling;
+#endif
 
 namespace Pathfinding.RVO {
+	using Pathfinding.Util;
+
 	/** Unity front end for an RVO simulator.
 	 * Attached to any GameObject in a scene, scripts such as the RVOController will use the
 	 * simulator exposed by this class to handle their movement.
 	 * In pretty much all cases you should only have a single RVOSimulator in the scene.
 	 *
-	 * You can have more than one of these, however most script which make use of the RVOSimulator
-	 * will find it by FindObjectOfType, and thus only one will be used.
+	 * You can have more than one of these, however most scripts which make use of the RVOSimulator
+	 * will use the #active property which just returns the first simulator in the scene.
 	 *
 	 * This is only a wrapper class for a Pathfinding.RVO.Simulator which simplifies exposing it
 	 * for a unity scene.
@@ -69,6 +74,13 @@ namespace Pathfinding.RVO {
 		[Tooltip("Determines if the XY (2D) or XZ (3D) plane is used for movement")]
 		public MovementPlane movementPlane = MovementPlane.XZ;
 
+		/** Draw obstacle gizmos to aid with debugging.
+		 *
+		 * In the screenshot the obstacles are visible in red.
+		 * \shadowimage{rvo/rvo_navmesh_obstacle.png}
+		 */
+		public bool drawObstacles;
+
 		/** Reference to the internal simulator */
 		Pathfinding.RVO.Simulator simulator;
 
@@ -110,5 +122,67 @@ namespace Pathfinding.RVO {
 			active = null;
 			if (simulator != null) simulator.OnDestroy();
 		}
+
+#if UNITY_EDITOR
+		[System.NonSerialized]
+		RetainedGizmos gizmos = new RetainedGizmos();
+
+		static Color ObstacleColor = new Color(255/255f, 60/255f, 15/255f, 1.0f);
+		void OnDrawGizmos () {
+			// Prevent interfering with scene view picking
+			if (Event.current.type != EventType.Repaint) return;
+
+			if (drawObstacles && simulator != null && simulator.obstacles != null) {
+				var hasher = new RetainedGizmos.Hasher();
+				var obstacles = simulator.obstacles;
+				int numEdges = 0;
+				for (int i = 0; i < obstacles.Count; i++) {
+					var vertex = obstacles[i];
+					do {
+						hasher.AddHash(vertex.position.GetHashCode() ^ vertex.height.GetHashCode());
+						numEdges++;
+						vertex = vertex.next;
+					} while (vertex != obstacles[i] && vertex != null);
+				}
+
+				if (!gizmos.Draw(hasher)) {
+					Profiler.BeginSample("Rebuild RVO Obstacle Gizmos");
+					using (var helper = gizmos.GetGizmoHelper(null, hasher)) {
+						var up = movementPlane == MovementPlane.XY ? Vector3.back : Vector3.up;
+						var vertices = new Vector3[numEdges*6];
+						var colors = new Color[numEdges*6];
+						int edgeIndex = 0;
+						for (int i = 0; i < obstacles.Count; i++) {
+							var start = obstacles[i];
+							var c = start;
+							do {
+								vertices[edgeIndex*6 + 0] = c.position;
+								vertices[edgeIndex*6 + 1] = c.next.position;
+								vertices[edgeIndex*6 + 2] = c.next.position + up*c.next.height;
+								vertices[edgeIndex*6 + 3] = c.position;
+								vertices[edgeIndex*6 + 4] = c.next.position + up*c.next.height;
+								vertices[edgeIndex*6 + 5] = c.position + up*c.height;
+								edgeIndex++;
+								c = c.next;
+							} while (c != start && c != null && c.next != null);
+						}
+
+						for (int i =  0; i < colors.Length; i++) {
+							colors[i] = ObstacleColor;
+						}
+
+						helper.DrawTriangles(vertices, colors, numEdges * 2);
+					}
+					Profiler.EndSample();
+				}
+
+				gizmos.FinalizeDraw();
+			}
+		}
+
+		void OnDisable () {
+			gizmos.ClearCache();
+		}
+#endif
 	}
 }

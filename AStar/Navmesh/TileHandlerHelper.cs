@@ -85,7 +85,7 @@ namespace Pathfinding {
 
 		void FindGraph () {
 			if (AstarPath.active != null) {
-				var graph = AstarPath.active.data.recastGraph as NavmeshBase ?? AstarPath.active.data.navmesh;
+				var graph = AstarPath.active.data.FindGraphWhichInheritsFrom(typeof(NavmeshBase)) as NavmeshBase;
 				if (graph != null) {
 					UseSpecifiedHandler(new TileHandler(graph));
 					handler.CreateTileTypesFromGraph();

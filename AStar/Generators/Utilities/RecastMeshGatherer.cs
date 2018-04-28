@@ -166,7 +166,7 @@ namespace Pathfinding.Recast {
 			// Clear cache to avoid memory leak
 			capsuleCache.Clear();
 
-			Util.ListPool<RecastMeshObj>.Release(buffer2);
+			Util.ListPool<RecastMeshObj>.Release(ref buffer2);
 		}
 
 		public void CollectTerrainMeshes (bool rasterizeTrees, float desiredChunkSize, List<RasterizationMesh> result) {

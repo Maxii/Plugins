@@ -27,11 +27,16 @@ namespace Pathfinding.Util {
 	 */
 	public static class ArrayPool<T>{
 #if !ASTAR_NO_POOLING
+		/** Maximum length of an array pooled using ClaimWithExactLength.
+		 * Arrays with lengths longer than this will silently not be pooled.
+		 */
+		const int MaximumExactArrayLength = 256;
+
 		/** Internal pool.
 		 * The arrays in each bucket have lengths of 2^i
 		 */
 		static readonly Stack<T[]>[] pool = new Stack<T[]>[31];
-		static readonly Dictionary<int, Stack<T[]> > exactPool = new Dictionary<int, Stack<T[]> >();
+		static readonly Stack<T[]>[] exactPool = new Stack<T[]>[MaximumExactArrayLength+1];
 		static readonly HashSet<T[]> inPool = new HashSet<T[]>();
 #endif
 
@@ -79,17 +84,16 @@ namespace Pathfinding.Util {
 				return Claim(length);
 			}
 
-			lock (pool) {
-				Stack<T[]> stack;
-				if (!exactPool.TryGetValue(length, out stack)) {
-					stack = new Stack<T[]>();
-					exactPool[length] = stack;
-				}
-
-				if (stack.Count > 0) {
-					var array = stack.Pop();
-					inPool.Remove(array);
-					return array;
+			if (length <= MaximumExactArrayLength) {
+				lock (pool) {
+					Stack<T[]> stack = exactPool[length];
+					if (stack != null && stack.Count > 0) {
+						var array = stack.Pop();
+#if !ASTAR_OPTIMIZE_POOLING
+						inPool.Remove(array);
+#endif
+						return array;
+					}
 				}
 			}
 #endif
@@ -101,6 +105,7 @@ namespace Pathfinding.Util {
 		 * The parameter exists to make sure that non power of two arrays are not pooled unintentionally which could lead to memory leaks.
 		 */
 		public static void Release (ref T[] array, bool allowNonPowerOfTwo = false) {
+			if (array == null) return;
 			if (array.GetType() != typeof(T[])) {
 				throw new System.ArgumentException("Expected array type " + typeof(T[]).Name + " but found " + array.GetType().Name + "\nAre you using the correct generic class?\n");
 			}
@@ -108,6 +113,7 @@ namespace Pathfinding.Util {
 #if !ASTAR_NO_POOLING
 			bool isPowerOfTwo = array.Length != 0 && (array.Length & (array.Length - 1)) == 0;
 			if (!isPowerOfTwo && !allowNonPowerOfTwo && array.Length != 0) throw new System.ArgumentException("Length is not a power of 2");
+
 			lock (pool) {
 #if !ASTAR_OPTIMIZE_POOLING
 				if (!inPool.Add(array)) {
@@ -125,13 +131,9 @@ namespace Pathfinding.Util {
 					}
 
 					pool[bucketIndex].Push(array);
-				} else {
-					Stack<T[]> stack;
-					if (!exactPool.TryGetValue(array.Length, out stack)) {
-						stack = new Stack<T[]>();
-						exactPool[array.Length] = stack;
-					}
-
+				} else if (array.Length <= MaximumExactArrayLength) {
+					Stack<T[]> stack = exactPool[array.Length];
+					if (stack == null) stack = exactPool[array.Length] = new Stack<T[]>();
 					stack.Push(array);
 				}
 			}
@@ -140,7 +142,8 @@ namespace Pathfinding.Util {
 		}
 	}
 
-	public static class ArrayPoolExtensions {
+	/** Extension methods for List<T> */
+	public static class ListExtensions {
 		/** Identical to ToArray but it uses ArrayPool<T> to avoid allocations if possible.
 		 *
 		 * Use with caution as pooling too many arrays with different lengths that
@@ -153,6 +156,25 @@ namespace Pathfinding.Util {
 				arr[i] = list[i];
 			}
 			return arr;
+		}
+
+		/** Clear a list faster than List<T>.Clear.
+		 * It turns out that the List<T>.Clear method will clear all elements in the underlaying array
+		 * not just the ones up to Count. If the list only has a few elements, but the capacity
+		 * is huge, this can cause performance problems. Using the RemoveRange method to remove
+		 * all elements in the list does not have this problem, however it is implemented in a
+		 * stupid way, so it will clear the elements twice (completely unnecessarily) so it will
+		 * only be faster than using the Clear method if the number of elements in the list is
+		 * less than half of the capacity of the list.
+		 *
+		 * Hopefully this method can be removed when Unity upgrades to a newer version of Mono.
+		 */
+		public static void ClearFast<T>(this List<T> list) {
+			if (list.Count*2 < list.Capacity) {
+				list.RemoveRange(0, list.Count);
+			} else {
+				list.Clear();
+			}
 		}
 	}
 }

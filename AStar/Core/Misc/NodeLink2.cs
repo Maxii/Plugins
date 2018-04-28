@@ -234,10 +234,10 @@ namespace Pathfinding {
 			Color color = selected ? GizmosColorSelected : GizmosColor;
 
 			if (StartTransform != null) {
-				Draw.Gizmos.CircleXZ(StartTransform.position, 0.4f, color, 0, 2*Mathf.PI, 10);
+				Draw.Gizmos.CircleXZ(StartTransform.position, 0.4f, color);
 			}
 			if (EndTransform != null) {
-				Draw.Gizmos.CircleXZ(EndTransform.position, 0.4f, color, 0, 2*Mathf.PI, 10);
+				Draw.Gizmos.CircleXZ(EndTransform.position, 0.4f, color);
 			}
 
 			if (StartTransform != null && EndTransform != null) {

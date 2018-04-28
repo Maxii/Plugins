@@ -179,60 +179,6 @@ namespace Pathfinding {
 			return value;
 		}
 
-		public static void TagMaskField (GUIContent label, int value, System.Action<int> callback) {
-			GUILayout.BeginHorizontal();
-
-			EditorGUILayout.PrefixLabel(label, EditorStyles.layerMaskField);
-
-			string[] tagNames = AstarPath.FindTagNames();
-
-			string text;
-			if (value == 0) {
-				text = "Nothing";
-			} else if (value == ~0) {
-				text = "Everything";
-			} else {
-				text = "";
-				for (int i = 0; i < 32; i++) {
-					if (((value >> i) & 0x1) != 0) {
-						// Add spacing between words
-						if (text.Length > 0) text += ", ";
-
-						text += tagNames[i];
-
-						// Too long, just give up
-						if (text.Length > 40) {
-							text = "Mixed...";
-							break;
-						}
-					}
-				}
-			}
-
-			if (GUILayout.Button(text, EditorStyles.layerMaskField, GUILayout.ExpandWidth(true))) {
-				GenericMenu.MenuFunction2 wrappedCallback = obj => callback((int)obj);
-
-				var menu = new GenericMenu();
-
-				menu.AddItem(new GUIContent("Everything"), value == ~0, wrappedCallback, ~0);
-				menu.AddItem(new GUIContent("Nothing"), value == 0, wrappedCallback, 0);
-
-				for (int i = 0; i < tagNames.Length; i++) {
-					bool on = (value >> i & 1) != 0;
-					int result = on ? value & ~(1 << i) : value | 1<<i;
-					menu.AddItem(new GUIContent(tagNames[i]), on, wrappedCallback, result);
-				}
-
-				// Shortcut to open the tag editor
-				menu.AddItem(new GUIContent("Edit Tag Names..."), false, AstarPathEditor.EditTags);
-				menu.ShowAsContext();
-
-				Event.current.Use();
-			}
-
-			GUILayout.EndHorizontal();
-		}
-
 		public static bool UnityTagMaskList (GUIContent label, bool foldout, List<string> tagMask) {
 			if (tagMask == null) throw new System.ArgumentNullException("tagMask");
 			if (EditorGUILayout.Foldout(foldout, label)) {
@@ -259,7 +205,6 @@ namespace Pathfinding {
 		/** Displays a LayerMask field.
 		 * \param label Label to display
 		 * \param selected Current LayerMask
-		 * \note Unity 3.5 and up will use the EditorGUILayout.MaskField instead of a custom written one.
 		 */
 		public static LayerMask LayerMaskField (string label, LayerMask selected) {
 			if (Event.current.type == EventType.Layout && System.DateTime.UtcNow.Ticks - lastUpdateTick > 10000000L) {
@@ -287,7 +232,7 @@ namespace Pathfinding {
 				}
 
 				currentLayerNames = layerNames[selected.value] = layers.ToArray();
-				Pathfinding.Util.ListPool<string>.Release(layers);
+				Pathfinding.Util.ListPool<string>.Release(ref layers);
 			}
 
 			selected.value = EditorGUILayout.MaskField(label, selected.value, currentLayerNames);

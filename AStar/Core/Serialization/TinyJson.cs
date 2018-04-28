@@ -71,29 +71,40 @@ namespace Pathfinding.Serialization {
 				var optIn = typeInfo.GetCustomAttributes(typeof(JsonOptInAttribute), true).Length > 0;
 #endif
 				output.Append("{");
-
-#if NETFX_CORE
-				var fields = typeInfo.DeclaredFields.Where(f => !f.IsStatic).ToArray();
-#else
-				var fields = type.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-#endif
 				bool earlier = false;
-				foreach (var field in fields) {
-					if ((!optIn && field.IsPublic) ||
-#if NETFX_CORE
-						field.CustomAttributes.Any(attr => attr.GetType() == typeof(JsonMemberAttribute))
-#else
-						field.GetCustomAttributes(typeof(JsonMemberAttribute), true).Length > 0
-#endif
-						) {
-						if (earlier) {
-							output.Append(", ");
-						}
 
-						earlier = true;
-						output.AppendFormat("\"{0}\": ", field.Name);
-						Serialize(field.GetValue(obj));
+				while (true) {
+#if NETFX_CORE
+					var fields = typeInfo.DeclaredFields.Where(f => !f.IsStatic).ToArray();
+#else
+					var fields = type.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+#endif
+					foreach (var field in fields) {
+						if (field.DeclaringType != type) continue;
+						if ((!optIn && field.IsPublic) ||
+#if NETFX_CORE
+							field.CustomAttributes.Any(attr => attr.GetType() == typeof(JsonMemberAttribute))
+#else
+							field.GetCustomAttributes(typeof(JsonMemberAttribute), true).Length > 0
+#endif
+							) {
+							if (earlier) {
+								output.Append(", ");
+							}
+
+							earlier = true;
+							output.AppendFormat("\"{0}\": ", field.Name);
+							Serialize(field.GetValue(obj));
+						}
 					}
+
+#if NETFX_CORE
+					typeInfo = typeInfo.BaseType;
+					if (typeInfo == null) break;
+#else
+					type = type.BaseType;
+					if (type == null) break;
+#endif
 				}
 				output.Append("}");
 			}
@@ -111,7 +122,16 @@ namespace Pathfinding.Serialization {
 			}
 
 			output.Append("{");
-			QuotedField("Name", obj.name);
+			var path = obj.name;
+#if UNITY_EDITOR
+			// Figure out the path of the object relative to a Resources folder.
+			// In a standalone player this cannot be done unfortunately, so we will assume it is at the top level in the Resources folder.
+			// Fortunately it should be extremely rare to have to serialize references to unity objects in a standalone player.
+			var realPath = UnityEditor.AssetDatabase.GetAssetPath(obj);
+			var match = System.Text.RegularExpressions.Regex.Match(realPath, @"Resources/(.*?)(\.\w+)?$");
+			if (match != null) path = match.Groups[1].Value;
+#endif
+			QuotedField("Name", path);
 			output.Append(", ");
 			QuotedField("Type", obj.GetType().FullName);
 
@@ -240,7 +260,13 @@ namespace Pathfinding.Serialization {
 				Eat("{");
 				while (!TryEat('}')) {
 					var name = EatField();
-					var field = tp.GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+					var tmpType = tp;
+					System.Reflection.FieldInfo field = null;
+					while (field == null && tmpType != null) {
+						field = tmpType.GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+						tmpType = tmpType.BaseType;
+					}
+
 					if (field == null) {
 						SkipFieldData();
 					} else {

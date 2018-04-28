@@ -4,8 +4,26 @@ using Pathfinding.Util;
 using Pathfinding.Serialization;
 
 namespace Pathfinding {
-	/**  Base class for all graphs */
-	public abstract class NavGraph {
+	/** Exposes internal methods for graphs.
+	 * This is used to hide methods that should not be used by any user code
+	 * but still have to be 'public' or 'internal' (which is pretty much the same as 'public'
+	 * as this library is distributed with source code).
+	 *
+	 * Hiding the internal methods cleans up the documentation and IntelliSense suggestions.
+	 */
+	public interface IGraphInternals {
+		string SerializedEditorSettings { get; set; }
+		void OnDestroy ();
+		void DestroyAllNodes ();
+		IEnumerable<Progress> ScanInternal ();
+		void SerializeExtraInfo (GraphSerializationContext ctx);
+		void DeserializeExtraInfo (GraphSerializationContext ctx);
+		void PostDeserialization (GraphSerializationContext ctx);
+		void DeserializeSettingsCompatibility (GraphSerializationContext ctx);
+	}
+
+	/** Base class for all graphs */
+	public abstract class NavGraph : IGraphInternals {
 		/** Reference to the AstarPath object in the scene */
 		public AstarPath active;
 
@@ -46,6 +64,11 @@ namespace Pathfinding {
 		[JsonMember]
 		public bool infoScreenOpen;
 
+		/** Used in the Unity editor to store serialized settings for graph inspectors */
+		[JsonMember]
+		string serializedEditorSettings;
+
+
 		/** True if the graph exists, false if it has been destroyed */
 		internal bool exists { get { return active != null; } }
 
@@ -76,17 +99,11 @@ namespace Pathfinding {
 		 *
 		 * Do not change the graph structure inside the delegate.
 		 *
-		 * \code
-		 * myGraph.GetNodes (node => {
-		 *     Debug.Log ("I found a node at position " + (Vector3)node.Position);
-		 * });
-		 * \endcode
+		 * \snippet MiscSnippets.cs NavGraph.GetNodes1
 		 *
 		 * If you want to store all nodes in a list you can do this
-		 * \code
-		 * List<GraphNode> nodes = new List<GraphNode>();
-		 * myGraph.GetNodes(nodes.Add);
-		 * \endcode
+		 *
+		 * \snippet MiscSnippets.cs NavGraph.GetNodes2
 		 */
 		public abstract void GetNodes (System.Action<GraphNode> action);
 
@@ -145,7 +162,7 @@ namespace Pathfinding {
 			GetNodes(node => node.position = ((Int3)deltaMatrix.MultiplyPoint((Vector3)node.position)));
 		}
 
-		/** Returns the nearest node to a position using the default NNConstraint.
+		/** Returns the nearest node to a position.
 		 * \param position The position to try to find a close node to
 		 * \see Pathfinding.NNConstraint.None
 		 */
@@ -220,48 +237,32 @@ namespace Pathfinding {
 		 * Use by creating a function overriding this one in a graph class, but always call base.OnDestroy () in that function.
 		 * All nodes should be destroyed in this function otherwise a memory leak will arise.
 		 */
-		public virtual void OnDestroy () {
-			DestroyAllNodesInternal();
+		protected virtual void OnDestroy () {
+			DestroyAllNodes();
 		}
 
 		/** Destroys all nodes in the graph.
 		 * \warning This is an internal method. Unless you have a very good reason, you should probably not call it.
 		 */
-		internal virtual void DestroyAllNodesInternal () {
+		protected virtual void DestroyAllNodes () {
 			GetNodes(node => node.Destroy());
 		}
 
-		/** Partially scan the graph.
-		 *
-		 * Consider using AstarPath.Scan () instead since this function might screw things up if there is more than one graph.
-		 * This function does not perform all necessary postprocessing for the graph to work with pathfinding (e.g flood fill).
-		 * See the source of the AstarPath.Scan function to see how it can be used.
-		 * In almost all cases you should use AstarPath.Scan instead.
+		/** Scan the graph.
+		 * \deprecated Use AstarPath.Scan() instead
 		 */
+		[System.Obsolete("Use AstarPath.Scan instead")]
 		public void ScanGraph () {
-			if (AstarPath.OnPreScan != null) {
-				AstarPath.OnPreScan(AstarPath.active);
-			}
-
-			if (AstarPath.OnGraphPreScan != null) {
-				AstarPath.OnGraphPreScan(this);
-			}
-
-			var scan = ScanInternal().GetEnumerator();
-			while (scan.MoveNext()) {}
-
-			if (AstarPath.OnGraphPostScan != null) {
-				AstarPath.OnGraphPostScan(this);
-			}
-
-			if (AstarPath.OnPostScan != null) {
-				AstarPath.OnPostScan(AstarPath.active);
-			}
+			Scan();
 		}
 
-		[System.Obsolete("Please use AstarPath.active.Scan or if you really want this.ScanInternal which has the same functionality as this method had")]
+		/** Scan the graph.
+		 *
+		 * Consider using AstarPath.Scan() instead since this function only scans this graph and if you are using multiple graphs
+		 * with connections between them, then it is better to scan all graphs at once.
+		 */
 		public void Scan () {
-			throw new System.Exception("This method is deprecated. Please use AstarPath.active.Scan or if you really want this.ScanInternal which has the same functionality as this method had.");
+			active.Scan(this);
 		}
 
 		/**
@@ -271,7 +272,7 @@ namespace Pathfinding {
 		 * Progress objects can be yielded to show progress info in the editor and to split up processing
 		 * over several frames when using async scanning.
 		 */
-		public abstract IEnumerable<Progress> ScanInternal ();
+		protected abstract IEnumerable<Progress> ScanInternal ();
 
 		/** Serializes graph type specific node data.
 		 * This function can be overriden to serialize extra node information (or graph information for that matter)
@@ -280,26 +281,26 @@ namespace Pathfinding {
 		 * When loading, the exact same byte array will be passed to the DeserializeExtraInfo function.\n
 		 * These functions will only be called if node serialization is enabled.\n
 		 */
-		public virtual void SerializeExtraInfo (GraphSerializationContext ctx) {
+		protected virtual void SerializeExtraInfo (GraphSerializationContext ctx) {
 		}
 
 		/** Deserializes graph type specific node data.
 		 * \see SerializeExtraInfo
 		 */
-		public virtual void DeserializeExtraInfo (GraphSerializationContext ctx) {
+		protected virtual void DeserializeExtraInfo (GraphSerializationContext ctx) {
 		}
 
 		/** Called after all deserialization has been done for all graphs.
 		 * Can be used to set up more graph data which is not serialized
 		 */
-		public virtual void PostDeserialization () {
+		protected virtual void PostDeserialization (GraphSerializationContext ctx) {
 		}
 
 		/** An old format for serializing settings.
 		 * \deprecated This is deprecated now, but the deserialization code is kept to
 		 * avoid loosing data when upgrading from older versions.
 		 */
-		public virtual void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
+		protected virtual void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
 			guid = new Guid(ctx.reader.ReadBytes(16));
 			initialPenalty = ctx.reader.ReadUInt32();
 			open = ctx.reader.ReadBoolean();
@@ -338,9 +339,17 @@ namespace Pathfinding {
 			});
 		}
 
-		/** Called when temporary meshes used in OnDrawGizmos need to be unloaded to prevent memory leaks */
-		internal virtual void UnloadGizmoMeshes () {
-		}
+		#region IGraphInternals implementation
+		string IGraphInternals.SerializedEditorSettings { get { return serializedEditorSettings; } set { serializedEditorSettings = value; } }
+		void IGraphInternals.OnDestroy () { OnDestroy(); }
+		void IGraphInternals.DestroyAllNodes () { DestroyAllNodes(); }
+		IEnumerable<Progress> IGraphInternals.ScanInternal () { return ScanInternal(); }
+		void IGraphInternals.SerializeExtraInfo (GraphSerializationContext ctx) { SerializeExtraInfo(ctx); }
+		void IGraphInternals.DeserializeExtraInfo (GraphSerializationContext ctx) { DeserializeExtraInfo(ctx); }
+		void IGraphInternals.PostDeserialization (GraphSerializationContext ctx) { PostDeserialization(ctx); }
+		void IGraphInternals.DeserializeSettingsCompatibility (GraphSerializationContext ctx) { DeserializeSettingsCompatibility(ctx); }
+
+		#endregion
 	}
 
 
@@ -350,17 +359,28 @@ namespace Pathfinding {
 	[System.Serializable]
 	public class GraphCollision {
 		/** Collision shape to use.
-		 * Pathfinding.ColliderType
+		 * \see #Pathfinding.ColliderType
 		 */
 		public ColliderType type = ColliderType.Capsule;
 
 		/** Diameter of capsule or sphere when checking for collision.
-		 * 1 equals \link Pathfinding.GridGraph.nodeSize nodeSize \endlink.
-		 * If #type is set to Ray, this does not affect anything */
+		 * When checking for collisions the system will check if any colliders
+		 * overlap a specific shape at the node's position. The shape is determined
+		 * by the #type field.
+		 *
+		 * A diameter of 1 means that the shape has a diameter equal to the node's width,
+		 * or in other words it is equal to \link Pathfinding.GridGraph.nodeSize nodeSize \endlink.
+		 *
+		 * If #type is set to Ray, this does not affect anything.
+		 *
+		 * \shadowimage{grid_collision_diameter.png}
+		 */
 		public float diameter = 1F;
 
 		/** Height of capsule or length of ray when checking for collision.
-		 * If #type is set to Sphere, this does not affect anything
+		 * If #type is set to Sphere, this does not affect anything.
+		 *
+		 * \shadowimage{grid_collision_height.png}
 		 */
 		public float height = 2F;
 
@@ -377,21 +397,27 @@ namespace Pathfinding {
 
 		/** Direction of the ray when checking for collision.
 		 * If #type is not Ray, this does not affect anything
-		 * \note This variable is not used currently, it does not affect anything
 		 */
 		public RayDirection rayDirection = RayDirection.Both;
 
-		/** Layer mask to use for collision check.
-		 * This should only contain layers of objects defined as obstacles */
+		/** Layers to be treated as obstacles. */
 		public LayerMask mask;
 
-		/** Layer mask to use for height check. */
+		/** Layers to be included in the height check. */
 		public LayerMask heightMask = -1;
 
-		/** The height to check from when checking height */
+		/** The height to check from when checking height ('ray length' in the inspector).
+		 *
+		 * As the image below visualizes, different ray lengths can make the ray hit different things.
+		 * The distance is measured up from the graph plane.
+		 *
+		 * \shadowimage{grid_collision_from_height.png}
+		 */
 		public float fromHeight = 100;
 
-		/** Toggles thick raycast */
+		/** Toggles thick raycast.
+		 * \see https://docs.unity3d.com/ScriptReference/Physics.SphereCast.html
+		 */
 		public bool thickRaycast;
 
 		/** Diameter of the thick raycast in nodes.
@@ -457,7 +483,6 @@ namespace Pathfinding {
 			if (use2D) {
 				switch (type) {
 				case ColliderType.Capsule:
-					throw new System.Exception("Capsule mode cannot be used with 2D since capsules don't exist in 2D. Please change the Physics Testing -> Collider Type setting.");
 				case ColliderType.Sphere:
 					return Physics2D.OverlapCircle(position, finalRadius, mask) == null;
 				default:
@@ -468,17 +493,17 @@ namespace Pathfinding {
 			position += up*collisionOffset;
 			switch (type) {
 			case ColliderType.Capsule:
-				return !Physics.CheckCapsule(position, position+upheight, finalRadius, mask);
+				return !Physics.CheckCapsule(position, position+upheight, finalRadius, mask, QueryTriggerInteraction.Ignore);
 			case ColliderType.Sphere:
-				return !Physics.CheckSphere(position, finalRadius, mask);
+				return !Physics.CheckSphere(position, finalRadius, mask, QueryTriggerInteraction.Ignore);
 			default:
 				switch (rayDirection) {
 				case RayDirection.Both:
-					return !Physics.Raycast(position, up, height, mask) && !Physics.Raycast(position+upheight, -up, height, mask);
+					return !Physics.Raycast(position, up, height, mask, QueryTriggerInteraction.Ignore) && !Physics.Raycast(position+upheight, -up, height, mask, QueryTriggerInteraction.Ignore);
 				case RayDirection.Up:
-					return !Physics.Raycast(position, up, height, mask);
+					return !Physics.Raycast(position, up, height, mask, QueryTriggerInteraction.Ignore);
 				default:
-					return !Physics.Raycast(position+upheight, -up, height, mask);
+					return !Physics.Raycast(position+upheight, -up, height, mask, QueryTriggerInteraction.Ignore);
 				}
 			}
 		}
@@ -508,14 +533,14 @@ namespace Pathfinding {
 
 			if (thickRaycast) {
 				var ray = new Ray(position+up*fromHeight, -up);
-				if (Physics.SphereCast(ray, finalRaycastRadius, out hit, fromHeight+0.005F, heightMask)) {
+				if (Physics.SphereCast(ray, finalRaycastRadius, out hit, fromHeight+0.005F, heightMask, QueryTriggerInteraction.Ignore)) {
 					return VectorMath.ClosestPointOnLine(ray.origin, ray.origin+ray.direction, hit.point);
 				}
 
 				walkable &= !unwalkableWhenNoGround;
 			} else {
 				// Cast a ray from above downwards to try to find the ground
-				if (Physics.Raycast(position+up*fromHeight, -up, out hit, fromHeight+0.005F, heightMask)) {
+				if (Physics.Raycast(position+up*fromHeight, -up, out hit, fromHeight+0.005F, heightMask, QueryTriggerInteraction.Ignore)) {
 					return hit.point;
 				}
 
@@ -538,13 +563,13 @@ namespace Pathfinding {
 
 			if (thickRaycast) {
 				var ray = new Ray(origin, -up);
-				if (Physics.SphereCast(ray, finalRaycastRadius, out hit, fromHeight+0.005F, heightMask)) {
+				if (Physics.SphereCast(ray, finalRaycastRadius, out hit, fromHeight+0.005F, heightMask, QueryTriggerInteraction.Ignore)) {
 					return VectorMath.ClosestPointOnLine(ray.origin, ray.origin+ray.direction, hit.point);
 				}
 
 				walkable &= !unwalkableWhenNoGround;
 			} else {
-				if (Physics.Raycast(origin, -up, out hit, fromHeight+0.005F, heightMask)) {
+				if (Physics.Raycast(origin, -up, out hit, fromHeight+0.005F, heightMask, QueryTriggerInteraction.Ignore)) {
 					return hit.point;
 				}
 
@@ -622,11 +647,16 @@ namespace Pathfinding {
 	}
 
 
-	/** Determines collision check shape */
+	/** Determines collision check shape.
+	 * \see #Pathfinding.GraphCollision
+	  */
 	public enum ColliderType {
-		Sphere,     /**< Uses a Sphere, Physics.CheckSphere */
-		Capsule,    /**< Uses a Capsule, Physics.CheckCapsule */
-		Ray         /**< Uses a Ray, Physics.Linecast */
+		/** Uses a Sphere, Physics.CheckSphere. In 2D this is a circle instead. */
+		Sphere,
+		/** Uses a Capsule, Physics.CheckCapsule. This will behave identically to the Sphere mode in 2D. */
+		Capsule,
+		/** Uses a Ray, Physics.Linecast. In 2D this is a single point instead. */
+		Ray
 	}
 
 	/** Determines collision check ray direction */

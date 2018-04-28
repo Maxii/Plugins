@@ -3,10 +3,10 @@ using Pathfinding.Util;
 
 namespace Pathfinding {
 	/** Contains useful functions for updating graphs.
-	 * This class works a lot with the Node class, a useful function to get nodes is AstarPath.GetNearest.
+	 * This class works a lot with the GraphNode class, a useful function to get nodes is #AstarPath.GetNearest.
 	 *
-	 * \see AstarPath.GetNearest
-	 * \see Pathfinding.Utils.PathUtilities
+	 * \see #AstarPath.GetNearest
+	 * \see #Pathfinding.PathUtilities
 	 *
 	 * \since Added in 3.1
 	 *
@@ -25,24 +25,11 @@ namespace Pathfinding {
 		 * \param guo The GraphUpdateObject to update the graphs with
 		 * \param node1 Node which should have a valid path to \a node2. All nodes should be walkable or \a false will be returned.
 		 * \param node2 Node which should have a valid path to \a node1. All nodes should be walkable or \a false will be returned.
-		 * \param alwaysRevert If true, reverts the graphs to the old state even if no blocking ocurred
+		 * \param alwaysRevert If true, reverts the graphs to the old state even if no blocking occurred
 		 *
 		 * \returns True if the given nodes are still reachable from each other after the \a guo has been applied. False otherwise.
 		 *
-		 * \code
-		 * var guo = new GraphUpdateObject(tower.GetComponent<Collider>.bounds);
-		 * var spawnPointNode = AstarPath.active.GetNearest(spawnPoint.position).node;
-		 * var goalNode = AstarPath.active.GetNearest(goalNode.position).node;
-		 * if (GraphUpdateUtilities.UpdateGraphsNoBlock(guo, spawnPointNode, goalNode, false)) {
-		 *     // Valid tower position
-		 *     // Since the last parameter (which is called "alwaysRevert") in the method call was false
-		 *     // The graph is now updated and the game can just continue
-		 * } else {
-		 *     // Invalid tower position. It blocks the path between the spawn point and the goal
-		 *     // The effect on the graph has been reverted
-		 *     Destroy(tower);
-		 * }
-		 * \endcode
+		 * \snippet MiscSnippets.cs GraphUpdateUtilities.UpdateGraphsNoBlock
 		 */
 		public static bool UpdateGraphsNoBlock (GraphUpdateObject guo, GraphNode node1, GraphNode node2, bool alwaysRevert = false) {
 			List<GraphNode> buffer = ListPool<GraphNode>.Claim();
@@ -50,7 +37,7 @@ namespace Pathfinding {
 			buffer.Add(node2);
 
 			bool worked = UpdateGraphsNoBlock(guo, buffer, alwaysRevert);
-			ListPool<GraphNode>.Release(buffer);
+			ListPool<GraphNode>.Release(ref buffer);
 			return worked;
 		}
 
@@ -65,7 +52,7 @@ namespace Pathfinding {
 		 *
 		 * \param guo The GraphUpdateObject to update the graphs with
 		 * \param nodes Nodes which should have valid paths between them. All nodes should be walkable or \a false will be returned.
-		 * \param alwaysRevert If true, reverts the graphs to the old state even if no blocking ocurred
+		 * \param alwaysRevert If true, reverts the graphs to the old state even if no blocking occurred
 		 *
 		 * \returns True if the given nodes are still reachable from each other after the \a guo has been applied. False otherwise.
 		 */

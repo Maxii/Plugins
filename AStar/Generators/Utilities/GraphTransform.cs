@@ -25,8 +25,12 @@ namespace Pathfinding.Util {
 	 * This is essentially just a simple wrapper around a matrix, but it has several utilities that are useful.
 	 */
 	public class GraphTransform : IMovementPlane, ITransform {
+		/** True if this transform is the identity transform (i.e it does not do anything) */
 		public readonly bool identity;
+
+		/** True if this transform is a pure translation without any scaling or rotation */
 		public readonly bool onlyTranslational;
+
 		readonly bool isXY;
 		readonly bool isXZ;
 
@@ -61,22 +65,22 @@ namespace Pathfinding.Util {
 			isXZ = rotation == Quaternion.Euler(0, 0, 0);
 		}
 
-		public Vector3 WorldUpAtGraphPosition (Vector3 p) {
+		public Vector3 WorldUpAtGraphPosition (Vector3 point) {
 			return up;
 		}
 
-		static bool MatrixIsTranslational (Matrix4x4 m) {
-			return m.GetColumn(0) == new Vector4(1, 0, 0, 0) && m.GetColumn(1) == new Vector4(0, 1, 0, 0) && m.GetColumn(2) == new Vector4(0, 0, 1, 0) && m.m33 == 1;
+		static bool MatrixIsTranslational (Matrix4x4 matrix) {
+			return matrix.GetColumn(0) == new Vector4(1, 0, 0, 0) && matrix.GetColumn(1) == new Vector4(0, 1, 0, 0) && matrix.GetColumn(2) == new Vector4(0, 0, 1, 0) && matrix.m33 == 1;
 		}
 
-		public Vector3 Transform (Vector3 p) {
-			if (onlyTranslational) return p + translation;
-			return matrix.MultiplyPoint3x4(p);
+		public Vector3 Transform (Vector3 point) {
+			if (onlyTranslational) return point + translation;
+			return matrix.MultiplyPoint3x4(point);
 		}
 
-		public Vector3 TransformVector (Vector3 p) {
-			if (onlyTranslational) return p;
-			return matrix.MultiplyVector(p);
+		public Vector3 TransformVector (Vector3 point) {
+			if (onlyTranslational) return point;
+			return matrix.MultiplyVector(point);
 		}
 
 		public void Transform (Int3[] arr) {
@@ -95,14 +99,14 @@ namespace Pathfinding.Util {
 			}
 		}
 
-		public Vector3 InverseTransform (Vector3 p) {
-			if (onlyTranslational) return p - translation;
-			return inverseMatrix.MultiplyPoint3x4(p);
+		public Vector3 InverseTransform (Vector3 point) {
+			if (onlyTranslational) return point - translation;
+			return inverseMatrix.MultiplyPoint3x4(point);
 		}
 
-		public Int3 InverseTransform (Int3 p) {
-			if (onlyTranslational) return p - i3translation;
-			return (Int3)inverseMatrix.MultiplyPoint3x4((Vector3)p);
+		public Int3 InverseTransform (Int3 point) {
+			if (onlyTranslational) return point - i3translation;
+			return (Int3)inverseMatrix.MultiplyPoint3x4((Vector3)point);
 		}
 
 		public void InverseTransform (Int3[] arr) {
@@ -117,19 +121,19 @@ namespace Pathfinding.Util {
 			return new GraphTransform(lhs * rhs.matrix);
 		}
 
-		public Bounds Transform (Bounds b) {
-			if (onlyTranslational) return new Bounds(b.center + translation, b.size);
+		public Bounds Transform (Bounds bounds) {
+			if (onlyTranslational) return new Bounds(bounds.center + translation, bounds.size);
 
 			var corners = ArrayPool<Vector3>.Claim(8);
-			var extents = b.extents;
-			corners[0] = Transform(b.center + new Vector3(extents.x, extents.y, extents.z));
-			corners[1] = Transform(b.center + new Vector3(extents.x, extents.y, -extents.z));
-			corners[2] = Transform(b.center + new Vector3(extents.x, -extents.y, extents.z));
-			corners[3] = Transform(b.center + new Vector3(extents.x, -extents.y, -extents.z));
-			corners[4] = Transform(b.center + new Vector3(-extents.x, extents.y, extents.z));
-			corners[5] = Transform(b.center + new Vector3(-extents.x, extents.y, -extents.z));
-			corners[6] = Transform(b.center + new Vector3(-extents.x, -extents.y, extents.z));
-			corners[7] = Transform(b.center + new Vector3(-extents.x, -extents.y, -extents.z));
+			var extents = bounds.extents;
+			corners[0] = Transform(bounds.center + new Vector3(extents.x, extents.y, extents.z));
+			corners[1] = Transform(bounds.center + new Vector3(extents.x, extents.y, -extents.z));
+			corners[2] = Transform(bounds.center + new Vector3(extents.x, -extents.y, extents.z));
+			corners[3] = Transform(bounds.center + new Vector3(extents.x, -extents.y, -extents.z));
+			corners[4] = Transform(bounds.center + new Vector3(-extents.x, extents.y, extents.z));
+			corners[5] = Transform(bounds.center + new Vector3(-extents.x, extents.y, -extents.z));
+			corners[6] = Transform(bounds.center + new Vector3(-extents.x, -extents.y, extents.z));
+			corners[7] = Transform(bounds.center + new Vector3(-extents.x, -extents.y, -extents.z));
 
 			var min = corners[0];
 			var max = corners[0];
@@ -141,19 +145,19 @@ namespace Pathfinding.Util {
 			return new Bounds((min+max)*0.5f, max - min);
 		}
 
-		public Bounds InverseTransform (Bounds b) {
-			if (onlyTranslational) return new Bounds(b.center - translation, b.size);
+		public Bounds InverseTransform (Bounds bounds) {
+			if (onlyTranslational) return new Bounds(bounds.center - translation, bounds.size);
 
 			var corners = ArrayPool<Vector3>.Claim(8);
-			var extents = b.extents;
-			corners[0] = InverseTransform(b.center + new Vector3(extents.x, extents.y, extents.z));
-			corners[1] = InverseTransform(b.center + new Vector3(extents.x, extents.y, -extents.z));
-			corners[2] = InverseTransform(b.center + new Vector3(extents.x, -extents.y, extents.z));
-			corners[3] = InverseTransform(b.center + new Vector3(extents.x, -extents.y, -extents.z));
-			corners[4] = InverseTransform(b.center + new Vector3(-extents.x, extents.y, extents.z));
-			corners[5] = InverseTransform(b.center + new Vector3(-extents.x, extents.y, -extents.z));
-			corners[6] = InverseTransform(b.center + new Vector3(-extents.x, -extents.y, extents.z));
-			corners[7] = InverseTransform(b.center + new Vector3(-extents.x, -extents.y, -extents.z));
+			var extents = bounds.extents;
+			corners[0] = InverseTransform(bounds.center + new Vector3(extents.x, extents.y, extents.z));
+			corners[1] = InverseTransform(bounds.center + new Vector3(extents.x, extents.y, -extents.z));
+			corners[2] = InverseTransform(bounds.center + new Vector3(extents.x, -extents.y, extents.z));
+			corners[3] = InverseTransform(bounds.center + new Vector3(extents.x, -extents.y, -extents.z));
+			corners[4] = InverseTransform(bounds.center + new Vector3(-extents.x, extents.y, extents.z));
+			corners[5] = InverseTransform(bounds.center + new Vector3(-extents.x, extents.y, -extents.z));
+			corners[6] = InverseTransform(bounds.center + new Vector3(-extents.x, -extents.y, extents.z));
+			corners[7] = InverseTransform(bounds.center + new Vector3(-extents.x, -extents.y, -extents.z));
 
 			var min = corners[0];
 			var max = corners[0];
@@ -176,29 +180,29 @@ namespace Pathfinding.Util {
 		 * a graph with a quaternion rotation R this will transform a vector V
 		 * to R * V (i.e rotate the vector V using the rotation R).
 		 */
-		Vector2 IMovementPlane.ToPlane (Vector3 p) {
+		Vector2 IMovementPlane.ToPlane (Vector3 point) {
 			// These special cases cover most graph orientations used in practice.
 			// Having them here improves performance in those cases by a factor of
 			// 2.5 without impacting the generic case in any significant way.
-			if (isXY) return new Vector2(p.x, p.y);
-			if (!isXZ) p = inverseRotation * p;
-			return new Vector2(p.x, p.z);
+			if (isXY) return new Vector2(point.x, point.y);
+			if (!isXZ) point = inverseRotation * point;
+			return new Vector2(point.x, point.z);
 		}
 
 		/** Transforms from world space to the 'ground' plane of the graph.
 		 * The transformation is purely a rotation so no scale or offset is used.
 		 */
-		Vector2 IMovementPlane.ToPlane (Vector3 p, out float elevation) {
-			if (!isXZ) p = inverseRotation * p;
-			elevation = p.y;
-			return new Vector2(p.x, p.z);
+		Vector2 IMovementPlane.ToPlane (Vector3 point, out float elevation) {
+			if (!isXZ) point = inverseRotation * point;
+			elevation = point.y;
+			return new Vector2(point.x, point.z);
 		}
 
 		/** Transforms from the 'ground' plane of the graph to world space.
 		 * The transformation is purely a rotation so no scale or offset is used.
 		 */
-		Vector3 IMovementPlane.ToWorld (Vector2 p, float elevation) {
-			return rotation * new Vector3(p.x, elevation, p.y);
+		Vector3 IMovementPlane.ToWorld (Vector2 point, float elevation) {
+			return rotation * new Vector3(point.x, elevation, point.y);
 		}
 
 		#endregion

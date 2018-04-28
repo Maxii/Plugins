@@ -75,16 +75,12 @@ namespace Pathfinding {
 				Trace(startNode);
 				CompleteState = PathCompleteState.Complete;
 			} else {
-				Error();
-				LogError("Could not find valid start node");
+				FailWithError("Could not find valid start node");
 			}
 		}
 
 		protected override void CalculateStep (long targetTick) {
-			if (!IsDone()) {
-				Error();
-				LogError("Something went wrong. At this point the path should be completed");
-			}
+			if (!IsDone()) throw new System.Exception("Something went wrong. At this point the path should be completed");
 		}
 
 		/** Traces the calculated path from the start node to the end.

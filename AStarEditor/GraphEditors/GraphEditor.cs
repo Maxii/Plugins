@@ -33,38 +33,32 @@ namespace Pathfinding {
 
 			if (obj != null) {
 				if (allowSceneObjects && !EditorUtility.IsPersistent(obj)) {
-					//Object is in the scene
+					// Object is in the scene
 					var com = obj as Component;
 					var go = obj as GameObject;
 					if (com != null) {
 						go = com.gameObject;
 					}
-					if (go != null) {
-						var urh = go.GetComponent<UnityReferenceHelper>();
-						if (urh == null) {
-							if (FixLabel("Object's GameObject must have a UnityReferenceHelper component attached")) {
-								go.AddComponent<UnityReferenceHelper>();
-							}
+					if (go != null && go.GetComponent<UnityReferenceHelper>() == null) {
+						if (FixLabel("Object's GameObject must have a UnityReferenceHelper component attached")) {
+							go.AddComponent<UnityReferenceHelper>();
 						}
 					}
 				} else if (EditorUtility.IsPersistent(obj)) {
-					string path = AssetDatabase.GetAssetPath(obj);
-
-					var rg = new System.Text.RegularExpressions.Regex(@"Resources[/|\\][^/]*$");
-
+					string path = AssetDatabase.GetAssetPath(obj).Replace("\\", "/");
+					var rg = new System.Text.RegularExpressions.Regex(@"Resources/.*$");
 
 					if (!rg.IsMatch(path)) {
-						if (FixLabel("Object must be in the 'Resources' folder, top level")) {
+						if (FixLabel("Object must be in the 'Resources' folder")) {
 							if (!System.IO.Directory.Exists(Application.dataPath+"/Resources")) {
 								System.IO.Directory.CreateDirectory(Application.dataPath+"/Resources");
 								AssetDatabase.Refresh();
 							}
-							string ext = System.IO.Path.GetExtension(path);
 
+							string ext = System.IO.Path.GetExtension(path);
 							string error = AssetDatabase.MoveAsset(path, "Assets/Resources/"+obj.name+ext);
 
 							if (error == "") {
-								//Debug.Log ("Successful move");
 								path = AssetDatabase.GetAssetPath(obj);
 							} else {
 								Debug.LogError("Couldn't move asset - "+error);
@@ -75,9 +69,7 @@ namespace Pathfinding {
 					if (!AssetDatabase.IsMainAsset(obj) && obj.name != AssetDatabase.LoadMainAssetAtPath(path).name) {
 						if (FixLabel("Due to technical reasons, the main asset must\nhave the same name as the referenced asset")) {
 							string error = AssetDatabase.RenameAsset(path, obj.name);
-							if (error == "") {
-								//Debug.Log ("Successful");
-							} else {
+							if (error != "") {
 								Debug.LogError("Couldn't rename asset - "+error);
 							}
 						}

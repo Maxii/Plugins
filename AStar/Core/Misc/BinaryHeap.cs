@@ -1,5 +1,6 @@
 #pragma warning disable 162
 #pragma warning disable 429
+#define DECREASE_KEY
 
 namespace Pathfinding {
 	/** Binary heap implementation.
@@ -34,6 +35,8 @@ namespace Pathfinding {
 		 */
 		const bool SortGScores = true;
 
+		public const ushort NotInHeap = 0xFFFF;
+
 		/** Internal backing array for the heap */
 		private Tuple[] heap;
 
@@ -46,8 +49,8 @@ namespace Pathfinding {
 
 		/** Item in the heap */
 		private struct Tuple {
-			public uint F;
 			public PathNode node;
+			public uint F;
 
 			public Tuple (uint f, PathNode node) {
 				this.F = f;
@@ -76,6 +79,14 @@ namespace Pathfinding {
 
 		/** Removes all elements from the heap */
 		public void Clear () {
+#if DECREASE_KEY
+			// Clear all heap indices
+			// This is important to avoid bugs
+			for (int i = 0; i < numberOfItems; i++) {
+				heap[i].node.heapIndex = NotInHeap;
+			}
+#endif
+
 			numberOfItems = 0;
 		}
 
@@ -89,23 +100,24 @@ namespace Pathfinding {
 
 		/** Expands to a larger backing array when the current one is too small */
 		void Expand () {
-			int newSize = System.Math.Max(heap.Length+4, (int)System.Math.Round(heap.Length*growthFactor));
+			// 65533 == 1 mod 4 and slightly smaller than 1<<16 = 65536
+			int newSize = System.Math.Max(heap.Length+4, System.Math.Min(65533, (int)System.Math.Round(heap.Length*growthFactor)));
 
 			// Make sure the size has remainder 1 when divided by D
 			// This allows us to always guarantee that indices used in the Remove method
 			// will never throw out of bounds exceptions
 			newSize = RoundUpToNextMultipleMod1(newSize);
 
-			if (newSize > 1<<18) {
-				throw new System.Exception("Binary Heap Size really large (2^18). A heap size this large is probably the cause of pathfinding running in an infinite loop. " +
-					"\nRemove this check (in BinaryHeap.cs) if you are sure that it is not caused by a bug");
+			// Check if the heap is really large
+			// Also note that heaps larger than this are not supported
+			// since PathNode.heapIndex is a ushort and can only store
+			// values up to 65535 (NotInHeap = 65535 is reserved however)
+			if (newSize > (1<<16) - 2) {
+				throw new System.Exception("Binary Heap Size really large (>65534). A heap size this large is probably the cause of pathfinding running in an infinite loop. ");
 			}
 
 			var newHeap = new Tuple[newSize];
-
-			for (int i = 0; i < heap.Length; i++) {
-				newHeap[i] = heap[i];
-			}
+			heap.CopyTo(newHeap, 0);
 			#if ASTARDEBUG
 			UnityEngine.Debug.Log("Resizing binary heap to "+newSize);
 			#endif
@@ -116,16 +128,30 @@ namespace Pathfinding {
 		public void Add (PathNode node) {
 			if (node == null) throw new System.ArgumentNullException("node");
 
+#if DECREASE_KEY
+			// Check if node is already in the heap
+			if (node.heapIndex != NotInHeap) {
+				DecreaseKey(heap[node.heapIndex], node.heapIndex);
+				return;
+			}
+#endif
+
 			if (numberOfItems == heap.Length) {
 				Expand();
 			}
 
+			DecreaseKey(new Tuple(0, node), (ushort)numberOfItems);
+			numberOfItems++;
+		}
+
+		void DecreaseKey (Tuple node, ushort index) {
 			// This is where 'obj' is in the binary heap logically speaking
 			// (for performance reasons we don't actually store it there until
 			// we know the final index, that's just a waste of CPU cycles)
-			int bubbleIndex = numberOfItems;
-			uint nodeF = node.F;
-			uint nodeG = node.G;
+			int bubbleIndex = index;
+			// Update F value, it might have changed since the node was originally added to the heap
+			uint nodeF = node.F = node.node.F;
+			uint nodeG = node.node.G;
 
 			while (bubbleIndex != 0) {
 				// Parent node of the bubble node
@@ -136,26 +162,39 @@ namespace Pathfinding {
 					// (we don't really need to store the bubble node until we know the final index though
 					// so we do that after the loop instead)
 					heap[bubbleIndex] = heap[parentIndex];
+#if DECREASE_KEY
+					heap[bubbleIndex].node.heapIndex = (ushort)bubbleIndex;
+#endif
 					bubbleIndex = parentIndex;
 				} else {
 					break;
 				}
 			}
 
-			heap[bubbleIndex] = new Tuple(nodeF, node);
-			numberOfItems++;
+			heap[bubbleIndex] = node;
+#if DECREASE_KEY
+			node.node.heapIndex = (ushort)bubbleIndex;
+#endif
 		}
 
 		/** Returns the node with the lowest F score from the heap */
 		public PathNode Remove () {
-			numberOfItems--;
 			PathNode returnItem = heap[0].node;
 
+#if DECREASE_KEY
+			returnItem.heapIndex = NotInHeap;
+#endif
+
+			numberOfItems--;
+			if (numberOfItems == 0) return returnItem;
+
+			// Last item in the heap array
 			var swapItem = heap[numberOfItems];
 			var swapItemG = swapItem.node.G;
 
 			int swapIndex = 0, parent;
 
+			// Trickle upwards
 			while (true) {
 				parent = swapIndex;
 				uint swapF = swapItem.F;
@@ -203,6 +242,9 @@ namespace Pathfinding {
 				// in local variable and only assign it once we know the final index)
 				if (parent != swapIndex) {
 					heap[parent] = heap[swapIndex];
+#if DECREASE_KEY
+					heap[parent].node.heapIndex = (ushort)parent;
+#endif
 				} else {
 					break;
 				}
@@ -210,6 +252,9 @@ namespace Pathfinding {
 
 			// Assign element to the final position
 			heap[swapIndex] = swapItem;
+#if DECREASE_KEY
+			swapItem.node.heapIndex = (ushort)swapIndex;
+#endif
 
 			// For debugging
 			// Validate ();
@@ -223,6 +268,11 @@ namespace Pathfinding {
 				if (heap[parentIndex].F > heap[i].F) {
 					throw new System.Exception("Invalid state at " + i + ":" +  parentIndex + " ( " + heap[parentIndex].F + " > " + heap[i].F + " ) ");
 				}
+#if DECREASE_KEY
+				if (heap[i].node.heapIndex != i) {
+					throw new System.Exception("Invalid heap index");
+				}
+#endif
 			}
 		}
 
@@ -242,7 +292,15 @@ namespace Pathfinding {
 
 					if (nodeF < heap[parentIndex].F) {
 						heap[bubbleIndex] = heap[parentIndex];
+#if DECREASE_KEY
+						heap[bubbleIndex].node.heapIndex = (ushort)bubbleIndex;
+#endif
+
 						heap[parentIndex] = node;
+#if DECREASE_KEY
+						heap[parentIndex].node.heapIndex = (ushort)parentIndex;
+#endif
+
 						bubbleIndex = parentIndex;
 						#if ASTARDEBUG
 						changes++;

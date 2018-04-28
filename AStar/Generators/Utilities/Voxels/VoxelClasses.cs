@@ -389,7 +389,7 @@ namespace Pathfinding.Voxels {
 			area = 0;
 		}
 
-		/** Recalculate the bounds based on vertices and matrix */
+		/** Recalculate the bounds based on #vertices and #matrix */
 		public void RecalculateBounds () {
 			Bounds b = new Bounds(matrix.MultiplyPoint3x4(vertices[0]), Vector3.zero);
 
@@ -401,7 +401,7 @@ namespace Pathfinding.Voxels {
 			bounds = b;
 		}
 
-		/** Pool the #vertex and #triangle arrays if the #pool field is true */
+		/** Pool the #vertices and #triangles arrays if the #pool field is true */
 		public void Pool () {
 			if (pool) {
 				Util.ArrayPool<int>.Release(ref triangles);

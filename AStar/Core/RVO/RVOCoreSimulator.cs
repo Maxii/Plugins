@@ -161,9 +161,18 @@ namespace Pathfinding.RVO {
 
 		/** How strongly other agents will avoid this agent.
 		 * Usually a value between 0 and 1.
-		 * Agents with similar priorities will avoid each other with an equal strength
-		 * an agent with a much lower priority than another agent will avoid the other
-		 * agent in a way similar to if the other agent was a moving obstacle.
+		 * Agents with similar priorities will avoid each other with an equal strength.
+		 * If an agent sees another agent with a higher priority than itself it will avoid that agent more strongly.
+		 * In the extreme case (e.g this agent has a priority of 0 and the other agent has a priority of 1) it will treat the other agent as being a moving obstacle.
+		 * Similarly if an agent sees another agent with a lower priority than itself it will avoid that agent less.
+		 *
+		 * In general the avoidance strength for this agent is:
+		 * \code
+		 * if this.priority > 0 or other.priority > 0:
+		 *     avoidanceStrength = other.priority / (this.priority + other.priority);
+		 * else:
+		 *     avoidanceStrength = 0.5
+		 * \endcode
 		 */
 		float Priority { get; set; }
 
@@ -761,6 +770,7 @@ namespace Pathfinding.RVO {
 			public float[] sampleSize = new float[50];
 		}
 
+		/** Worker thread for RVO simulation */
 		class Worker {
 			public int start, end;
 			readonly AutoResetEvent runFlag = new AutoResetEvent(false);

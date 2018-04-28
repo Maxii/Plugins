@@ -6,40 +6,19 @@ namespace Pathfinding {
 	/** Editor for GraphUpdateScene */
 	[CustomEditor(typeof(GraphUpdateScene))]
 	[CanEditMultipleObjects]
-	public class GraphUpdateSceneEditor : Editor {
+	public class GraphUpdateSceneEditor : EditorBase {
 		int selectedPoint = -1;
 
 		const float pointGizmosRadius = 0.09F;
 		static Color PointColor = new Color(1, 0.36F, 0, 0.6F);
 		static Color PointSelectedColor = new Color(1, 0.24F, 0, 1.0F);
 
-		SerializedProperty points, updatePhysics, updateErosion, convex;
-		SerializedProperty minBoundsHeight, applyOnStart, applyOnScan;
-		SerializedProperty modifyWalkable, walkableValue, penaltyDelta, modifyTag, tagValue;
-		SerializedProperty resetPenaltyOnPhysics, legacyMode;
-
 		GraphUpdateScene[] scripts;
 
-		void OnEnable () {
+		protected override void Inspector () {
 			// Find all properties
-			points = serializedObject.FindProperty("points");
-			updatePhysics = serializedObject.FindProperty("updatePhysics");
-			resetPenaltyOnPhysics = serializedObject.FindProperty("resetPenaltyOnPhysics");
-			updateErosion = serializedObject.FindProperty("updateErosion");
-			convex = serializedObject.FindProperty("convex");
-			minBoundsHeight = serializedObject.FindProperty("minBoundsHeight");
-			applyOnStart = serializedObject.FindProperty("applyOnStart");
-			applyOnScan = serializedObject.FindProperty("applyOnScan");
-			modifyWalkable = serializedObject.FindProperty("modifyWalkability");
-			walkableValue = serializedObject.FindProperty("setWalkability");
-			penaltyDelta = serializedObject.FindProperty("penaltyDelta");
-			modifyTag = serializedObject.FindProperty("modifyTag");
-			tagValue = serializedObject.FindProperty("setTag");
-			legacyMode = serializedObject.FindProperty("legacyMode");
-		}
-
-		public override void OnInspectorGUI () {
-			serializedObject.Update();
+			var points = FindProperty("points");
+			var legacyMode = FindProperty("legacyMode");
 
 			// Get a list of inspected components
 			scripts = new GraphUpdateScene[targets.Length];
@@ -70,19 +49,17 @@ namespace Pathfinding {
 
 			DrawPhysicsField();
 
-			EditorGUILayout.PropertyField(updateErosion, new GUIContent("Update Erosion", "Recalculate erosion for grid graphs.\nSee online documentation for more info"));
+			PropertyField("updateErosion", null, "Recalculate erosion for grid graphs.\nSee online documentation for more info");
 
 			DrawConvexField();
 
 			// Minimum bounds height is not applied when using the bounds from a collider or renderer
 			if (points.hasMultipleDifferentValues || points.arraySize > 0) {
-				EditorGUILayout.PropertyField(minBoundsHeight, new GUIContent("Min Bounds Height", "Defines a minimum height to be used for the bounds of the GUO.\nUseful if you define points in 2D (which would give height 0)"));
-				if (!minBoundsHeight.hasMultipleDifferentValues) {
-					minBoundsHeight.floatValue = Mathf.Max(minBoundsHeight.floatValue, 0.1f);
-				}
+				PropertyField("minBoundsHeight");
+				Clamp("minBoundsHeight", 0.1f);
 			}
-			EditorGUILayout.PropertyField(applyOnStart, new GUIContent("Apply On Start"));
-			EditorGUILayout.PropertyField(applyOnScan, new GUIContent("Apply On Scan"));
+			PropertyField("applyOnStart");
+			PropertyField("applyOnScan");
 
 			DrawWalkableField();
 			DrawPenaltyField();
@@ -95,6 +72,7 @@ namespace Pathfinding {
 					"Disabling legacy mode is recommended but you may have to tweak the point locations or object rotation in some cases", MessageType.Warning);
 				if (GUILayout.Button("Disable Legacy Mode")) {
 					for (int i = 0; i < scripts.Length; i++) {
+						Undo.RecordObject(scripts[i], "Disable Legacy Mode");
 						scripts[i].DisableLegacyMode();
 					}
 				}
@@ -117,8 +95,6 @@ namespace Pathfinding {
 				}
 			}
 
-			serializedObject.ApplyModifiedProperties();
-
 			if (EditorGUI.EndChangeCheck()) {
 				for (int i = 0; i < scripts.Length; i++) {
 					EditorUtility.SetDirty(scripts[i]);
@@ -131,7 +107,7 @@ namespace Pathfinding {
 
 		void DrawPointsField () {
 			EditorGUI.BeginChangeCheck();
-			EditorGUILayout.PropertyField(points, true);
+			PropertyField("points");
 			if (EditorGUI.EndChangeCheck()) {
 				serializedObject.ApplyModifiedProperties();
 				for (int i = 0; i < scripts.Length; i++) {
@@ -142,19 +118,17 @@ namespace Pathfinding {
 		}
 
 		void DrawPhysicsField () {
-			EditorGUILayout.PropertyField(updatePhysics, new GUIContent("Update Physics", "Perform similar calculations on the nodes as during scan.\n" +
-					"Grid Graphs will update the position of the nodes and also check walkability using collision.\nSee online documentation for more info."));
-
-			if (!updatePhysics.hasMultipleDifferentValues && updatePhysics.boolValue) {
+			if (PropertyField("updatePhysics", "Update Physics", "Perform similar calculations on the nodes as during scan.\n" +
+					"Grid Graphs will update the position of the nodes and also check walkability using collision.\nSee online documentation for more info.")) {
 				EditorGUI.indentLevel++;
-				EditorGUILayout.PropertyField(resetPenaltyOnPhysics, new GUIContent("Reset Penalty On Physics", "Will reset the penalty to the default value during the update."));
+				PropertyField("resetPenaltyOnPhysics");
 				EditorGUI.indentLevel--;
 			}
 		}
 
 		void DrawConvexField () {
 			EditorGUI.BeginChangeCheck();
-			EditorGUILayout.PropertyField(convex, new GUIContent("Convex", "Sets if only the convex hull of the points should be used or the whole polygon"));
+			PropertyField("convex");
 			if (EditorGUI.EndChangeCheck()) {
 				serializedObject.ApplyModifiedProperties();
 				for (int i = 0; i < scripts.Length; i++) {
@@ -165,27 +139,25 @@ namespace Pathfinding {
 		}
 
 		void DrawWalkableField () {
-			EditorGUILayout.PropertyField(modifyWalkable, new GUIContent("Modify walkability", "If true, walkability of all nodes will be modified"));
-			if (!modifyWalkable.hasMultipleDifferentValues && modifyWalkable.boolValue) {
+			if (PropertyField("modifyWalkability")) {
 				EditorGUI.indentLevel++;
-				EditorGUILayout.PropertyField(walkableValue, new GUIContent("Walkability Value", "Nodes' walkability will be set to this value"));
+				PropertyField("setWalkability", "Walkability Value");
 				EditorGUI.indentLevel--;
 			}
 		}
 
 		void DrawPenaltyField () {
-			EditorGUILayout.PropertyField(penaltyDelta, new GUIContent("Penalty Delta", "A penalty will be added to the nodes, usually you need very large values, at least 1000-10000.\n" +
-					"A higher penalty will mean that agents will try to avoid those nodes."));
+			PropertyField("penaltyDelta", "Penalty Delta");
 
-			if (!penaltyDelta.hasMultipleDifferentValues && penaltyDelta.intValue < 0) {
+			if (!FindProperty("penaltyDelta").hasMultipleDifferentValues && FindProperty("penaltyDelta").intValue < 0) {
 				EditorGUILayout.HelpBox("Be careful when lowering the penalty. Negative penalties are not supported and will instead underflow and get really high.\n" +
 					"You can set an initial penalty on graphs (see their settings) and then lower them like this to get regions which are easier to traverse.", MessageType.Warning);
 			}
 		}
 
 		void DrawTagField () {
-			EditorGUILayout.PropertyField(modifyTag, new GUIContent("Modify Tag", "Should the tags of the nodes be modified"));
-			if (!modifyTag.hasMultipleDifferentValues && modifyTag.boolValue) {
+			if (PropertyField("modifyTag")) {
+				var tagValue = FindProperty("setTag");
 				EditorGUI.indentLevel++;
 				EditorGUI.showMixedValue = tagValue.hasMultipleDifferentValues;
 				EditorGUI.BeginChangeCheck();
@@ -193,11 +165,11 @@ namespace Pathfinding {
 				if (EditorGUI.EndChangeCheck()) {
 					tagValue.intValue = newTag;
 				}
-				EditorGUI.indentLevel--;
-			}
 
-			if (GUILayout.Button("Tags can be used to restrict which units can walk on what ground. Click here for more info", "HelpBox")) {
-				Application.OpenURL(AstarUpdateChecker.GetURL("tags"));
+				if (GUILayout.Button("Tags can be used to restrict which units can walk on what ground. Click here for more info", "HelpBox")) {
+					Application.OpenURL(AstarUpdateChecker.GetURL("tags"));
+				}
+				EditorGUI.indentLevel--;
 			}
 		}
 
@@ -339,7 +311,7 @@ namespace Pathfinding {
 
 			// Make sure the convex hull stays up to date
 			script.RecalcConvex();
-			Pathfinding.Util.ListPool<Vector3>.Release(points);
+			Pathfinding.Util.ListPool<Vector3>.Release(ref points);
 
 			if (GUI.changed) HandleUtility.Repaint();
 		}

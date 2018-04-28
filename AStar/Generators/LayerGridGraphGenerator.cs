@@ -19,7 +19,7 @@ namespace Pathfinding {
 	 */
 	public class LayerGridGraph : GridGraph, IUpdatableGraph {
 		// This function will be called when this graph is destroyed
-		public override void OnDestroy () {
+		protected override void OnDestroy () {
 			base.OnDestroy();
 
 			// Clean up a reference in a static variable which otherwise should point to this graph forever and stop the GC from collecting it
@@ -47,6 +47,11 @@ namespace Pathfinding {
 		internal int lastScannedWidth;
 		internal int lastScannedDepth;
 
+		/** All nodes in this graph.
+		 * \snippet MiscSnippets.cs LayerGridGraph.nodes1
+		 *
+		 * \see #GetNodes
+		 */
 		public new LevelGridNode[] nodes;
 
 		public override bool uniformWidthDepthGrid {
@@ -175,7 +180,19 @@ namespace Pathfinding {
 			return counter;
 		}
 
-		public new void UpdateArea (GraphUpdateObject o) {
+		/** Node in the specified cell in the first layer.
+		 * \snippet MiscSnippets.cs GridGraph.GetNode
+		 */
+		public override GridNodeBase GetNode (int x, int z) {
+			return nodes[x + z*width];
+		}
+
+		/** Node in the specified cell */
+		public GridNodeBase GetNode (int x, int z, int layer) {
+			return nodes[x + z*width + layer*width*depth];
+		}
+
+		void IUpdatableGraph.UpdateArea (GraphUpdateObject o) {
 			if (nodes == null || nodes.Length != width*depth*layerCount) {
 				Debug.LogWarning("The Grid Graph is not scanned, cannot update area ");
 				//Not scanned
@@ -331,7 +348,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override IEnumerable<Progress> ScanInternal () {
+		protected override IEnumerable<Progress> ScanInternal () {
 			// Not possible to have a negative node size
 			if (nodeSize <= 0) yield break;
 
@@ -544,6 +561,13 @@ namespace Pathfinding {
 					node.GraphIndex = graphIndex;
 				}
 
+#if ASTAR_SET_LEVELGRIDNODE_HEIGHT
+				node.height = lln.height;
+#endif
+				node.position = (Int3)lln.position;
+				node.Walkable = lln.walkable;
+				node.WalkableErosion = node.Walkable;
+
 				if (isNewNode || resetPenalties) {
 					node.Penalty = initialPenalty;
 
@@ -555,13 +579,6 @@ namespace Pathfinding {
 				if (isNewNode || resetTags) {
 					node.Tag = 0;
 				}
-
-#if ASTAR_SET_LEVELGRIDNODE_HEIGHT
-				node.height = lln.height;
-#endif
-				node.position = (Int3)lln.position;
-				node.Walkable = lln.walkable;
-				node.WalkableErosion = node.Walkable;
 
 				//Adjust penalty based on the surface slope
 				if (lln.hit.normal != Vector3.zero && (penaltyAngle || cosAngle > 0.0001f)) {
@@ -854,7 +871,7 @@ namespace Pathfinding {
 			return node.GetConnection(dir);
 		}
 
-		public override void SerializeExtraInfo (GraphSerializationContext ctx) {
+		protected override void SerializeExtraInfo (GraphSerializationContext ctx) {
 			if (nodes == null) {
 				ctx.writer.Write(-1);
 				return;
@@ -872,7 +889,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void DeserializeExtraInfo (GraphSerializationContext ctx) {
+		protected override void DeserializeExtraInfo (GraphSerializationContext ctx) {
 			int count = ctx.reader.ReadInt32();
 
 			if (count == -1) {
@@ -891,7 +908,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void PostDeserialization () {
+		protected override void PostDeserialization (GraphSerializationContext ctx) {
 			UpdateTransform();
 			lastScannedWidth = width;
 			lastScannedDepth = depth;
@@ -1159,7 +1176,7 @@ namespace Pathfinding {
 
 		public override void UpdateRecursiveG (Path path, PathNode pathNode, PathHandler handler) {
 			handler.heap.Add(pathNode);
-			UpdateG(path, pathNode);
+			pathNode.UpdateG(path);
 
 			LayerGridGraph graph = GetGridGraph(GraphIndex);
 			int[] neighbourOffsets = graph.neighbourOffsets;
@@ -1209,7 +1226,7 @@ namespace Pathfinding {
 						otherPN.cost = neighbourCosts[i];
 
 						otherPN.H = path.CalculateHScore(other);
-						other.UpdateG(path, otherPN);
+						otherPN.UpdateG(path);
 
 						handler.heap.Add(otherPN);
 					} else {
@@ -1228,18 +1245,6 @@ namespace Pathfinding {
 
 							other.UpdateRecursiveG(path, otherPN, handler);
 						}
-						//Or if the path from this node ("other") to the current ("current") is better
-#if ASTAR_NO_TRAVERSAL_COST
-						else if (otherPN.G+tmpCost < pathNode.G)
-#else
-						else if (otherPN.G+tmpCost+path.GetTraversalCost(this) < pathNode.G)
-#endif
-						{
-							pathNode.parent = otherPN;
-							pathNode.cost = tmpCost;
-
-							UpdateRecursiveG(path, pathNode, handler);
-						}
 					}
 				}
 			}
@@ -1257,13 +1262,11 @@ namespace Pathfinding {
 			ctx.writer.Write((ulong)gridConnections);
 		}
 
-		static System.Version V3_9_0 = new System.Version(3, 9, 0);
-
 		public override void DeserializeNode (GraphSerializationContext ctx) {
 			base.DeserializeNode(ctx);
 			position = ctx.DeserializeInt3();
 			gridFlags = ctx.reader.ReadUInt16();
-			if (ctx.meta.version < V3_9_0) {
+			if (ctx.meta.version < AstarSerializer.V3_9_0) {
 #if ASTAR_LEVELGRIDNODE_FEW_LAYERS
 				// Set the upper 16 bits for compatibility
 				gridConnections = ctx.reader.ReadUInt16() | 0xFFFF0000U;

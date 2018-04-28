@@ -27,7 +27,7 @@ namespace Pathfinding {
 	 * The <b>The Snap Size</b> button snaps the internal size of the graph to exactly contain the current number of nodes, i.e not contain 100.3 nodes but exactly 100 nodes.\n
 	 * This will make the "center" coordinate more accurate.\n
 	 *
-	 * <b>Updating the graph during runtime</b>
+	 * <b>Updating the graph during runtime</b>\n
 	 * Any graph which implements the IUpdatableGraph interface can be updated during runtime.\n
 	 * For grid graphs this is a great feature since you can update only a small part of the grid without causing any lag like a complete rescan would.\n
 	 * If you for example just have instantiated a sphere obstacle in the scene and you want to update the grid where that sphere was instantiated, you can do this:\n
@@ -37,58 +37,42 @@ namespace Pathfinding {
 	 * A grid graph will update that area and a small margin around it equal to \link Pathfinding.GraphCollision.diameter collision testing diameter/2 \endlink
 	 * \see \ref graph-updates for more info about updating graphs during runtime
 	 *
-	 * <b>Hexagon graphs</b>
-	 * The graph can be configured to work like a hexagon graph with some simple settings.
-	 * Just set the #neighbours (called 'connections' in the editor) field to 'Six' and then click the 'Configure as Hexagon Graph' button that will show up.
-	 * That will set the isometricAngle field to 54.74 (more precisely 90-atan(1/sqrt(2))) and enable uniformEdgeCosts.
-	 *
-	 * Then the graph will work like a hexagon graph. You might want to rotate it to better match your game however.
+	 * <b>Hexagon graphs</b>\n
+	 * The graph can be configured to work like a hexagon graph with some simple settings. Since 4.1.x the grid graph has a 'Shape' dropdown.
+	 * If you set it to 'Hexagonal' the graph will behave as a hexagon graph.
+	 * Often you may want to rotate the graph +45 or -45 degrees.
+	 * \shadowimage{grid_shape.png}
 	 *
 	 * Note however that the snapping to the closest node is not exactly as you would expect in a real hexagon graph,
 	 * but it is close enough that you will likely not notice.
 	 *
-	 * <b>Configure using code</b>
-	 * \code
-	 * // This holds all graph data
-	 * AstarData data = AstarPath.active.data;
-	 *
-	 * // This creates a Grid Graph
-	 * GridGraph gg = data.AddGraph(typeof(GridGraph)) as GridGraph;
-	 *
-	 * // Setup a grid graph with some values
-	 * int width = 50;
-	 * int depth = 50;
-	 * float nodeSize = 1;
-	 * gg.center = new Vector3 (10,0,0);
-	 *
-	 * // Updates internal size from the above values
-	 * gg.SetDimensions(width, depth, nodeSize);
-	 *
-	 * // Scans all graphs, do not call gg.Scan(), that is an internal method
-	 * AstarPath.active.Scan();
-	 * \endcode
+	 * <b>Configure using code</b>\n
+	 * \snippet MiscSnippets.cs GridGraph.AddFromCode
 	 *
 	 * \ingroup graphs
 	 * \nosubgrouping
 	 *
-	 * <b>Tree colliders</b>
+	 * <b>Tree colliders</b>\n
 	 * It seems that Unity will only generate tree colliders at runtime when the game is started.
 	 * For this reason, the grid graph will not pick up tree colliders when outside of play mode
 	 * but it will pick them up once the game starts. If it still does not pick them up
 	 * make sure that the trees actually have colliders attached to them and that the tree prefabs are
 	 * in the correct layer (the layer should be included in the 'Collision Testing' mask).
+	 *
+	 * \see #Pathfinding.GraphCollision for documentation on the 'Height Testing' and 'Collision Testing' sections
+	 * of the grid graph settings.
 	 */
 	public class GridGraph : NavGraph, IUpdatableGraph, ITransformedGraph
 		, IRaycastableGraph {
 		/** This function will be called when this graph is destroyed */
-		public override void OnDestroy () {
+		protected override void OnDestroy () {
 			base.OnDestroy();
 
 			// Clean up a reference in a static variable which otherwise should point to this graph forever and stop the GC from collecting it
 			RemoveGridGraphFromStatic();
 		}
 
-		internal override void DestroyAllNodesInternal () {
+		protected override void DestroyAllNodes () {
 			GetNodes(node => {
 				// If the grid data happens to be invalid (e.g we had to abort a graph update while it was running) using 'false' as
 				// the parameter will prevent the Destroy method from potentially throwing IndexOutOfRange exceptions due to trying
@@ -134,6 +118,12 @@ namespace Pathfinding {
 
 		/** \name Inspector - Settings
 		 * \{ */
+
+		/** Determines the layout of the grid graph inspector in the Unity Editor.
+		 * This field is only used in the editor, it has no effect on the rest of the game whatsoever.
+		 */
+		[JsonMember]
+		public InspectorGridMode inspectorGridMode = InspectorGridMode.Grid;
 
 		/** Width of the grid in nodes. \see SetDimensions */
 		public int width;
@@ -190,7 +180,7 @@ namespace Pathfinding {
 		public Vector2 unclampedSize;
 
 		/** Size of one node in world units.
-		 * \see UpdateSizeFromWidthDepth
+		 * \see #SetDimensions
 		 */
 		[JsonMember]
 		public float nodeSize = 1;
@@ -214,7 +204,7 @@ namespace Pathfinding {
 		/** Use heigh raycasting normal for max slope calculation.
 		 * True if #maxSlope is less than 90 degrees.
 		 */
-		public bool useRaycastNormal { get { return Math.Abs(90-maxSlope) > float.Epsilon; } }
+		protected bool useRaycastNormal { get { return Math.Abs(90-maxSlope) > float.Epsilon; } }
 
 		/** Erosion of the graph.
 		 * The graph can be eroded after calculation.
@@ -248,21 +238,6 @@ namespace Pathfinding {
 		[JsonMember]
 		public int erosionFirstTag = 1;
 
-		/**
-		 * Auto link the graph's edge nodes together with other GridGraphs in the scene on Scan.
-		 * \warning This feature is experimental and it is currently disabled.
-		 *
-		 * \see #autoLinkDistLimit */
-		[JsonMember]
-		public bool autoLinkGrids;
-
-		/**
-		 * Distance limit for grid graphs to be auto linked.
-		 * \warning This feature is experimental and it is currently disabled.
-		 *
-		 * \see #autoLinkGrids */
-		[JsonMember]
-		public float autoLinkDistLimit = 10F;
 
 		/** Number of neighbours for each node.
 		 * Either four, six, eight connections per node.
@@ -309,6 +284,12 @@ namespace Pathfinding {
 		[JsonMember]
 		public float penaltyAnglePower = 1;
 
+		/** Use jump point search to speed up pathfinding.
+		 * Jump point search can improve pathfinding performance significantly by making use of some assumptions of the graph.
+		 * More specifically it assumes a grid graph with no penalties.
+		 *
+		 * \see https://en.wikipedia.org/wiki/Jump_point_search
+		 */
 		[JsonMember]
 		public bool useJumpPointSearch;
 
@@ -389,12 +370,15 @@ namespace Pathfinding {
 		 * The first node has grid coordinates X=0, Z=0, the second one X=1, Z=0\n
 		 * the last one has grid coordinates X=width-1, Z=depth-1.
 		 *
-		 * \see GetNodes
+		 * \snippet MiscSnippets.cs GridGraph.nodes1
+		 *
+		 * \see #GetNode
+		 * \see #GetNodes
 		 */
 		public GridNode[] nodes;
 
 		/** Determines how the graph transforms graph space to world space.
-		 * \see UpdateTransform
+		 * \see #UpdateTransform
 		  */
 		public GraphTransform transform { get; private set; }
 
@@ -626,6 +610,8 @@ namespace Pathfinding {
 		 * You should use this method instead of setting the #width and #depth fields
 		 * as the grid dimensions are not defined by the #width and #depth variables but by
 		 * the #unclampedSize and #center variables.
+		 *
+		 * \snippet MiscSnippets.cs GridGraph.SetDimensions
 		 */
 		public void SetDimensions (int width, int depth, float nodeSize) {
 			unclampedSize = new Vector2(width, depth)*nodeSize;
@@ -633,14 +619,14 @@ namespace Pathfinding {
 			UpdateTransform();
 		}
 
-		/** Updates #unclampedSize from #width, #depth and #nodeSize values. \deprecated Use SetDimensions instead */
+		/** Updates #unclampedSize from #width, #depth and #nodeSize values. \deprecated Use #SetDimensions instead */
 		[System.Obsolete("Use SetDimensions instead")]
 		public void UpdateSizeFromWidthDepth () {
 			SetDimensions(width, depth, nodeSize);
 		}
 
-		/** Generates the matrix used for translating nodes from grid coordinates to world coordintes.
-		 * \deprecated This method has been renamed to UpdateTransform
+		/** Generates the matrix used for translating nodes from grid coordinates to world coordinates.
+		 * \deprecated This method has been renamed to #UpdateTransform
 		  */
 		[System.Obsolete("This method has been renamed to UpdateTransform")]
 		public void GenerateMatrix () {
@@ -651,8 +637,8 @@ namespace Pathfinding {
 		 * In graph space all nodes are laid out in the XZ plane with the first node having a corner in the origin.
 		 * One unit in graph space is one node so the first node in the graph is at (0.5,0) the second one at (1.5,0) etc.
 		 *
-		 * This takes the current values of the parameters such as position and rotation into account
-		 * the transform that was used the last time the graph was scanned is stored in the #transform field.
+		 * This takes the current values of the parameters such as position and rotation into account.
+		 * The transform that was used the last time the graph was scanned is stored in the #transform field.
 		 *
 		 * The #transform field is calculated using this method when the graph is scanned.
 		 * The width, depth variables are also updated based on the #unclampedSize field.
@@ -664,7 +650,7 @@ namespace Pathfinding {
 
 		/** Returns a new transform which transforms graph space to world space.
 		 * Does not update the #transform field.
-		 * \see UpdateTransform
+		 * \see #UpdateTransform
 		 */
 		public GraphTransform CalculateTransform () {
 			int newWidth, newDepth;
@@ -963,9 +949,7 @@ namespace Pathfinding {
 			neighbourZOffsets[7] = -1;
 		}
 
-		public override IEnumerable<Progress> ScanInternal () {
-			AstarPath.OnPostScan += new OnScanDelegate(OnPostScan);
-
+		protected override IEnumerable<Progress> ScanInternal () {
 			if (nodeSize <= 0) {
 				yield break;
 			}
@@ -1273,7 +1257,7 @@ namespace Pathfinding {
 			}
 
 			// Return the list to the pool
-			Pathfinding.Util.ListPool<GraphNode>.Release(nodesInRect);
+			Pathfinding.Util.ListPool<GraphNode>.Release(ref nodesInRect);
 		}
 
 		/** Returns true if a connection between the adjacent nodes \a n1 and \a n2 is valid.
@@ -1291,7 +1275,7 @@ namespace Pathfinding {
 				return false;
 			}
 
-			if (maxClimb <= 0) return true;
+			if (maxClimb <= 0 || collision.use2D) return true;
 
 			if (transform.onlyTranslational) {
 				// Common case optimization.
@@ -1304,6 +1288,20 @@ namespace Pathfinding {
 				var p2 = (Vector3)node2.position;
 				var up = transform.WorldUpAtGraphPosition(p1);
 				return System.Math.Abs(Vector3.Dot(up, p1) - Vector3.Dot(up, p2)) <= maxClimb;
+			}
+		}
+
+		/** Calculates the grid connections for a cell as well as its neighbours.
+		 * This is a useful utility function if you want to modify the walkability of a single node in the graph.
+		 *
+		 * \snippet MiscSnippets.cs GridGraph.CalculateConnectionsForCellAndNeighbours
+		 */
+		public void CalculateConnectionsForCellAndNeighbours (int x, int z) {
+			CalculateConnections(x, z);
+			for (int i = 0; i < 8; i++) {
+				int nx = x + neighbourXOffsets[i];
+				int nz = z + neighbourZOffsets[i];
+				CalculateConnections(nx, nz);
 			}
 		}
 
@@ -1462,120 +1460,6 @@ namespace Pathfinding {
 			}
 		}
 
-		/** Auto links grid graphs together. Called after all graphs have been scanned.
-		 * \see autoLinkGrids
-		 */
-		public void OnPostScan (AstarPath script) {
-			AstarPath.OnPostScan -= new OnScanDelegate(OnPostScan);
-
-			if (!autoLinkGrids || autoLinkDistLimit <= 0) {
-				return;
-			}
-
-			//Link to other grids
-
-			throw new System.NotSupportedException();
-
-#if FALSE
-			int maxCost = Mathf.RoundToInt(autoLinkDistLimit * Int3.Precision);
-
-			//Loop through all GridGraphs
-			foreach (GridGraph gg in script.data.FindGraphsOfType(typeof(GridGraph))) {
-				if (gg == this || gg.nodes == null || nodes == null) {
-					continue;
-				}
-
-				//Int3 prevPos = gg.GetNearest (nodes[0]).position;
-
-				//Z = 0
-				for (int x = 0; x < width; x++) {
-					GraphNode node1 = nodes[x];
-					GraphNode node2 = gg.GetNearest((Vector3)node1.Position).node;
-
-					Vector3 pos = transform.InverseTransform((Vector3)node2.Position);
-
-					if (pos.z > 0) {
-						continue;
-					}
-
-					int cost = (node1.Position-node2.Position).costMagnitude;
-
-					if (cost > maxCost) {
-						continue;
-					}
-
-					node1.AddConnection(node2, cost);
-					node2.AddConnection(node1, cost);
-				}
-
-				//X = 0
-				for (int z = 0; z < depth; z++) {
-					GraphNode node1 = nodes[z*width];
-					GraphNode node2 = gg.GetNearest((Vector3)node1.Position).node;
-
-					Vector3 pos = transform.InverseTransform((Vector3)node2.Position);
-
-					if (pos.x > 0) {
-						continue;
-					}
-
-					int cost = (node1.Position-node2.Position).costMagnitude;
-
-					if (cost > maxCost) {
-						continue;
-					}
-
-					node1.AddConnection(node2, cost);
-					node2.AddConnection(node1, cost);
-				}
-
-				//Z = max
-				for (int x = 0; x < width; x++) {
-					GraphNode node1 = nodes[(depth-1)*width+x];
-					GraphNode node2 = gg.GetNearest((Vector3)node1.Position).node;
-
-					Vector3 pos = transform.InverseTransform((Vector3)node2.Position);
-
-					if (pos.z < depth-1) {
-						continue;
-					}
-
-					//Debug.DrawLine (node1.position,node2.position,Color.red);
-					int cost = (node1.Position-node2.Position).costMagnitude;
-
-					if (cost > maxCost) {
-						continue;
-					}
-
-					node1.AddConnection(node2, cost);
-					node2.AddConnection(node1, cost);
-				}
-
-				//X = max
-				for (int z = 0; z < depth; z++) {
-					GraphNode node1 = nodes[z*width+width-1];
-					GraphNode node2 = gg.GetNearest((Vector3)node1.Position).node;
-
-					Vector3 pos = transform.InverseTransform((Vector3)node2.Position);
-
-					if (pos.x < width-1) {
-						continue;
-					}
-
-					int cost = (node1.Position-node2.Position).costMagnitude;
-
-					if (cost > maxCost) {
-						continue;
-					}
-
-
-
-					node1.AddConnection(node2, cost);
-					node2.AddConnection(node1, cost);
-				}
-			}
-#endif
-		}
 
 		public override void OnDrawGizmos (RetainedGizmos gizmos, bool drawNodes) {
 			using (var helper = gizmos.GetSingleFrameGizmoHelper(active)) {
@@ -1613,7 +1497,7 @@ namespace Pathfinding {
 			// for large graphs. However just checking if any mesh needs to be updated is relatively fast. So we just store
 			// a hash together with the mesh and rebuild the mesh when necessary.
 			const int chunkWidth = 32;
-			GridNodeBase[] allNodes = ArrayPool<GridNodeBase>.ClaimWithExactLength(chunkWidth*chunkWidth*LayerCount);
+			GridNodeBase[] allNodes = ArrayPool<GridNodeBase>.Claim(chunkWidth*chunkWidth*LayerCount);
 			for (int cx = width/chunkWidth; cx >= 0; cx--) {
 				for (int cz = depth/chunkWidth; cz >= 0; cz--) {
 					Profiler.BeginSample("Hash");
@@ -1644,7 +1528,7 @@ namespace Pathfinding {
 					}
 				}
 			}
-			ArrayPool<GridNodeBase>.Release(ref allNodes, true);
+			ArrayPool<GridNodeBase>.Release(ref allNodes);
 
 			if (active.showUnwalkableNodes) DrawUnwalkableNodes(nodeSize * 0.3f);
 		}
@@ -1912,12 +1796,26 @@ namespace Pathfinding {
 			return counter;
 		}
 
-		public GraphUpdateThreading CanUpdateAsync (GraphUpdateObject o) {
+		/** Node in the specified cell.
+		 * Returns null if the coordinate is outside the grid.
+		 *
+		 * \snippet MiscSnippets.cs GridGraph.GetNode
+		 *
+		 * If you know the coordinate is inside the grid and you are looking to maximize performance then you
+		 * can look up the node in the internal array directly which is slightly faster.
+		 * \see #nodes
+		 */
+		public virtual GridNodeBase GetNode (int x, int z) {
+			if (x < 0 || z < 0 || x >= width || z >= depth) return null;
+			return nodes[x + z*width];
+		}
+
+		GraphUpdateThreading IUpdatableGraph.CanUpdateAsync (GraphUpdateObject o) {
 			return GraphUpdateThreading.UnityThread;
 		}
 
-		public void UpdateAreaInit (GraphUpdateObject o) {}
-		public void UpdateAreaPost (GraphUpdateObject o) {}
+		void IUpdatableGraph.UpdateAreaInit (GraphUpdateObject o) {}
+		void IUpdatableGraph.UpdateAreaPost (GraphUpdateObject o) {}
 
 		protected void CalculateAffectedRegions (GraphUpdateObject o, out IntRect originalRect, out IntRect affectRect, out IntRect physicsRect, out bool willChangeWalkability, out int erosion) {
 			// Take the bounds and transform it using the matrix
@@ -1971,7 +1869,7 @@ namespace Pathfinding {
 		}
 
 		/** Internal function to update an area of the graph */
-		public void UpdateArea (GraphUpdateObject o) {
+		void IUpdatableGraph.UpdateArea (GraphUpdateObject o) {
 			if (nodes == null || nodes.Length != width*depth) {
 				Debug.LogWarning("The Grid Graph is not scanned, cannot update area");
 				//Not scanned
@@ -2116,7 +2014,13 @@ namespace Pathfinding {
 
 		/** Returns if there is an obstacle between \a from and \a to on the graph.
 		 * This is not the same as Physics.Linecast, this function traverses the graph and looks for collisions.
-		 * \astarpro */
+		 *
+		 * \snippet MiscSnippets.cs GridGraph.Linecast2
+		 *
+		 * \shadowimage{linecast.png}
+		 *
+		 * \astarpro
+		 */
 		public bool Linecast (Vector3 from, Vector3 to) {
 			GraphHitInfo hit;
 
@@ -2126,10 +2030,16 @@ namespace Pathfinding {
 		/** Returns if there is an obstacle between \a from and \a to on the graph.
 		 * \param [in] from Point to linecast from
 		 * \param [in] to Point to linecast to
-		 * \param [in] hint If you have some idea of what the start node might be (the one close to \a from), pass it to hint since it can enable faster lookups
+		 * \param [in] hint This parameter is deprecated. It will be ignored.
 		 *
 		 * This is not the same as Physics.Linecast, this function traverses the graph and looks for collisions.
-		 * \astarpro */
+		 *
+		 * \snippet MiscSnippets.cs GridGraph.Linecast2
+		 *
+		 * \shadowimage{linecast.png}
+		 *
+		 * \astarpro
+		 */
 		public bool Linecast (Vector3 from, Vector3 to, GraphNode hint) {
 			GraphHitInfo hit;
 
@@ -2140,10 +2050,16 @@ namespace Pathfinding {
 		 * \param [in] from Point to linecast from
 		 * \param [in] to Point to linecast to
 		 * \param [out] hit Contains info on what was hit, see GraphHitInfo
-		 * \param [in] hint If you have some idea of what the start node might be (the one close to \a _a), pass it to hint since it can enable faster lookups
+		 * \param [in] hint This parameter is deprecated. It will be ignored.
 		 *
 		 * This is not the same as Physics.Linecast, this function traverses the graph and looks for collisions.
-		 * \astarpro */
+		 *
+		 * \snippet MiscSnippets.cs GridGraph.Linecast2
+		 *
+		 * \shadowimage{linecast.png}
+		 *
+		 * \astarpro
+		 */
 		public bool Linecast (Vector3 from, Vector3 to, GraphNode hint, out GraphHitInfo hit) {
 			return Linecast(from, to, hint, out hit, null);
 		}
@@ -2151,6 +2067,11 @@ namespace Pathfinding {
 		/** Magnitude of the cross product a x b */
 		protected static float CrossMagnitude (Vector2 a, Vector2 b) {
 			return a.x*b.y - b.x*a.y;
+		}
+
+		/** Magnitude of the cross product a x b */
+		protected static long CrossMagnitude (Int2 a, Int2 b) {
+			return (long)a.x*b.y - (long)b.x*a.y;
 		}
 
 		/** Clips a line segment in graph space to the graph bounds.
@@ -2233,22 +2154,20 @@ namespace Pathfinding {
 		 * \param [in] from Point to linecast from
 		 * \param [in] to Point to linecast to
 		 * \param [out] hit Contains info on what was hit, see GraphHitInfo
-		 * \param [in] hint \deprecated
+		 * \param [in] hint This parameter is deprecated. It will be ignored.
 		 * \param trace If a list is passed, then it will be filled with all nodes the linecast traverses
 		 *
 		 * This is not the same as Physics.Linecast, this function traverses the graph and looks for collisions.
 		 *
-		 * It uses a method similar to Bresenham's line algorithm but it has been
-		 * extended to allow the start and end points to lie on non-integer coordinates
-		 * (which makes the math a bit trickier).
-		 *
-		 * \see https://en.wikipedia.org/wiki/Bresenham's_line_algorithm
+		 * \snippet MiscSnippets.cs GridGraph.Linecast2
 		 *
 		 * \version In 3.6.8 this method was rewritten to improve accuracy and performance.
 		 * Previously it used a sampling approach which could cut corners of obstacles slightly
 		 * and was pretty inefficient.
 		 *
 		 * \astarpro
+		 *
+		 * \shadowimage{linecast.png}
 		 */
 		public bool Linecast (Vector3 from, Vector3 to, GraphNode hint, out GraphHitInfo hit, List<GraphNode> trace) {
 			hit = new GraphHitInfo();
@@ -2262,6 +2181,7 @@ namespace Pathfinding {
 			if (!ClipLineSegmentToBounds(fromInGraphSpace, toInGraphSpace, out fromInGraphSpace, out toInGraphSpace)) {
 				// Line does not intersect the graph
 				// So there are no obstacles we can hit
+				hit.point = to;
 				return false;
 			}
 
@@ -2319,17 +2239,14 @@ namespace Pathfinding {
 			 *             |
 			 */
 
-			// This is the direction which moves further to the right of the segment (when looking from the start)
-			int directionToReduceError;
-			// This is the direction which moves further to the left of the segment (when looking from the start)
-			int directionToIncreaseError;
-
 			// Some XORing to get the quadrant index as shown in the diagram above
 			int quadrant = (dir.y >= 0 ? 0 : 3) ^ (dir.x >= 0 ? 0 : 1);
 			// This will be (1,2) for quadrant 0 and (2,3) for quadrant 1 etc.
 			// & 0x3 is just the same thing as % 4 but it is faster
-			directionToReduceError = (quadrant + 1) & 0x3;
-			directionToIncreaseError = (quadrant + 2) & 0x3;
+			// This is the direction which moves further to the right of the segment (when looking from the start)
+			int directionToReduceError = (quadrant + 1) & 0x3;
+			// This is the direction which moves further to the left of the segment (when looking from the start)
+			int directionToIncreaseError = (quadrant + 2) & 0x3;
 
 			// Current node. Start at n1
 			var current = startNode;
@@ -2364,18 +2281,11 @@ namespace Pathfinding {
 					// We know from what direction we moved in
 					// so we can calculate the line which we hit
 
-					// Either X offset is 0 or Z offset is zero since we only move in one of the 4 axis aligned directions
-					// The line we hit will be right between two nodes (so a distance of 0.5 from the current node in graph space)
-					Vector2 lineOrigin = p + new Vector2(neighbourXOffsets[ndir], neighbourZOffsets[ndir]) * 0.5f;
-					Vector2 lineDirection;
-
-					if (neighbourXOffsets[ndir] == 0) {
-						// We hit a line parallel to the X axis
-						lineDirection = new Vector2(1, 0);
-					} else {
-						// We hit a line parallel to the Z axis
-						lineDirection = new Vector2(0, 1);
-					}
+					// Current direction and current direction ±90 degrees
+					var d1 = new Vector2(neighbourXOffsets[ndir], neighbourZOffsets[ndir]);
+					var d2 = new Vector2(neighbourXOffsets[(ndir-1+4) & 0x3], neighbourZOffsets[(ndir-1+4) & 0x3]);
+					Vector2 lineDirection = new Vector2(neighbourXOffsets[(ndir+1) & 0x3], neighbourZOffsets[(ndir+1) & 0x3]);
+					Vector2 lineOrigin = p + (d1 + d2) * 0.5f;
 
 					// Find the intersection
 					var intersection = VectorMath.LineIntersectionPoint(lineOrigin, lineOrigin+lineDirection, start, end);
@@ -2402,6 +2312,8 @@ namespace Pathfinding {
 
 			// No obstacles detected
 			if (current == endNode) {
+				hit.point = to;
+				hit.node = current;
 				return false;
 			}
 
@@ -2412,20 +2324,21 @@ namespace Pathfinding {
 		}
 
 		/** Returns if there is an obstacle between \a from and \a to on the graph.
-		 * This function is different from the other Linecast functions since it 1) snaps the start and end positions directly to the graph.
+		 * \param [in] from Point to linecast from.
+		 * \param [in] to Point to linecast to.
+		 * \param [out] hit Contains info on what was hit, see GraphHitInfo.
+		 * \param [in] hint This parameter is deprecated. It will be ignored.
 		 *
-		 * \param [in] from Point to linecast from
-		 * \param [in] to Point to linecast to
-		 * \param [out] hit Contains info on what was hit, see GraphHitInfo
-		 * \param [in] hint \deprecated
-		 *
+		 * This function is different from the other Linecast functions since it snaps the start and end positions to the centers of the closest nodes on the graph.
 		 * This is not the same as Physics.Linecast, this function traverses the graph and looks for collisions.
 		 *
 		 * \version Since 3.6.8 this method uses the same implementation as the other linecast methods so there is no performance boost to using it.
 		 * \version In 3.6.8 this method was rewritten and that fixed a large number of bugs.
 		 * Previously it had not always followed the line exactly as it should have
 		 * and the hit output was not very accurate
-		 * (for example the hit point was just the node position instead of a point on the edge which was hit)
+		 * (for example the hit point was just the node position instead of a point on the edge which was hit).
+		 *
+		 * \astarpro
 		 */
 		public bool SnappedLinecast (Vector3 from, Vector3 to, GraphNode hint, out GraphHitInfo hit) {
 			return Linecast(
@@ -2434,6 +2347,70 @@ namespace Pathfinding {
 				hint,
 				out hit
 				);
+		}
+
+		/** Returns if there is an obstacle between the two nodes on the graph.
+		 * This method is very similar to the other Linecast methods however it is much faster
+		 * due to being able to use only integer math and not having to look up which node is closest to a particular input point.
+		 *
+		 * \snippet MiscSnippets.cs GridGraph.Linecast1
+		 *
+		 * \astarpro
+		 */
+		public bool Linecast (GridNodeBase fromNode, GridNodeBase toNode) {
+			var dir = new Int2(toNode.XCoordinateInGrid - fromNode.XCoordinateInGrid, toNode.ZCoordinateInGrid - fromNode.ZCoordinateInGrid);
+
+			// How much further we move away from (or towards) the line when walking along the primary direction (e.g up and right or down and left).
+			// This isn't an actual distance. It is a signed distance so it can be negative (other side of the line)
+			// Also it includes an additional factor, but the same factor is used everywhere
+			// and we only check for if the signed distance is greater or equal to zero so it is ok
+			long primaryDirectionError = CrossMagnitude(dir, new Int2(System.Math.Sign(dir.x), System.Math.Sign(dir.y)));
+
+			/*            Y/Z
+			 *             |
+			 *  quadrant   |   quadrant
+			 *     1              0
+			 *             2
+			 *             |
+			 *   ----  3 - X - 1  ----- X
+			 *             |
+			 *             0
+			 *  quadrant       quadrant
+			 *     2       |      3
+			 *             |
+			 */
+
+			// Calculate the quadrant index as shown in the diagram above (the axes are part of the quadrants after them in the counter clockwise direction)
+			int quadrant = 0;
+
+			if (dir.x <= 0 && dir.y > 0) quadrant = 1;
+			else if (dir.x < 0 && dir.y <= 0) quadrant = 2;
+			else if (dir.x >= 0 && dir.y < 0) quadrant = 3;
+
+			// This will be (1,2) for quadrant 0 and (2,3) for quadrant 1 etc.
+			// & 0x3 is just the same thing as % 4 but it is faster
+			// This is the direction which moves further to the right of the segment (when looking from the start)
+			int directionToReduceError = (quadrant + 1) & 0x3;
+			// This is the direction which moves further to the left of the segment (when looking from the start)
+			int directionToIncreaseError = (quadrant + 2) & 0x3;
+			int directionDiagonal = (dir.x != 0 && dir.y != 0) ? 4 + ((quadrant + 1) & 0x3) : -1;
+			Int2 offset = new Int2(0, 0);
+			while (fromNode != null && fromNode.NodeInGridIndex != toNode.NodeInGridIndex) {
+				// This is proportional to the distance between the line and the node
+				var error = CrossMagnitude(dir, offset) * 2;
+
+				// How does the error change we take one step in the primary direction
+				var nerror = error + primaryDirectionError;
+
+				// Check if we need to reduce or increase the error (we want to keep it near zero)
+				// and pick the appropriate direction to move in
+				int ndir = nerror < 0 ? directionToIncreaseError : directionToReduceError;
+				if (nerror == 0 && directionDiagonal != -1) ndir = directionDiagonal;
+
+				fromNode = fromNode.GetNeighbourAlongDirection(ndir);
+				offset += new Int2(neighbourXOffsets[ndir], neighbourZOffsets[ndir]);
+			}
+			return fromNode != toNode;
 		}
 
 		/** Returns if \a node is connected to it's neighbour in the specified direction.
@@ -2467,7 +2444,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void SerializeExtraInfo (GraphSerializationContext ctx) {
+		protected override void SerializeExtraInfo (GraphSerializationContext ctx) {
 			if (nodes == null) {
 				ctx.writer.Write(-1);
 				return;
@@ -2480,7 +2457,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void DeserializeExtraInfo (GraphSerializationContext ctx) {
+		protected override void DeserializeExtraInfo (GraphSerializationContext ctx) {
 			int count = ctx.reader.ReadInt32();
 
 			if (count == -1) {
@@ -2496,7 +2473,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
+		protected override void DeserializeSettingsCompatibility (GraphSerializationContext ctx) {
 			base.DeserializeSettingsCompatibility(ctx);
 
 			aspectRatio = ctx.reader.ReadSingle();
@@ -2511,7 +2488,7 @@ namespace Pathfinding {
 			erodeIterations = ctx.reader.ReadInt32();
 			erosionUseTags = ctx.reader.ReadBoolean();
 			erosionFirstTag = ctx.reader.ReadInt32();
-			autoLinkGrids = ctx.reader.ReadBoolean();
+			ctx.reader.ReadBoolean(); // Old field
 			neighbours = (NumNeighbours)ctx.reader.ReadInt32();
 			cutCorners = ctx.reader.ReadBoolean();
 			penaltyPosition = ctx.reader.ReadBoolean();
@@ -2524,7 +2501,7 @@ namespace Pathfinding {
 			useJumpPointSearch = ctx.reader.ReadBoolean();
 		}
 
-		public override void PostDeserialization () {
+		protected override void PostDeserialization (GraphSerializationContext ctx) {
 			UpdateTransform();
 			SetUpOffsetsAndCosts();
 			GridNode.SetGridGraph((int)graphIndex, this);

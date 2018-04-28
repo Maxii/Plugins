@@ -72,9 +72,13 @@
     <Compile Include="..\..\CustomTools\CustomTools.AssemblyVersionInfo\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Behaviors\AIDestinationSetter.cs" />
+    <Compile Include="Behaviors\Patrol.cs" />
+    <Compile Include="changelog.cs" />
     <Compile Include="Core\AI\AIBase.cs" />
     <Compile Include="Core\AI\AILerp.cs" />
     <Compile Include="Core\AI\AIPath.cs" />
+    <Compile Include="Core\AI\IAstarAI.cs" />
     <Compile Include="Core\AI\NavmeshController.cs" />
     <Compile Include="Core\AI\RichAI.cs" />
     <Compile Include="Core\AI\RichPath.cs" />
@@ -89,13 +93,13 @@
     <Compile Include="Core\Misc\AnimationLink.cs" />
     <Compile Include="Core\Misc\ArrayPool.cs" />
     <Compile Include="Core\Misc\AstarDebugger.cs" />
-    <Compile Include="Core\Misc\AstarEnumFlagAttr.cs" />
     <Compile Include="Core\Misc\BinaryHeap.cs" />
     <Compile Include="Core\Misc\Draw.cs" />
     <Compile Include="Core\Misc\EditorResourceHelper.cs" />
     <Compile Include="Core\Misc\GraphEditorBase.cs" />
     <Compile Include="Core\Misc\GraphModifier.cs" />
     <Compile Include="Core\Misc\GraphUpdateProcessor.cs" />
+    <Compile Include="Core\Misc\GraphUtilities.cs" />
     <Compile Include="Core\Misc\Int3.cs" />
     <Compile Include="Core\Misc\ListPool.cs" />
     <Compile Include="Core\Misc\MovementUtilities.cs" />
@@ -124,7 +128,6 @@
     <Compile Include="Core\Serialization\SimpleJsonReplacement.cs" />
     <Compile Include="Core\Serialization\SimpleZipReplacement.cs" />
     <Compile Include="Core\Serialization\TinyJson.cs" />
-    <Compile Include="Core\VersionedMonoBehaviour.cs" />
     <Compile Include="Generators\Base.cs" />
     <Compile Include="Generators\GridGenerator.cs" />
     <Compile Include="Generators\LayerGridGraphGenerator.cs" />
@@ -157,6 +160,10 @@
     <Compile Include="Generators\Utilities\Voxels\VoxelRasterization.cs" />
     <Compile Include="Generators\Utilities\Voxels\VoxelRegion.cs" />
     <Compile Include="Generators\Utilities\Voxels\VoxelUtility.cs" />
+    <Compile Include="Legacy\LegacyAIPath.cs" />
+    <Compile Include="Legacy\LegacyRichAI.cs" />
+    <Compile Include="Legacy\LegacyRVOController.cs" />
+    <Compile Include="Legacy\MiscLegacy.cs" />
     <Compile Include="Modifiers\AdvancedSmooth.cs" />
     <Compile Include="Modifiers\AlternativePath.cs" />
     <Compile Include="Modifiers\FunnelModifier.cs" />
@@ -169,6 +176,9 @@
     <Compile Include="Navmesh\NavmeshCut.cs" />
     <Compile Include="Navmesh\RelevantGraphSurface.cs" />
     <Compile Include="Navmesh\TileHandlerHelper.cs" />
+    <Compile Include="PackageTools\EnumFlagAttribute.cs" />
+    <Compile Include="PackageTools\UniqueComponentAttribute.cs" />
+    <Compile Include="PackageTools\VersionedMonoBehaviour.cs" />
     <Compile Include="Pathfinders\ABPath.cs" />
     <Compile Include="Pathfinders\ConstantPath.cs" />
     <Compile Include="Pathfinders\FleePath.cs" />
@@ -185,6 +195,7 @@
     <Compile Include="RVO\RVOSquareObstacle.cs" />
     <Compile Include="TurnBased\BlockManager.cs" />
     <Compile Include="TurnBased\SingleNodeBlocker.cs" />
+    <Compile Include="Utilities\AnimationLinkTraverser.cs" />
     <Compile Include="Utilities\AstarChecksum.cs" />
     <Compile Include="Utilities\AstarMemory.cs" />
     <Compile Include="Utilities\AstarParallel.cs" />
@@ -193,7 +204,6 @@
     <Compile Include="Utilities\Funnel.cs" />
     <Compile Include="Utilities\GraphGizmoHelper.cs" />
     <Compile Include="Utilities\GraphUpdateUtilities.cs" />
-    <Compile Include="Utilities\LockFreeStack.cs" />
     <Compile Include="Utilities\PathUtilities.cs" />
     <Compile Include="Utilities\ProfileHelper.cs" />
     <Compile Include="Utilities\RetainedGizmos.cs" />

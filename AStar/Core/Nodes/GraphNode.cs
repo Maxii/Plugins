@@ -15,6 +15,26 @@ namespace Pathfinding {
 		 */
 		public uint cost;
 
+		/** Side of the node shape which this connection uses.
+		 * Used for mesh nodes.
+		 * A value of 0 corresponds to using the side for vertex 0 and vertex 1 on the node. 1 corresponds to vertex 1 and 2, etc.
+		 * A negative value means that this connection does not use any side at all (this is mostly used for off-mesh links).
+		 *
+		 * \note Due to alignment, the #node and #cost fields use 12 bytes which will be padded
+		 * to 16 bytes when used in an array even if this field would be removed.
+		 * So this field does not contribute to increased memory usage.
+		 *
+		 * \see TriangleMeshNode
+		 * \see TriangleMeshNode.AddConnection
+		 */
+		public byte shapeEdge;
+
+		public Connection (GraphNode node, uint cost, byte shapeEdge = 0xFF) {
+			this.node = node;
+			this.cost = cost;
+			this.shapeEdge = shapeEdge;
+		}
+
 		public override int GetHashCode () {
 			return node.GetHashCode() ^ (int)cost;
 		}
@@ -22,13 +42,13 @@ namespace Pathfinding {
 		public override bool Equals (object obj) {
 			if (obj == null) return false;
 			var conn = (Connection)obj;
-			return conn.node == node && conn.cost == cost;
+			return conn.node == node && conn.cost == cost && conn.shapeEdge == shapeEdge;
 		}
 	}
 
 	/** Base class for all nodes */
 	public abstract class GraphNode {
-		/** Internal unique index */
+		/** Internal unique index. Also stores some bitpacked values such as #TemporaryFlag1 and #TemporaryFlag2. */
 		private int nodeIndex;
 
 		/** Bitpacked field holding several pieces of data.
@@ -47,6 +67,22 @@ namespace Pathfinding {
 		 */
 		private uint penalty;
 #endif
+
+		/** Graph which this node belongs to.
+		 *
+		 * If you know the node belongs to a particular graph type, you can cast it to that type:
+		 * \code
+		 * GraphNode node = ...;
+		 * GridGraph graph = node.Graph as GridGraph;
+		 * \endcode
+		 *
+		 * Will return null if the node has been destroyed.
+		 */
+		public NavGraph Graph {
+			get {
+				return Destroyed ? null : AstarData.GetGraph(this);
+			}
+		}
 
 		/** Constructor for a graph node. */
 		protected GraphNode (AstarPath astar) {
@@ -77,20 +113,36 @@ namespace Pathfinding {
 			if (AstarPath.active != null) {
 				AstarPath.active.DestroyNode(this);
 			}
-			nodeIndex = -1;
+			NodeIndex = DestroyedNodeIndex;
 		}
 
 		public bool Destroyed {
 			get {
-				return nodeIndex == -1;
+				return NodeIndex == DestroyedNodeIndex;
 			}
 		}
+
+		// If anyone creates more than about 200 million nodes then things will not go so well, however at that point one will certainly have more pressing problems, such as having run out of RAM
+		const int NodeIndexMask = 0xFFFFFFF;
+		const int DestroyedNodeIndex = NodeIndexMask - 1;
+		const int TemporaryFlag1Mask = 0x10000000;
+		const int TemporaryFlag2Mask = 0x20000000;
 
 		/** Internal unique index.
 		 * Every node will get a unique index.
 		 * This index is not necessarily correlated with e.g the position of the node in the graph.
 		 */
-		public int NodeIndex { get { return nodeIndex; } }
+		public int NodeIndex { get { return nodeIndex & NodeIndexMask; } private set { nodeIndex = (nodeIndex & ~NodeIndexMask) | value; } }
+
+		/** Temporary flag for internal purposes.
+		 * May only be used in the Unity thread. Must be reset to false after every use.
+		 */
+		internal bool TemporaryFlag1 { get { return (nodeIndex & TemporaryFlag1Mask) != 0; } set { nodeIndex = (nodeIndex & ~TemporaryFlag1Mask) | (value ? TemporaryFlag1Mask : 0); } }
+
+		/** Temporary flag for internal purposes.
+		 * May only be used in the Unity thread. Must be reset to false after every use.
+		 */
+		internal bool TemporaryFlag2 { get { return (nodeIndex & TemporaryFlag2Mask) != 0; } set { nodeIndex = (nodeIndex & ~TemporaryFlag2Mask) | (value ? TemporaryFlag2Mask : 0); } }
 
 		/** Position of the node in world space.
 		 * \note The position is stored as an Int3, not a Vector3.
@@ -139,7 +191,10 @@ namespace Pathfinding {
 			}
 		}
 
-		/** Penalty cost for walking on this node. This can be used to make it harder/slower to walk over certain areas. */
+		/** Penalty cost for walking on this node.
+		 * This can be used to make it harder/slower to walk over certain areas.
+		 * A cost of 1000 (\link Pathfinding.Int3.Precision Int3.Precision\endlink) corresponds to the cost of moving 1 world unit.
+		 */
 		public uint Penalty {
 #if !ASTAR_NO_PENALTY
 			get {
@@ -210,17 +265,9 @@ namespace Pathfinding {
 
 		#endregion
 
-		public void UpdateG (Path path, PathNode pathNode) {
-#if ASTAR_NO_TRAVERSAL_COST
-			pathNode.G = pathNode.parent.G + pathNode.cost;
-#else
-			pathNode.G = pathNode.parent.G + pathNode.cost + path.GetTraversalCost(this);
-#endif
-		}
-
 		public virtual void UpdateRecursiveG (Path path, PathNode pathNode, PathHandler handler) {
 			//Simple but slow default implementation
-			UpdateG(path, pathNode);
+			pathNode.UpdateG(path);
 
 			handler.heap.Add(pathNode);
 
@@ -242,17 +289,10 @@ namespace Pathfinding {
 		}
 
 		/** Calls the delegate with all connections from this node.
-		 * \code
-		 * node.GetConnections(connectedTo => {
-		 *    Debug.DrawLine((Vector3)node.position, (Vector3)connectedTo.position, Color.red);
-		 * });
-		 * \endcode
+		 * \snippet MiscSnippets.cs GraphNode.GetConnections1
 		 *
 		 * You can add all connected nodes to a list like this
-		 * \code
-		 * List<GraphNode> connections = new List<GraphNode>();
-		 * node.GetConnections(connections.Add);
-		 * \endcode
+		 * \snippet MiscSnippets.cs GraphNode.GetConnections2
 		 */
 		public abstract void GetConnections (System.Action<GraphNode> action);
 
@@ -379,9 +419,24 @@ namespace Pathfinding {
 		 */
 		public Connection[] connections;
 
+		/** Get a vertex of this node.
+		 * \param i vertex index. Must be between 0 and #GetVertexCount (exclusive).
+		 */
 		public abstract Int3 GetVertex (int i);
+
+		/** Number of corner vertices that this node has.
+		 * For example for a triangle node this will return 3.
+		 */
 		public abstract int GetVertexCount ();
+
+		/** Closest point on the surface of this node to the point \a p */
 		public abstract Vector3 ClosestPointOnNode (Vector3 p);
+
+		/** Closest point on the surface of this node when seen from above.
+		 * This is usually very similar to #ClosestPointOnNode but when the node is in a slope this can be significantly different.
+		 * \shadowimage{distanceXZ.png}
+		 * When the \a blue point in the above image is used as an argument this method call will return the \a green point while the #ClosestPointOnNode method will return the \a red point.
+		 */
 		public abstract Vector3 ClosestPointOnNodeXZ (Vector3 p);
 
 		public override void ClearConnections (bool alsoReverse) {
@@ -426,7 +481,7 @@ namespace Pathfinding {
 		}
 
 		public override void UpdateRecursiveG (Path path, PathNode pathNode, PathHandler handler) {
-			UpdateG(path, pathNode);
+			pathNode.UpdateG(path);
 
 			handler.heap.Add(pathNode);
 
@@ -440,6 +495,9 @@ namespace Pathfinding {
 		}
 
 		/** Add a connection from this node to the specified node.
+		 * \param node Node to add a connection to
+		 * \param cost Cost of traversing the connection. A cost of 1000 corresponds approximately to the cost of moving 1 world unit.
+		 *
 		 * If the connection already exists, the cost will simply be updated and
 		 * no extra connection added.
 		 *
@@ -447,6 +505,21 @@ namespace Pathfinding {
 		 * to get a two-way connection.
 		 */
 		public override void AddConnection (GraphNode node, uint cost) {
+			AddConnection(node, cost, -1);
+		}
+
+		/** Add a connection from this node to the specified node.
+		 * \param node Node to add a connection to
+		 * \param cost Cost of traversing the connection. A cost of 1000 corresponds approximately to the cost of moving 1 world unit.
+		 * \param shapeEdge Which edge on the shape of this node to use or -1 if no edge is used. \see Pathfinding.Connection.edge
+		 *
+		 * If the connection already exists, the cost will simply be updated and
+		 * no extra connection added.
+		 *
+		 * \note Only adds a one-way connection. Consider calling the same function on the other node
+		 * to get a two-way connection.
+		 */
+		public void AddConnection (GraphNode node, uint cost, int shapeEdge) {
 			if (node == null) throw new System.ArgumentNullException();
 
 			// Check if we already have a connection to the node
@@ -455,6 +528,10 @@ namespace Pathfinding {
 					if (connections[i].node == node) {
 						// Just update the cost for the existing connection
 						connections[i].cost = cost;
+						// Update edge only if it was a definite edge, otherwise reuse the existing one
+						// This makes it possible to use the AddConnection(node,cost) overload to only update the cost
+						// without changing the edge which is required for backwards compatibility.
+						connections[i].shapeEdge = shapeEdge >= 0 ? (byte)shapeEdge : connections[i].shapeEdge;
 						return;
 					}
 				}
@@ -468,7 +545,7 @@ namespace Pathfinding {
 				newconns[i] = connections[i];
 			}
 
-			newconns[connLength] = new Connection { node = node, cost = cost };
+			newconns[connLength] = new Connection(node, cost, (byte)shapeEdge);
 
 			if (connections != null) {
 				ArrayPool<Connection>.Release(ref connections, true);
@@ -511,25 +588,27 @@ namespace Pathfinding {
 			}
 		}
 
-		/** Checks if \a p is inside the node in XZ space
-		 *
-		 * The default implementation uses XZ space and is in large part got from the website linked below
-		 * \author http://unifycommunity.com/wiki/index.php?title=PolyContainsPoint (Eric5h5)
-		 *
-		 * The TriangleMeshNode overrides this and implements faster code for that case.
-		 */
-		public virtual bool ContainsPoint (Int3 p) {
-			bool inside = false;
-
-			int count = GetVertexCount();
-
-			for (int i = 0, j = count-1; i < count; j = i++) {
-				if (((GetVertex(i).z <= p.z && p.z < GetVertex(j).z) || (GetVertex(j).z <= p.z && p.z < GetVertex(i).z)) &&
-					(p.x < (GetVertex(j).x - GetVertex(i).x) * (p.z - GetVertex(i).z) / (GetVertex(j).z - GetVertex(i).z) + GetVertex(i).x))
-					inside = !inside;
-			}
-			return inside;
+		/** Checks if \a point is inside the node */
+		public virtual bool ContainsPoint (Int3 point) {
+			return ContainsPoint((Vector3)point);
 		}
+
+		/** Checks if \a point is inside the node.
+		 *
+		 * Note that #ContainsPointInGraphSpace is faster than this method as it avoids
+		 * some coordinate transformations. If you are repeatedly calling this method
+		 * on many different nodes but with the same point then you should consider
+		 * transforming the point first and then calling ContainsPointInGraphSpace.
+		 * \snippet MiscSnippets.cs MeshNode.ContainsPoint
+		 */
+		public abstract bool ContainsPoint (Vector3 point);
+
+		/** Checks if \a point is inside the node in graph space.
+		 *
+		 * In graph space the up direction is always the Y axis so in principle
+		 * we project the triangle down on the XZ plane and check if the point is inside the 2D triangle there.
+		 */
+		public abstract bool ContainsPointInGraphSpace (Int3 point);
 
 		public override int GetGizmoHashCode () {
 			var hash = base.GetGizmoHashCode();
@@ -550,6 +629,7 @@ namespace Pathfinding {
 				for (int i = 0; i < connections.Length; i++) {
 					ctx.SerializeNodeReference(connections[i].node);
 					ctx.writer.Write(connections[i].cost);
+					ctx.writer.Write(connections[i].shapeEdge);
 				}
 			}
 		}
@@ -563,10 +643,11 @@ namespace Pathfinding {
 				connections = ArrayPool<Connection>.ClaimWithExactLength(count);
 
 				for (int i = 0; i < count; i++) {
-					connections[i] = new Connection {
-						node = ctx.DeserializeNodeReference(),
-						cost = ctx.reader.ReadUInt32()
-					};
+					connections[i] = new Connection(
+						ctx.DeserializeNodeReference(),
+						ctx.reader.ReadUInt32(),
+						ctx.meta.version < AstarSerializer.V4_1_0 ? (byte)0xFF : ctx.reader.ReadByte()
+						);
 				}
 			}
 		}

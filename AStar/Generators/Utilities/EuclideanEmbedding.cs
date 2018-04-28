@@ -62,7 +62,7 @@ namespace Pathfinding {
 		 */
 		uint rval;
 
-		System.Object lockObj = new object();
+		System.Object lockObj = new object ();
 
 		/** Simple linear congruential generator.
 		 * \see http://en.wikipedia.org/wiki/Linear_congruential_generator
@@ -200,7 +200,7 @@ namespace Pathfinding {
 						pivotList.Add(first);
 					} else {
 						Debug.LogError("Could not find any walkable node in any of the graphs.");
-						Pathfinding.Util.ListPool<GraphNode>.Release(pivotList);
+						Pathfinding.Util.ListPool<GraphNode>.Release(ref pivotList);
 						return;
 					}
 				}
@@ -215,7 +215,7 @@ namespace Pathfinding {
 
 			pivots = pivotList.ToArray();
 
-			Pathfinding.Util.ListPool<GraphNode>.Release(pivotList);
+			Pathfinding.Util.ListPool<GraphNode>.Release(ref pivotList);
 		}
 
 		public void RecalculateCosts () {
@@ -245,7 +245,6 @@ namespace Pathfinding {
 				numComplete++;
 				if (numComplete == pivotCount) {
 					// Last completed path
-					Debug.Log("Grid graph special case!");
 					ApplyGridGraphEndpointSpecialCase();
 				}
 			};

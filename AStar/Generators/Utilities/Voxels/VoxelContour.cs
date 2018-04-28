@@ -151,8 +151,8 @@ namespace Pathfinding.Voxels {
 				}
 			}
 
-			Pathfinding.Util.ListPool<int>.Release(verts);
-			Pathfinding.Util.ListPool<int>.Release(simplified);
+			Pathfinding.Util.ListPool<int>.Release(ref verts);
+			Pathfinding.Util.ListPool<int>.Release(ref simplified);
 
 			AstarProfiler.EndProfile("- Simplify Contours");
 
@@ -457,8 +457,8 @@ namespace Pathfinding.Voxels {
 					cinc = pn-1;
 					ci = (bi+cinc) % pn;
 					endi = ai;
-					Utility.Swap(ref ax, ref bx);
-					Utility.Swap(ref az, ref bz);
+					Util.Memory.Swap(ref ax, ref bx);
+					Util.Memory.Swap(ref az, ref bz);
 				}
 
 				// Tessellate only outer edges or edges between areas.

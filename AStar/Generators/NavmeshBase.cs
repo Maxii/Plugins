@@ -9,6 +9,7 @@ namespace Pathfinding {
 	using Pathfinding.Util;
 	using Pathfinding.Serialization;
 	using Math = System.Math;
+	using System.Linq;
 
 	/** Base class for RecastGraph and NavMeshGraph */
 	public abstract class NavmeshBase : NavGraph, INavmesh, INavmeshHolder, ITransformedGraph
@@ -70,8 +71,8 @@ namespace Pathfinding {
 		 * Recomended for single-layered environments. Faster but can be inaccurate esp. in multilayered contexts.
 		 * You should not use this if the graph is rotated since then the XZ plane no longer corresponds to the ground plane.
 		 *
-		 * This can be important on sloped surfaces. See the image below:
-		 * \shadowimage{distanceXZ.png}
+		 * This can be important on sloped surfaces. See the image below in which the closest point for each blue point is queried for:
+		 * \shadowimage{distanceXZ2.png}
 		 *
 		 * You can also control this using a \link Pathfinding.NNConstraint.distanceXZ field on an NNConstraint object\endlink.
 		 */
@@ -84,12 +85,18 @@ namespace Pathfinding {
 		/** List of tiles updating during batch */
 		List<int> batchUpdatedTiles = new List<int>();
 
+		/** List of nodes that are going to be destroyed as part of a batch update */
+		List<MeshNode> batchNodesToDestroy = new List<MeshNode>();
+
 		/** Determines how the graph transforms graph space to world space.
 		 * \see #CalculateTransform
 		 */
 		public GraphTransform transform = new GraphTransform(Matrix4x4.identity);
 
 		GraphTransform ITransformedGraph.transform { get { return transform; } }
+
+		/** \copydoc Pathfinding::NavMeshGraph::recalculateNormals */
+		protected abstract bool RecalculateNormals { get; }
 
 		/** Returns a new transform which transforms graph space to world space.
 		 * Does not update the #transform field.
@@ -107,6 +114,8 @@ namespace Pathfinding {
 
 		/** Tile at the specified x, z coordinate pair.
 		 * The first tile is at (0,0), the last tile at (tileXCount-1, tileZCount-1).
+		 *
+		 * \snippet MiscSnippets.cs NavmeshBase.GetTile
 		 */
 		public NavmeshTile GetTile (int x, int z) {
 			return tiles[x + z * tileXCount];
@@ -155,15 +164,15 @@ namespace Pathfinding {
 			return tiles;
 		}
 
-		/** Returns an XZ bounds object with the bounds of a group of tiles.
-		 * The bounds object is defined in world units.
+		/** Returns a bounds object with the bounding box of a group of tiles.
+		 * The bounding box is defined in world space.
 		 */
 		public Bounds GetTileBounds (IntRect rect) {
 			return GetTileBounds(rect.xmin, rect.ymin, rect.Width, rect.Height);
 		}
 
-		/** Returns an XZ bounds object with the bounds of a group of tiles.
-		 * The bounds object is defined in world units.
+		/** Returns a bounds object with the bounding box of a group of tiles.
+		 * The bounding box is defined in world space.
 		 */
 		public Bounds GetTileBounds (int x, int z, int width = 1, int depth = 1) {
 			return transform.Transform(GetTileBoundsInGraphSpace(x, z, width, depth));
@@ -184,17 +193,17 @@ namespace Pathfinding {
 			return b;
 		}
 
-		/** Returns the tile coordinate which contains the point \a p.
+		/** Returns the tile coordinate which contains the specified \a position.
 		 * It is not necessarily a valid tile (i.e it could be out of bounds).
 		 */
-		public Int2 GetTileCoordinates (Vector3 p) {
-			p = transform.InverseTransform(p);
-			p.x /= TileWorldSizeX;
-			p.z /= TileWorldSizeZ;
-			return new Int2((int)p.x, (int)p.z);
+		public Int2 GetTileCoordinates (Vector3 position) {
+			position = transform.InverseTransform(position);
+			position.x /= TileWorldSizeX;
+			position.z /= TileWorldSizeZ;
+			return new Int2((int)position.x, (int)position.z);
 		}
 
-		public override void OnDestroy () {
+		protected override void OnDestroy () {
 			base.OnDestroy();
 
 			// Cleanup
@@ -252,7 +261,7 @@ namespace Pathfinding {
 		}
 
 		/** Creates a single new empty tile */
-		protected static NavmeshTile NewEmptyTile (int x, int z) {
+		protected NavmeshTile NewEmptyTile (int x, int z) {
 			return new NavmeshTile {
 					   x = x,
 					   z = z,
@@ -262,7 +271,8 @@ namespace Pathfinding {
 					   vertsInGraphSpace = new Int3[0],
 					   tris = new int[0],
 					   nodes = new TriangleMeshNode[0],
-					   bbTree = ObjectPool<BBTree>.Claim()
+					   bbTree = ObjectPool<BBTree>.Claim(),
+					   graph = this,
 			};
 		}
 
@@ -549,10 +559,11 @@ namespace Pathfinding {
 						for (int b = 0; b < bv; b++) {
 							/** \todo This will fail on edges which are only partially shared */
 							if (other.GetVertexIndex(b) == second && other.GetVertexIndex((b+1) % bv) == first) {
-								connections.Add(new Connection {
-									node = other,
-									cost = (uint)(node.position - other.position).costMagnitude
-								});
+								connections.Add(new Connection(
+										other,
+										(uint)(node.position - other.position).costMagnitude,
+										(byte)a
+										));
 								break;
 							}
 						}
@@ -564,7 +575,7 @@ namespace Pathfinding {
 
 			nodeRefs.Clear();
 			ObjectPoolSimple<Dictionary<Int2, int> >.Release(ref nodeRefs);
-			ListPool<Connection>.Release(connections);
+			ListPool<Connection>.Release(ref connections);
 		}
 
 		/** Generate connections between the two tiles.
@@ -663,8 +674,8 @@ namespace Pathfinding {
 											VectorMath.SqrDistanceSegmentSegment((Vector3)aVertex1, (Vector3)aVertex2, (Vector3)bVertex1, (Vector3)bVertex2) < MaxTileConnectionEdgeDistance*MaxTileConnectionEdgeDistance) {
 											uint cost = (uint)(nodeA.position - nodeB.position).costMagnitude;
 
-											nodeA.AddConnection(nodeB, cost);
-											nodeB.AddConnection(nodeA, cost);
+											nodeA.AddConnection(nodeB, cost, a);
+											nodeB.AddConnection(nodeA, cost, b);
 										}
 									}
 								}
@@ -685,87 +696,139 @@ namespace Pathfinding {
 			batchTileUpdate = true;
 		}
 
+		/** Destroy several nodes simultaneously.
+		 * This is faster than simply looping through the nodes and calling the node.Destroy method because some optimizations
+		 * relating to how connections are removed can be optimized.
+		 */
+		void DestroyNodes (List<MeshNode> nodes) {
+			for (int i = 0; i < batchNodesToDestroy.Count; i++) {
+				batchNodesToDestroy[i].TemporaryFlag1 = true;
+			}
+
+			for (int i = 0; i < batchNodesToDestroy.Count; i++) {
+				var node = batchNodesToDestroy[i];
+				for (int j = 0; j < node.connections.Length; j++) {
+					var neighbour = node.connections[j].node;
+					if (!neighbour.TemporaryFlag1) {
+						neighbour.RemoveConnection(node);
+					}
+				}
+
+				// Remove the connections array explicitly for performance.
+				// Otherwise the Destroy method will try to remove the connections in both directions one by one which is slow.
+				ArrayPool<Connection>.Release(ref node.connections, true);
+				node.Destroy();
+			}
+		}
+
+		void TryConnect (int tileIdx1, int tileIdx2) {
+			// If both tiles were flagged, then only connect if tileIdx1 < tileIdx2 to make sure we don't connect the tiles twice
+			// as this method will be called with swapped arguments as well.
+			if (tiles[tileIdx1].flag && tiles[tileIdx2].flag && tileIdx1 >= tileIdx2) return;
+			ConnectTiles(tiles[tileIdx1], tiles[tileIdx2]);
+		}
+
 		/** End batch updating of tiles.
 		 * During batch updating, tiles will not be connected if they are updating with ReplaceTile.
 		 * When ending batching, all affected tiles will be connected.
 		 * This is faster than not using batching.
 		 */
 		public void EndBatchTileUpdate () {
-			if (!batchTileUpdate) throw new System.InvalidOperationException("Calling EndBatchLoad when batching not enabled");
+			if (!batchTileUpdate) throw new System.InvalidOperationException("Calling EndBatchTileUpdate when batching had not yet been started");
 
 			batchTileUpdate = false;
 
-			int tw = tileXCount;
-			int td = tileZCount;
-
-			//Clear all flags
-			for (int z = 0; z < td; z++) {
-				for (int x = 0; x < tw; x++) {
-					tiles[x + z*tileXCount].flag = false;
-				}
-			}
+			DestroyNodes(batchNodesToDestroy);
+			batchNodesToDestroy.ClearFast();
 
 			for (int i = 0; i < batchUpdatedTiles.Count; i++) tiles[batchUpdatedTiles[i]].flag = true;
 
-			for (int z = 0; z < td; z++) {
-				for (int x = 0; x < tw; x++) {
-					if (x < tw-1
-						&& (tiles[x + z*tileXCount].flag || tiles[x+1 + z*tileXCount].flag)
-						&& tiles[x + z*tileXCount] != tiles[x+1 + z*tileXCount]) {
-						ConnectTiles(tiles[x + z*tileXCount], tiles[x+1 + z*tileXCount]);
-					}
-
-					if (z < td-1
-						&& (tiles[x + z*tileXCount].flag || tiles[x + (z+1)*tileXCount].flag)
-						&& tiles[x + z*tileXCount] != tiles[x + (z+1)*tileXCount]) {
-						ConnectTiles(tiles[x + z*tileXCount], tiles[x + (z+1)*tileXCount]);
-					}
-				}
+			for (int i = 0; i < batchUpdatedTiles.Count; i++) {
+				int x = batchUpdatedTiles[i] % tileXCount, z = batchUpdatedTiles[i] / tileXCount;
+				if (x > 0) TryConnect(batchUpdatedTiles[i], batchUpdatedTiles[i] - 1);
+				if (x < tileXCount - 1) TryConnect(batchUpdatedTiles[i], batchUpdatedTiles[i] + 1);
+				if (z > 0) TryConnect(batchUpdatedTiles[i], batchUpdatedTiles[i] - tileXCount);
+				if (z < tileZCount - 1) TryConnect(batchUpdatedTiles[i], batchUpdatedTiles[i] + tileXCount);
 			}
 
-			batchUpdatedTiles.Clear();
+			for (int i = 0; i < batchUpdatedTiles.Count; i++) tiles[batchUpdatedTiles[i]].flag = false;
+
+			batchUpdatedTiles.ClearFast();
 		}
 
-		/** Clear all tiles within the rectangle with one corner at (x,z), width w and depth d */
-		protected void ClearTiles (int x, int z, int w, int d) {
-			for (int cz = z; cz < z+d; cz++) {
-				for (int cx = x; cx < x+w; cx++) {
-					int tileIndex = cx + cz*tileXCount;
-					NavmeshTile otile = tiles[tileIndex];
-					if (otile == null) continue;
+		/** Clear the tile at the specified coordinate.
+		 * Must be called during a batch update, see #StartBatchTileUpdate.
+		 */
+		protected void ClearTile (int x, int z) {
+			if (!batchTileUpdate) throw new System.Exception("Must be called during a batch update. See StartBatchTileUpdate");
+			var tile = GetTile(x, z);
+			if (tile == null) return;
+			var nodes = tile.nodes;
+			for (int i = 0; i < nodes.Length; i++) {
+				if (nodes[i] != null) batchNodesToDestroy.Add(nodes[i]);
+			}
+			ObjectPool<BBTree>.Release(ref tile.bbTree);
+			// TODO: Pool tile object and various arrays in it?
+			tiles[x + z*tileXCount] = null;
+		}
 
-					otile.Destroy();
+		/** Temporary buffer used in #PrepareNodeRecycling */
+		Dictionary<int, int> nodeRecyclingHashBuffer = new Dictionary<int, int>();
 
-					for (int qz = otile.z; qz < otile.z+otile.d; qz++) {
-						for (int qx = otile.x; qx < otile.x+otile.w; qx++) {
-							NavmeshTile qtile = tiles[qx + qz*tileXCount];
-							if (qtile == null || qtile != otile) throw new System.Exception("This should not happen");
+		/** Reuse nodes that keep the exact same vertices after a tile replacement.
+		 * The reused nodes will be added to the \a recycledNodeBuffer array at the index corresponding to the
+		 * indices in the triangle array that its vertices uses.
+		 *
+		 * All connections on the reused nodes will be removed except ones that go to other graphs.
+		 * The reused nodes will be removed from the tile by replacing it with a null slot in the node array.
+		 *
+		 * \see #ReplaceTile
+		 */
+		void PrepareNodeRecycling (int x, int z, Int3[] verts, int[] tris, TriangleMeshNode[] recycledNodeBuffer) {
+			NavmeshTile tile = GetTile(x, z);
 
-							if (qz < z || qz >= z+d || qx < x || qx >= x+w) {
-								// if out of this tile's bounds, replace with empty tile
-								tiles[qx + qz*tileXCount] = NewEmptyTile(qx, qz);
+			if (tile == null || tile.nodes.Length == 0) return;
+			var nodes = tile.nodes;
+			var recycling = nodeRecyclingHashBuffer;
+			for (int i = 0, j = 0; i < tris.Length; i += 3, j++) {
+				recycling[verts[tris[i+0]].GetHashCode() + verts[tris[i+1]].GetHashCode() + verts[tris[i+2]].GetHashCode()] = j;
+			}
+			var connectionsToKeep = ListPool<Connection>.Claim();
 
-								if (batchTileUpdate) {
-									batchUpdatedTiles.Add(qx + qz*tileXCount);
-								}
-							} else {
-								//Will be replaced by the new tile
-								tiles[qx + qz*tileXCount] = null;
+			for (int i = 0; i < nodes.Length; i++) {
+				var node = nodes[i];
+				Int3 v0, v1, v2;
+				node.GetVerticesInGraphSpace(out v0, out v1, out v2);
+				var hash = v0.GetHashCode() + v1.GetHashCode() + v2.GetHashCode();
+				int newNodeIndex;
+				if (recycling.TryGetValue(hash, out newNodeIndex)) {
+					// Technically we should check for a cyclic permutations of the vertices (e.g node a,b,c could become node b,c,a)
+					// but in almost all cases the vertices will keep the same order. Allocating one or two extra nodes isn't such a big deal.
+					if (verts[tris[3*newNodeIndex+0]] == v0 && verts[tris[3*newNodeIndex+1]] == v1 && verts[tris[3*newNodeIndex+2]] == v2) {
+						recycledNodeBuffer[newNodeIndex] = node;
+						// Remove the node from the tile
+						nodes[i] = null;
+						// Only keep connections to nodes on other graphs
+						// Usually there are no connections to nodes to other graphs and this is faster than removing all connections them one by one
+						for (int j = 0; j < node.connections.Length; j++) {
+							if (node.connections[j].node.GraphIndex != node.GraphIndex) {
+								connectionsToKeep.Add(node.connections[j]);
 							}
+						}
+						ArrayPool<Connection>.Release(ref node.connections, true);
+						if (connectionsToKeep.Count > 0) {
+							node.connections = connectionsToKeep.ToArrayFromPool();
+							connectionsToKeep.Clear();
 						}
 					}
 				}
 			}
+
+			recycling.Clear();
+			ListPool<Connection>.Release(ref connectionsToKeep);
 		}
 
 		/** Replace tile at index with nodes created from specified navmesh.
-		 * \see StartBatchTileUpdating
-		 */
-		public void ReplaceTile (int x, int z, Int3[] verts, int[] tris) {
-			ReplaceTile(x, z, 1, 1, verts, tris);
-		}
-
-		/** Replaces a tile with a new mesh.
 		 * This will create new nodes and link them to the adjacent tile (unless batching has been started in which case that will be done when batching ends).
 		 *
 		 * The vertices are assumed to be in 'tile space', that is being in a rectangle with
@@ -773,22 +836,25 @@ namespace Pathfinding {
 		 *
 		 * \note The vertex and triangle arrays may be modified and will be stored with the tile data.
 		 * do not modify them after this method has been called.
+		 *
+		 * \see #StartBatchTileUpdate
 		 */
-		public void ReplaceTile (int x, int z, int w, int d, Int3[] verts, int[] tris) {
+		public void ReplaceTile (int x, int z, Int3[] verts, int[] tris) {
+			int w = 1, d = 1;
+
 			if (x + w > tileXCount || z+d > tileZCount || x < 0 || z < 0) {
 				throw new System.ArgumentException("Tile is placed at an out of bounds position or extends out of the graph bounds ("+x+", " + z + " [" + w + ", " + d+ "] " + tileXCount + " " + tileZCount + ")");
 			}
 
-			if (w < 1 || d < 1) throw new System.ArgumentException("width and depth must be greater or equal to 1. Was " + w + ", " + d);
 			if (tris.Length % 3 != 0) throw new System.ArgumentException("Triangle array's length must be a multiple of 3 (tris)");
-			if (verts.Length > 0xFFFF) throw new System.ArgumentException("Too many vertices per tile (more than 65535). Try using a smaller tile size.");
+			if (verts.Length > VertexIndexMask) {
+				Debug.LogError("Too many vertices in the tile (" + verts.Length + " > " + VertexIndexMask +")\nYou can enable ASTAR_RECAST_LARGER_TILES under the 'Optimizations' tab in the A* Inspector to raise this limit. Or you can use a smaller tile size to reduce the likelihood of this happening.");
+				verts = new Int3[0];
+				tris = new int[0];
+			}
 
-			Profiler.BeginSample("Clear Previous Tiles");
-
-			// Remove previous tiles
-			ClearTiles(x, z, w, d);
-
-			Profiler.EndSample();
+			var wasNotBatching = !batchTileUpdate;
+			if (wasNotBatching) StartBatchTileUpdate();
 			Profiler.BeginSample("Tile Initialization");
 
 			//Create a new navmesh tile and assign its settings
@@ -798,7 +864,8 @@ namespace Pathfinding {
 				w = w,
 				d = d,
 				tris = tris,
-				bbTree = ObjectPool<BBTree>.Claim()
+				bbTree = ObjectPool<BBTree>.Claim(),
+				graph = this,
 			};
 
 			if (!Mathf.Approximately(x*TileWorldSizeX*Int3.FloatPrecision, (float)Math.Round(x*TileWorldSizeX*Int3.FloatPrecision))) Debug.LogWarning("Possible numerical imprecision. Consider adjusting tileSize and/or cellSize");
@@ -813,30 +880,29 @@ namespace Pathfinding {
 			tile.verts = (Int3[])verts.Clone();
 			transform.Transform(tile.verts);
 
-			//Here we are faking a new graph
-			//The tile is not added to any graphs yet, but to get the position querys from the nodes
-			//to work correctly (not throw exceptions because the tile is not calculated) we fake a new graph
-			//and direct the position queries directly to the tile
-			int graphIndex = AstarPath.active.data.graphs.Length;
+			Profiler.BeginSample("Clear Previous Tiles");
 
-			TriangleMeshNode.SetNavmeshHolder(graphIndex, tile);
-
-			//This index will be ORed to the triangle indices
-			int tileIndex = x + z*tileXCount;
-			tileIndex <<= TileIndexOffset;
+			// Create a backing array for the new nodes
+			var nodes = tile.nodes = new TriangleMeshNode[tris.Length/3];
+			// Recycle any nodes that are in the exact same spot after replacing the tile.
+			// This also keeps e.g penalties and tags and other connections which might be useful.
+			// It also avoids trashing the paths for the RichAI component (as it will have to immediately recalculate its path
+			// if it discovers that its path contains destroyed nodes).
+			PrepareNodeRecycling(x, z, tile.vertsInGraphSpace, tris, tile.nodes);
+			// Remove previous tiles (except the nodes that were recycled above)
+			ClearTile(x, z);
 
 			Profiler.EndSample();
-
-			if (tile.verts.Length > VertexIndexMask) {
-				Debug.LogError("Too many vertices in the tile (" + tile.verts.Length + " > " + VertexIndexMask +")\nYou can enable ASTAR_RECAST_LARGER_TILES under the 'Optimizations' tab in the A* Inspector to raise this limit.");
-				tiles[tileIndex] = NewEmptyTile(x, z);
-				return;
-			}
+			Profiler.EndSample();
 
 			Profiler.BeginSample("Assign Node Data");
 
+			// Set tile
+			tiles[x + z*tileXCount] = tile;
+			batchUpdatedTiles.Add(x + z*tileXCount);
+
 			// Create nodes and assign triangle indices
-			var nodes = tile.nodes = CreateNodes(tile.tris, tileIndex, (uint)graphIndex);
+			CreateNodes(nodes, tile.tris, x + z*tileXCount, (uint)active.data.GetGraphIndex(this));
 
 			Profiler.EndSample();
 			Profiler.BeginSample("AABBTree Rebuild");
@@ -849,40 +915,25 @@ namespace Pathfinding {
 
 			Profiler.BeginSample("Connect With Neighbours");
 
-			// Set tile
-			for (int cz = z; cz < z+d; cz++) {
-				for (int cx = x; cx < x+w; cx++) {
-					tiles[cx + cz*tileXCount] = tile;
-				}
-			}
-
-			if (batchTileUpdate) {
-				batchUpdatedTiles.Add(x + z*tileXCount);
-			} else {
-				ConnectTileWithNeighbours(tile);
-			}
-
-			//Remove the fake graph
-			TriangleMeshNode.SetNavmeshHolder(graphIndex, null);
-			Profiler.EndSample();
-
-			Profiler.BeginSample("Set graph index");
-
-			//Real graph index
-			//TODO, could this step be changed for this function, is a fake index required?
-			graphIndex = AstarPath.active.data.GetGraphIndex(this);
-
-			for (int i = 0; i < nodes.Length; i++) nodes[i].GraphIndex = (uint)graphIndex;
-
+			if (wasNotBatching) EndBatchTileUpdate();
 			Profiler.EndSample();
 		}
 
-		protected TriangleMeshNode[] CreateNodes (int[] tris, int tileIndex, uint graphIndex) {
-			var nodes = new TriangleMeshNode[tris.Length/3];
+		protected void CreateNodes (TriangleMeshNode[] buffer, int[] tris, int tileIndex, uint graphIndex) {
+			if (buffer == null || buffer.Length < tris.Length/3) throw new System.ArgumentException("buffer must be non null and at least as large as tris.Length/3");
+			// This index will be ORed to the triangle indices
+			tileIndex <<= TileIndexOffset;
 
 			// Create nodes and assign vertex indices
-			for (int i = 0; i < nodes.Length; i++) {
-				var node = nodes[i] = new TriangleMeshNode(active);
+			for (int i = 0; i < buffer.Length; i++) {
+				var node = buffer[i];
+				// Allow the buffer to be partially filled in already to allow for recycling nodes
+				if (node == null) node = buffer[i] = new TriangleMeshNode(active);
+
+				// Reset all relevant fields on the node (even on recycled nodes to avoid exposing internal implementation details)
+				node.Walkable = true;
+				node.Tag = 0;
+				node.Penalty = initialPenalty;
 				node.GraphIndex = graphIndex;
 				// The vertices stored on the node are composed
 				// out of the triangle index and the tile index
@@ -891,23 +942,21 @@ namespace Pathfinding {
 				node.v2 = tris[i*3+2] | tileIndex;
 
 				// Make sure the triangle is clockwise in graph space (it may not be in world space since the graphs can be rotated)
-				if (!VectorMath.IsClockwiseXZ(node.GetVertexInGraphSpace(0), node.GetVertexInGraphSpace(1), node.GetVertexInGraphSpace(2))) {
-					int tmp = node.v0;
-					node.v0 = node.v2;
-					node.v2 = tmp;
+				if (RecalculateNormals && !VectorMath.IsClockwiseXZ(node.GetVertexInGraphSpace(0), node.GetVertexInGraphSpace(1), node.GetVertexInGraphSpace(2))) {
+					Memory.Swap(ref node.v0, ref node.v2);
 				}
 
-				node.Walkable = true;
-				node.Penalty = initialPenalty;
 				node.UpdatePositionFromVertices();
 			}
-
-			return nodes;
 		}
 
 		/** Returns if there is an obstacle between \a origin and \a end on the graph.
 		 * This is not the same as Physics.Linecast, this function traverses the \b graph and looks for collisions instead of checking for collider intersection.
-		 * \astarpro */
+		 *
+		 * \astarpro
+		 *
+		 * \shadowimage{linecast.png}
+		 */
 		public bool Linecast (Vector3 origin, Vector3 end) {
 			return Linecast(origin, end, GetNearest(origin, NNConstraint.None).node);
 		}
@@ -919,9 +968,12 @@ namespace Pathfinding {
 		 * \param [in] hint You need to pass the node closest to the start point
 		 *
 		 * This is not the same as Physics.Linecast, this function traverses the \b graph and looks for collisions instead of checking for collider intersection.
-		 * \astarpro */
+		 * \astarpro
+		 *
+		 * \shadowimage{linecast.png}
+		 */
 		public bool Linecast (Vector3 origin, Vector3 end, GraphNode hint, out GraphHitInfo hit) {
-			return Linecast(this as INavmesh, origin, end, hint, out hit, null);
+			return Linecast(this, origin, end, hint, out hit, null);
 		}
 
 		/** Returns if there is an obstacle between \a origin and \a end on the graph.
@@ -930,11 +982,14 @@ namespace Pathfinding {
 		 * \param [in] hint You need to pass the node closest to the start point
 		 *
 		 * This is not the same as Physics.Linecast, this function traverses the \b graph and looks for collisions instead of checking for collider intersection.
-		 * \astarpro */
+		 * \astarpro
+		 *
+		 * \shadowimage{linecast.png}
+		 */
 		public bool Linecast (Vector3 origin, Vector3 end, GraphNode hint) {
 			GraphHitInfo hit;
 
-			return Linecast(this as INavmesh, origin, end, hint, out hit, null);
+			return Linecast(this, origin, end, hint, out hit, null);
 		}
 
 		/** Returns if there is an obstacle between \a origin and \a end on the graph.
@@ -945,171 +1000,219 @@ namespace Pathfinding {
 		 * \param trace If a list is passed, then it will be filled with all nodes the linecast traverses
 		 *
 		 * This is not the same as Physics.Linecast, this function traverses the \b graph and looks for collisions instead of checking for collider intersection.
-		 * \astarpro */
+		 * \astarpro
+		 *
+		 * \shadowimage{linecast.png}
+		 */
 		public bool Linecast (Vector3 origin, Vector3 end, GraphNode hint, out GraphHitInfo hit, List<GraphNode> trace) {
-			return Linecast(this as INavmesh, origin, end, hint, out hit, trace);
+			return Linecast(this, origin, end, hint, out hit, trace);
 		}
 
 		/** Returns if there is an obstacle between \a origin and \a end on the graph.
 		 * \param [in] graph The graph to perform the search on
-		 * \param [in] tmp_origin Point to start from
-		 * \param [in] tmp_end Point to linecast to
+		 * \param [in] origin Point to start from
+		 * \param [in] end Point to linecast to
 		 * \param [out] hit Contains info on what was hit, see GraphHitInfo
 		 * \param [in] hint You need to pass the node closest to the start point, if null, a search for the closest node will be done
 		 *
 		 * This is not the same as Physics.Linecast, this function traverses the \b graph and looks for collisions instead of checking for collider intersection.
-		 * \astarpro */
-		public static bool Linecast (INavmesh graph, Vector3 tmp_origin, Vector3 tmp_end, GraphNode hint, out GraphHitInfo hit) {
-			return Linecast(graph, tmp_origin, tmp_end, hint, out hit, null);
+		 * \astarpro
+		 *
+		 * \shadowimage{linecast.png}
+		 */
+		public static bool Linecast (NavmeshBase graph, Vector3 origin, Vector3 end, GraphNode hint, out GraphHitInfo hit) {
+			return Linecast(graph, origin, end, hint, out hit, null);
+		}
+
+		/** Cached \link Pathfinding.NNConstraint.None NNConstraint.None\endlink to reduce allocations */
+		static readonly NNConstraint NNConstraintNone = NNConstraint.None;
+
+		/** Used to optimize linecasts by precomputing some values */
+		static readonly byte[] LinecastShapeEdgeLookup;
+
+		static NavmeshBase () {
+			// Want want to figure out which side of a triangle that a ray exists using.
+			// There are only 3*3*3 = 27 different options for the [left/right/colinear] options for the 3 vertices of a triangle.
+			// So we can precompute the result to improve the performance of linecasts.
+			// For simplicity we reserve 2 bits for each side which means that we have 4*4*4 = 64 entries in the lookup table.
+			LinecastShapeEdgeLookup = new byte[64];
+			Side[] sideOfLine = new Side[3];
+			for (int i = 0; i < LinecastShapeEdgeLookup.Length; i++) {
+				sideOfLine[0] = (Side)((i >> 0) & 0x3);
+				sideOfLine[1] = (Side)((i >> 2) & 0x3);
+				sideOfLine[2] = (Side)((i >> 4) & 0x3);
+				LinecastShapeEdgeLookup[i] = 0xFF;
+				// Value 3 is an invalid value. So we just skip it.
+				if (sideOfLine[0] != (Side)3 && sideOfLine[1] != (Side)3 && sideOfLine[2] != (Side)3) {
+					// Figure out the side of the triangle that the line exits.
+					// In case the line passes through one of the vertices of the triangle
+					// there may be multiple alternatives. In that case pick the edge
+					// which contains the fewest vertices that lie on the line.
+					// This prevents a potential infinite loop when a linecast is done colinear
+					// to the edge of a triangle.
+					int bestBadness = int.MaxValue;
+					for (int j = 0; j < 3; j++) {
+						if ((sideOfLine[j] == Side.Left || sideOfLine[j] == Side.Colinear) && (sideOfLine[(j+1)%3] == Side.Right || sideOfLine[(j+1)%3] == Side.Colinear)) {
+							var badness = (sideOfLine[j] == Side.Colinear ? 1 : 0) + (sideOfLine[(j+1)%3] == Side.Colinear ? 1 : 0);
+							if (badness < bestBadness) {
+								LinecastShapeEdgeLookup[i] = (byte)j;
+								bestBadness = badness;
+							}
+						}
+					}
+				}
+			}
 		}
 
 		/** Returns if there is an obstacle between \a origin and \a end on the graph.
 		 * \param [in] graph The graph to perform the search on
-		 * \param [in] tmp_origin Point to start from
-		 * \param [in] tmp_end Point to linecast to
+		 * \param [in] origin Point to start from. This point should be on the navmesh. It will be snapped to the closest point on the navmesh otherwise.
+		 * \param [in] end Point to linecast to
 		 * \param [out] hit Contains info on what was hit, see GraphHitInfo
-		 * \param [in] hint You need to pass the node closest to the start point, if null, a search for the closest node will be done
-		 * \param trace If a list is passed, then it will be filled with all nodes the linecast traverses
+		 * \param [in] hint If you already know the node which contains the \a origin point, you may pass it here for slighly improved performance. If null, a search for the closest node will be done.
+		 * \param trace If a list is passed, then it will be filled with all nodes along the line up until it hits an obstacle or reaches the end.
 		 *
-		 * This is not the same as Physics.Linecast, this function traverses the \b graph and looks for collisions instead of checking for collider intersection.
-		 * \astarpro */
-		public static bool Linecast (INavmesh graph, Vector3 tmp_origin, Vector3 tmp_end, GraphNode hint, out GraphHitInfo hit, List<GraphNode> trace) {
-			var end = (Int3)tmp_end;
-			var origin = (Int3)tmp_origin;
-
+		 * This is not the same as Physics.Linecast, this function traverses the \b graph and looks for collisions instead of checking for collider intersections.
+		 *
+		 * \note This method only makes sense for graphs in which there is a definite 'up' direction. For example it does not make sense for e.g spherical graphs,
+		 * navmeshes in which characters can walk on walls/ceilings or other curved worlds. If you try to use this method on such navmeshes it may output nonsense.
+		 *
+		 * \astarpro
+		 *
+		 * \shadowimage{linecast.png}
+		 */
+		public static bool Linecast (NavmeshBase graph, Vector3 origin, Vector3 end, GraphNode hint, out GraphHitInfo hit, List<GraphNode> trace) {
 			hit = new GraphHitInfo();
 
-			if (float.IsNaN(tmp_origin.x + tmp_origin.y + tmp_origin.z)) throw new System.ArgumentException("origin is NaN");
-			if (float.IsNaN(tmp_end.x + tmp_end.y + tmp_end.z)) throw new System.ArgumentException("end is NaN");
+			if (float.IsNaN(origin.x + origin.y + origin.z)) throw new System.ArgumentException("origin is NaN");
+			if (float.IsNaN(end.x + end.y + end.z)) throw new System.ArgumentException("end is NaN");
 
 			var node = hint as TriangleMeshNode;
 			if (node == null) {
-				node = (graph as NavGraph).GetNearest(tmp_origin, NNConstraint.None).node as TriangleMeshNode;
+				node = graph.GetNearest(origin, NNConstraintNone).node as TriangleMeshNode;
 
 				if (node == null) {
 					Debug.LogError("Could not find a valid node to start from");
-					hit.point = tmp_origin;
+					hit.origin = origin;
+					hit.point = origin;
 					return true;
 				}
 			}
 
-			if (origin == end) {
-				hit.node = node;
-				return false;
-			}
-
-			origin = (Int3)node.ClosestPointOnNode((Vector3)origin);
-			hit.origin = (Vector3)origin;
+			// Snap the origin to the navmesh
+			var i3originInGraphSpace = node.ClosestPointOnNodeXZInGraphSpace(origin);
+			hit.origin = graph.transform.Transform((Vector3)i3originInGraphSpace);
 
 			if (!node.Walkable) {
-				hit.point = (Vector3)origin;
-				hit.tangentOrigin = (Vector3)origin;
+				hit.node = node;
+				hit.point = hit.origin;
+				hit.tangentOrigin = hit.origin;
 				return true;
 			}
 
+			var endInGraphSpace = graph.transform.InverseTransform(end);
+			var i3endInGraphSpace = (Int3)endInGraphSpace;
 
-			List<Vector3> left = Pathfinding.Util.ListPool<Vector3>.Claim();
-			List<Vector3> right = Pathfinding.Util.ListPool<Vector3>.Claim();
+			// Fast early out check
+			if (i3originInGraphSpace == i3endInGraphSpace) {
+				hit.point = hit.origin;
+				hit.node = node;
+				return false;
+			}
 
 			int counter = 0;
 			while (true) {
 				counter++;
 				if (counter > 2000) {
 					Debug.LogError("Linecast was stuck in infinite loop. Breaking.");
-					Pathfinding.Util.ListPool<Vector3>.Release(left);
-					Pathfinding.Util.ListPool<Vector3>.Release(right);
 					return true;
 				}
 
-				TriangleMeshNode newNode = null;
-
 				if (trace != null) trace.Add(node);
 
-				if (node.ContainsPoint(end)) {
-					Pathfinding.Util.ListPool<Vector3>.Release(left);
-					Pathfinding.Util.ListPool<Vector3>.Release(right);
+				Int3 a0, a1, a2;
+				node.GetVerticesInGraphSpace(out a0, out a1, out a2);
+				int sideOfLine = (byte)VectorMath.SideXZ(i3originInGraphSpace, i3endInGraphSpace, a0);
+				sideOfLine |= (byte)VectorMath.SideXZ(i3originInGraphSpace, i3endInGraphSpace, a1) << 2;
+				sideOfLine |= (byte)VectorMath.SideXZ(i3originInGraphSpace, i3endInGraphSpace, a2) << 4;
+				// Use a lookup table to figure out which side of this triangle that the ray exits
+				int shapeEdgeA = (int)LinecastShapeEdgeLookup[sideOfLine];
+				// The edge consists of the vertex with index 'sharedEdgeA' and the next vertex after that (index '(sharedEdgeA+1)%3')
+
+				var sideNodeExit = VectorMath.SideXZ(shapeEdgeA == 0 ? a0 : (shapeEdgeA == 1 ? a1 : a2), shapeEdgeA == 0 ? a1 : (shapeEdgeA == 1 ? a2 : a0), i3endInGraphSpace);
+				if (sideNodeExit != Side.Left) {
+					// Ray stops before it leaves the current node.
+					// The endpoint must be inside the current node.
+					hit.point = end;
+					hit.node = node;
 					return false;
 				}
 
-				for (int i = 0; i < node.connections.Length; i++) {
-					//Nodes on other graphs should not be considered
-					//They might even be of other types (not MeshNode)
-					if (node.connections[i].node.GraphIndex != node.GraphIndex) continue;
+				if (shapeEdgeA == 0xFF) {
+					// Line does not intersect node at all?
+					// This may theoretically happen if the origin was not properly snapped to the inside of the triangle, but is instead a tiny distance outside the node.
+					Debug.LogError("Line does not intersect node at all");
+					hit.node = node;
+					hit.point = hit.tangentOrigin = hit.origin;
+					return true;
+				} else {
+					bool success = false;
+					var nodeConnections = node.connections;
+					for (int i = 0; i < nodeConnections.Length; i++) {
+						if (nodeConnections[i].shapeEdge == shapeEdgeA) {
+							// This might be the next node that we enter
 
-					left.Clear();
-					right.Clear();
+							var neighbour = nodeConnections[i].node as TriangleMeshNode;
+							if (neighbour == null || !neighbour.Walkable) continue;
 
-					if (!node.GetPortal(node.connections[i].node, left, right, false)) continue;
+							var neighbourConnections = neighbour.connections;
+							int shapeEdgeB = -1;
+							for (int j = 0; j < neighbourConnections.Length; j++) {
+								if (neighbourConnections[j].node == node) {
+									shapeEdgeB = neighbourConnections[j].shapeEdge;
+									break;
+								}
+							}
 
-					Vector3 a = left[0];
-					Vector3 b = right[0];
+							if (shapeEdgeB == -1) {
+								// Connection was mono-directional!
+								// This shouldn't normally not happen on navmeshes happen on navmeshes (when the shapeEdge matches at least) unless a user has done something strange to the navmesh.
+								continue;
+							}
 
-					//i.e Left or colinear
-					if (!VectorMath.RightXZ(a, b, hit.origin)) {
-						if (VectorMath.RightXZ(a, b, tmp_end)) {
-							//Since polygons are laid out in clockwise order, the ray would intersect (if intersecting) this edge going in to the node, not going out from it
-							continue;
-						}
-					}
+							var side1 = VectorMath.SideXZ(i3originInGraphSpace, i3endInGraphSpace, neighbour.GetVertexInGraphSpace(shapeEdgeB));
+							var side2 = VectorMath.SideXZ(i3originInGraphSpace, i3endInGraphSpace, neighbour.GetVertexInGraphSpace((shapeEdgeB+1) % 3));
 
-					float factor1, factor2;
+							// Check if the line enters this edge
+							success = (side1 == Side.Right || side1 == Side.Colinear) && (side2 == Side.Left || side2 == Side.Colinear);
 
-					if (VectorMath.LineIntersectionFactorXZ(a, b, hit.origin, tmp_end, out factor1, out factor2)) {
-						//Intersection behind the start
-						if (factor2 < 0) continue;
+							if (!success) continue;
 
-						if (factor1 >= 0 && factor1 <= 1) {
-							newNode = node.connections[i].node as TriangleMeshNode;
+							// Ray has entered the neighbouring node.
+							// After the first node, it is possible to prove the loop invariant that shapeEdgeA will *never* end up as -1 (checked above)
+							// Since side = Colinear acts essentially as a wildcard. side1 and side2 can be the most restricted if they are side1=right, side2=left.
+							// Then when we get to the next node we know that the sideOfLine array is either [*, Right, Left], [Left, *, Right] or [Right, Left, *], where * is unknown.
+							// We are looking for the sequence [Left, Right] (possibly including Colinear as wildcard). We will always find this sequence regardless of the value of *.
+							node = neighbour;
 							break;
 						}
 					}
-				}
 
-				if (newNode == null) {
-					//Possible edge hit
-					int vs = node.GetVertexCount();
-
-					for (int i = 0; i < vs; i++) {
-						// The two vertices of edge i on the node
-						var a = (Vector3)node.GetVertex(i);
-						var b = (Vector3)node.GetVertex((i + 1) % vs);
-
-						//i.e left or colinear
-						if (!VectorMath.RightXZ(a, b, hit.origin)) {
-							//Since polygons are laid out in clockwise order, the ray would intersect (if intersecting) this edge going in to the node, not going out from it
-							if (VectorMath.RightXZ(a, b, tmp_end)) {
-								//Since polygons are laid out in clockwise order, the ray would intersect (if intersecting) this edge going in to the node, not going out from it
-								continue;
-							}
-						}
-
-						float factor1, factor2;
-						if (VectorMath.LineIntersectionFactorXZ(a, b, hit.origin, tmp_end, out factor1, out factor2)) {
-							if (factor2 < 0) continue;
-
-							if (factor1 >= 0 && factor1 <= 1) {
-								Vector3 intersectionPoint = a + (b-a)*factor1;
-								hit.point = intersectionPoint;
-								hit.node = node;
-								hit.tangent = b-a;
-								hit.tangentOrigin = a;
-
-								Pathfinding.Util.ListPool<Vector3>.Release(left);
-								Pathfinding.Util.ListPool<Vector3>.Release(right);
-								return true;
-							}
-						}
+					if (!success) {
+						// Node did not enter any neighbours
+						// It must have hit the border of the navmesh
+						var hitEdgeStartInGraphSpace = (Vector3)(shapeEdgeA == 0 ? a0 : (shapeEdgeA == 1 ? a1 : a2));
+						var hitEdgeEndInGraphSpace = (Vector3)(shapeEdgeA == 0 ? a1 : (shapeEdgeA == 1 ? a2 : a0));
+						var intersectionInGraphSpace = VectorMath.LineIntersectionPointXZ(hitEdgeStartInGraphSpace, hitEdgeEndInGraphSpace, (Vector3)i3originInGraphSpace, (Vector3)i3endInGraphSpace);
+						hit.point = graph.transform.Transform(intersectionInGraphSpace);
+						hit.node = node;
+						var hitEdgeStart = graph.transform.Transform(hitEdgeStartInGraphSpace);
+						var hitEdgeEnd = graph.transform.Transform(hitEdgeEndInGraphSpace);
+						hit.tangent = hitEdgeEnd - hitEdgeStart;
+						hit.tangentOrigin = hitEdgeStart;
+						return true;
 					}
-
-					//Ok, this is wrong...
-					Debug.LogWarning("Linecast failing because point not inside node, and line does not hit any edges of it");
-
-					Pathfinding.Util.ListPool<Vector3>.Release(left);
-					Pathfinding.Util.ListPool<Vector3>.Release(right);
-					return false;
 				}
-
-				node = newNode;
 			}
 		}
 
@@ -1242,7 +1345,7 @@ namespace Pathfinding {
 		 *
 		 * \see
 		 */
-		public override void SerializeExtraInfo (GraphSerializationContext ctx) {
+		protected override void SerializeExtraInfo (GraphSerializationContext ctx) {
 			BinaryWriter writer = ctx.writer;
 
 			if (tiles == null) {
@@ -1292,7 +1395,7 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void DeserializeExtraInfo (GraphSerializationContext ctx) {
+		protected override void DeserializeExtraInfo (GraphSerializationContext ctx) {
 			BinaryReader reader = ctx.reader;
 
 			tileXCount = reader.ReadInt32();
@@ -1322,19 +1425,18 @@ namespace Pathfinding {
 						continue;
 					}
 
-					var tile = new NavmeshTile();
-
-					tile.x = tx;
-					tile.z = tz;
-					tile.w = reader.ReadInt32();
-					tile.d = reader.ReadInt32();
-					tile.bbTree = ObjectPool<BBTree>.Claim();
-
-					tiles[tileIndex] = tile;
+					var tile = tiles[tileIndex] = new NavmeshTile {
+						x = tx,
+						z = tz,
+						w = reader.ReadInt32(),
+						d = reader.ReadInt32(),
+						bbTree = ObjectPool<BBTree>.Claim(),
+						graph = this,
+					};
 
 					int trisCount = reader.ReadInt32();
 
-					if (trisCount % 3 != 0) throw new System.Exception("Corrupt data. Triangle indices count must be divisable by 3. Got " + trisCount);
+					if (trisCount % 3 != 0) throw new System.Exception("Corrupt data. Triangle indices count must be divisable by 3. Read " + trisCount);
 
 					tile.tris = new int[trisCount];
 					for (int i = 0; i < tile.tris.Length; i++) tile.tris[i] = reader.ReadInt32();
@@ -1360,7 +1462,7 @@ namespace Pathfinding {
 					int nodeCount = reader.ReadInt32();
 					tile.nodes = new TriangleMeshNode[nodeCount];
 
-					//Prepare for storing in vertex indices
+					// Prepare for storing in vertex indices
 					tileIndex <<= TileIndexOffset;
 
 					for (int i = 0; i < tile.nodes.Length; i++) {
@@ -1380,7 +1482,25 @@ namespace Pathfinding {
 			}
 		}
 
-		public override void PostDeserialization () {
+		protected override void PostDeserialization (GraphSerializationContext ctx) {
+			// Compatibility
+			if (ctx.meta.version < AstarSerializer.V4_1_0 && tiles != null) {
+				Dictionary<TriangleMeshNode, Connection[]> conns = tiles.SelectMany(s => s.nodes).ToDictionary(n => n, n => n.connections ?? new Connection[0]);
+				// We need to recalculate all connections when upgrading data from earlier than 4.1.0
+				// as the connections now need information about which edge was used.
+				// This may remove connections for e.g off-mesh links.
+				foreach (var tile in tiles) CreateNodeConnections(tile.nodes);
+				foreach (var tile in tiles) ConnectTileWithNeighbours(tile);
+
+				// Restore any connections that were contained in the serialized file but didn't get added by the method calls above
+				GetNodes(node => {
+					var triNode = node as TriangleMeshNode;
+					foreach (var conn in conns[triNode].Where(conn => !triNode.ContainsConnection(conn.node)).ToList()) {
+						triNode.AddConnection(conn.node, conn.cost, conn.shapeEdge);
+					}
+				});
+			}
+
 			// Make sure that the transform is up to date.
 			// It is assumed that the current graph settings correspond to the correct
 			// transform as it is not serialized itself.

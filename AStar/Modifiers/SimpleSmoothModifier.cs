@@ -54,6 +54,7 @@ namespace Pathfinding {
 
 		/** Determines how much smoothing to apply in each smooth iteration. 0.5 usually produces the nicest looking curves. */
 		[Tooltip("Determines how much smoothing to apply in each smooth iteration. 0.5 usually produces the nicest looking curves")]
+		[Range(0, 1)]
 		public float strength = 0.5F;
 
 		/** Toggle to divide all lines in equal length segments.
@@ -107,7 +108,7 @@ namespace Pathfinding {
 			}
 
 			if (path != p.vectorPath) {
-				ListPool<Vector3>.Release(p.vectorPath);
+				ListPool<Vector3>.Release(ref p.vectorPath);
 				p.vectorPath = path;
 			}
 		}
@@ -244,7 +245,7 @@ namespace Pathfinding {
 				subdivided[(path.Count-2)*(int)Mathf.Pow(2, iteration+1)+2-1] = subdivided2[currentPathLength-1];
 			}
 
-			ListPool<Vector3>.Release(subdivided2);
+			ListPool<Vector3>.Release(ref subdivided2);
 
 			return subdivided;
 		}
@@ -283,6 +284,9 @@ namespace Pathfinding {
 
 					distanceAlong -= length;
 				}
+
+				// Make sure we get the exact position of the last point
+				subdivided.Add(path[path.Count-1]);
 			} else {
 				subdivisions = Mathf.Max(subdivisions, 0);
 
@@ -293,15 +297,8 @@ namespace Pathfinding {
 
 				int steps = 1 << subdivisions;
 				subdivided = ListPool<Vector3>.Claim((path.Count-1)*steps + 1);
-
-				for (int i = 0; i < path.Count-1; i++)
-					for (int j = 0; j < steps; j++)
-						subdivided.Add(Vector3.Lerp(path[i], path[i+1], (float)j / steps));
+				Polygon.Subdivide(path, subdivided, steps);
 			}
-
-			// Make sure we get the exact position of the last point
-			// (none of the branches above will add it)
-			subdivided.Add(path[path.Count-1]);
 
 			if (strength > 0) {
 				for (int it = 0; it < iterations; it++) {

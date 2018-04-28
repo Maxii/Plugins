@@ -116,8 +116,7 @@ namespace Pathfinding {
 			startIntPoint = (Int3)start;
 
 			if (targets.Length == 0) {
-				Error();
-				LogError("No targets were assigned to the MultiTargetPath");
+				FailWithError("No targets were assigned to the MultiTargetPath");
 				return;
 			}
 
@@ -224,10 +223,13 @@ namespace Pathfinding {
 
 			for (int i = 0; i < nodePaths.Length; i++) {
 				if (nodePaths[i] != null) {
-					CompleteState = PathCompleteState.Complete;
+					// Note that we use the lowercase 'completeState' here.
+					// The property (CompleteState) will ensure that the complete state is never
+					// changed away from the error state but in this case we don't want that behaviour.
+					completeState = PathCompleteState.Complete;
 					anySucceded = true;
 				} else {
-					CompleteState = PathCompleteState.Error;
+					completeState = PathCompleteState.Error;
 				}
 
 				if (callbacks != null && callbacks[i] != null) {
@@ -240,10 +242,10 @@ namespace Pathfinding {
 			}
 
 			if (anySucceded) {
-				CompleteState = PathCompleteState.Complete;
+				completeState = PathCompleteState.Complete;
 				SetPathParametersForReturn(chosenTarget);
 			} else {
-				CompleteState = PathCompleteState.Error;
+				completeState = PathCompleteState.Error;
 			}
 
 			if (callback != null) {
@@ -301,14 +303,12 @@ namespace Pathfinding {
 			startNode = startNNInfo.node;
 
 			if (startNode == null) {
-				LogError("Could not find start node for multi target path");
-				Error();
+				FailWithError("Could not find start node for multi target path");
 				return;
 			}
 
 			if (!CanTraverse(startNode)) {
-				Error();
-				LogError("The node closest to the start point could not be traversed");
+				FailWithError("The node closest to the start point could not be traversed");
 				return;
 			}
 
@@ -364,31 +364,20 @@ namespace Pathfinding {
 
 			startIntPoint = (Int3)startPoint;
 
-			if (startNode == null || !anyNotNull) {
-				LogError("Couldn't find close nodes to either the start or the end (start = "+(startNode != null ? "found" : "not found")+" end = "+(anyNotNull ? "at least one found" : "none found")+")");
-				Error();
-				return;
-			}
-
-			if (!startNode.Walkable) {
-				LogError("The node closest to the start point is not walkable");
-				Error();
+			if (!anyNotNull) {
+				FailWithError("Couldn't find nodes close to the all of the end points");
 				return;
 			}
 
 			if (!anyWalkable) {
-				Error();
-				LogError("No target nodes could be traversed");
+				FailWithError("No target nodes could be traversed");
 				return;
 			}
 
 			if (!anySameArea) {
-				LogError("There are no valid paths to the targets");
-				Error();
+				FailWithError("There are no valid paths to the targets");
 				return;
 			}
-
-			//=== Calcuate hTarget ===
 
 			RecalculateHTarget(true);
 		}
@@ -540,8 +529,7 @@ namespace Pathfinding {
 
 			//any nodes left to search?
 			if (pathHandler.heap.isEmpty) {
-				LogError("No open points, the start node didn't open any nodes");
-				Error();
+				FailWithError("No open points, the start node didn't open any nodes");
 				return;
 			}
 
@@ -569,7 +557,7 @@ namespace Pathfinding {
 		protected override void CalculateStep (long targetTick) {
 			int counter = 0;
 
-			// Continue to search while there hasn't ocurred an error and the end hasn't been found
+			// Continue to search as long as we haven't encountered an error and we haven't found the target
 			while (CompleteState == PathCompleteState.NotCalculated) {
 				// @Performance Just for debug info
 				searchedNodes++;

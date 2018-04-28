@@ -817,7 +817,7 @@ namespace Pathfinding.Voxels {
 				voxelArea.compactSpans[i].reg = srcReg[i];
 			}
 
-			Pathfinding.Util.ListPool<int>.Release(stack);
+			Pathfinding.Util.ListPool<int>.Release(ref stack);
 
 
 			// Some debug code not currently used

@@ -134,28 +134,31 @@ namespace Pathfinding.Util {
 			}
 		}
 
+
+		/** Releases a list and sets the variable to null.
+		 * After the list has been released it should not be used anymore.
+		 *
+		 * \throws System.InvalidOperationException
+		 * Releasing a list when it has already been released will cause an exception to be thrown.
+		 *
+		 * \see #Claim
+		 */
+		public static void Release (ref List<T> list) {
+			Release(list);
+			list = null;
+		}
+
 		/** Releases a list.
 		 * After the list has been released it should not be used anymore.
 		 *
 		 * \throws System.InvalidOperationException
 		 * Releasing a list when it has already been released will cause an exception to be thrown.
 		 *
-		 * \see Claim
+		 * \see #Claim
 		 */
 		public static void Release (List<T> list) {
 #if !ASTAR_NO_POOLING
-			// It turns out that the Clear method will clear all elements in the underlaying array
-			// not just the ones up to Count. If the list only has a few elements, but the capacity
-			// is huge, this can cause performance problems. Using the RemoveRange method to remove
-			// all elements in the list does not have this problem, however it is implemented in a
-			// stupid way, so it will clear the elements twice (completely unnecessarily) so it will
-			// only be faster than using the Clear method if the number of elements in the list is
-			// less than half of the capacity of the list.
-			if (list.Count*2 < list.Capacity) {
-				list.RemoveRange(0, list.Count);
-			} else {
-				list.Clear();
-			}
+			list.ClearFast();
 
 			lock (pool) {
 #if !ASTAR_OPTIMIZE_POOLING

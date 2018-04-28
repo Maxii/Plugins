@@ -7,9 +7,9 @@ namespace Pathfinding.Util {
 		List<Vector3> path;
 
 		float distanceToSegmentStart;
-		float currentSegmentLength;
 		float currentDistance;
-		float totalDistance;
+		float currentSegmentLength = float.PositiveInfinity;
+		float totalDistance = float.PositiveInfinity;
 
 		/** Current position */
 		public virtual Vector3 position {
@@ -67,12 +67,19 @@ namespace Pathfinding.Util {
 		 * This will reset all interpolation variables.
 		 */
 		public void SetPath (List<Vector3> path) {
-			if (path.Count < 2) throw new System.ArgumentException("Path must have a length of at least 2");
 			this.path = path;
-
 			currentDistance = 0;
 			segmentIndex = 0;
 			distanceToSegmentStart = 0;
+
+			if (path == null) {
+				totalDistance = float.PositiveInfinity;
+				currentSegmentLength = float.PositiveInfinity;
+				return;
+			}
+
+			if (path.Count < 2) throw new System.ArgumentException("Path must have a length of at least 2");
+
 			currentSegmentLength = (path[1] - path[0]).magnitude;
 			totalDistance = 0f;
 
@@ -86,6 +93,7 @@ namespace Pathfinding.Util {
 
 		/** Move to the specified segment and move a fraction of the way to the next segment */
 		public void MoveToSegment (int index, float fractionAlongSegment) {
+			if (path == null) return;
 			if (index < 0 || index >= path.Count - 1) throw new System.ArgumentOutOfRangeException("index");
 			while (segmentIndex > index) PrevSegment();
 			while (segmentIndex < index) NextSegment();
@@ -94,6 +102,8 @@ namespace Pathfinding.Util {
 
 		/** Move as close as possible to the specified point */
 		public void MoveToClosestPoint (Vector3 point) {
+			if (path == null) return;
+
 			float bestDist = float.PositiveInfinity;
 			float bestFactor = 0f;
 			int bestIndex = 0;
@@ -114,6 +124,8 @@ namespace Pathfinding.Util {
 		}
 
 		public void MoveToLocallyClosestPoint (Vector3 point, bool allowForwards = true, bool allowBackwards = true) {
+			if (path == null) return;
+
 			while (allowForwards && segmentIndex < path.Count - 2 && (path[segmentIndex+1] - point).sqrMagnitude <= (path[segmentIndex] - point).sqrMagnitude) {
 				NextSegment();
 			}
@@ -140,8 +152,16 @@ namespace Pathfinding.Util {
 		}
 
 		public void MoveToCircleIntersection2D (Vector3 circleCenter3D, float radius, IMovementPlane transform) {
+			if (path == null) return;
+
+			// Move forwards as long as we are getting closer to circleCenter3D
+			while (segmentIndex < path.Count - 2 && VectorMath.ClosestPointOnLineFactor(path[segmentIndex], path[segmentIndex+1], circleCenter3D) > 1) {
+				NextSegment();
+			}
+
 			var circleCenter = transform.ToPlane(circleCenter3D);
 
+			// Move forwards as long as the current segment endpoint is within the circle
 			while (segmentIndex < path.Count - 2 && (transform.ToPlane(path[segmentIndex+1]) - circleCenter).sqrMagnitude <= radius*radius) {
 				NextSegment();
 			}

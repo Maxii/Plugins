@@ -82,6 +82,29 @@ namespace Pathfinding {
 	 * \ingroup utils
 	 */
 	public static class VectorMath {
+		/** Complex number multiplication.
+		 * \returns a * b
+		 *
+		 * Used to rotate vectors in an efficient way.
+		 *
+		 * \see https://en.wikipedia.org/wiki/Complex_number#Multiplication_and_division
+		 */
+		public static Vector2 ComplexMultiply (Vector2 a, Vector2 b) {
+			return new Vector2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+		}
+
+		/** Complex number multiplication.
+		 * \returns a * conjugate(b)
+		 *
+		 * Used to rotate vectors in an efficient way.
+		 *
+		 * \see https://en.wikipedia.org/wiki/Complex_number#Multiplication_and_division
+		 * \see https://en.wikipedia.org/wiki/Complex_conjugate
+		 */
+		public static Vector2 ComplexMultiplyConjugate (Vector2 a, Vector2 b) {
+			return new Vector2(a.x * b.x + a.y * b.y, a.y * b.x - a.x * b.y);
+		}
+
 		/** Returns the closest point on the line.
 		 * The line is treated as infinite.
 		 * \see ClosestPointOnSegment
@@ -341,6 +364,15 @@ namespace Pathfinding {
 			return (long)(b.x - a.x) * (long)(p.z - a.z) - (long)(p.x - a.x) * (long)(b.z - a.z) < 0;
 		}
 
+		/** Returns which side of the line \a a - \a b that \a p lies on.
+		 * Uses XZ space.
+		 */
+		public static Side SideXZ (Int3 a, Int3 b, Int3 p) {
+			var s = (long)(b.x - a.x) * (long)(p.z - a.z) - (long)(p.x - a.x) * (long)(b.z - a.z);
+
+			return s > 0 ? Side.Left : (s < 0 ? Side.Right : Side.Colinear);
+		}
+
 		/** Returns if \a p lies on the right side of the line \a a - \a b.
 		 * Also returns true if the points are colinear.
 		 */
@@ -394,6 +426,21 @@ namespace Pathfinding {
 		/** Returns true if the points a in a clockwise order or if they are colinear */
 		public static bool IsClockwiseOrColinear (Int2 a, Int2 b, Int2 c) {
 			return RightOrColinear(a, b, c);
+		}
+
+		/** Returns if the points are colinear (lie on a straight line) */
+		public static bool IsColinear (Vector3 a, Vector3 b, Vector3 c) {
+			var lhs = b - a;
+			var rhs = c - a;
+			// Take the cross product of lhs and rhs
+			// The magnitude of the cross product will be zero if the points a,b,c are colinear
+			float x = lhs.y * rhs.z - lhs.z * rhs.y;
+			float y = lhs.z * rhs.x - lhs.x * rhs.z;
+			float z = lhs.x * rhs.y - lhs.y * rhs.x;
+			float v = x*x + y*y + z*z;
+
+			// Epsilon not chosen with much thought, just that float.Epsilon was a bit too small.
+			return v <= 0.0000001f;
 		}
 
 		/** Returns if the points are colinear (lie on a straight line) */
@@ -1006,14 +1053,14 @@ namespace Pathfinding {
 			return ((bytes/(1024D*1024D*1024D))*sign).ToString("0.0") +" GiB";
 		}
 
-		/** Returns bit number \a b from int \a a. The bit number is zero based. Relevant \a b values are from 0 to 31\n
+		/** Returns bit number \a b from int \a a. The bit number is zero based. Relevant \a b values are from 0 to 31.
 		 * Equals to (a >> b) & 1
 		 */
 		static int Bit (int a, int b) {
 			return (a >> b) & 1;
 		}
 
-		/** Returns a nice color from int \a i with alpha \a a. Got code from the open-source Recast project, works really well\n
+		/** Returns a nice color from int \a i with alpha \a a. Got code from the open-source Recast project, works really well.
 		 * Seems like there are only 64 possible colors from studying the code
 		 */
 		public static Color IntToColor (int i, float a) {
@@ -1346,6 +1393,21 @@ namespace Pathfinding {
 			return inside;
 		}
 
+		/** Sample Y coordinate of the triangle (p1, p2, p3) at the point p in XZ space.
+		 * The y coordinate of \a p is ignored.
+		 *
+		 * \returns The interpolated y coordinate unless the triangle is degenerate in which case a DivisionByZeroException will be thrown
+		 *
+		 * \see https://en.wikipedia.org/wiki/Barycentric_coordinate_system
+		 */
+		public static int SampleYCoordinateInTriangle (Int3 p1, Int3 p2, Int3 p3, Int3 p) {
+			double det = ((double)(p2.z - p3.z)) * (p1.x - p3.x) + ((double)(p3.x - p2.x)) * (p1.z - p3.z);
+
+			double lambda1 = ((((double)(p2.z - p3.z)) * (p.x - p3.x) + ((double)(p3.x - p2.x)) * (p.z - p3.z)) / det);
+			double lambda2 = ((((double)(p3.z - p1.z)) * (p.x - p3.x) + ((double)(p1.x - p3.x)) * (p.z - p3.z)) / det);
+
+			return (int)Math.Round(lambda1 * p1.y + lambda2 * p2.y + (1 - lambda1 - lambda2) * p3.y);
+		}
 
 		/** Returns if \a p lies on the left side of the line \a a - \a b. Uses XZ space.
 		 * Does not return true if the points are colinear.
@@ -1954,6 +2016,69 @@ namespace Pathfinding {
 				outVertices[i] = vertices[i];
 
 			ArrayPool<int>.Release(ref compressedPointers);
+		}
+
+		/** Given a set of edges between vertices, follows those edges and returns them as chains and cycles.
+		 * \param outline outline[a] = b if there is an edge from \a a to \a b.
+		 * \param hasInEdge \a hasInEdge should contain \a b if outline[a] = b for any key \a a.
+		 * \param results Will be called once for each contour with the contour as a parameter as well as a boolean indicating if the contour is a cycle or a chain (see image).
+		 *
+		 * \shadowimage{grid_contour_compressed.png}
+		 */
+		public static void TraceContours (Dictionary<int, int> outline, HashSet<int> hasInEdge, System.Action<List<int>, bool> results) {
+			// Iterate through chains of the navmesh outline.
+			// I.e segments of the outline that are not loops
+			// we need to start these at the beginning of the chain.
+			// Then iterate over all the loops of the outline.
+			// Since they are loops, we can start at any point.
+			var obstacleVertices = ListPool<int>.Claim();
+			var outlineKeys = ListPool<int>.Claim();
+
+			outlineKeys.AddRange(outline.Keys);
+			for (int k = 0; k <= 1; k++) {
+				bool cycles = k == 1;
+				for (int i = 0; i < outlineKeys.Count; i++) {
+					var startIndex = outlineKeys[i];
+
+					// Chains (not cycles) need to start at the start of the chain
+					// Cycles can start at any point
+					if (!cycles && hasInEdge.Contains(startIndex)) {
+						continue;
+					}
+
+					var index = startIndex;
+					obstacleVertices.Clear();
+					obstacleVertices.Add(index);
+
+					while (outline.ContainsKey(index)) {
+						var next = outline[index];
+						outline.Remove(index);
+
+						obstacleVertices.Add(next);
+
+						// We traversed a full cycle
+						if (next == startIndex) break;
+
+						index = next;
+					}
+
+					if (obstacleVertices.Count > 1) {
+						results(obstacleVertices, cycles);
+					}
+				}
+			}
+
+			ListPool<int>.Release(ref outlineKeys);
+			ListPool<int>.Release(ref obstacleVertices);
+		}
+
+		/** Divides each segment in the list into \a subSegments segments and fills the result list with the new points */
+		public static void Subdivide (List<Vector3> points, List<Vector3> result, int subSegments) {
+			for (int i = 0; i < points.Count-1; i++)
+				for (int j = 0; j < subSegments; j++)
+					result.Add(Vector3.Lerp(points[i], points[i+1], j / (float)subSegments));
+
+			result.Add(points[points.Count-1]);
 		}
 	}
 }

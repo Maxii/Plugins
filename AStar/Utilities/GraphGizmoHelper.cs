@@ -21,16 +21,17 @@ namespace Pathfinding.Util {
 		}
 
 		public void Init (AstarPath active, RetainedGizmos.Hasher hasher, RetainedGizmos gizmos) {
-			debugData = active.debugPathData;
-			debugPathID = active.debugPathID;
-			debugMode = active.debugMode;
-			debugFloor = active.debugFloor;
-			debugRoof = active.debugRoof;
+			if (active != null) {
+				debugData = active.debugPathData;
+				debugPathID = active.debugPathID;
+				debugMode = active.debugMode;
+				debugFloor = active.debugFloor;
+				debugRoof = active.debugRoof;
+				showSearchTree = active.showSearchTree && debugData != null;
+			}
 			this.gizmos = gizmos;
 			this.hasher = hasher;
 			builder = ObjectPool<RetainedGizmos.Builder>.Claim();
-
-			showSearchTree = active.showSearchTree && debugData != null;
 		}
 
 		public void OnEnterPool () {
@@ -135,7 +136,7 @@ namespace Pathfinding.Util {
 
 			for (int i = 0; i < numTriangles*3; i++) triangles.Add(i);
 			builder.DrawMesh(gizmos, vertices, triangles, colors);
-			ListPool<int>.Release(triangles);
+			ListPool<int>.Release(ref triangles);
 		}
 
 		public void DrawWireTriangles (Vector3[] vertices, Color[] colors, int numTriangles) {

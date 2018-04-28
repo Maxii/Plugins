@@ -63,7 +63,86 @@ namespace Pathfinding {
 			DrawLastSection(graph);
 		}
 
+		bool IsHexagonal (GridGraph graph) {
+			return Mathf.Approximately(graph.isometricAngle, standardIsometric) && graph.neighbours == NumNeighbours.Six && graph.uniformEdgeCosts;
+		}
+
+		bool IsIsometric (GridGraph graph) {
+			if (graph.aspectRatio != 1) return true;
+			if (IsHexagonal(graph)) return false;
+			return graph.isometricAngle != 0;
+		}
+
+		bool IsAdvanced (GridGraph graph) {
+			if (graph.inspectorGridMode == InspectorGridMode.Advanced) return true;
+			// Weird configuration
+			return (graph.neighbours == NumNeighbours.Six) != graph.uniformEdgeCosts;
+		}
+
+		InspectorGridMode DetermineGridType (GridGraph graph) {
+			bool hex = IsHexagonal(graph);
+			bool iso = IsIsometric(graph);
+			bool adv = IsAdvanced(graph);
+
+			if (adv || (hex && iso)) return InspectorGridMode.Advanced;
+			if (hex) return InspectorGridMode.Hexagonal;
+			if (iso) return InspectorGridMode.IsometricGrid;
+			return graph.inspectorGridMode;
+		}
+
+		void DrawInspectorMode (GridGraph graph) {
+			graph.inspectorGridMode = DetermineGridType(graph);
+			var newMode = (InspectorGridMode)EditorGUILayout.EnumPopup("Shape", (System.Enum)graph.inspectorGridMode);
+			if (newMode != graph.inspectorGridMode) {
+				switch (newMode) {
+				case InspectorGridMode.Grid:
+					graph.isometricAngle = 0;
+					graph.aspectRatio = 1;
+					graph.uniformEdgeCosts = false;
+					if (graph.neighbours == NumNeighbours.Six) graph.neighbours = NumNeighbours.Eight;
+					break;
+				case InspectorGridMode.Hexagonal:
+					graph.isometricAngle = standardIsometric;
+					graph.aspectRatio = 1;
+					graph.uniformEdgeCosts = true;
+					graph.neighbours = NumNeighbours.Six;
+					break;
+				case InspectorGridMode.IsometricGrid:
+					graph.uniformEdgeCosts = false;
+					if (graph.neighbours == NumNeighbours.Six) graph.neighbours = NumNeighbours.Eight;
+					graph.isometricAngle = standardIsometric;
+					break;
+				case InspectorGridMode.Advanced:
+				default:
+					break;
+				}
+				graph.inspectorGridMode = newMode;
+			}
+
+			if (graph.inspectorGridMode == InspectorGridMode.Hexagonal && graph.useJumpPointSearch) {
+				EditorGUILayout.HelpBox("Jump Point Search does not work with hexagonal graphs.", MessageType.Error);
+			}
+		}
+
+		static bool Is2D (GridGraph graph) {
+			return Quaternion.Euler(graph.rotation) * Vector3.up == -Vector3.forward;
+		}
+
+		protected virtual void Draw2DMode (GridGraph graph) {
+			EditorGUI.BeginChangeCheck();
+			bool new2D = EditorGUILayout.Toggle(new GUIContent("2D"), Is2D(graph));
+			if (EditorGUI.EndChangeCheck()) {
+				graph.rotation = new2D ? new Vector3(graph.rotation.y - 90, 270, 90) : new Vector3(0, graph.rotation.x + 90, 0);
+			}
+		}
+
 		void DrawFirstSection (GridGraph graph) {
+			float prevRatio = graph.aspectRatio;
+
+			DrawInspectorMode(graph);
+
+			Draw2DMode(graph);
+
 			var normalizedPivotPoint = NormalizedPivotPoint(graph, pivot);
 			var worldPoint = graph.CalculateTransform().Transform(normalizedPivotPoint);
 			int newWidth, newDepth;
@@ -74,10 +153,11 @@ namespace Pathfinding {
 
 			newNodeSize = newNodeSize <= 0.01F ? 0.01F : newNodeSize;
 
-			float prevRatio = graph.aspectRatio;
-			graph.aspectRatio = EditorGUILayout.FloatField(new GUIContent("Aspect Ratio", "Scaling of the nodes width/depth ratio. Good for isometric games"), graph.aspectRatio);
+			if (graph.inspectorGridMode == InspectorGridMode.IsometricGrid || graph.inspectorGridMode == InspectorGridMode.Advanced) {
+				graph.aspectRatio = EditorGUILayout.FloatField(new GUIContent("Aspect Ratio", "Scaling of the nodes width/depth ratio. Good for isometric games"), graph.aspectRatio);
 
-			DrawIsometricField(graph);
+				DrawIsometricField(graph);
+			}
 
 			if ((graph.nodeSize != newNodeSize && locked) || (newWidth != graph.width || newDepth != graph.depth) || prevRatio != graph.aspectRatio) {
 				graph.nodeSize = newNodeSize;
@@ -99,7 +179,23 @@ namespace Pathfinding {
 
 			DrawPositionField(graph);
 
-			graph.rotation = RoundVector3(EditorGUILayout.Vector3Field("Rotation", graph.rotation));
+			DrawRotationField(graph);
+		}
+
+		void DrawRotationField (GridGraph graph) {
+			if (Is2D(graph)) {
+				var right = Quaternion.Euler(graph.rotation) * Vector3.right;
+				var angle = Mathf.Atan2(right.y, right.x) * Mathf.Rad2Deg;
+				if (angle < 0) angle += 360;
+				if (Mathf.Abs(angle - Mathf.Round(angle)) < 0.001f) angle = Mathf.Round(angle);
+				EditorGUI.BeginChangeCheck();
+				angle = EditorGUILayout.FloatField("Rotation", angle);
+				if (EditorGUI.EndChangeCheck()) {
+					graph.rotation = RoundVector3(new Vector3(-90 + angle, 270, 90));
+				}
+			} else {
+				graph.rotation = RoundVector3(EditorGUILayout.Vector3Field("Rotation", graph.rotation));
+			}
 		}
 
 		void DrawWidthDepthFields (GridGraph graph, out int newWidth, out int newDepth) {
@@ -204,6 +300,8 @@ namespace Pathfinding {
 		}
 
 		protected virtual void DrawCutCorners (GridGraph graph) {
+			if (graph.inspectorGridMode == InspectorGridMode.Hexagonal) return;
+
 			graph.cutCorners = EditorGUILayout.Toggle(new GUIContent("Cut Corners", "Enables or disables cutting corners. See docs for image example"), graph.cutCorners);
 			if (!graph.cutCorners && graph.useJumpPointSearch) {
 				EditorGUILayout.HelpBox("Jump Point Search only works if 'Cut Corners' is enabled.", MessageType.Error);
@@ -211,7 +309,16 @@ namespace Pathfinding {
 		}
 
 		protected virtual void DrawNeighbours (GridGraph graph) {
-			graph.neighbours = (NumNeighbours)EditorGUILayout.EnumPopup(new GUIContent("Connections", "Sets how many connections a node should have to it's neighbour nodes."), graph.neighbours);
+			if (graph.inspectorGridMode == InspectorGridMode.Hexagonal) return;
+
+			var neighboursGUIContent = new GUIContent("Connections", "Sets how many connections a node should have to it's neighbour nodes.");
+			GUIContent[] neighbourOptions;
+			if (graph.inspectorGridMode == InspectorGridMode.Advanced) {
+				neighbourOptions = new [] { new GUIContent("Four"), new GUIContent("Eight"), new GUIContent("Six") };
+			} else {
+				neighbourOptions = new [] { new GUIContent("Four"), new GUIContent("Eight") };
+			}
+			graph.neighbours = (NumNeighbours)EditorGUILayout.Popup(neighboursGUIContent, (int)graph.neighbours, neighbourOptions);
 
 			EditorGUI.indentLevel++;
 
@@ -221,10 +328,7 @@ namespace Pathfinding {
 
 			if (graph.neighbours == NumNeighbours.Six) {
 				graph.uniformEdgeCosts = EditorGUILayout.Toggle(new GUIContent("Hexagon connection costs", "Tweak the edge costs in the graph to be more suitable for hexagon graphs"), graph.uniformEdgeCosts);
-				if ((!Mathf.Approximately(graph.isometricAngle, standardIsometric) || !graph.uniformEdgeCosts) && GUILayout.Button("Configure as hexagon graph")) {
-					graph.isometricAngle = standardIsometric;
-					graph.uniformEdgeCosts = true;
-				}
+				EditorGUILayout.HelpBox("You can set all settings to make this a hexagonal graph by changing the 'Mode' field above", MessageType.None);
 			} else {
 				graph.uniformEdgeCosts = false;
 			}
@@ -237,12 +341,16 @@ namespace Pathfinding {
 		}
 
 		protected virtual void DrawMaxClimb (GridGraph graph) {
-			graph.maxClimb = EditorGUILayout.FloatField(new GUIContent("Max Climb", "How high in world units, relative to the graph, should a climbable level be. A zero (0) indicates infinity"), graph.maxClimb);
-			if (graph.maxClimb < 0) graph.maxClimb = 0;
+			if (!graph.collision.use2D) {
+				graph.maxClimb = EditorGUILayout.FloatField(new GUIContent("Max Climb", "How high in world units, relative to the graph, should a climbable level be. A zero (0) indicates infinity"), graph.maxClimb);
+				if (graph.maxClimb < 0) graph.maxClimb = 0;
+			}
 		}
 
 		protected void DrawMaxSlope (GridGraph graph) {
-			graph.maxSlope = EditorGUILayout.Slider(new GUIContent("Max Slope", "Sets the max slope in degrees for a point to be walkable. Only enabled if Height Testing is enabled."), graph.maxSlope, 0, 90F);
+			if (!graph.collision.use2D) {
+				graph.maxSlope = EditorGUILayout.Slider(new GUIContent("Max Slope", "Sets the max slope in degrees for a point to be walkable. Only enabled if Height Testing is enabled."), graph.maxSlope, 0, 90F);
+			}
 		}
 
 		protected void DrawErosion (GridGraph graph) {
@@ -339,22 +447,30 @@ namespace Pathfinding {
 
 			collision.collisionCheck = ToggleGroup("Collision testing", collision.collisionCheck);
 			if (collision.collisionCheck) {
-				collision.type = (ColliderType)EditorGUILayout.EnumPopup("Collider type", collision.type);
-				if (collision.use2D && collision.type == ColliderType.Capsule) {
-					EditorGUILayout.HelpBox("Capsules cannot be used with 2D physics. Pick some other collider type.", MessageType.Error);
+				string[] colliderOptions = collision.use2D ? new [] { "Circle", "Point" } : new [] { "Sphere", "Capsule", "Ray" };
+				int[] colliderValues = collision.use2D ? new [] { 0, 2 } : new [] { 0, 1, 2 };
+				// In 2D the Circle (Sphere) mode will replace both the Sphere and the Capsule modes
+				// However make sure that the original value is still stored in the grid graph in case the user changes back to the 3D mode in the inspector.
+				var tp = collision.type;
+				if (tp == ColliderType.Capsule && collision.use2D) tp = ColliderType.Sphere;
+				EditorGUI.BeginChangeCheck();
+				tp = (ColliderType)EditorGUILayout.IntPopup("Collider type", (int)tp, colliderOptions, colliderValues);
+				if (EditorGUI.EndChangeCheck()) collision.type = tp;
+
+				// Only spheres and capsules have a diameter
+				if (collision.type == ColliderType.Capsule || collision.type == ColliderType.Sphere) {
+					collision.diameter = EditorGUILayout.FloatField(new GUIContent("Diameter", "Diameter of the capsule or sphere. 1 equals one node width"), collision.diameter);
 				}
 
-				EditorGUI.BeginDisabledGroup(collision.type != ColliderType.Capsule && collision.type != ColliderType.Sphere);
-				collision.diameter = EditorGUILayout.FloatField(new GUIContent("Diameter", "Diameter of the capsule or sphere. 1 equals one node width"), collision.diameter);
-				EditorGUI.EndDisabledGroup();
+				if (!collision.use2D) {
+					if (collision.type == ColliderType.Capsule || collision.type == ColliderType.Ray) {
+						collision.height = EditorGUILayout.FloatField(new GUIContent("Height/Length", "Height of cylinder or length of ray in world units"), collision.height);
+					}
 
-				EditorGUI.BeginDisabledGroup(collision.type != ColliderType.Capsule && collision.type != ColliderType.Ray);
-				collision.height = EditorGUILayout.FloatField(new GUIContent("Height/Length", "Height of cylinder or length of ray in world units"), collision.height);
-				EditorGUI.EndDisabledGroup();
+					collision.collisionOffset = EditorGUILayout.FloatField(new GUIContent("Offset", "Offset upwards from the node. Can be used so that obstacles can be used as ground and at the same time as obstacles for lower positioned nodes"), collision.collisionOffset);
+				}
 
-				collision.collisionOffset = EditorGUILayout.FloatField(new GUIContent("Offset", "Offset upwards from the node. Can be used so that obstacles can be used as ground and at the same time as obstacles for lower positioned nodes"), collision.collisionOffset);
-
-				collision.mask = EditorGUILayoutx.LayerMaskField("Mask", collision.mask);
+				collision.mask = EditorGUILayoutx.LayerMaskField("Obstacle Layer Mask", collision.mask);
 			}
 
 			GUILayout.Space(2);
@@ -610,7 +726,7 @@ namespace Pathfinding {
 				}
 			} else if (Tools.current == Tool.Move) {
 				EditorGUI.BeginChangeCheck();
-				center = Handles.PositionHandle(graph.center, Quaternion.identity);
+				center = Handles.PositionHandle(graph.center, Tools.pivotRotation == PivotRotation.Global ? Quaternion.identity : Quaternion.Euler(graph.rotation));
 
 				if (EditorGUI.EndChangeCheck() && Tools.viewTool != ViewTool.Orbit) {
 					graph.center = center;

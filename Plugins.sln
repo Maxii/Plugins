@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.27428.2037
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ngui", "Ngui\Ngui.csproj", "{AC0F8B23-DD41-4BAB-A967-AA2C33BB1D0B}"
 EndProject
@@ -214,5 +214,8 @@ Global
 		{A1736422-DCCB-466A-8B1A-CF5984F76FD1} = {250733FE-01D4-469A-89B9-20F929CCF094}
 		{D18AF44A-52B5-4597-9A9E-1EDB091EF793} = {2F20FE2A-83D8-425E-BC6E-365428096460}
 		{5CA00105-12EC-405A-A369-DA31160B2B46} = {D18AF44A-52B5-4597-9A9E-1EDB091EF793}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {471A4817-9ECB-4534-B054-8D0373541952}
 	EndGlobalSection
 EndGlobal

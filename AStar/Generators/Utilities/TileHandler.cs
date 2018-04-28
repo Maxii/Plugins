@@ -352,6 +352,10 @@ namespace Pathfinding.Util {
 
 			AstarPath.active.AddWorkItem(new AstarWorkItem(force => {
 				graph.EndBatchTileUpdate();
+
+				// Trigger post update event
+				// This can trigger for example recalculation of navmesh links
+				GraphModifier.TriggerEvent(GraphModifier.EventType.PostUpdate);
 				return true;
 			}));
 		}
@@ -617,7 +621,7 @@ namespace Pathfinding.Util {
 								if (holes.Count == 0 && outer.Count == 3 && meshIndex == -1) {
 									for (int i = 0; i < 3; i++) {
 										var p = new Int3((int)outer[i].X, 0, (int)outer[i].Y);
-										p.y = SampleYCoordinateInTriangle(tp1, tp2, tp3, p);
+										p.y = Pathfinding.Polygon.SampleYCoordinateInTriangle(tp1, tp2, tp3, p);
 
 										outtris.Add(outverts.Count);
 										outverts.Add(p);
@@ -637,7 +641,7 @@ namespace Pathfinding.Util {
 											polypoints.Add(pp);
 
 											var p = new Int3((int)contour[i].X, 0, (int)contour[i].Y);
-											p.y = SampleYCoordinateInTriangle(tp1, tp2, tp3, p);
+											p.y = Pathfinding.Polygon.SampleYCoordinateInTriangle(tp1, tp2, tp3, p);
 
 											// Prepare a lookup table for pp -> vertex index
 											point2Index[pp] = outverts.Count;
@@ -697,9 +701,9 @@ namespace Pathfinding.Util {
 
 				if (vertexBuffer != null) ArrayPool<Int3>.Release(ref vertexBuffer);
 				StackPool<Poly2Tri.Polygon>.Release(polyCache);
-				ListPool<List<IntPoint> >.Release(intermediateClipResult);
-				ListPool<IntPoint>.Release(poly);
-				ListPool<Poly2Tri.PolygonPoint>.Release(polypoints);
+				ListPool<List<IntPoint> >.Release(ref intermediateClipResult);
+				ListPool<IntPoint>.Release(ref poly);
+				ListPool<Poly2Tri.PolygonPoint>.Release(ref polypoints);
 			}
 
 			// This next step will remove all duplicate vertices in the data (of which there are quite a few)
@@ -713,16 +717,16 @@ namespace Pathfinding.Util {
 			}
 
 			// Release back to pools
-			ListPool<Int3>.Release(outverts);
-			ListPool<int>.Release(outtris);
-			ListPool<int>.Release(intersectingCuts);
+			ListPool<Int3>.Release(ref outverts);
+			ListPool<int>.Release(ref outtris);
+			ListPool<int>.Release(ref intersectingCuts);
 
 			for (int i = 0; i < cutInfos.Count; i++) {
 				ListPool<IntPoint>.Release(cutInfos[i].contour);
 			}
 
-			ListPool<Cut>.Release(cutInfos);
-			ListPool<NavmeshCut>.Release(navmeshCuts);
+			ListPool<Cut>.Release(ref cutInfos);
+			ListPool<NavmeshCut>.Release(ref navmeshCuts);
 			return result;
 		}
 
@@ -797,7 +801,7 @@ namespace Pathfinding.Util {
 				}
 			}
 
-			ListPool<List<Vector3> >.Release(contourBuffer);
+			ListPool<List<Vector3> >.Release(ref contourBuffer);
 			return result;
 		}
 
@@ -817,22 +821,6 @@ namespace Pathfinding.Util {
 				polygon.Holes.Clear();
 			polygon.Points.Clear();
 			pool.Push(polygon);
-		}
-
-		/** Sample Y coordinate of the triangle (p1, p2, p3) at the point p in XZ space.
-		 * The y coordinate of \a p is ignored.
-		 *
-		 * \returns The interpolated y coordinate unless the triangle is degenerate in which case a DivisionByZeroException will be thrown
-		 *
-		 * \see https://en.wikipedia.org/wiki/Barycentric_coordinate_system
-		 */
-		static int SampleYCoordinateInTriangle (Int3 p1, Int3 p2, Int3 p3, Int3 p) {
-			double det = ((double)(p2.z - p3.z)) * (p1.x - p3.x) + ((double)(p3.x - p2.x)) * (p1.z - p3.z);
-
-			double lambda1 = ((((double)(p2.z - p3.z)) * (p.x - p3.x) + ((double)(p3.x - p2.x)) * (p.z - p3.z)) / det);
-			double lambda2 = ((((double)(p3.z - p1.z)) * (p.x - p3.x) + ((double)(p1.x - p3.x)) * (p.z - p3.z)) / det);
-
-			return (int)Math.Round(lambda1 * p1.y + lambda2 * p2.y + (1 - lambda1 - lambda2) * p3.y);
 		}
 
 		void CutAll (List<IntPoint> poly, List<int> intersectingCutIndices, List<Cut> cuts, Pathfinding.ClipperLib.PolyTree result) {
@@ -1073,9 +1061,12 @@ namespace Pathfinding.Util {
 				graph.ReplaceTile(x, z, new Int3[0], new int[0]);
 
 				activeTileTypes[x + z*tileXCount] = null;
-				//Trigger post update event
-				//This can trigger for example recalculation of navmesh links
-				GraphModifier.TriggerEvent(GraphModifier.EventType.PostUpdate);
+
+				if (!isBatching) {
+				    // Trigger post update event
+				    // This can trigger for example recalculation of navmesh links
+					GraphModifier.TriggerEvent(GraphModifier.EventType.PostUpdate);
+				}
 
 				//Flood fill everything to make sure graph areas are still valid
 				//This tends to take more than 50% of the calculation time
@@ -1209,15 +1200,19 @@ namespace Pathfinding.Util {
 				int newWidth = rotation % 2 == 0 ? tile.Width : tile.Depth;
 				int newDepth = rotation % 2 == 0 ? tile.Depth : tile.Width;
 
+				if (newWidth != 1 || newDepth != 1) throw new System.Exception("Only tiles of width = depth = 1 are supported at this time");
+
 				Profiler.BeginSample("ReplaceTile");
 				// Replace the tile using the final vertices and triangles
 				// The vertices are still in local space
-				graph.ReplaceTile(x, z, newWidth, newDepth, cuttingResult.verts, cuttingResult.tris);
+				graph.ReplaceTile(x, z, cuttingResult.verts, cuttingResult.tris);
 				Profiler.EndSample();
 
-				// Trigger post update event
-				// This can trigger for example recalculation of navmesh links
-				GraphModifier.TriggerEvent(GraphModifier.EventType.PostUpdate);
+				if (!isBatching) {
+				    // Trigger post update event
+				    // This can trigger for example recalculation of navmesh links
+					GraphModifier.TriggerEvent(GraphModifier.EventType.PostUpdate);
+				}
 
 				// Flood fill everything to make sure graph areas are still valid
 				// This tends to take more than 50% of the calculation time

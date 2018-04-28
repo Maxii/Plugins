@@ -10,15 +10,15 @@ namespace Pathfinding {
 	 *
 	 * The path can be called like:
 	 * \code
-	 * //Here you create a new path and set how far it should search. Null is for the callback, but the seeker will handle that
-	 * ConstantPath cpath = ConstantPath.Construct (transform.position, 2000, null);
-	 * //Set the seeker to search for the path (where mySeeker is a variable referencing a Seeker component)
-	 * mySeeker.StartPath (cpath, myCallbackFunction);
+	 * // Here you create a new path and set how far it should search. Null is for the callback, but the seeker will handle that
+	 * ConstantPath cpath = ConstantPath.Construct(transform.position, 2000, null);
+	 * // Set the seeker to search for the path (where mySeeker is a variable referencing a Seeker component)
+	 * mySeeker.StartPath(cpath, myCallbackFunction);
 	 * \endcode
 	 *
 	 * Then when getting the callback, all nodes will be stored in the variable ConstantPath.allNodes (remember that you need to cast it from Path to ConstantPath first to get the variable).
 	 *
-	 * This list will be sorted by G score (cost/distance to reach the node), however only the last duplicate of a node in the list is guaranteed to be sorted in this way.
+	 * This list will be sorted by the cost to reach that node (more specifically the G score if you are familiar with the terminology for search algorithms).
 	 * \shadowimage{constantPath.png}
 	 *
 	 * \ingroup paths
@@ -31,8 +31,7 @@ namespace Pathfinding {
 		public Vector3 originalStartPoint;
 
 		/** Contains all nodes the path found.
-		 * \note Due to the nature of the search, there might be duplicates of some nodes in the array.
-		 * This list will be sorted by G score (cost/distance to reach the node), however only the last duplicate of a node in the list is guaranteed to be sorted in this way.
+		 * This list will be sorted by G score (cost/distance to reach the node).
 		 */
 		public List<GraphNode> allNodes;
 
@@ -75,7 +74,7 @@ namespace Pathfinding {
 
 		protected override void OnEnterPool () {
 			base.OnEnterPool();
-			if (allNodes != null) Util.ListPool<GraphNode>.Release(allNodes);
+			if (allNodes != null) Util.ListPool<GraphNode>.Release(ref allNodes);
 		}
 
 		/** Reset the path to default values.
@@ -100,8 +99,7 @@ namespace Pathfinding {
 
 			startNode = startNNInfo.node;
 			if (startNode == null) {
-				Error();
-				LogError("Could not find close node to the start point");
+				FailWithError("Could not find close node to the start point");
 				return;
 			}
 		}
@@ -143,7 +141,7 @@ namespace Pathfinding {
 		protected override void CalculateStep (long targetTick) {
 			int counter = 0;
 
-			//Continue to search while there hasn't ocurred an error and the end hasn't been found
+			//Continue to search as long as we haven't encountered an error and we haven't found the target
 			while (CompleteState == PathCompleteState.NotCalculated) {
 				searchedNodes++;
 

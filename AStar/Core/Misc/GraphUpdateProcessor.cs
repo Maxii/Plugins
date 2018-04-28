@@ -95,7 +95,7 @@ namespace Pathfinding {
 #if !UNITY_WINRT
 				graphUpdateThread.Priority = System.Threading.ThreadPriority.Lowest;
 #endif
-				graphUpdateThread.Start(this);
+				graphUpdateThread.Start();
 			}
 #endif
 		}

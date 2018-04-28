@@ -4,18 +4,16 @@ using UnityEditor;
 namespace Pathfinding {
 	[CustomEditor(typeof(RecastMeshObj))]
 	[CanEditMultipleObjects]
-	public class RecastMeshObjEditor : Editor {
+	public class RecastMeshObjEditor : EditorBase {
 		SerializedProperty areaProp;
 		SerializedProperty dynamicProp;
 
-		void OnEnable () {
+		protected override void OnEnable () {
 			areaProp = serializedObject.FindProperty("area");
 			dynamicProp = serializedObject.FindProperty("dynamic");
 		}
 
-		public override void OnInspectorGUI () {
-			serializedObject.Update();
-
+		protected override void Inspector () {
 			var customValue = 1;
 
 			for (int i = 0; i < targets.Length; i++) {
@@ -42,7 +40,7 @@ namespace Pathfinding {
 			}
 
 			if (!areaProp.hasMultipleDifferentValues && areaProp.intValue >= 1) {
-				EditorGUILayout.PropertyField(areaProp);
+				PropertyField(areaProp);
 			}
 
 			if (!areaProp.hasMultipleDifferentValues) {
@@ -56,13 +54,11 @@ namespace Pathfinding {
 				}
 			}
 
-			EditorGUILayout.PropertyField(dynamicProp, new GUIContent("Dynamic", "Setting this value to false will give better scanning performance, but you will not be able to move the object during runtime"));
+			PropertyField(dynamicProp, "Dynamic", "Setting this value to false will give better scanning performance, but you will not be able to move the object during runtime");
 
 			if (!dynamicProp.hasMultipleDifferentValues && !dynamicProp.boolValue) {
 				EditorGUILayout.HelpBox("This object must not be moved during runtime since 'dynamic' is set to false", MessageType.Info);
 			}
-
-			serializedObject.ApplyModifiedProperties();
 		}
 	}
 }

@@ -4,14 +4,18 @@ using UnityEditor;
 using UnityEngine;
 
 namespace Pathfinding {
-	[CustomPropertyDrawer(typeof(AstarEnumFlagAttribute))]
-	public class AstarEnumFlagDrawer : PropertyDrawer {
+	[CustomPropertyDrawer(typeof(EnumFlagAttribute))]
+	public class EnumFlagDrawer : PropertyDrawer {
 		public override void OnGUI (Rect position, SerializedProperty property, GUIContent label) {
 			Enum targetEnum = GetBaseProperty<Enum>(property);
 
 			EditorGUI.BeginProperty(position, label, property);
 			EditorGUI.BeginChangeCheck();
+#if UNITY_2017_3_OR_NEWER
+			Enum enumNew = EditorGUI.EnumFlagsField(position, label, targetEnum);
+#else
 			Enum enumNew = EditorGUI.EnumMaskField(position, label, targetEnum);
+#endif
 			if (EditorGUI.EndChangeCheck() || !property.hasMultipleDifferentValues) {
 				property.intValue = (int)Convert.ChangeType(enumNew, targetEnum.GetType());
 			}
