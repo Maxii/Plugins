@@ -121,3 +121,5 @@ UpgradeLog*.htm*
 *.ide-shm
 *.ide-wal
 *.lock
+# My VS2017 additions
+*.dtbcache
